@@ -13,7 +13,7 @@ import MessageList from "@/components/MessageList";
 import NewMessageInput from "@/components/NewMessageInput";
 import { UIMessage } from "ai";
 import { useNewConversation } from "@/providers/new-conversation-provider";
-import { calculateCreditCost, models } from "@/constants/models";
+import { calculateCreditCost } from "@/constants/models";
 import { useAuth } from "@/providers/auth-provider";
 import { useMessageStore } from "@/app/utils/message-store";
 import ModelSelector from "@/components/ModelSelector";
@@ -21,6 +21,7 @@ import AnimatedMessageInput from "@/components/AnimatedMessageInput";
 import { useSidebarStore } from "@/components/Sidebar";
 import Link from "next/link";
 import { Warning } from "@phosphor-icons/react";
+import { useModelCatalog } from "@/lib/hooks/use-model-catalog";
 
 type Conversation = InstaQLEntity<AppSchema, "conversations">;
 type Message = InstaQLEntity<AppSchema, "messages">;
@@ -36,7 +37,8 @@ export default function ConversationPage() {
   const { db } = useDatabase();
   const { getProviderKey } = useKey();
   const { user, sessionId } = useAuth();
-  const [selectedModel, setSelectedModel] = useState<string>(models[0].id);
+  const { models: catalogModels, loading: modelsLoading, error: modelsError } = useModelCatalog();
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shouldHighlight, setShouldHighlight] = useState<boolean>(false);
@@ -48,9 +50,16 @@ export default function ConversationPage() {
 
   // Check if the selected model has an API key
   const hasApiKey = () => {
+    if (!selectedModel) return false;
     const key = getProviderKey(selectedModel);
     return key && key.length > 0;
   };
+
+  useEffect(() => {
+    if (!selectedModel && catalogModels.length > 0) {
+      setSelectedModel(catalogModels[0].id);
+    }
+  }, [catalogModels, selectedModel]);
 
   useEffect(() => {
     if (message !== "" && !hasRun.current) {
@@ -117,7 +126,7 @@ export default function ConversationPage() {
   const { messages, input, handleInputChange, append, setInput, status } = useChat({
     api: '/api/chat',
     headers: {
-      'Authorization': `Bearer ${getProviderKey(selectedModel)}`,
+      'Authorization': selectedModel ? `Bearer ${getProviderKey(selectedModel)}` : '',
       'X-Session-Id': sessionId ?? '',
       'X-Token': user?.refresh_token ?? '',
     },
@@ -131,12 +140,13 @@ export default function ConversationPage() {
     onFinish: async (message, options) => {
       setIsProcessing(false);
       const aiMessageId = newInstantId();
+      const creditsConsumed = selectedModel ? await calculateCreditCost(selectedModel, options.usage) : 0;
       await db.transact(db.tx.messages[aiMessageId].ruleParams({ sessionId: sessionId ?? '' }).update({
         content: message.content,
         role: "assistant",
         createdAt: DateTime.now().toISO(),
         model: selectedModel,
-        creditsConsumed: calculateCreditCost(selectedModel, options.usage)
+        creditsConsumed
       }).link({ conversation: id as string }));
     },
     initialMessages: initialMessages
@@ -147,6 +157,12 @@ export default function ConversationPage() {
     console.log('createMessage called');
     if (!id) {
       console.error('No conversation ID available');
+      return;
+    }
+
+    if (!selectedModel) {
+      setShouldHighlight(true);
+      setTimeout(() => setShouldHighlight(false), 1000);
       return;
     }
 
@@ -207,8 +223,8 @@ export default function ConversationPage() {
       
       <div className="flex flex-col gap-4 p-4  mx-auto w-full absolute bottom-0 bg-gradient-to-t from-gray-1 to-transparent via-20% via-gray-1">
         {!hasApiKey() && (
-          <Link 
-            href="/settings" 
+          <Link
+            href="/settings"
             className={`flex items-center gap-2 p-2.5 mx-auto max-w-md bg-gray-2 dark:bg-gray-2 border border-gray-3 dark:border-gray-3 rounded-lg text-xs transition-all duration-300 hover:bg-gray-3 dark:hover:bg-gray-3 cursor-pointer hover:border-gray-4 dark:hover:border-gray-4 ${
               shouldHighlight ? 'animate-pulse border-red-6 dark:border-red-6 bg-red-3 dark:bg-red-3' : ''
             }`}
@@ -219,7 +235,7 @@ export default function ConversationPage() {
             <span className={`transition-colors duration-300 ${
               shouldHighlight ? 'text-red-11 dark:text-red-12' : 'text-gray-11'
             }`}>
-              Add your {selectedModel.split('/')[0]} API key to continue
+              Add your {selectedModel ? selectedModel.split('/')[0] : 'model'} API key to continue
               <span className={`ml-1 font-medium transition-colors ${
                 shouldHighlight ? 'text-red-12 dark:text-red-12' : 'text-gray-12'
               }`}>
@@ -234,6 +250,12 @@ export default function ConversationPage() {
             <span className="text-red-11 dark:text-red-12">{errorMessage}</span>
           </div>
         )}
+        {modelsError && (
+          <div className="flex items-center gap-2 p-2.5 mx-auto max-w-md bg-amber-2 dark:bg-amber-3 border border-amber-4 dark:border-amber-6 rounded-lg text-xs text-amber-11">
+            <Warning size={14} weight="duotone" className="text-amber-10 dark:text-amber-11 flex-shrink-0" />
+            <span>We couldn&apos;t load the model catalog. Try refreshing the page.</span>
+          </div>
+        )}
         <AnimatedMessageInput
           value={input}
           onChange={handleInputChange}
@@ -243,7 +265,8 @@ export default function ConversationPage() {
           }}
           selectedModel={selectedModel}
           setSelectedModel={setSelectedModel}
-          isLoading={isProcessing}
+          isLoading={isProcessing || modelsLoading || !selectedModel}
+          disabled={!selectedModel || !!modelsError}
           layoutId="message-input"
         />
       </div>

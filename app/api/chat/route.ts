@@ -75,9 +75,10 @@ const createProviderStream = (provider: string, modelId: string, messages: CoreM
         temperature: 1,
         onFinish: async (data: { usage: LanguageModelUsage }) => {
           if (userProfile) {
-            await useCredits(`${provider}/${modelId}`, userProfile, data.usage);
-            dataStream.writeMessageAnnotation({ 
-              creditsConsumed: calculateCreditCost(`${provider}/${modelId}`, data.usage) 
+            const creditsConsumed = await calculateCreditCost(`${provider}/${modelId}`, data.usage);
+            await useCredits(`${provider}/${modelId}`, userProfile, data.usage, creditsConsumed);
+            dataStream.writeMessageAnnotation({
+              creditsConsumed
             });
           }
         },
@@ -185,10 +186,12 @@ async function usageLimitReached(sessionId?: string | null, userProfile?: UserPr
   return false;
 }
 
-async function useCredits(model: string, userProfile: UserProfile, usage?: LanguageModelUsage): Promise<void> {
+async function useCredits(model: string, userProfile: UserProfile, usage?: LanguageModelUsage, precomputedCost?: number): Promise<void> {
   if (!userProfile) return;
 
-  const creditCost = calculateCreditCost(model, usage);
+  const creditCost = typeof precomputedCost === 'number'
+    ? precomputedCost
+    : await calculateCreditCost(model, usage);
   await db.transact(db.tx.userProfiles[userProfile.id].update({
     credits: userProfile.credits - creditCost
   }));

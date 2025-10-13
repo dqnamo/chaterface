@@ -10,9 +10,10 @@ import {
   autoUpdate,
   FloatingFocusManager
 } from '@floating-ui/react';
-import { models } from "@/constants/models";
+import type { ModelSummary } from "@/constants/models";
+import { useModelCatalog } from "@/lib/hooks/use-model-catalog";
 import { motion } from "motion/react";
-import { CaretDown, DiamondsFour, Question, Sparkle } from "@phosphor-icons/react";
+import { CaretDown, Sparkle } from "@phosphor-icons/react";
 import { useAuth } from '@/providers/auth-provider';
 import Link from 'next/link';
 import { useModal } from '@/providers/modal-provider';
@@ -28,17 +29,34 @@ export default function ModelSelector({
   setSelectedModel 
 }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const { models: catalogModels, loading, error } = useModelCatalog();
+  const [availableModels, setAvailableModels] = useState<ModelSummary[]>([]);
   const references = useRef<Array<HTMLElement | null>>([]);
   const {user, profile} = useAuth();
   const {showModal} = useModal();
   useEffect(() => {
-    if(user && profile?.hasPurchasedCredits) {
-      setAvailableModels(models);
-    } else {
-      setAvailableModels(models.filter(model => model.free));
+    if (!catalogModels.length) {
+      setAvailableModels([]);
+      return;
     }
-  }, [user, profile]);
+
+    const freeModels = catalogModels.filter((model) => model.free);
+    const unlockedModels = catalogModels;
+    const visibleModels = user && profile?.hasPurchasedCredits
+      ? unlockedModels
+      : freeModels.length > 0
+        ? freeModels
+        : unlockedModels;
+
+    setAvailableModels(visibleModels);
+
+    const preferredModel = visibleModels.find((model) => model.id === selectedModel)
+      || unlockedModels.find((model) => model.id === selectedModel);
+
+    if (!preferredModel && visibleModels[0]) {
+      setSelectedModel(visibleModels[0].id);
+    }
+  }, [catalogModels, profile?.hasPurchasedCredits, selectedModel, setSelectedModel, user]);
   
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
@@ -60,17 +78,28 @@ export default function ModelSelector({
     dismiss
   ]);
 
-  const selectedModelData = models.find(model => model.id === selectedModel) || models[0];
+  const selectedModelData = catalogModels.find(model => model.id === selectedModel) || availableModels[0] || catalogModels[0];
+
+  const buttonLabel = (() => {
+    if (loading && !selectedModelData) {
+      return "Loading models...";
+    }
+    if (!selectedModelData) {
+      return "Select a model";
+    }
+    return selectedModelData.name;
+  })();
 
   return (
     <div>
       <button
         type="button"
-        className="bg-gray-1 dark:bg-gray-3 px-2 py-1 text-base flex items-center gap-2 rounded-md border border-gray-3 dark:border-gray-5 hover:bg-gray-2 dark:hover:bg-gray-4 transition-colors cursor-pointer text-gray-10 dark:text-gray-11"
+        className="bg-gray-1 dark:bg-gray-3 px-2 py-1 text-base flex items-center gap-2 rounded-md border border-gray-3 dark:border-gray-5 hover:bg-gray-2 dark:hover:bg-gray-4 transition-colors cursor-pointer text-gray-10 dark:text-gray-11 disabled:opacity-60 disabled:cursor-not-allowed"
         ref={refs.setReference}
         {...getReferenceProps()}
+        disabled={loading && !availableModels.length}
       >
-        {selectedModelData.name}
+        {buttonLabel}
         <CaretDown size={12} weight="bold" className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
@@ -93,6 +122,16 @@ export default function ModelSelector({
                 closed: { opacity: 0, y: 10 }
               }}
             >
+              {error && (
+                <div className="px-3 py-3 text-xs text-red-11">
+                  {error}
+                </div>
+              )}
+              {!error && availableModels.length === 0 && !loading && (
+                <div className="px-3 py-3 text-xs text-gray-11">
+                  No models available.
+                </div>
+              )}
               {availableModels.map((model, index) => (
                 <motion.button
                   type="button"
@@ -112,54 +151,33 @@ export default function ModelSelector({
                     closed: { opacity: 0, y: -10 }
                   }}
                 >
-                  <div className="flex flex-row gap-2">
-                    <p className="text-xs">
-                      {model.name}
-                    </p>
-                    {model.isNew && (
-                      <div className="flex flex-row items-center gap-1 rounded-full">
-                        <Sparkle size={12} weight="fill" className="text-sky-10" />
-                        <p className="text-[11px] text-sky-11 dark:text-sky-5 font-medium">
-                          New
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 ml-auto">
-                    
-                    <div className="flex flex-col gap-px justify-center">
-                      <p className="text-[10px] uppercase font-mono text-gray-10">
-                        Speed
+                  <div className="flex flex-col gap-1">
+                    <div className="flex flex-row gap-2 items-center">
+                      <p className="text-xs text-gray-12 font-medium">
+                        {model.name}
                       </p>
-                    
-                      <div className="relative h-1 rounded-full bg-gray-5 w-20 overflow-hidden">
-
-                          <div 
-                            className={`absolute inset-0 ${(model.speed/300) * 100 > 60 ? 'bg-gradient-to-r from-grass-10 to-grass-8' : 'bg-gradient-to-r from-amber-10 to-amber-8'} rounded-full`} 
-                            style={{ width: `${(model.speed/320) * 100}%` }} 
-                          />
-                      </div>
-                    </div>        
-
-                    <div className="flex flex-col gap-px">
-                      <p className="text-[10px] uppercase font-mono text-gray-10">
-                        Intelligence
-                      </p>
-                      <div className="relative h-1 rounded-full bg-gray-5 w-20 overflow-hidden">
-                        <div 
-                          className={`absolute inset-0 ${(model.intelligence/80) * 100 > 60 ? 'bg-gradient-to-r from-grass-10 to-grass-8' : 'bg-gradient-to-r from-amber-10 to-amber-8'} rounded-full`} 
-                          style={{ width: `${(model.intelligence/90) * 100}%` }} 
-                        />
-                      </div>
-                
+                      {model.free && (
+                        <div className="flex flex-row items-center gap-1 rounded-full px-2 py-0.5 bg-sage-3 text-sage-11">
+                          <Sparkle size={12} weight="fill" className="text-sage-11" />
+                          <p className="text-[10px] font-medium">Free</p>
+                        </div>
+                      )}
                     </div>
 
+                    <p className="text-[11px] text-gray-10">
+                      Provider: {model.provider}
+                    </p>
+
+                    {model.contextLength && (
+                      <p className="text-[11px] text-gray-10">
+                        Context length: {model.contextLength.toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </motion.button>
               ))}
 
-              {!profile?.hasPurchasedCredits && (
+              {!profile?.hasPurchasedCredits && availableModels.length < catalogModels.length && (
                 <div className="px-3 py-3 text-sm text-gray-11 hover:bg-gray-2 dark:hover:bg-gray-4 transition-colors cursor-pointer" onClick={() => {showModal(<PlansModal />)}}>
                   <p className="text-gray-12 font-medium text-xs">
                     Looking for more models?

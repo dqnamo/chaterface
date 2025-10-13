@@ -4,9 +4,9 @@ import Button from "@/components/button";
 import IntroductionModal from "@/components/IntroductionModal";
 import Logo from "@/components/logo";
 import ModelSelector from "@/components/ModelSelector";
-import { models } from "@/constants/models";
+import { useModelCatalog } from "@/lib/hooks/use-model-catalog";
 import { DiamondsFour, Folder, Warning } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import Sidebar from "@/components/Sidebar";
@@ -25,7 +25,8 @@ import Link from "next/link";
 
 export default function Page() {
   const { db } = useDatabase();
-  const [selectedModel, setSelectedModel] = useState<string>(models[0].id);
+  const { models: catalogModels, loading: modelsLoading, error: modelsError } = useModelCatalog();
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { user, sessionId } = useAuth();
@@ -36,8 +37,18 @@ export default function Page() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shouldHighlight, setShouldHighlight] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (!selectedModel && catalogModels.length > 0) {
+      setSelectedModel(catalogModels[0].id);
+    }
+  }, [catalogModels, selectedModel]);
+
+  const hasAvailableModels = useMemo(() => catalogModels.length > 0, [catalogModels]);
+
   // Check if the selected model has an API key
   const hasApiKey = () => {
+    if (!selectedModel) return false;
+
     const key = getProviderKey(selectedModel);
     return key && key.length > 0;
   };
@@ -49,7 +60,13 @@ export default function Page() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return;
-    
+
+    if (!selectedModel) {
+      setShouldHighlight(true);
+      setTimeout(() => setShouldHighlight(false), 1000);
+      return;
+    }
+
     // Check if API key is set
     if (!hasApiKey()) {
       // Trigger highlight animation
@@ -186,16 +203,28 @@ export default function Page() {
                 <span className="text-red-11 dark:text-red-12">{errorMessage}</span>
               </motion.div>
             )}
+            {modelsError && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="flex items-center gap-2 p-2.5 mx-auto max-w-md bg-amber-2 dark:bg-amber-3 border border-amber-4 dark:border-amber-6 rounded-lg text-xs text-amber-11">
+                  <Warning size={14} weight="duotone" className="text-amber-10 dark:text-amber-11 flex-shrink-0" />
+                  <span>We couldn&apos;t load the model catalog. Try refreshing the page.</span>
+                </div>
+              </motion.div>
+            )}
 
             <AnimatedMessageInput
               value={input}
-              onChange={handleInputChange}
-              onSubmit={handleSubmit}
-              selectedModel={selectedModel}
-              setSelectedModel={setSelectedModel}
-              isLoading={isLoading}
-              layoutId="message-input"
-            />
+          onChange={handleInputChange}
+          onSubmit={handleSubmit}
+          selectedModel={selectedModel}
+          setSelectedModel={setSelectedModel}
+          isLoading={isLoading || modelsLoading || !hasAvailableModels}
+          disabled={!hasAvailableModels || !!modelsError}
+          layoutId="message-input"
+        />
           </div>
           </>
   )

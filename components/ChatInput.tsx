@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import Button from './button';
-import { models } from '@/constants/models';
+import { useModelCatalog } from '@/lib/hooks/use-model-catalog';
 
 export interface Model {
   id: string;
@@ -37,6 +37,8 @@ export default function ChatInput({
   loadingButtonText = "Creating..."
 }: ChatInputProps) {
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const { models: catalogModels, loading: modelsLoading } = useModelCatalog();
+  const models = catalogModels.length > 0 ? catalogModels : [];
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
@@ -77,13 +79,19 @@ export default function ChatInput({
             value={selectedModel}
             onChange={(e) => onModelChange(e.target.value)}
             className="text-sm bg-sage-3 text-sage-12 border border-sage-4 rounded-md px-2 py-1 outline-none hover:bg-sage-4 transition-colors"
-            disabled={isLoading}
+            disabled={isLoading || modelsLoading || models.length === 0}
           >
+            {modelsLoading && models.length === 0 && (
+              <option value="">Loading models...</option>
+            )}
             {models.map(model => (
               <option key={model.id} value={model.id}>
                 {model.name}
               </option>
             ))}
+            {!modelsLoading && models.length === 0 && (
+              <option value="">No models available</option>
+            )}
           </select>
         </div>
 

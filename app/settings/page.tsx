@@ -1,16 +1,17 @@
 "use client"
 import Header from "@/components/Header";
-import { providers } from "@/constants/models";
 import { useKey } from "@/providers/key-provider";
 import { Check, CheckCircle } from "@phosphor-icons/react";
 import { useState, useEffect } from "react";
+import { useModelCatalog } from "@/lib/hooks/use-model-catalog";
 
 
 export default function SettingsPage() {
+  const { providers, loading, error } = useModelCatalog();
   return (
     <div className="flex flex-col h-dvh">
       <Header title="Settings">
-        
+
       </Header>
 
     <div className="flex flex-col gap-2 p-4">
@@ -19,10 +20,22 @@ export default function SettingsPage() {
         <p className="text-xs text-gray-10">All your LLM provider api keys are stored locally and are never stored on our servers.</p>
       </div>
 
+      {error && (
+        <div className="text-xs text-red-11 bg-red-2 border border-red-3 rounded-md px-3 py-2 w-full md:w-auto">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+        {loading && providers.length === 0 && (
+          <div className="text-xs text-gray-10">Loading providers...</div>
+        )}
         {providers.map((provider) => (
           <Provider key={provider.id} provider={provider} />
         ))}
+        {!loading && providers.length === 0 && !error && (
+          <div className="text-xs text-gray-10">No providers available.</div>
+        )}
       </div>
     </div>
     </div>
