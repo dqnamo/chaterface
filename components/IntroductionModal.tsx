@@ -104,10 +104,10 @@ const IntroductionModal: React.FC = () => {
                 </div>
                 <div className="flex flex-col gap-1 border-gray-3 dark:border-gray-2 lg:border-r p-8">
                   <div className="flex flex-col gap-1 mb-1">
-                    <h3 className="text-base font-medium text-gray-12 text-pretty">Credit based pricing</h3>
+                    <h3 className="text-base font-medium text-gray-12 text-pretty">Bring your own key</h3>
                   </div>
                   <p className="text-xs text-gray-10 text-pretty">
-                    Just buy credits and pay for what you need.
+                    Connect your OpenRouter API key and keep full control over usage and billing.
                   </p>
                 </div>
                 <div className="flex flex-col gap-1 border-gray-3 p-8">

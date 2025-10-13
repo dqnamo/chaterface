@@ -1,22 +1,12 @@
 "use client"
 import { useDatabase } from "@/providers/database-provider";
-import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Chat, CreditCard, DiamondsFour, Gear, MoonStars, Plus, SidebarSimple, SignIn, SignOut, Sun, Users } from "@phosphor-icons/react";
-import NumberFlow from "@number-flow/react";
+import { Gear, Plus, SignIn } from "@phosphor-icons/react";
 import { useAuth } from "@/providers/auth-provider";
-import { useEffect, useState } from "react";
-import PlansModal from "./modals/PlansModal";
-import { useModal } from "@/providers/modal-provider";
-import { GithubLogo } from "@phosphor-icons/react";
-import { useTheme } from "@/providers/theme-provider";
-import Logo from "./logo";
-import ThemeToggle from "./misc/ThemeToggle";
 import { create } from "zustand";
 import { AnimatePresence, motion } from "motion/react";
 import Toolbar from "./Toolbar";
-import { url } from "inspector";
 
 type SidebarStore = {
   sidebarOpen: boolean;
@@ -31,17 +21,10 @@ export const useSidebarStore = create<SidebarStore>((set) => ({
 export default function Sidebar() {
   const { data, db } = useDatabase();
   const params = useParams();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const id = typeof params.id === 'string' ? params.id : Array.isArray(params.id) ? params.id[0] : undefined;
-  const [messageCount, setMessageCount] = useState<number>(0);
-  const { theme, setTheme } = useTheme();
-  const { showModal } = useModal();
   const { sidebarOpen, setSidebarOpen } = useSidebarStore();
 
-  useEffect(() => {
-    console.log(data?.conversations)
-  }, [data]);
-  
   const url = db.auth.createAuthorizationURL({
     clientName: "google-web",
     redirectURL: window.location.href,

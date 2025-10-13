@@ -2,7 +2,7 @@
 import Header from "@/components/Header";
 import { providers } from "@/constants/models";
 import { useKey } from "@/providers/key-provider";
-import { Check, CheckCircle } from "@phosphor-icons/react";
+import { CheckCircle } from "@phosphor-icons/react";
 import { useState, useEffect } from "react";
 
 
@@ -15,11 +15,11 @@ export default function SettingsPage() {
 
     <div className="flex flex-col gap-2 p-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-base font-medium text-gray-11">API Keys</h1>
-        <p className="text-xs text-gray-10">All your LLM provider api keys are stored locally and are never stored on our servers.</p>
+        <h1 className="text-base font-medium text-gray-11">OpenRouter API Key</h1>
+        <p className="text-xs text-gray-10">Bring your own OpenRouter key. We store it locally in your browser and send it with each request.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
         {providers.map((provider) => (
           <Provider key={provider.id} provider={provider} />
         ))}
@@ -77,6 +77,9 @@ function Provider({provider}: {provider: any}) {
             </div>
           )}
         </div>
+        {provider.description && (
+          <p className="text-xs text-gray-10">{provider.description}</p>
+        )}
         <div className="flex flex-wrap gap-1">
           {provider.models.map((model: string) => (
             <div key={model} className="text-xs text-gray-10 px-2 py-1 bg-gray-3 dark:bg-gray-2 rounded-md">
@@ -91,7 +94,7 @@ function Provider({provider}: {provider: any}) {
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         className="bg-gray-2 mt-auto dark:bg-gray-2 m-2 rounded p-2 text-xs border border-gray-3 dark:border-gray-3 text-gray-10 dark:text-gray-11 focus:outline-none" 
-        placeholder="Your API Key"
+        placeholder="Enter your OpenRouter API key"
         type="password"
       />
     </div>

@@ -2,7 +2,7 @@
 
 import Button from "@/components/button";
 import Logo from "@/components/logo";
-import { Plus, MoonStars, Sun, ArrowRight, SignOut, SignIn, DiamondsFour, CreditCard, GithubLogo, Book } from "@phosphor-icons/react";
+import { Plus, MoonStars, Sun, SignOut, SignIn, GithubLogo } from "@phosphor-icons/react";
 import { useAuth } from "@/providers/auth-provider";
 import { useDatabase } from "@/providers/database-provider";
 import { useEffect, useState } from "react";
@@ -12,9 +12,6 @@ import hotkeys from 'hotkeys-js';
 import { useCreateConversation } from "@/app/utils/conversation"
 import { AppSchema } from "@/instant.schema";
 import { InstaQLEntity } from "@instantdb/react";
-import NumberFlow from '@number-flow/react'
-import PlansModal from "./modals/PlansModal";
-import { useModal } from "@/providers/modal-provider";
 import { DateTime } from "luxon";
 
 // Define the expected shape of a conversation based on AppSchema
@@ -27,11 +24,9 @@ export default function AppLayout({
 }>) {
   const { user, profile, db, sessionId } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messageCount, setMessageCount] = useState<number>(0);
   const pathname = usePathname();
   const router = useRouter();
   // const { createConversationAndRedirect } = useCreateConversation();
-  const { showModal } = useModal();
   // Determine the active conversation ID from the pathname
   const conversationId = pathname.startsWith('/conversations/') ? pathname.split('/').pop() : null;
 
@@ -44,14 +39,6 @@ export default function AppLayout({
         },
         order: { createdAt: "desc" }
       },
-    },
-    messages: {
-      $: {
-        where: {
-          role: 'assistant',
-          or: [{ 'conversation.sessionId': sessionId ?? '' }, { 'conversation.user.id': user?.id ?? '' }],
-        }
-      }
     }
   }, {
     ruleParams: {
@@ -65,9 +52,6 @@ export default function AppLayout({
       setConversations(data.conversations as Conversation[]);
     }
 
-    if (data?.messages) {
-      setMessageCount(data.messages.length);
-    }
   }, [data]);
 
   // Set up keyboard shortcuts
@@ -136,46 +120,28 @@ export default function AppLayout({
 
         
 
-        <div className="flex flex-col gap-2 border bg-white dark:bg-sage-2 border-sage-3 dark:border-sage-3 rounded-md p-2 w-full mt-1 divide-y divide-sage-3">
-          <div className="flex flex-row gap-2 items-center justify-between pb-2">
-            <div className="flex flex-row gap-1 items-center">
-              <DiamondsFour size={12} weight="fill" className="text-teal-9 group-hover:text-sage-12 transition-colors duration-300" />
-
-              {user ? (
-                <NumberFlow value={user && profile?.credits ? profile?.credits : 100} className="text-xs font-semibold text-sage-12 dark:text-sage-12" />
-              ) : (
-                <NumberFlow value={100 - messageCount} className="text-xs font-semibold text-sage-12 dark:text-sage-12" />
-              )}
-            </div>
-            { user ?
-            (
-              <div className="flex flex-row gap-1 items-center bg-sage-2 dark:bg-sage-3 dark:boder-sage-2 dark:hover:bg-sage-4  hover:border-sage-5 transition-colors duration-300 border border-sage-5 rounded-md p-1 px-2">
-                <CreditCard size={12} weight="bold" className="text-sage-12 group-hover:text-sage-12 transition-colors duration-300" />
-                <div onClick={() => {showModal(<PlansModal />)}} className="text-[11px] text-sage-12 font-medium hover:text-sage-12 transition-colors duration-300 hover:cursor-pointer">Add credits</div>
-            
-              </div>
-            ) : null }
+        <div className="flex flex-col gap-3 border bg-white dark:bg-sage-2 border-sage-3 dark:border-sage-3 rounded-md p-3 w-full mt-1">
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-sage-12">Bring your own OpenRouter key</p>
+            <p className="text-xs text-sage-10 dark:text-sage-10">
+              Manage your API key from the settings page. Keys are saved locally in your browser and sent with each chat request.
+            </p>
+            <Link href="/settings" className="w-max text-xs font-medium text-sage-11 hover:text-sage-12 transition-colors duration-300 underline">
+              Open settings
+            </Link>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 border-t border-sage-3 pt-3">
             <p className="text-xs text-sage-10 dark:text-sage-10">Chaterface is a fully open source project by <Link href="https://x.com/dqnamo" target="_blank" className="font-medium text-sage-11 hover:text-sage-12 transition-colors duration-300">@dqnamo</Link> and <Link href="https://x.com/hyperaide" target="_blank" className="font-medium text-sage-11 hover:text-sage-12 transition-colors duration-300">Hyperaide</Link>.</p>
             <div className="flex flex-wrap w-full gap-2">
               <Link href="https://github.com/hyperaide/chaterface" target="_blank" className="flex flex-row items-center gap-1 group bg-sage-2 dark:bg-sage-4 hover:bg-sage-5 hover:border-sage-6 transition-colors duration-300 border border-sage-5 rounded-md p-1 px-2">
                 <GithubLogo size={12} weight="bold" className="text-sage-11 dark:text-sage-11 group-hover:text-sage-12 transition-colors duration-300" />
                 <p className="text-xs text-sage-11 dark:text-sage-11 hover:text-sage-12 transition-colors duration-300">Github</p>
-                {/* <ArrowRight size={12} weight="bold" className="text-sage-11 dark:text-sage-11 group-hover:text-sage-12 transition-colors duration-300" /> */}
               </Link>
-              {/* <Link href="https://github.com/hyperaide/chaterface" target="_blank" className="flex flex-row items-center gap-1 group bg-sage-2 dark:bg-sage-4 hover:bg-sage-5 hover:border-sage-6 transition-colors duration-300 border border-sage-5 rounded-md p-1 px-2">
-                <Book size={12} weight="bold" className="text-sage-11 dark:text-sage-11 group-hover:text-sage-12 transition-colors duration-300" />
-                <p className="text-xs text-sage-11 dark:text-sage-11 hover:text-sage-12 transition-colors duration-300">Docs</p>
-            
-              </Link> */}
             </div>
           </div>
 
         </div>
-
-        
 
         {/* Conversation List */}
         <div className="w-full flex flex-col h-full relative">

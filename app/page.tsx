@@ -33,13 +33,13 @@ export default function Page() {
   const router = useRouter();
   const { sidebarOpen } = useSidebarStore();
   const { getProviderKey } = useKey();
+  const providerKey = getProviderKey();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shouldHighlight, setShouldHighlight] = useState<boolean>(false);
 
   // Check if the selected model has an API key
   const hasApiKey = () => {
-    const key = getProviderKey(selectedModel);
-    return key && key.length > 0;
+    return providerKey !== null && providerKey.length > 0;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -165,7 +165,7 @@ export default function Page() {
                   <span className={`transition-colors duration-300 ${
                     shouldHighlight ? 'text-red-11 dark:text-red-12' : 'text-gray-11'
                   }`}>
-                    Add your {selectedModel.split('/')[0]} API key to continue
+                    Add your OpenRouter API key to continue
                     <span className={`ml-1 font-medium transition-colors ${
                       shouldHighlight ? 'text-red-12 dark:text-red-12' : 'text-gray-12'
                     }`}>

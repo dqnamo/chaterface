@@ -9,7 +9,7 @@ import type { Components } from 'react-markdown';
 import React, { type ClassAttributes, type HTMLAttributes } from "react"; // Import necessary types
 import { motion } from "motion/react";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { CircleNotch, Clock, DiamondsFour, Hourglass } from "@phosphor-icons/react";
+import { CircleNotch } from "@phosphor-icons/react";
 // Define the type for props passed to the custom code component
 // Combines standard HTML attributes for <code> with react-markdown specific props
 type CodeProps = ClassAttributes<HTMLElement> &
@@ -97,7 +97,6 @@ const CodeBlock: Components['code'] = ({ node, inline, className, children, ...p
 const Message = React.forwardRef<HTMLDivElement, { message: UIMessage, annotations: any }>(({ message, annotations }, ref) => {
 
   const [modelName, setModelName] = useState<string | null>(null);
-  const [creditsConsumed, setCreditsConsumed] = useState<number | null>(null);
 
   useEffect(() => {
     if(annotations) {
@@ -106,10 +105,6 @@ const Message = React.forwardRef<HTMLDivElement, { message: UIMessage, annotatio
         setModelName(modelAnnotation.model);
       }
 
-      const creditsAnnotation = annotations[1];
-      if (creditsAnnotation && typeof creditsAnnotation.creditsConsumed === 'number' && creditsAnnotation.creditsConsumed) {
-        setCreditsConsumed(creditsAnnotation.creditsConsumed);
-      }
     }
   }, [annotations]);
 
@@ -151,12 +146,6 @@ const Message = React.forwardRef<HTMLDivElement, { message: UIMessage, annotatio
         )}
         </p>
 
-        {message.role === "assistant" && creditsConsumed && (
-        <p className="z-10 absolute -bottom-2 left-4 text-tiny flex flex-row items-center gap-1 text-gray-11 font-mono uppercase font-medium bg-gray-1 px-2 rounded-md">
-        <DiamondsFour size={12} className="text-teal-9" weight="fill" />
-          {String(creditsConsumed)}
-          </p>
-        )}
       </div>
     </div>
     );

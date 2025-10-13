@@ -12,9 +12,7 @@ const _schema = i.schema({
       email: i.string().unique().indexed(),
     }),
     userProfiles: i.entity({
-      credits: i.number().optional(),
       theme: i.string().optional(),
-      hasPurchasedCredits: i.boolean().optional(),
     }),
     conversations: i.entity({
       name: i.string(),
@@ -26,7 +24,6 @@ const _schema = i.schema({
       content: i.string(),
       createdAt: i.date(),
       model: i.string(),
-      creditsConsumed: i.number().optional(),
     }),
     personas: i.entity({
       name: i.string(),

@@ -13,7 +13,7 @@ import MessageList from "@/components/MessageList";
 import NewMessageInput from "@/components/NewMessageInput";
 import { UIMessage } from "ai";
 import { useNewConversation } from "@/providers/new-conversation-provider";
-import { calculateCreditCost, models } from "@/constants/models";
+import { models } from "@/constants/models";
 import { useAuth } from "@/providers/auth-provider";
 import { useMessageStore } from "@/app/utils/message-store";
 import ModelSelector from "@/components/ModelSelector";
@@ -35,6 +35,7 @@ export default function ConversationPage() {
   const id = typeof params.id === 'string' ? params.id : Array.isArray(params.id) ? params.id[0] : undefined;
   const { db } = useDatabase();
   const { getProviderKey } = useKey();
+  const providerKey = getProviderKey();
   const { user, sessionId } = useAuth();
   const [selectedModel, setSelectedModel] = useState<string>(models[0].id);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -48,8 +49,7 @@ export default function ConversationPage() {
 
   // Check if the selected model has an API key
   const hasApiKey = () => {
-    const key = getProviderKey(selectedModel);
-    return key && key.length > 0;
+    return providerKey !== null && providerKey.length > 0;
   };
 
   useEffect(() => {
@@ -102,8 +102,7 @@ export default function ConversationPage() {
           text: message.content
         }],
         annotations: [
-          { model: message.model },
-          { creditsConsumed: message.creditsConsumed ?? 0 }
+          { model: message.model }
         ]
       })));
     }
@@ -117,7 +116,7 @@ export default function ConversationPage() {
   const { messages, input, handleInputChange, append, setInput, status } = useChat({
     api: '/api/chat',
     headers: {
-      'Authorization': `Bearer ${getProviderKey(selectedModel)}`,
+      'Authorization': providerKey ? `Bearer ${providerKey}` : '',
       'X-Session-Id': sessionId ?? '',
       'X-Token': user?.refresh_token ?? '',
     },
@@ -128,7 +127,7 @@ export default function ConversationPage() {
       setIsProcessing(false);
       setErrorMessage(error.message);
     },
-    onFinish: async (message, options) => {
+    onFinish: async (message) => {
       setIsProcessing(false);
       const aiMessageId = newInstantId();
       await db.transact(db.tx.messages[aiMessageId].ruleParams({ sessionId: sessionId ?? '' }).update({
@@ -136,7 +135,6 @@ export default function ConversationPage() {
         role: "assistant",
         createdAt: DateTime.now().toISO(),
         model: selectedModel,
-        creditsConsumed: calculateCreditCost(selectedModel, options.usage)
       }).link({ conversation: id as string }));
     },
     initialMessages: initialMessages
@@ -144,7 +142,6 @@ export default function ConversationPage() {
 
 
   async function createMessage(content: string) {
-    console.log('createMessage called');
     if (!id) {
       console.error('No conversation ID available');
       return;
@@ -219,7 +216,7 @@ export default function ConversationPage() {
             <span className={`transition-colors duration-300 ${
               shouldHighlight ? 'text-red-11 dark:text-red-12' : 'text-gray-11'
             }`}>
-              Add your {selectedModel.split('/')[0]} API key to continue
+              Add your OpenRouter API key to continue
               <span className={`ml-1 font-medium transition-colors ${
                 shouldHighlight ? 'text-red-12 dark:text-red-12' : 'text-gray-12'
               }`}>

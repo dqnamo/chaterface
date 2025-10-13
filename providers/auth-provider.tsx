@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { init, id, i } from '@instantdb/react';
 import { Homepage } from '../components/Homepage';
-import Pricing from '@/components/Pricing';
 import Cookies from 'js-cookie';
 import { CircleNotch } from '@phosphor-icons/react';
 
@@ -48,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!profile) {
           const profileId = id()
           await db.transact(db.tx.userProfiles[profileId].update({
-            credits: 200
+            theme: 'light'
           }).link({user: user?.id}))
         }
       }else{

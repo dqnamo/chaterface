@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { 
   useFloating, 
   useInteractions,
@@ -12,34 +12,21 @@ import {
 } from '@floating-ui/react';
 import { models } from "@/constants/models";
 import { motion } from "motion/react";
-import { CaretDown, DiamondsFour, Question, Sparkle } from "@phosphor-icons/react";
-import { useAuth } from '@/providers/auth-provider';
-import Link from 'next/link';
-import { useModal } from '@/providers/modal-provider';
-import PlansModal from './modals/PlansModal';
+import { CaretDown, Sparkle } from "@phosphor-icons/react";
 
 interface ModelSelectorProps {
   selectedModel: string;
   setSelectedModel: (model: string) => void;
 }
 
-export default function ModelSelector({ 
-  selectedModel, 
-  setSelectedModel 
+export default function ModelSelector({
+  selectedModel,
+  setSelectedModel
 }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const availableModels = models;
   const references = useRef<Array<HTMLElement | null>>([]);
-  const {user, profile} = useAuth();
-  const {showModal} = useModal();
-  useEffect(() => {
-    if(user && profile?.hasPurchasedCredits) {
-      setAvailableModels(models);
-    } else {
-      setAvailableModels(models.filter(model => model.free));
-    }
-  }, [user, profile]);
-  
+
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     placement: 'top-start',
@@ -159,16 +146,6 @@ export default function ModelSelector({
                 </motion.button>
               ))}
 
-              {!profile?.hasPurchasedCredits && (
-                <div className="px-3 py-3 text-sm text-gray-11 hover:bg-gray-2 dark:hover:bg-gray-4 transition-colors cursor-pointer" onClick={() => {showModal(<PlansModal />)}}>
-                  <p className="text-gray-12 font-medium text-xs">
-                    Looking for more models?
-                  </p>
-                  <p className="text-gray-11 text-xs">
-                    You need to purchase credits to unlock all models.
-                  </p>
-                </div>
-              )}
             </motion.div>
           </div>
         </FloatingFocusManager>
