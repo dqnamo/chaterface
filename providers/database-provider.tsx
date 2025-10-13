@@ -19,8 +19,7 @@ const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined
 
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
-  const { sessionId } = useAuth();
-  const { user } = useAuth();
+  const { sessionId, user } = useAuth();
 
   useEffect(() => {
     init({

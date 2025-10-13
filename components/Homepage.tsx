@@ -49,11 +49,9 @@ const FeaturePoint = ({ children }: { children: React.ReactNode }) => {
 };
 
 export function Homepage({ db, googleClientId, googleClientName }: HomepageProps) {
-  const [nonce] = useState(() => typeof window !== 'undefined' ? crypto.randomUUID() : '');
-
-  if (!googleClientId || typeof window === 'undefined') {
-    return <div>Loading login provider...</div>;
-  }
+  const isBrowser = typeof window !== 'undefined';
+  const [nonce] = useState(() => (isBrowser ? crypto.randomUUID() : ''));
+  const canRenderGoogle = Boolean(isBrowser && googleClientId);
 
   return (
     <div className='flex flex-col w-full p-2 h-full dark bg-sage-1'>
@@ -70,37 +68,52 @@ export function Homepage({ db, googleClientId, googleClientName }: HomepageProps
           
           <div className='flex flex-row gap-4 mt-4 items-center'>
             <Button size="small" href="https://github.com/hyperaide/chaterface" target="_blank" className="w-max bg-sage-4 hover:bg-sage-5 text-sage-12 border border-sage-6" icon={<GithubLogo size={14} weight="bold" />}>View on GitHub</Button>
-            <div className='w-max'>
-                <GoogleOAuthProvider clientId={googleClientId}>
-                  <GoogleLogin
-                    theme='filled_black'
-                    logo_alignment='center'
-                    nonce={nonce}
-                    onError={() => {
-                      console.error('Google Login Failed');
-                      alert('Login failed. Please try again.');
-                    }}
-                    onSuccess={async ({ credential }) => {
-                      if (!credential) {
-                        console.error('Google Login Failed: No credential received');
-                        alert('Login failed: No credential received.');
-                        return;
-                      }
-                      try {
-                        await db.auth.signInWithIdToken({
-                          clientName: googleClientName || '',
-                          idToken: credential,
-                          nonce,
-                        });
-                        // Login successful, AuthProvider will re-render with the user
-                      } catch (err: any) {
-                        console.error('InstantDB Sign In Failed:', err);
-                        alert('Uh oh: ' + (err.body?.message || err.message || 'An unknown error occurred during sign in.'));
-                      }
-                    }}
-                  />
-                </GoogleOAuthProvider>
-              </div>
+            {canRenderGoogle ? (
+              <div className='w-max'>
+                  <GoogleOAuthProvider clientId={googleClientId}>
+                    <GoogleLogin
+                      theme='filled_black'
+                      logo_alignment='center'
+                      nonce={nonce}
+                      onError={() => {
+                        console.error('Google Login Failed');
+                        alert('Login failed. Please try again.');
+                      }}
+                      onSuccess={async ({ credential }) => {
+                        if (!credential) {
+                          console.error('Google Login Failed: No credential received');
+                          alert('Login failed: No credential received.');
+                          return;
+                        }
+                        try {
+                          await db.auth.signInWithIdToken({
+                            clientName: googleClientName || '',
+                            idToken: credential,
+                            nonce,
+                          });
+                          // Login successful, AuthProvider will re-render with the user
+                        } catch (err: any) {
+                          console.error('InstantDB Sign In Failed:', err);
+                          alert('Uh oh: ' + (err.body?.message || err.message || 'An unknown error occurred during sign in.'));
+                        }
+                      }}
+                    />
+                  </GoogleOAuthProvider>
+                </div>
+            ) : null}
+              <button
+                onClick={() => {
+                  db.auth
+                    .signInAsGuest()
+                    .catch((err: any) => {
+                      console.error('InstantDB Guest Sign In Failed:', err);
+                      alert('Uh oh: ' + (err.body?.message || err.message || 'Unable to sign in as guest.'));
+                    });
+                }}
+                className="flex items-center justify-center rounded-md border border-sage-6 bg-sage-3 px-3 py-2 text-xs font-semibold text-sage-12 transition-colors duration-300 hover:bg-sage-4"
+              >
+                Try before signing up
+              </button>
           </div>
         </div>
 

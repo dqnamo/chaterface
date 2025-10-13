@@ -26,6 +26,7 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   const { user, profile, db, sessionId } = useAuth();
+  const isGuest = Boolean(user && (user as any).isGuest);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messageCount, setMessageCount] = useState<number>(0);
   const pathname = usePathname();
@@ -122,9 +123,32 @@ export default function AppLayout({
             )}
 
             {user ? (
-              <button onClick={() => signOut()} className="p-1 hover:bg-sage-3 dark:hover:bg-sage-4 rounded-md group transition-colors duration-300">
-                <SignOut size={16} weight="bold" className="text-sage-10 group-hover:text-sage-12 dark:text-sage-9 dark:group-hover:text-sage-11 transition-colors duration-300" />
-              </button>
+              <>
+                {isGuest && (
+                  <Link
+                    href={url}
+                    className="p-1 hover:bg-sage-3 dark:hover:bg-sage-4 rounded-md group transition-colors duration-300"
+                    title="Upgrade your account"
+                  >
+                    <SignIn
+                      size={16}
+                      weight="bold"
+                      className="text-sage-10 group-hover:text-sage-12 dark:text-sage-9 dark:group-hover:text-sage-11 transition-colors duration-300"
+                    />
+                  </Link>
+                )}
+                <button
+                  onClick={() => signOut()}
+                  className="p-1 hover:bg-sage-3 dark:hover:bg-sage-4 rounded-md group transition-colors duration-300"
+                  title="Sign out"
+                >
+                  <SignOut
+                    size={16}
+                    weight="bold"
+                    className="text-sage-10 group-hover:text-sage-12 dark:text-sage-9 dark:group-hover:text-sage-11 transition-colors duration-300"
+                  />
+                </button>
+              </>
             ) : (
               <Link href={url} className="p-1 hover:bg-sage-3 dark:hover:bg-sage-4 rounded-md group transition-colors duration-300">
                 <SignIn size={16} weight="bold" className="text-sage-10 group-hover:text-sage-12 dark:text-sage-9 dark:group-hover:text-sage-11 transition-colors duration-300" />

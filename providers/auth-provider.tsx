@@ -1,10 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { init, id, i } from '@instantdb/react';
+import { init, id } from '@instantdb/react';
 import { Homepage } from '../components/Homepage';
-import Pricing from '@/components/Pricing';
-import Cookies from 'js-cookie';
 import { CircleNotch } from '@phosphor-icons/react';
 
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || '';
@@ -28,47 +26,40 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isLoading, user, error } = db.useAuth();
   const [profile, setProfile] = useState<any | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const sessionId = user?.id ?? null;
 
   useEffect(() => {
+    if (!user) return;
+
     const ensureProfile = async () => {
-      if (user) {
-        const profile = await db.queryOnce({
+      const existingProfile = await db
+        .queryOnce({
           userProfiles: {
             $: {
               where: {
-                'user.id': user.id
-              }
-            }
-          }
-        }).then((data) => {
-          return data.data.userProfiles[0];
+                'user.id': user.id,
+              },
+            },
+          },
         })
+        .then((data) => data.data.userProfiles[0]);
 
-        if (!profile) {
-          const profileId = id()
-          await db.transact(db.tx.userProfiles[profileId].update({
-            credits: 200
-          }).link({user: user?.id}))
-        }
-      }else{
-        // Check if a session ID cookie exists
-        let currentSessionId = Cookies.get('sessionId');
-        if (!currentSessionId) {
-          // If no cookie, generate a new session ID
-          currentSessionId = id();
-          // Set the cookie, expires in 7 days (adjust as needed)
-          Cookies.set('sessionId', currentSessionId, { expires: 7 });
-        }
-        // Set the session ID in state
-        setSessionId(currentSessionId);
+      if (!existingProfile) {
+        const profileId = id();
+        await db.transact(
+          db.tx.userProfiles[profileId]
+            .update({
+              credits: 200,
+            })
+            .link({ user: user.id })
+        );
       }
     };
+
     ensureProfile();
   }, [user]);
 
-
-  const { data: profileData, isLoading: profileIsLoading, error: profileError } = db.useQuery({
+  const { data: profileData, error: profileError } = db.useQuery({
     userProfiles: {
       $: {
         where: { 'user.id': user?.id ?? '' }
@@ -82,6 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profileData])
 
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+    }
+  }, [user]);
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
@@ -93,13 +90,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return <div>Authentication Error: {error.message}</div>;
   }
 
-  // Render children if user is authenticated, otherwise render Homepage component
+  const combinedError = React.useMemo(() => {
+    if (error?.message) {
+      return new Error(error.message);
+    }
+    if (profileError instanceof Error) {
+      return profileError;
+    }
+    if (profileError && typeof (profileError as any).message === 'string') {
+      return new Error((profileError as any).message);
+    }
+    return null;
+  }, [error, profileError]);
+
   return (
-    // <AuthContext.Provider value={{ user, isLoading, error: error || null, profile: profile, db: db }}>
-    //   {user ? children : <Homepage db={db} googleClientId={GOOGLE_CLIENT_ID} googleClientName={GOOGLE_CLIENT_NAME} />}
-    // </AuthContext.Provider>
-    <AuthContext.Provider value={{ user, isLoading, error: error || null, profile: profile, db: db, sessionId: sessionId }}>
-      {children}
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        error: combinedError,
+        profile,
+        db,
+        sessionId,
+      }}
+    >
+      {user ? (
+        children
+      ) : (
+        <Homepage
+          db={db}
+          googleClientId={GOOGLE_CLIENT_ID}
+          googleClientName={GOOGLE_CLIENT_NAME}
+        />
+      )}
     </AuthContext.Provider>
   );
 }

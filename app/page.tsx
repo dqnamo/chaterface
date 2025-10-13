@@ -61,11 +61,15 @@ export default function Page() {
     setIsLoading(true);
     setErrorMessage(null);
     const conversationId = id();
-    await db.transact(db.tx.conversations[conversationId].update({
+    const conversationTx = db.tx.conversations[conversationId].update({
       name: "New Conversation",
       createdAt: new Date().toISOString(),
-      sessionId: sessionId
-    }));
+      ...(sessionId ? { sessionId } : {}),
+    });
+
+    await db.transact(
+      user?.id ? conversationTx.link({ user: user.id }) : conversationTx
+    );
     await startBackgroundJob(`${process.env.NEXT_PUBLIC_APP_URL}/api/name-conversation`, { conversationId, firstMessageContent: input });
     useMessageStore.setState({ message: input });
     router.push(`/conversations/${conversationId}`);
