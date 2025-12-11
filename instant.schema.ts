@@ -13,6 +13,16 @@ const _schema = i.schema({
       imageURL: i.string().optional(),
       type: i.string().optional(),
     }),
+    conversations: i.entity({
+      name: i.string(),
+      createdAt: i.date().indexed(),
+      updatedAt: i.date().indexed(),
+    }),
+    messages: i.entity({
+      createdAt: i.date().indexed(),
+      content: i.string(),
+      role: i.string(),
+    }),
   },
   links: {
     $usersLinkedPrimaryUser: {
@@ -26,6 +36,30 @@ const _schema = i.schema({
         on: "$users",
         has: "many",
         label: "linkedGuestUsers",
+      },
+    },
+    userConversations: {
+      forward: {
+        on: "conversations",
+        has: "one",
+        label: "user",
+      },
+      reverse: {
+        on: "$users",
+        has: "many",
+        label: "conversations",
+      },
+    },
+    conversationMessages: {
+      forward: {
+        on: "messages",
+        has: "one",
+        label: "conversation",
+      },
+      reverse: {
+        on: "conversations",
+        has: "many",
+        label: "messages",
       },
     },
   },

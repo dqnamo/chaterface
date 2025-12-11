@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import GameOfLife from "./components/GameOfLife";
+import GameOfLife from "../components/GameOfLife";
 import { GithubLogoIcon } from "@phosphor-icons/react/dist/ssr";
 
 export default function Home() {
@@ -53,9 +53,9 @@ export default function Home() {
               <p className="text-gray-12 hover:bg-sky-4 hover:text-sky-9 text-sm font-medium bg-gray-5/50 group-hover:text-gray-2 transition-all duration-300">
                 View Code
               </p>
-              <p className="text-gray-9 bg-gray-4/50 text-sm font-medium group-hover:text-gray-2 transition-all duration-300">
+              {/* <p className="text-gray-9 bg-gray-4/50 text-sm font-medium group-hover:text-gray-2 transition-all duration-300">
                 How do I self host?
-              </p>
+              </p> */}
             </div>
           </div>
         </div>
@@ -64,7 +64,7 @@ export default function Home() {
       </div>
 
       {/* Main */}
-      <div className="flex flex-col items-start border-t border-gray-3 pt-2 border-dashed">
+      {/* <div className="flex flex-col items-start border-t border-gray-3 pt-2 border-dashed">
         <div className="flex flex-col p-16">
           <h2 className="text-xl font-medium text-gray-12">
             Self Hosting Guide
@@ -73,7 +73,7 @@ export default function Home() {
             Get started with running your own chaterface in under 5 minutes.
           </p>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
