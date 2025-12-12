@@ -152,7 +152,7 @@ export default function Sidebar() {
           />
         </button>
         <Link
-          href="/chat"
+          href="/"
           type="button"
           aria-label="New conversation"
           className="p-1 hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
