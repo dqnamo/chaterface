@@ -208,7 +208,7 @@ export default function ChatInput({
   return (
     <motion.div
       layoutId="chat-input-container"
-      className={`backdrop-blur-sm flex flex-col subtle-shadow bg-white dark:bg-gray-1 border border-gray-3 dark:border-gray-2 rounded-xl w-full ${
+      className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-white dark:bg-gray-1 border border-gray-3 dark:border-gray-2 rounded-xl w-full ${
         style === "bottom"
           ? "w-full max-w-2xl fixed bottom-2"
           : "max-w-2xl mt-10 "

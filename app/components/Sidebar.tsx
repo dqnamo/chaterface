@@ -9,6 +9,8 @@ import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
 import PiChatPlusSolid from "./icons/PiChatPlusSolid";
 import PiUserSettingsSolid from "./icons/PiUserSettingsSolid";
+import PiSunStroke from "./icons/PiSunStroke";
+import { useThemeStore } from "@/app/providers/ThemeProvider";
 
 export default function Sidebar() {
   const { conversations } = useData();
@@ -117,8 +119,61 @@ export default function Sidebar() {
       .map(({ c }) => c);
   }, [conversations, search]);
 
+  const { theme, toggleTheme } = useThemeStore();
+
   return (
-    <div className="fixed left-0 top-0 z-50 w-full border-b border-gray-3 lg:border-none bg-gray-1 lg:bg-transparent lg:w-max">
+    <div className="fixed flex flex-col left-0 top-0 p-1.5 z-50 w-64 border-b border-gray-3 h-dvh gap-1.5 ">
+      <motion.div
+        initial={false}
+        animate={{ width: isOpen ? "100%" : "max-content" }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="p-1 bg-white dark:bg-gray-1 shadow-subtle border border-gray-3 dark:border-gray-2 rounded-lg flex flex-row items-center gap-1"
+      >
+        <button
+          type="button"
+          aria-label="New conversation"
+          className="p-1 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+          onClick={toggleTheme}
+        >
+          <PiSunStroke
+            className="text-gray-10 transition-colors group-hover:text-gray-12"
+            size={16}
+          />
+        </button>
+        <button
+          type="button"
+          aria-label="New conversation"
+          className="p-1 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+          onClick={() => {}}
+        >
+          <PiUserSettingsSolid
+            className="text-gray-10 transition-colors group-hover:text-gray-12"
+            size={16}
+          />
+        </button>
+        <Link
+          href="/chat"
+          type="button"
+          aria-label="New conversation"
+          className="p-1 hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+        >
+          <PiChatPlusSolid
+            className="text-gray-10 transition-colors group-hover:text-gray-12"
+            size={16}
+          />
+        </Link>
+        <button
+          type="button"
+          aria-label="Open sidebar"
+          className="ml-auto p-1 cursor-pointer hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <PiSidebarDefaultSolid
+            className="text-gray-10 transition-colors group-hover:text-gray-12"
+            size={16}
+          />
+        </button>
+      </motion.div>
       <AnimatePresence>
         {isOpen ? (
           <>
@@ -133,164 +188,84 @@ export default function Sidebar() {
               onClick={() => setIsOpen(false)}
             /> */}
 
-            <motion.aside
-              className="fixed left-0 top-0 h-dvh max-w-[256px] w-full p-1.5"
+            {/* <motion.div
+              className="max-w-[256px] w-full"
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
+            > */}
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
+              className="bg-white flex flex-col subtle-shadow dark:bg-gray-1 rounded-lg border border-gray-3 dark:border-gray-2 backdrop-blur-sm h-full overflow-hidden"
             >
-              <div className="bg-white subtle-shadow dark:bg-gray-1 rounded-lg border border-gray-3 backdrop-blur-sm h-full overflow-hidden">
-                <div className="flex items-center gap-px p-1.5 mb-2 flex-row w-full border-b border-gray-3 bg-gray-1 dark:bg-gray-2">
-                  <button
-                    type="button"
-                    aria-label="New conversation"
-                    className="p-1.5 hover:bg-gray-3 rounded-md group transition-colors"
-                    onClick={() => {}}
-                  >
-                    <PiUserSettingsSolid
-                      className="text-gray-11 transition-colors group-hover:text-gray-12"
-                      size={16}
-                    />
-                  </button>
-                  <Link
-                    href="/chat"
-                    type="button"
-                    aria-label="New conversation"
-                    className="p-1.5 hover:bg-gray-3 rounded-md group transition-colors"
-                  >
-                    <PiChatPlusSolid
-                      className="text-gray-11 transition-colors group-hover:text-gray-12"
-                      size={16}
-                    />
-                  </Link>
-                  <button
-                    type="button"
-                    aria-label="Close sidebar"
-                    className="p-1.5 hover:bg-gray-3 rounded-md group transition-colors ml-auto"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <PiSidebarDefaultSolid
-                      className="text-gray-11 transition-colors group-hover:text-gray-12"
-                      size={16}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex flex-col">
-                  <div className="flex flex-col">
-                    <p className="text-gray-11 font-medium text-xs px-3">
-                      Conversations
-                    </p>
-                    <div className="relative border-b border-gray-3">
-                      <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") setSearch("");
-                        }}
-                        placeholder="Search conversations"
-                        className="w-full text-gray-12 placeholder:text-gray-10 text-xs p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-5 bg-transparent pr-12"
-                      />
-                      {search.trim().length > 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => setSearch("")}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-10 hover:text-gray-12 transition-colors px-2 py-1 rounded-md hover:bg-gray-3"
-                          aria-label="Clear search"
-                        >
-                          Clear
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-px p-1">
-                    {filteredConversations.length === 0 ? (
-                      <div className="text-gray-9 text-xs p-3">
-                        {conversations.length === 0
-                          ? "No conversations yet."
-                          : `No conversations found for “${search.trim()}”.`}
-                      </div>
-                    ) : (
-                      filteredConversations.map((conversation) => (
-                        <Link
-                          href={`/${conversation.id}`}
-                          key={conversation.id}
-                          className={`flex flex-col rounded-md px-2 py-1 hover:bg-gray-2 transition-colors group ${
-                            conversationId === conversation.id
-                              ? "bg-gray-2"
-                              : ""
-                          }`}
-                        >
-                          <p
-                            className={`text-gray-11 text-sm truncate group-hover:text-gray-12 transition-all duration-200 ${
-                              conversationId === conversation.id
-                                ? "text-gray-12"
-                                : ""
-                            }`}
-                          >
-                            {conversation.name}
-                          </p>
-                          <p className="text-gray-9 text-[11px] truncate">
-                            {DateTime.fromISO(
-                              conversation.createdAt as string
-                            ).toRelative()}
-                          </p>
-                        </Link>
-                      ))
-                    )}
-                  </div>
+              <div className="flex flex-col">
+                <p className="text-gray-11 font-medium text-xs px-3 pt-3">
+                  Conversations
+                </p>
+                <div className="relative border-b border-gray-3">
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setSearch("");
+                    }}
+                    placeholder="Search conversations"
+                    className="w-full text-gray-12 border-gray-3 dark:border-gray-2 placeholder:text-gray-10 text-xs p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-5 bg-transparent pr-12"
+                  />
+                  {search.trim().length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-10 hover:text-gray-12 transition-colors px-2 py-1 rounded-md hover:bg-gray-3"
+                      aria-label="Clear search"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
                 </div>
               </div>
-            </motion.aside>
-          </>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {!isOpen ? (
-          <div className="max-w-3xl mx-auto w-full px-4 lg:max-w-none">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-row p-1 items-center gap-1 w-max m-1 rounded-md"
-            >
-              <button
-                type="button"
-                aria-label="New conversation"
-                className="p-1 hover:bg-gray-6 rounded-md group hover:scale-105 transition-all duration-200"
-                onClick={() => {}}
-              >
-                <PiUserSettingsSolid
-                  className="text-gray-10 transition-colors group-hover:text-gray-12"
-                  size={16}
-                />
-              </button>
-              <Link
-                href="/chat"
-                type="button"
-                aria-label="New conversation"
-                className="p-1 hover:bg-gray-6 rounded-md group hover:scale-105 transition-all duration-200"
-              >
-                <PiChatPlusSolid
-                  className="text-gray-10 transition-colors group-hover:text-gray-12"
-                  size={16}
-                />
-              </Link>
-              <button
-                type="button"
-                aria-label="Open sidebar"
-                className="p-1 hover:bg-gray-6 rounded-md group hover:scale-105 transition-all duration-200"
-                onClick={() => setIsOpen(true)}
-              >
-                <PiSidebarDefaultSolid
-                  className="text-gray-10 transition-colors group-hover:text-gray-12"
-                  size={16}
-                />
-              </button>
+              <div className="flex flex-col gap-px p-1 overflow-y-auto">
+                {filteredConversations.length === 0 ? (
+                  <div className="text-gray-9 text-xs p-3">
+                    {conversations.length === 0
+                      ? "No conversations yet."
+                      : `No conversations found for “${search.trim()}”.`}
+                  </div>
+                ) : (
+                  filteredConversations.map((conversation) => (
+                    <Link
+                      href={`/${conversation.id}`}
+                      key={conversation.id}
+                      className={`flex flex-col rounded-md px-2 py-1 hover:bg-gray-2 transition-colors group ${
+                        conversationId === conversation.id ? "bg-gray-2" : ""
+                      }`}
+                    >
+                      <p
+                        className={`text-gray-11 text-sm truncate group-hover:text-gray-12 transition-all duration-200 ${
+                          conversationId === conversation.id
+                            ? "text-gray-12"
+                            : ""
+                        }`}
+                      >
+                        {conversation.name}
+                      </p>
+                      <p className="text-gray-9 text-[11px] truncate">
+                        {DateTime.fromISO(
+                          conversation.createdAt as string
+                        ).toRelative()}
+                      </p>
+                    </Link>
+                  ))
+                )}
+              </div>
             </motion.div>
-          </div>
+            {/* </motion.div> */}
+          </>
         ) : null}
       </AnimatePresence>
     </div>

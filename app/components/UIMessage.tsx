@@ -19,7 +19,7 @@ export default function UIMessage({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
-          className="flex flex-row bg-gray-3 p-2 rounded-lg max-w-lg w-max"
+          className="flex flex-row bg-gray-3 dark:bg-gray-2 p-2 rounded-lg max-w-lg w-max"
         >
           <div className="text-sm text-gray-12 whitespace-pre-wrap">
             {message.parts.map((part, i) => {
