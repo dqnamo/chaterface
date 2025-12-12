@@ -14,7 +14,11 @@ const db = init({
 });
 
 export const DataContext = createContext({
-  conversations: [] as InstaQLEntity<AppSchema, "conversations", object>[],
+  conversations: [] as InstaQLEntity<
+    AppSchema,
+    "conversations",
+    { messages: object }
+  >[],
   db,
   // user: null as InstaQLEntity<AppSchema, "$users", object> | null,
   isLoading: true,
@@ -26,7 +30,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // const { user } = useAuth();
 
   const query = {
-    conversations: {},
+    conversations: {
+      messages: {},
+    },
   };
 
   const { isLoading, error, data } = db.useQuery(query);
@@ -37,11 +43,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   return (
     <DataContext.Provider
       value={{
-        conversations: (data?.conversations || []) as InstaQLEntity<
-          AppSchema,
-          "conversations",
-          object
-        >[],
+        conversations: data?.conversations || [],
         db,
         isLoading: isLoading,
       }}

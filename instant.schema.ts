@@ -13,6 +13,12 @@ const _schema = i.schema({
       imageURL: i.string().optional(),
       type: i.string().optional(),
     }),
+    interfaces: i.entity({
+      subdomain: i.string().unique().indexed(),
+      openrouterApiKey: i.string().optional(),
+      name: i.string(),
+      createdAt: i.date().indexed(),
+    }),
     conversations: i.entity({
       name: i.string(),
       createdAt: i.date().indexed(),
@@ -22,6 +28,7 @@ const _schema = i.schema({
       createdAt: i.date().indexed(),
       content: i.string(),
       role: i.string(),
+      model: i.string().optional(),
     }),
   },
   links: {
@@ -36,6 +43,18 @@ const _schema = i.schema({
         on: "$users",
         has: "many",
         label: "linkedGuestUsers",
+      },
+    },
+    interfaceConversations: {
+      forward: {
+        on: "conversations",
+        has: "one",
+        label: "interface",
+      },
+      reverse: {
+        on: "interfaces",
+        has: "many",
+        label: "conversations",
       },
     },
     userConversations: {
