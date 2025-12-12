@@ -3,9 +3,12 @@
 @import "@radix-ui/colors/gray-dark.css";
 @import "@radix-ui/colors/sky.css";
 @import "@radix-ui/colors/sky-dark.css";
+@source "../node_modules/streamdown/dist/*.js";
 
 
 @custom-variant dark (&:is(.dark, .dark *));
+
+
 
 @theme inline {
   --color-background: var(--background);
@@ -39,3 +42,74 @@
   --color-sky-11: var(--sky-11);
   --color-sky-12: var(--sky-12);
 }
+
+:root {
+  --border: red
+  --shadow-subtle: rgba(28, 40, 64, 0.06) 0px 1px 2px 0px,
+    rgba(28, 40, 64, 0.08) 0px 2px 6px -3px;
+  --shadow-1: rgba(28, 40, 64, 0.10) 0px 4px 8px -4px,
+    rgba(28, 40, 64, 0.12) 0px 4px 12px -2px;
+  --shadow-2: rgba(28, 40, 64, 0.14) 0px 6px 14px -6px,
+    rgba(28, 40, 64, 0.14) 0px 10px 24px -12px;
+  --shadow-3: rgba(28, 40, 64, 0.16) 0px 10px 22px -10px,
+    rgba(28, 40, 64, 0.18) 0px 18px 46px -18px;
+  --shadow-4: rgba(28, 40, 64, 0.18) 0px 14px 32px -14px,
+    rgba(28, 40, 64, 0.22) 0px 28px 80px -28px;
+  --shadow-outline: rgba(28, 40, 64, 0.06) 0px 0px 0px 1px;
+}
+
+.dark {
+  --border: red
+  --shadow-subtle: rgba(255, 255, 255, 0.035) 0px 1px 0px 0px inset,
+    rgba(0, 0, 0, 0.50) 0px 1px 2px 0px,
+    rgba(0, 0, 0, 0.55) 0px 10px 30px -24px;
+  --shadow-1: rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset,
+    rgba(0, 0, 0, 0.55) 0px 6px 18px -14px,
+    rgba(0, 0, 0, 0.70) 0px 18px 50px -36px;
+  --shadow-2: rgba(255, 255, 255, 0.045) 0px 1px 0px 0px inset,
+    rgba(0, 0, 0, 0.60) 0px 10px 24px -18px,
+    rgba(0, 0, 0, 0.75) 0px 26px 70px -46px;
+  --shadow-3: rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset,
+    rgba(0, 0, 0, 0.65) 0px 14px 32px -22px,
+    rgba(0, 0, 0, 0.78) 0px 34px 90px -56px;
+  --shadow-4: rgba(255, 255, 255, 0.055) 0px 1px 0px 0px inset,
+    rgba(0, 0, 0, 0.70) 0px 18px 44px -28px,
+    rgba(0, 0, 0, 0.80) 0px 44px 130px -72px;
+  --shadow-outline: rgba(255, 255, 255, 0.10) 0px 0px 0px 1px;
+}
+
+@utility no-scrollbar {
+  @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
+}
+
+@utility shadow-1 {
+  box-shadow: var(--shadow-1);
+}
+
+@utility shadow-2 {
+  box-shadow: var(--shadow-2);
+}
+
+@utility shadow-3 {
+  box-shadow: var(--shadow-3);
+}
+
+@utility shadow-4 {
+  box-shadow: var(--shadow-4);
+}
+
+@utility shadow-outline {
+  box-shadow: var(--shadow-outline);
+}
+
+@utility subtle-shadow {
+  box-shadow: var(--shadow-subtle);
+}
+
+
+[data-streamdown="code-block"] {
+  @apply bg-gray-2 rounded-lg p-2 border border-gray-3;
+ }
+[data-streamdown="mermaid-block"] { 
+  @apply bg-gray-2 rounded-lg p-2 border border-gray-3;
+ }

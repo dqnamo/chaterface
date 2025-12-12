@@ -31,20 +31,7 @@ export default function ConversationPage({
     },
   });
 
-  const { messages, sendMessage, setMessages } = useChat({
-    onFinish: async (message) => {
-      await db.transact([
-        db.tx.messages[id()]
-          .update({
-            content: message.message.parts.find((part) => part.type === "text")
-              ?.text as string,
-            role: "assistant",
-            createdAt: DateTime.now().toISO(),
-          })
-          .link({ conversation: conversationId }),
-      ]);
-    },
-  });
+  const { messages, sendMessage, setMessages, status } = useChat();
 
   useEffect(() => {
     if (isLoading || intialMessagesInitialized) return;
@@ -55,7 +42,12 @@ export default function ConversationPage({
           {
             text: data.conversations[0].messages[0].content as string,
           },
-          { body: { model: data.conversations[0].messages[0].model as string } }
+          {
+            body: {
+              model: data.conversations[0].messages[0].model as string,
+              conversationId: conversationId,
+            },
+          }
         );
         setIntialMessagesInitialized(true);
         return;
@@ -77,7 +69,10 @@ export default function ConversationPage({
   }, [data, isLoading, intialMessagesInitialized, setMessages]);
 
   const handleNewMessage = async (message: string, model: string) => {
-    sendMessage({ text: message.trim() }, { body: { model: model } });
+    sendMessage(
+      { text: message.trim() },
+      { body: { model: model, conversationId: conversationId } }
+    );
 
     await db.transact([
       db.tx.messages[id()]
@@ -92,16 +87,17 @@ export default function ConversationPage({
   };
 
   return (
-    <div className="flex flex-col justify-center items-center h-max p-4 pb-40">
+    <div className="flex flex-col justify-center items-center h-max p-4 pb-60">
       {/* <div className="flex flex-col h-full w-full max-w-3xl mx-auto p-4">
         {data?.conversations[0]?.messages.map((message) => (
           <Message key={message.id} message={message} />
         ))}
       </div> */}
+      <motion.div layoutId="chat-content" className="hidden" />
 
-      <div className="flex flex-col h-full w-full max-w-3xl mx-auto p-4 gap-4">
+      <div className="flex flex-col h-full w-full max-w-2xl mx-auto lg:p-4 pt-18 gap-4">
         {messages.map((message) => (
-          <UIMessage key={message.id} message={message} />
+          <UIMessage key={message.id} message={message} status={status} />
         ))}
       </div>
 

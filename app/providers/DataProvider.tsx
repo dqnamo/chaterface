@@ -1,11 +1,10 @@
 "use client";
 
 import { init } from "@instantdb/react";
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext } from "react";
 import { InstaQLEntity } from "@instantdb/react";
 import { AppSchema } from "@/instant.schema";
 import schema from "@/instant.schema";
-import { DateTime } from "luxon";
 
 const db = init({
   appId: process.env.NEXT_PUBLIC_INSTANT_APP_ID!,
@@ -35,7 +34,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     },
   };
 
-  const { isLoading, error, data } = db.useQuery(query);
+  const { isLoading, data } = db.useQuery(query);
 
   // Consider it loading if we don't have a user yet or if the query is loading
   // const effectiveIsLoading = !user || isLoading;

@@ -1,12 +1,11 @@
 "use client";
 
 import { useData } from "@/app/providers/DataProvider";
-import { useState } from "react";
 import { id } from "@instantdb/react";
 import { DateTime } from "luxon";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import ChatInput from "@/app/components/ChatInput";
+import { motion } from "motion/react";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -41,12 +40,19 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col justify-center items-center h-full p-4">
-      <div className="flex flex-col text-center">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="flex flex-col text-center"
+        layoutId="chat-content"
+      >
         <h2 className="text-gray-12 text-xl font-medium">
           Any Model. Any Question.
         </h2>
         <p className="text-gray-10 text-xs">What do you want to know?</p>
-      </div>
+      </motion.div>
 
       <ChatInput
         onSend={(message, model) => handleNewMessage(message, model)}
