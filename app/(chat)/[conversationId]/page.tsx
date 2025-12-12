@@ -87,7 +87,7 @@ export default function ConversationPage({
   };
 
   return (
-    <div className="flex flex-col justify-center items-center h-max p-4 pb-60">
+    <div className="flex flex-col justify-center items-center p-4 pb-60">
       {/* <div className="flex flex-col h-full w-full max-w-3xl mx-auto p-4">
         {data?.conversations[0]?.messages.map((message) => (
           <Message key={message.id} message={message} />
@@ -95,7 +95,7 @@ export default function ConversationPage({
       </div> */}
       <motion.div layoutId="chat-content" className="hidden" />
 
-      <div className="flex flex-col h-full w-full max-w-2xl mx-auto lg:p-4 pt-18 gap-4">
+      <div className="flex flex-col w-full max-w-2xl mx-auto lg:p-4 pt-18 gap-4 pb-60">
         {messages.map((message) => (
           <UIMessage key={message.id} message={message} status={status} />
         ))}
