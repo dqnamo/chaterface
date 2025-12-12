@@ -35,7 +35,7 @@ export default function UIMessage({
   }
 
   return (
-    <div className="flex flex-col" key={message.id}>
+    <div className="flex flex-col p-2" key={message.id}>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
