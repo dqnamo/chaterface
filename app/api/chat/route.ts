@@ -31,7 +31,7 @@ export async function POST(req: Request) {
           })
           .link({ conversation: conversationId }),
       );
-    },
+    }
   });
 
   return result.toUIMessageStreamResponse();

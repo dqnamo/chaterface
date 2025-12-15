@@ -9,6 +9,7 @@ import { useChat } from "@ai-sdk/react";
 import UIMessage from "@/app/components/UIMessage";
 import type { UIMessage as UIMessageModel } from "ai";
 import ChatInput from "@/app/components/ChatInput";
+import { useModelStore } from "@/lib/modelStore";
 
 export default function ConversationPage({
   params,
@@ -16,10 +17,10 @@ export default function ConversationPage({
   params: Promise<{ conversationId: string }>;
 }) {
   const { db } = useData();
+  const { selectedModel } = useModelStore();
   const [intialMessagesInitialized, setIntialMessagesInitialized] =
     useState(false);
   const { conversationId } = use(params);
-  const [message, setMessage] = useState("");
   const { data, isLoading } = db.useQuery({
     conversations: {
       $: {
@@ -31,7 +32,24 @@ export default function ConversationPage({
     },
   });
 
-  const { messages, sendMessage, setMessages, status } = useChat();
+  const { messages, sendMessage, setMessages, status, stop } = useChat({
+    onFinish: async ({ message, isAbort }) => {
+      if (isAbort) {
+        await db.transact(
+          db.tx.messages[id()]
+            .update({
+              content: message.parts
+                .map((part) => (part.type === "text" ? part.text : ""))
+                .join(""),
+              createdAt: DateTime.now().toISO(),
+              role: "assistant",
+              model: selectedModel,
+            })
+            .link({ conversation: conversationId })
+        );
+      }
+    },
+  });
 
   useEffect(() => {
     if (isLoading || intialMessagesInitialized) return;
@@ -101,7 +119,12 @@ export default function ConversationPage({
         ))}
       </div>
 
-      <ChatInput onSend={handleNewMessage} style="bottom" />
+      <ChatInput
+        onSend={handleNewMessage}
+        onStop={stop}
+        status={status}
+        style="bottom"
+      />
     </div>
   );
 }

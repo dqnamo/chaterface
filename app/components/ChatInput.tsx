@@ -14,66 +14,38 @@ import {
   useRole,
 } from "@floating-ui/react";
 
-type Model = {
-  id: string;
-  name: string;
-  description?: string;
-  context_length: number;
-};
+import { useModelStore } from "@/lib/modelStore";
 
 import PiSendPlaneSlantSolid from "./icons/PiSendPlaneSlantSolid";
 import PiAlertTriangleStroke from "./icons/PiAlertTriangleStroke";
 import PiUserSettingsSolid from "./icons/PiUserSettingsSolid";
+import PiStopFill from "./icons/PiStopFill";
+
 export default function ChatInput({
   onSend,
+  onStop,
+  status,
   style = "floating",
 }: {
   onSend: (message: string, model: string) => void;
+  onStop?: () => void;
+  status?: "streaming" | "submitted" | "ready" | "error";
   style?: "floating" | "bottom";
 }) {
   const [message, setMessage] = useState("");
-  const [model, setModel] = useState("");
   const [modelSearch, setModelSearch] = useState("");
 
-  const [models, setModels] = useState<Model[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
+  const {
+    selectedModel: model,
+    setSelectedModel,
+    models,
+    isLoading: modelsLoading,
+    fetchModels,
+  } = useModelStore();
 
   useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        // get the count from local storage
-        let response = await fetch("/api/chat/models/fetch", {
-          method: "POST",
-          body: JSON.stringify({ countOnly: true }),
-        });
-        let data = await response.json();
-        if (localStorage.getItem("modelsCount") == data.count.toString()) {
-          setModels(JSON.parse(localStorage.getItem("modelsList") || "[]"));
-          return;
-        }
-
-        response = await fetch("/api/chat/models/fetch", {
-          method: "POST",
-          body: JSON.stringify({ countOnly: false }),
-        });
-
-        data = await response.json();
-        setModels(data);
-        localStorage.setItem("modelsList", JSON.stringify(data));
-        localStorage.setItem("modelsCount", data.length.toString());
-      } finally {
-        setModelsLoading(false);
-      }
-    };
-
-    if (localStorage.getItem("lastSelectedModel")) {
-      setModel(localStorage.getItem("lastSelectedModel") as string);
-    } else {
-      setModel("xai/grok-4.1-fast");
-    }
-
     fetchModels();
-  }, []);
+  }, [fetchModels]);
 
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const { refs, floatingStyles, context } = useFloating({
@@ -95,14 +67,17 @@ export default function ChatInput({
     role,
   ]);
 
+  const isStreaming = status === "streaming" || status === "submitted";
+  const isInputEmpty = message.trim().length === 0;
+
   const handleSend = () => {
+    if (isInputEmpty) return;
     onSend(message.trim(), model);
     setMessage("");
   };
 
   const handleModelSelect = (model: string) => {
-    setModel(model);
-    localStorage.setItem("lastSelectedModel", model);
+    setSelectedModel(model);
     setModelDropdownOpen(false);
   };
 
@@ -250,7 +225,10 @@ export default function ChatInput({
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
-            handleSend();
+            e.preventDefault();
+            if (!isStreaming && !isInputEmpty) {
+              handleSend();
+            }
           }
         }}
       />
@@ -318,15 +296,25 @@ export default function ChatInput({
           </div>
         )}
         <div
-          onClick={handleSend}
-          className="bg-gray-12 dark:bg-gray-5 rounded-lg border border-transparent dark:border-gray-6 dark:hover:bg-gray-3 px-2 py-1 flex flex-row items-center justify-center gap-2"
+          onClick={
+            isStreaming ? onStop : !isInputEmpty ? handleSend : undefined
+          }
+          className={`${
+            isStreaming || !isInputEmpty
+              ? "bg-gray-12 dark:bg-gray-5 cursor-pointer dark:hover:bg-gray-3"
+              : "bg-gray-12/50 dark:bg-gray-5/50 cursor-not-allowed"
+          } rounded-lg border border-transparent dark:border-gray-6 px-2 py-1 flex flex-row items-center justify-center gap-2`}
         >
-          <PiSendPlaneSlantSolid
-            className="text-gray-2 dark:text-gray-12"
-            size={12}
-          />
+          {isStreaming ? (
+            <PiStopFill className="text-gray-2 dark:text-gray-12" size={12} />
+          ) : (
+            <PiSendPlaneSlantSolid
+              className="text-gray-2 dark:text-gray-12"
+              size={12}
+            />
+          )}
           <p className="text-gray-2 dark:text-gray-12 font-medium text-sm">
-            Send
+            {isStreaming ? "Stop" : "Send"}
           </p>
         </div>
       </div>

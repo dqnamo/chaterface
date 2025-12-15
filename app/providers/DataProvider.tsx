@@ -28,13 +28,16 @@ export const useData = () => useContext(DataContext);
 export function DataProvider({ children }: { children: React.ReactNode }) {
   // const { user } = useAuth();
 
-  const query = {
+  const { isLoading, data } = db.useQuery({
     conversations: {
+      $: {
+        order: {
+          serverCreatedAt: "desc",
+        },
+      },
       messages: {},
     },
-  };
-
-  const { isLoading, data } = db.useQuery(query);
+  });
 
   // Consider it loading if we don't have a user yet or if the query is loading
   // const effectiveIsLoading = !user || isLoading;
