@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import ChatInput from "@/app/components/ChatInput";
 import { motion } from "motion/react";
 import Link from "next/link";
+import { userplexClient } from "@/lib/userplexClient";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -39,6 +40,14 @@ export default function ChatPage() {
         })
         .link({ conversation: conversationId }),
     ]);
+
+    userplexClient.logs.new({
+      name: "new_conversation_started",
+      user_id: user?.id ?? "",
+      data: {
+        model: model,
+      },
+    });
 
     router.push(`/${conversationId}`);
   };
