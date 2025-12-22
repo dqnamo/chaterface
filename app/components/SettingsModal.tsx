@@ -172,7 +172,7 @@ function ApiKeySection() {
   );
 
   useEffect(() => {
-    localStorage.setItem("LOCAL_API_KEY", apiKey);
+    localStorage.setItem("chaterface_openrouter_api_key", apiKey);
   }, [apiKey]);
 
   return (
