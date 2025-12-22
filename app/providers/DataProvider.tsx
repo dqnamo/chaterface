@@ -46,7 +46,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // Auto sign-in as guest if no user after auth check completes
   useEffect(() => {
     if (!isAuthLoading && !user) {
-      alert("Signing in as guest");
       db.auth.signInAsGuest();
     }
   }, [isAuthLoading, user]);
