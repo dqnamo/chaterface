@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chaterface"
+  title: "Chaterface",
   description: "Interface To Intelligence.",
 };
 
