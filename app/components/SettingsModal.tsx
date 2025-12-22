@@ -3,12 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useData } from "../providers/DataProvider";
-import {
-  encrypt,
-  getLocalApiKey,
-  setLocalApiKey,
-  removeLocalApiKey,
-} from "@/lib/crypto";
+import { getLocalApiKey, setLocalApiKey } from "@/lib/crypto";
 import {
   CheckIcon,
   GearIcon,
@@ -164,15 +159,9 @@ function ApiKeySection() {
   // Initialize with local storage value
   const [apiKey, setApiKey] = useState(() => getLocalApiKey() || "");
   const [showKey, setShowKey] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">(
-    "idle"
-  );
-  const [storageLocation, setStorageLocation] = useState<"local" | "cloud">(
-    () => (getLocalApiKey() ? "local" : "local")
-  );
 
   useEffect(() => {
-    localStorage.setItem("chaterface_openrouter_api_key", apiKey);
+    setLocalApiKey(apiKey);
   }, [apiKey]);
 
   return (
@@ -210,12 +199,6 @@ function ApiKeySection() {
           </button>
         </div>
       </div>
-
-      {saveStatus === "error" && (
-        <p className="text-sm text-red-500">
-          Failed to save. Please try again.
-        </p>
-      )}
     </div>
   );
 }
@@ -482,22 +465,6 @@ function AccountSection() {
                 />
               </svg>
               Access from any device
-            </li>
-            <li className="flex items-center gap-2">
-              <svg
-                className="w-4 h-4 text-sky-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Encrypted API key storage in the cloud
             </li>
           </ul>
         </div>

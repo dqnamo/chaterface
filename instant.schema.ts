@@ -16,7 +16,6 @@ const _schema = i.schema({
     }),
     interfaces: i.entity({
       subdomain: i.string().unique().indexed(),
-      openrouterApiKey: i.string().optional(),
       name: i.string(),
       createdAt: i.date().indexed(),
     }),

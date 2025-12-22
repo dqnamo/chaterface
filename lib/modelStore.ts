@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getLocalApiKey } from './crypto';
 
 export type Model = {
   id: string;
@@ -24,27 +25,28 @@ export const useModelStore = create<ModelState>()(
       isLoading: false,
       setSelectedModel: (model) => set({ selectedModel: model }),
       fetchModels: async () => {
+        const apiKey = getLocalApiKey();
+        if (!apiKey) return;
+
         set({ isLoading: true });
         try {
-          const response = await fetch("/api/chat/models/fetch", {
-            method: "POST",
-            body: JSON.stringify({ countOnly: true }),
+          // Fetch models from OpenRouter
+          const response = await fetch("https://openrouter.ai/api/v1/models", {
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json"
+            }
           });
-          const data = await response.json();
-          const currentModels = get().models;
-
-          // If count matches and we have models, we assume they are up to date
-          if (currentModels.length === data.count && currentModels.length > 0) {
-            set({ isLoading: false });
-            return;
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch models: ${response.statusText}`);
           }
 
-          const fullResponse = await fetch("/api/chat/models/fetch", {
-            method: "POST",
-            body: JSON.stringify({ countOnly: false }),
-          });
-          const fullData = await fullResponse.json();
-          set({ models: fullData });
+          const data = await response.json();
+          // OpenRouter returns { data: Model[] }
+          if (data && Array.isArray(data.data)) {
+            set({ models: data.data });
+          }
         } catch (error) {
           console.error("Failed to fetch models:", error);
         } finally {
