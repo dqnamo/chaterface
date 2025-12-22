@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import DqnamoSignature from "./components/DqnamoSignature";
 import AppLayout from "./components/AppLayout";
+import { ModalProvider } from "./providers/ModalProvider";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -28,7 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans bg-gray-2 dark:bg-neutral-950`}
       >
-        <AppLayout>{children}</AppLayout>
+        <ModalProvider>
+          <AppLayout>{children}</AppLayout>
+        </ModalProvider>
       </body>
     </html>
   );

@@ -10,6 +10,8 @@ import UIMessage from "@/app/components/UIMessage";
 import type { UIMessage as UIMessageModel } from "ai";
 import ChatInput from "@/app/components/ChatInput";
 import { useModelStore } from "@/lib/modelStore";
+import { useApiKey } from "@/lib/apiKey";
+import Image from "next/image";
 
 export default function ConversationPage({
   params,
@@ -18,6 +20,7 @@ export default function ConversationPage({
 }) {
   const { db } = useData();
   const { selectedModel } = useModelStore();
+  const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const [intialMessagesInitialized, setIntialMessagesInitialized] =
     useState(false);
   const { conversationId } = use(params);
@@ -55,7 +58,11 @@ export default function ConversationPage({
     if (isLoading || intialMessagesInitialized) return;
 
     if (data?.conversations?.[0]?.messages) {
+      // If there's only 1 message, we need to send it to get a response
       if (data.conversations[0].messages.length === 1) {
+        // Wait for API key to be loaded before sending
+        if (isApiKeyLoading) return;
+
         sendMessage(
           {
             text: data.conversations[0].messages[0].content as string,
@@ -64,6 +71,7 @@ export default function ConversationPage({
             body: {
               model: data.conversations[0].messages[0].model as string,
               conversationId: conversationId,
+              apiKey: apiKey,
             },
           }
         );
@@ -84,12 +92,21 @@ export default function ConversationPage({
       // Data loaded but empty
       setIntialMessagesInitialized(true);
     }
-  }, [data, isLoading, intialMessagesInitialized, setMessages]);
+  }, [
+    data,
+    isLoading,
+    isApiKeyLoading,
+    intialMessagesInitialized,
+    setMessages,
+    sendMessage,
+    conversationId,
+    apiKey,
+  ]);
 
   const handleNewMessage = async (message: string, model: string) => {
     sendMessage(
       { text: message.trim() },
-      { body: { model: model, conversationId: conversationId } }
+      { body: { model: model, conversationId: conversationId, apiKey: apiKey } }
     );
 
     await db.transact([
@@ -117,6 +134,9 @@ export default function ConversationPage({
         {messages.map((message) => (
           <UIMessage key={message.id} message={message} status={status} />
         ))}
+
+        {status === "streaming" ||
+          (status === "submitted" && <LoadingSpinner />)}
       </div>
 
       <ChatInput
@@ -125,6 +145,49 @@ export default function ConversationPage({
         status={status}
         style="bottom"
       />
+    </div>
+  );
+}
+
+function LoadingSpinner() {
+  const [text, setText] = useState("Thinking...");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const loadingTexts = [
+        "Consulting the neural spirits...",
+        "Browsing the entire internet...",
+        "Generating witty retort...",
+        "Doing complex math...",
+        "Pretending to think...",
+        "Asking the silicon oracle...",
+        "Analyzing your genius...",
+        "Crunching the tokens...",
+        "Synthesizing brilliance...",
+        "Loading personality...",
+      ];
+      setText(loadingTexts[Math.floor(Math.random() * loadingTexts.length)]);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="flex flex-row items-center gap-1 animate-pulse">
+      <Image
+        src="/white-logomark.svg"
+        alt="Logo"
+        width={20}
+        height={20}
+        className="hidden dark:block opacity-80"
+      />
+      <Image
+        src="/black-logomark.svg"
+        alt="Logo"
+        width={20}
+        height={20}
+        className="block dark:hidden opacity-80"
+      />
+      <p className="text-gray-10 text-sm">{text}</p>
     </div>
   );
 }

@@ -14,12 +14,18 @@ import {
   useRole,
 } from "@floating-ui/react";
 
+import SettingsModal from "./SettingsModal";
 import { useModelStore } from "@/lib/modelStore";
+import { useApiKey } from "@/lib/apiKey";
+import { useData } from "../providers/DataProvider";
 
-import PiSendPlaneSlantSolid from "./icons/PiSendPlaneSlantSolid";
-import PiAlertTriangleStroke from "./icons/PiAlertTriangleStroke";
-import PiUserSettingsSolid from "./icons/PiUserSettingsSolid";
-import PiStopFill from "./icons/PiStopFill";
+import { useModal } from "../providers/ModalProvider";
+import {
+  FadersIcon,
+  PaperPlaneTiltIcon,
+  StopIcon,
+  WarningIcon,
+} from "@phosphor-icons/react";
 
 export default function ChatInput({
   onSend,
@@ -35,6 +41,24 @@ export default function ChatInput({
   const [message, setMessage] = useState("");
   const [modelSearch, setModelSearch] = useState("");
 
+  const { showModal } = useModal();
+  const { hasKey: hasApiKey, isLoading: isApiKeyLoading } = useApiKey();
+  const { user, db } = useData();
+
+  const { data: userData } = db.useQuery(
+    user ? { $users: { $: { where: { id: user.id } } } } : null
+  );
+  const userSettings = userData?.$users?.[0]?.settings;
+  const disabledModels = useMemo(
+    () => (userSettings?.disabledModels as string[]) || [],
+    [userSettings]
+  );
+  const favorites = useMemo(
+    () => (userSettings?.favorites as string[]) || [],
+    [userSettings]
+  );
+  const defaultModel = userSettings?.defaultModel as string | undefined;
+
   const {
     selectedModel: model,
     setSelectedModel,
@@ -42,6 +66,12 @@ export default function ChatInput({
     isLoading: modelsLoading,
     fetchModels,
   } = useModelStore();
+
+  useEffect(() => {
+    if (defaultModel) {
+      setSelectedModel(defaultModel);
+    }
+  }, [defaultModel, setSelectedModel]);
 
   useEffect(() => {
     fetchModels();
@@ -160,11 +190,25 @@ export default function ChatInput({
     };
 
     const qNorm = normalize(modelSearch);
-    if (!qNorm) return models;
+
+    // Filter out disabled models first
+    const availableModels = models.filter(
+      (m) => !disabledModels.includes(m.id)
+    );
+
+    if (!qNorm) {
+      return availableModels.sort((a, b) => {
+        const aFav = favorites.includes(a.id);
+        const bFav = favorites.includes(b.id);
+        if (aFav && !bFav) return -1;
+        if (!aFav && bFav) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
 
     const tokens = qNorm.split(" ").filter(Boolean);
 
-    return models
+    return availableModels
       .map((m) => {
         const nameScore = scoreField(m.name, qNorm, tokens) * 1.2;
         const idScore = scoreField(m.id, qNorm, tokens) * 1.0;
@@ -175,10 +219,14 @@ export default function ChatInput({
       .filter(({ score }) => score > 0)
       .sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
+        const aFav = favorites.includes(a.m.id);
+        const bFav = favorites.includes(b.m.id);
+        if (aFav && !bFav) return -1;
+        if (!aFav && bFav) return 1;
         return a.m.name.localeCompare(b.m.name);
       })
       .map(({ m }) => m);
-  }, [models, modelSearch]);
+  }, [models, modelSearch, disabledModels, favorites]);
 
   return (
     <motion.div
@@ -189,34 +237,43 @@ export default function ChatInput({
           : "max-w-2xl mt-10 "
       }`}
     >
-      <motion.div
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="flex flex-col p-1 shrink-0"
-      >
-        <div className="flex flex-row bg-gray-2 rounded-lg p-1.5 gap-2 items-center">
-          <div className="flex flex-row items-center px-1.5 gap-2">
-            <PiAlertTriangleStroke className="text-red-500 text-xs" size={16} />
-            <h3 className="text-gray-11 text-xs font-medium">
-              No OpenRouter API Key Set
-            </h3>
-          </div>
+      {!isApiKeyLoading && !hasApiKey && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex flex-col p-1 shrink-0"
+        >
+          <div className="flex flex-row bg-gray-2 rounded-lg p-1.5 gap-2 items-center">
+            <div className="flex flex-row items-center px-1.5 gap-2">
+              <WarningIcon
+                className="text-red-500 text-xs"
+                size={16}
+                weight="bold"
+              />
+              <h3 className="text-gray-11 text-xs font-medium">
+                No OpenRouter API Key Set
+              </h3>
+            </div>
 
-          <div
-            onClick={handleSend}
-            className="ml-auto bg-gray-12 dark:bg-gray-5 rounded-lg border border-transparent dark:border-gray-6 dark:hover:bg-gray-3 px-2 py-1 flex flex-row items-center justify-center gap-2"
-          >
-            <PiUserSettingsSolid
-              className="text-gray-2 dark:text-gray-12"
-              size={12}
-            />
-            <p className="text-gray-2 dark:text-gray-12 font-medium text-xs">
-              Open Settings
-            </p>
+            <button
+              type="button"
+              onClick={() => showModal(<SettingsModal />)}
+              className="ml-auto bg-gray-12 dark:bg-gray-5 rounded-lg border border-transparent dark:border-gray-6 dark:hover:bg-gray-3 px-2 py-1 flex flex-row items-center justify-center gap-2"
+            >
+              <FadersIcon
+                className="text-gray-2 dark:text-gray-12"
+                size={14}
+                weight="bold"
+              />
+              <span className="text-gray-2 dark:text-gray-12 font-medium text-xs">
+                Open Settings
+              </span>
+            </button>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
       <textarea
         className="w-full h-full p-4 resize-none focus:outline-none text-gray-12 text-sm placeholder:text-gray-10"
         rows={2}
@@ -306,11 +363,16 @@ export default function ChatInput({
           } rounded-lg border border-transparent dark:border-gray-6 px-2 py-1 flex flex-row items-center justify-center gap-2`}
         >
           {isStreaming ? (
-            <PiStopFill className="text-gray-2 dark:text-gray-12" size={12} />
-          ) : (
-            <PiSendPlaneSlantSolid
+            <StopIcon
+              weight="fill"
               className="text-gray-2 dark:text-gray-12"
-              size={12}
+              size={14}
+            />
+          ) : (
+            <PaperPlaneTiltIcon
+              weight="fill"
+              className="text-gray-2 dark:text-gray-12"
+              size={14}
             />
           )}
           <p className="text-gray-2 dark:text-gray-12 font-medium text-sm">

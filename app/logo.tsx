@@ -5,10 +5,12 @@ export default function Logo({
   style = "default",
   className,
   color = "black",
+  withText = true,
 }: {
   style?: "small" | "default";
   className?: string;
   color?: "black" | "white";
+  withText?: boolean;
 }) {
   return (
     <Link href="/" className={`flex flex-row items-center justify-center`}>
@@ -26,7 +28,9 @@ export default function Logo({
         height={24}
         className="block dark:block"
       />
-      <h1 className={`text-xl font-medium text-gray-12`}>Chaterface</h1>
+      {withText && (
+        <h1 className={`text-xl font-medium text-gray-12`}>Chaterface</h1>
+      )}
     </Link>
   );
 }

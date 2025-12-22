@@ -23,7 +23,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <DataProvider>
         <Sidebar />
         {children}
-        <DqnamoSignature className="fixed bottom-4 right-4 z-10 lg:block hidden" />
       </DataProvider>
     </div>
   );

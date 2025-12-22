@@ -6,25 +6,30 @@ import { DateTime } from "luxon";
 import { useRouter } from "next/navigation";
 import ChatInput from "@/app/components/ChatInput";
 import { motion } from "motion/react";
+import Link from "next/link";
 
 export default function ChatPage() {
   const router = useRouter();
 
-  const { db } = useData();
+  const { db, user } = useData();
 
   const handleNewMessage = async (message: string, model: string) => {
+    if (!user) return; // Shouldn't happen with guest auth, but safety check
+
     const messageContent = message.trim();
 
     const conversationId = id();
     const messageId = id();
 
-    // Create conversation and message in one transaction
+    // Create conversation and message in one transaction, linked to user
     db.transact([
-      db.tx.conversations[conversationId].update({
-        name: messageContent,
-        createdAt: DateTime.now().toISO(),
-        updatedAt: DateTime.now().toISO(),
-      }),
+      db.tx.conversations[conversationId]
+        .update({
+          name: messageContent,
+          createdAt: DateTime.now().toISO(),
+          updatedAt: DateTime.now().toISO(),
+        })
+        .link({ user: user.id }),
       db.tx.messages[messageId]
         .update({
           content: messageContent,

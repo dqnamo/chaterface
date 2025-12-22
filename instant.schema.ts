@@ -12,6 +12,7 @@ const _schema = i.schema({
       email: i.string().unique().indexed().optional(),
       imageURL: i.string().optional(),
       type: i.string().optional(),
+      settings: i.json().optional(),
     }),
     interfaces: i.entity({
       subdomain: i.string().unique().indexed(),

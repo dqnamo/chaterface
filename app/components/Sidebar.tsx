@@ -11,6 +11,17 @@ import PiChatPlusSolid from "./icons/PiChatPlusSolid";
 import PiUserSettingsSolid from "./icons/PiUserSettingsSolid";
 import PiSunStroke from "./icons/PiSunStroke";
 import { useThemeStore } from "@/app/providers/ThemeProvider";
+import { useModal } from "../providers/ModalProvider";
+import SettingsModal from "./SettingsModal";
+import {
+  ChatIcon,
+  ChatsIcon,
+  FadersIcon,
+  MoonStarsIcon,
+  PlusIcon,
+  SidebarSimpleIcon,
+  SunIcon,
+} from "@phosphor-icons/react";
 
 export default function Sidebar() {
   const { conversations } = useData();
@@ -120,7 +131,7 @@ export default function Sidebar() {
   }, [conversations, search]);
 
   const { theme, toggleTheme } = useThemeStore();
-
+  const { showModal } = useModal();
   return (
     <div className="fixed flex flex-col left-0 top-0 p-1.5 z-50 w-64 border-b border-gray-3 h-dvh gap-1.5 ">
       <motion.div
@@ -131,35 +142,43 @@ export default function Sidebar() {
       >
         <button
           type="button"
-          aria-label="New conversation"
+          aria-label="Toggle theme"
           className="p-1 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
           onClick={toggleTheme}
         >
-          <PiSunStroke
-            className="text-gray-10 transition-colors group-hover:text-gray-12"
+          <SunIcon
+            className="dark:block hidden text-gray-10 transition-colors group-hover:text-gray-12"
             size={16}
+            weight="bold"
+          />
+          <MoonStarsIcon
+            className="block dark:hidden text-gray-10 transition-colors group-hover:text-gray-12"
+            size={16}
+            weight="bold"
           />
         </button>
         <button
           type="button"
-          aria-label="New conversation"
+          aria-label="Settings"
           className="p-1 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
-          onClick={() => {}}
+          onClick={() => showModal(<SettingsModal />)}
         >
-          <PiUserSettingsSolid
+          <FadersIcon
             className="text-gray-10 transition-colors group-hover:text-gray-12"
             size={16}
+            weight="bold"
           />
         </button>
         <Link
           href="/"
           type="button"
-          aria-label="New conversation"
+          aria-label="Create new conversation"
           className="p-1 hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
         >
-          <PiChatPlusSolid
+          <PlusIcon
             className="text-gray-10 transition-colors group-hover:text-gray-12"
             size={16}
+            weight="bold"
           />
         </Link>
         <button
@@ -168,9 +187,10 @@ export default function Sidebar() {
           className="ml-auto p-1 cursor-pointer hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
           onClick={() => setIsOpen(!isOpen)}
         >
-          <PiSidebarDefaultSolid
+          <SidebarSimpleIcon
             className="text-gray-10 transition-colors group-hover:text-gray-12"
             size={16}
+            weight={isOpen ? "fill" : "bold"}
           />
         </button>
       </motion.div>

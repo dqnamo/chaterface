@@ -11,10 +11,25 @@ const db = init({
 });
 
 export async function POST(req: Request) {
-  const { messages, model, conversationId }: { messages: UIMessage[]; model: string; conversationId: string } = await req.json();
+  const { messages, model, conversationId, apiKey: userApiKey }: { 
+    messages: UIMessage[]; 
+    model: string; 
+    conversationId: string;
+    apiKey?: string;
+  } = await req.json();
+
+  // Use user's API key if provided, otherwise fall back to env var
+  const apiKey = userApiKey || process.env.OPENROUTER_API_KEY;
+  
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({ error: 'No OpenRouter API key provided. Please add your API key in Settings.' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 
   const openrouter = createOpenRouter({
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey,
   });
 
   const result = streamText({
