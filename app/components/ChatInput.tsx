@@ -104,13 +104,13 @@ export default function ChatInput({
   const handleSend = () => {
     if (isInputEmpty) return;
     onSend(message.trim(), model);
-    // userplexClient.logs.new({
-    //   name: "sent_new_message",
-    //   user_id: user?.id ?? "",
-    //   data: {
-    //     model: model,
-    //   },
-    // });
+    userplexClient.logs.new({
+      name: "sent_new_message",
+      user_id: user?.id ?? "",
+      data: {
+        model: model,
+      },
+    });
     setMessage("");
   };
 
