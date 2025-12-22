@@ -164,9 +164,6 @@ function ApiKeySection() {
   // Initialize with local storage value
   const [apiKey, setApiKey] = useState(() => getLocalApiKey() || "");
   const [showKey, setShowKey] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingKey, setIsLoadingKey] = useState(false);
-  const [hasLoadedCloud, setHasLoadedCloud] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">(
     "idle"
   );
@@ -174,58 +171,9 @@ function ApiKeySection() {
     () => (getLocalApiKey() ? "local" : "local")
   );
 
-  const handleSave = async () => {
-    if (!apiKey.trim()) return;
-
-    setIsSaving(true);
-    setSaveStatus("idle");
-
-    try {
-      if (user && storageLocation === "cloud") {
-        // Encrypt and save to DB
-        const encryptedApiKey = await encrypt(apiKey, user.id);
-        await db.transact(
-          db.tx.$users[user.id].update({
-            settings: { encryptedApiKey },
-          })
-        );
-        // Remove from local storage if it was there
-        removeLocalApiKey();
-      } else {
-        // Save to local storage
-        setLocalApiKey(apiKey);
-      }
-      setSaveStatus("success");
-      setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch (error) {
-      console.error("Failed to save API key:", error);
-      setSaveStatus("error");
-    }
-    setIsSaving(false);
-  };
-
-  const handleRemove = async () => {
-    setIsSaving(true);
-    try {
-      if (user) {
-        // Remove from DB
-        await db.transact(
-          db.tx.$users[user.id].update({
-            settings: {},
-          })
-        );
-      }
-      // Always remove from local storage
-      removeLocalApiKey();
-      setApiKey("");
-      setSaveStatus("success");
-      setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch (error) {
-      console.error("Failed to remove API key:", error);
-      setSaveStatus("error");
-    }
-    setIsSaving(false);
-  };
+  useEffect(() => {
+    localStorage.setItem("LOCAL_API_KEY", apiKey);
+  }, [apiKey]);
 
   return (
     <div className="">
