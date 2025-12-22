@@ -41,13 +41,13 @@ export default function ChatPage() {
         .link({ conversation: conversationId }),
     ]);
 
-    userplexClient.logs.new({
-      name: "new_conversation_started",
-      user_id: user?.id ?? "",
-      data: {
-        model: model,
-      },
-    });
+    // userplexClient.logs.new({
+    //   name: "new_conversation_started",
+    //   user_id: user?.id ?? "",
+    //   data: {
+    //     model: model,
+    //   },
+    // });
 
     router.push(`/${conversationId}`);
   };
