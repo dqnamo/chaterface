@@ -14,6 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import { useModelStore } from "@/lib/modelStore";
 import { useEffect } from "react";
+import { userplexClient } from "@/lib/userplexClient";
 
 type Tab = "general" | "account" | "models";
 
@@ -162,6 +163,10 @@ function ApiKeySection() {
 
   useEffect(() => {
     setLocalApiKey(apiKey);
+    userplexClient.logs.new({
+      name: "api_key_set",
+      user_id: user?.id ?? "",
+    });
   }, [apiKey]);
 
   return (
