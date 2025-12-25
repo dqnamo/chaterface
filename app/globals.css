@@ -113,3 +113,10 @@
 [data-streamdown="mermaid-block"] { 
   @apply bg-gray-2 rounded-lg p-2 border border-gray-3;
  }
+
+/* Fix iOS zoom on input */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}

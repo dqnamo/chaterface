@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useData } from "../providers/DataProvider";
 import { getLocalApiKey, setLocalApiKey } from "@/lib/crypto";
@@ -10,10 +10,8 @@ import {
   HeadCircuitIcon,
   StarIcon,
   UserIcon,
-  XIcon,
 } from "@phosphor-icons/react";
 import { useModelStore } from "@/lib/modelStore";
-import { useEffect } from "react";
 import { userplexClient } from "@/lib/userplexClient";
 
 type Tab = "general" | "account" | "models";
@@ -156,18 +154,39 @@ export function AnimatedTabs({
 }
 
 function ApiKeySection() {
-  const { user, db, isAuthLoading } = useData();
+  const { user } = useData();
+  const { fetchModels, error, isLoading, setError, models } = useModelStore();
   // Initialize with local storage value
   const [apiKey, setApiKey] = useState(() => getLocalApiKey() || "");
   const [showKey, setShowKey] = useState(false);
+  const initialKey = useRef(apiKey);
 
   useEffect(() => {
-    setLocalApiKey(apiKey);
-    userplexClient.logs.new({
-      name: "api_key_set",
-      user_id: user?.id ?? "",
-    });
-  }, [apiKey]);
+    // If the key is the same as when we opened the modal,
+    // we only fetch if we don't have models yet.
+    if (apiKey === initialKey.current) {
+      if (apiKey && models.length === 0) {
+        fetchModels();
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setLocalApiKey(apiKey);
+      if (apiKey) {
+        // Force fetch to verify the new key
+        fetchModels(true);
+        userplexClient.logs.new({
+          name: "api_key_set",
+          user_id: user?.id ?? "",
+        });
+      } else {
+        setError(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [apiKey, fetchModels, user?.id, setError, models.length]);
 
   return (
     <div className="">
@@ -186,23 +205,56 @@ function ApiKeySection() {
       </p>
 
       {/* API Key Input */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="relative">
           <input
             type={showKey ? "text" : "password"}
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="sk-or-v1-..."
-            className="w-full px-3 py-2.5 pr-20 bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-8 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all font-mono text-sm"
+            className={`w-full px-3 py-2.5 pr-20 bg-gray-2 border ${
+              error ? "border-red-500" : "border-gray-4"
+            } rounded-lg text-gray-12 placeholder:text-gray-8 focus:outline-none focus:ring-2 ${
+              error ? "focus:ring-red-500/20" : "focus:ring-sky-7"
+            } focus:border-transparent transition-all font-mono text-sm`}
           />
-          <button
-            type="button"
-            onClick={() => setShowKey(!showKey)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded transition-colors"
-          >
-            {showKey ? "Hide" : "Show"}
-          </button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            {isLoading && (
+              <div className="w-3 h-3 border-2 border-gray-6 border-t-gray-11 rounded-full animate-spin" />
+            )}
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="px-2 py-1 text-xs text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded transition-colors"
+            >
+              {showKey ? "Hide" : "Show"}
+            </button>
+          </div>
         </div>
+
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center gap-2 text-red-500 text-xs bg-red-500/10 p-2 rounded-lg border border-red-500/20"
+            >
+              <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              {error}
+            </motion.div>
+          )}
+          {!error && apiKey && !isLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 text-emerald-500 text-xs bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20"
+            >
+              <CheckIcon size={14} weight="bold" />
+              API Key is valid
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -480,7 +532,7 @@ function AccountSection() {
 
 function ModelsSection() {
   const [search, setSearch] = useState("");
-  const { models, isLoading } = useModelStore();
+  const { models } = useModelStore();
   const { db } = useData();
   const [filteredModels, setFilteredModels] = useState(models);
 
@@ -521,20 +573,23 @@ function ModelsSection() {
     );
   };
 
-  const filterModels = (search: string) => {
-    setFilteredModels(
-      models.filter(
-        (model) =>
-          model.name.toLowerCase().includes(search.toLowerCase()) ||
-          model.id.toLowerCase().includes(search.toLowerCase()) ||
-          model.description?.toLowerCase().includes(search.toLowerCase())
-      )
-    );
-  };
+  const filterModels = useCallback(
+    (search: string) => {
+      setFilteredModels(
+        models.filter(
+          (model) =>
+            model.name.toLowerCase().includes(search.toLowerCase()) ||
+            model.id.toLowerCase().includes(search.toLowerCase()) ||
+            model.description?.toLowerCase().includes(search.toLowerCase())
+        )
+      );
+    },
+    [models]
+  );
 
   useEffect(() => {
     filterModels(search);
-  }, [search]);
+  }, [search, filterModels]);
 
   const handleEnableAll = () => {
     if (!user) return;

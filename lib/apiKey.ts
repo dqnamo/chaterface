@@ -8,11 +8,15 @@ import { getLocalApiKey } from "./crypto";
  * Returns the key from local storage
  */
 export function useApiKey() {
-  const [apiKey, setApiKey] = useState<string | null>(() => getLocalApiKey());
+  const [apiKey, setApiKey] = useState<string | null>(null);
   // Determine loading based on whether we've attempted to read from local storage
-  // Since getLocalApiKey is synchronous, we can start with false, but for consistency with hydration we might want to check effects.
-  // Actually, getLocalApiKey checks window, so it's safe.
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initial load
+  useEffect(() => {
+    setApiKey(getLocalApiKey());
+    setIsLoading(false);
+  }, []);
 
   // Listen for storage events to update key across tabs/components if needed
   useEffect(() => {

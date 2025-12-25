@@ -81,7 +81,11 @@ export default function ChatInput({
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const { refs, floatingStyles, context } = useFloating({
     open: modelDropdownOpen,
-    onOpenChange: setModelDropdownOpen,
+    onOpenChange: (open) => {
+      if (hasApiKey) {
+        setModelDropdownOpen(open);
+      }
+    },
     whileElementsMounted: autoUpdate,
     middleware: [offset(4), flip(), shift({ padding: 0 })],
     placement: "top-start",
@@ -291,7 +295,7 @@ export default function ChatInput({
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            if (!isStreaming && !isInputEmpty) {
+            if (!isStreaming && !isInputEmpty && hasApiKey) {
               handleSend();
             }
           }
@@ -300,14 +304,17 @@ export default function ChatInput({
       <div className="flex flex-row items-end justify-between p-2">
         <button
           type="button"
-          className="focus:outline-none focus:ring-0"
+          disabled={!hasApiKey}
+          className="focus:outline-none focus:ring-0 disabled:cursor-not-allowed"
           ref={setReference}
           {...getReferenceProps({
             className:
-              "bg-gray-2 dark:bg-gray-3 rounded-lg border border-gray-4 dark:border-gray-4 px-2 py-1 hover:bg-gray-4/70 dark:hover:bg-gray-4/40 transition-colors",
+              "bg-gray-2 dark:bg-gray-3 rounded-lg border border-gray-4 dark:border-gray-4 px-2 py-1 hover:bg-gray-4/70 dark:hover:bg-gray-4/40 transition-colors disabled:opacity-50",
           })}
         >
-          <p className="text-gray-10 text-xs">{model}</p>
+          <p className="text-gray-10 text-xs">
+            {hasApiKey ? model : "Set API key"}
+          </p>
         </button>
         {modelDropdownOpen && (
           <div
@@ -362,10 +369,14 @@ export default function ChatInput({
         )}
         <div
           onClick={
-            isStreaming ? onStop : !isInputEmpty ? handleSend : undefined
+            isStreaming
+              ? onStop
+              : !isInputEmpty && hasApiKey
+              ? handleSend
+              : undefined
           }
           className={`${
-            isStreaming || !isInputEmpty
+            isStreaming || (!isInputEmpty && hasApiKey)
               ? "bg-gray-12 dark:bg-gray-5 cursor-pointer dark:hover:bg-gray-3"
               : "bg-gray-12/50 dark:bg-gray-5/50 cursor-not-allowed"
           } rounded-lg border border-transparent dark:border-gray-6 px-2 py-1 flex flex-row items-center justify-center gap-2`}
