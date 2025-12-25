@@ -243,10 +243,10 @@ export default function ChatInput({
   return (
     <motion.div
       layoutId="chat-input-container"
-      className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-white dark:bg-gray-1 border border-gray-3 dark:border-gray-2 rounded-xl ${
+      className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-white dark:bg-gray-1 border border-gray-3 dark:border-gray-2 w-full ${
         style === "bottom"
-          ? "max-w-2xl fixed bottom-4 left-4 right-4 md:bottom-2  md:w-full mx-auto"
-          : "max-w-2xl mt-10 "
+          ? "w-full max-w-2xl fixed bottom-0 rounded-t-xl md:rounded-xl md:bottom-2"
+          : "max-w-2xl mt-10 rounded-xl"
       }`}
     >
       {!isApiKeyLoading && !hasApiKey && (
