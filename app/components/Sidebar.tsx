@@ -133,7 +133,7 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useThemeStore();
   const { showModal } = useModal();
   return (
-    <div className="fixed flex flex-col left-0 top-0 p-1.5 z-50 w-64 border-b border-gray-3 h-dvh gap-1.5 ">
+    <div className="fixed flex flex-col left-0 top-0 p-1.5 z-60 w-64 border-b border-gray-3 h-dvh gap-1.5 ">
       <motion.div
         initial={false}
         animate={{ width: isOpen ? "100%" : "max-content" }}
