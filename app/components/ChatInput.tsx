@@ -27,6 +27,7 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import { userplexClient } from "@/lib/userplexClient";
+import { useIsPWA } from "@/lib/useIsPWA";
 
 export default function ChatInput({
   onSend,
@@ -67,6 +68,8 @@ export default function ChatInput({
     isLoading: modelsLoading,
     fetchModels,
   } = useModelStore();
+
+  const isPWA = useIsPWA();
 
   useEffect(() => {
     if (defaultModel) {
@@ -245,7 +248,9 @@ export default function ChatInput({
       layoutId="chat-input-container"
       className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-white dark:bg-gray-1 border border-gray-3 dark:border-gray-2 w-full ${
         style === "bottom"
-          ? "w-full max-w-2xl fixed bottom-0 rounded-t-xl md:rounded-xl md:bottom-2"
+          ? `w-full max-w-2xl fixed bottom-0 rounded-t-xl md:rounded-xl md:bottom-2 ${
+              isPWA ? "pb-10 md:pb-0" : ""
+            }`
           : "max-w-2xl mt-10 rounded-xl"
       }`}
     >
@@ -257,7 +262,7 @@ export default function ChatInput({
           transition={{ duration: 0.2 }}
           className="flex flex-col p-1 shrink-0"
         >
-          <div className="flex flex-row bg-gray-2 rounded-lg p-1.5 gap-2 items-center">
+          <div className="flex flex-row bg-gray-2 rounded-lg p- 1.5 gap-2 items-center">
             <div className="flex flex-row items-center px-1.5 gap-2">
               <WarningIcon
                 className="text-red-500 text-xs"
