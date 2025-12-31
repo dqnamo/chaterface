@@ -137,29 +137,8 @@ export default function ChatInput({
   const isInputEmpty = message.trim().length === 0 && attachments.length === 0;
 
   const handleSend = async () => {
-    if (isInputEmpty) return;
-
-    if (attachments.length > 0 && onSendWithAttachments) {
-      // Attachments are already uploaded, just pass them
-      // We filter out any that failed or don't have an ID (shouldn't happen if we block send)
-      const validAttachments = attachments.filter((a) => a.id && a.path);
-
-      // Pass the PATH as the URL so the backend can construct the real URL
-      // This avoids blob URL issues and ensures we use the storage path
-      const attachmentsToSend = validAttachments.map((a) => ({
-        id: a.id as string,
-        url: a.path || a.url, // Use path if available, else url (fallback)
-        name: a.name,
-        type: a.type,
-      }));
-
-      onSendWithAttachments(message.trim(), model, attachmentsToSend);
-      setAttachments([]);
-      setMessage("");
-    } else {
-      onSend(message.trim(), model);
-      setMessage("");
-    }
+    onSend(message.trim(), model);
+    setMessage("");
 
     userplexClient.logs.new({
       name: "sent_new_message",
@@ -371,9 +350,9 @@ export default function ChatInput({
   return (
     <motion.div
       layoutId="chat-input-container"
-      className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-white dark:bg-gray-1 border border-gray-3 dark:border-gray-2 w-full ${
+      className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-gray-1 dark:bg-gray-2  border-gray-4 border w-full ${
         style === "bottom"
-          ? `w-full max-w-2xl fixed bottom-0 rounded-t-xl md:rounded-xl md:bottom-2 ${
+          ? `w-full max-w-2xl fixed bottom-0 md:border-b-0 md:pb-2 rounded-t-xl ${
               isPWA ? "pb-10 md:pb-0" : ""
             }`
           : "max-w-2xl mt-10 rounded-xl"
@@ -387,10 +366,10 @@ export default function ChatInput({
           transition={{ duration: 0.2 }}
           className="flex flex-col p-1 shrink-0"
         >
-          <div className="flex flex-row bg-gray-2 rounded-lg p- 1.5 gap-2 items-center">
+          <div className="flex flex-row bg-gray-2 rounded-lg p-1.5 gap-2 items-center">
             <div className="flex flex-row items-center px-1.5 gap-2">
               <WarningIcon
-                className="text-red-500 text-sm"
+                className="text-orange-500 text-sm"
                 size={16}
                 weight="bold"
               />

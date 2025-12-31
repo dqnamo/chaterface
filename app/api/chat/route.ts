@@ -8,17 +8,14 @@ const db = init({
   schema: schema,
 });
 
-type Part = { type: 'text'; text: string } | { type: 'image'; image: string };
-
 export async function POST(req: Request) {
-  const { messages, model, apiKey: userApiKey }: { 
+  const { messages, model }: { 
     messages: UIMessage[]; 
     model: string; 
     conversationId: string;
-    apiKey?: string;
   } = await req.json();
 
-  const apiKey = userApiKey || process.env.OPENROUTER_API_KEY;
+  const apiKey = req.headers.get('Authorization')?.split(' ')[1];
   
   if (!apiKey) {
     return new Response(
@@ -27,100 +24,8 @@ export async function POST(req: Request) {
     );
   }
 
-  // 1. Convert to intermediate format for processing
-  const intermediateMessages = messages.map(m => {
-    let parts: Part[] = [];
-
-    // Start with parts if they exist
-    if (m.parts && m.parts.length > 0) {
-      parts = m.parts.map(p => {
-        if (p.type === 'text') return { type: 'text', text: p.text };
-        if (p.type === 'image') return { type: 'image', image: p.image };
-        return null;
-      }).filter((p): p is Part => p !== null);
-    } else {
-      // Fallback: Use content as text part
-      parts = [{ type: 'text', text: m.content }];
-    }
-
-    // Check if experimental_attachments exist and append them if we don't have images yet
-    // This handles the case where parts only contains text but attachments has images
-    const hasImages = parts.some(p => p.type === 'image');
-
-    if (!hasImages && m.experimental_attachments && m.experimental_attachments.length > 0) {
-        m.experimental_attachments.forEach(a => {
-            if (a.contentType?.startsWith('image/')) {
-                // We use the URL or path here. The processor expects 'image' property.
-                parts.push({ type: 'image', image: a.url });
-            }
-        });
-    }
-
-    return {
-        role: m.role,
-        content: parts
-    };
-  });
-
-  // 2. Process images (resolve InstantDB paths)
-  const processedMessages = await Promise.all(intermediateMessages.map(async msg => {
-    if (msg.role === 'user' && Array.isArray(msg.content)) {
-        const processedContent = await Promise.all(msg.content.map(async (part) => {
-             if (part.type === 'image' && typeof part.image === 'string') {
-                const imageStr = part.image;
-                if (!imageStr.startsWith('http') && !imageStr.startsWith('data:')) {
-                     // It is likely a storage path. Query InstantDB for the file URL.
-                     const result = await db.query({
-                         $files: {
-                             $: {
-                                 where: { path: imageStr }
-                             }
-                         }
-                     });
-
-                     console.log('result for image', imageStr, result);
-                     
-                     const file = result.$files?.[0];
-                     if (file && file.url) {
-                         return { ...part, image: file.url };
-                     } else {
-                         console.warn(`Could not find file URL for path: ${imageStr}`);
-                     }
-                }
-             }
-             return part;
-        }));
-        
-        return {
-            ...msg,
-            content: processedContent
-        };
-    }
-    return msg;
-  }));
-
-  // 3. Convert to OpenRouter format
-  const openRouterMessages = processedMessages.map(msg => {
-      if (Array.isArray(msg.content)) {
-          return {
-              role: msg.role,
-              content: msg.content.map((part) => {
-                  if (part.type === 'image') {
-                      return {
-                          type: 'image_url',
-                          image_url: {
-                              url: part.image
-                          }
-                      };
-                  }
-                  return part;
-              })
-          };
-      }
-      return msg;
-  });
-
   try {
+    console.log("messages", messages);
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -131,7 +36,7 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
         model: model,
-        messages: openRouterMessages,
+        messages: messages,
         stream: true,
         include_reasoning: true, // Request reasoning if available
         }),

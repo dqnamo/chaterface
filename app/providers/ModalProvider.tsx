@@ -6,6 +6,8 @@ import {
   useState,
   ReactNode,
   useEffect,
+  useCallback,
+  useMemo,
 } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -25,17 +27,20 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     "content" | "small" | "medium" | "large"
   >("content");
 
-  const showModal = (
-    content: ReactNode,
-    size: "content" | "small" | "medium" | "large" = "content"
-  ) => {
-    setModalContent(content);
-    setModalSize(size);
-  };
+  const showModal = useCallback(
+    (
+      content: ReactNode,
+      size: "content" | "small" | "medium" | "large" = "content"
+    ) => {
+      setModalContent(content);
+      setModalSize(size);
+    },
+    []
+  );
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalContent(null);
-  };
+  }, []);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -56,8 +61,13 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     }
   }, [modalContent]);
 
+  const value = useMemo(
+    () => ({ showModal, closeModal }),
+    [showModal, closeModal]
+  );
+
   return (
-    <ModalContext.Provider value={{ showModal, closeModal }}>
+    <ModalContext.Provider value={value}>
       {children}
       <AnimatePresence>
         {modalContent && (

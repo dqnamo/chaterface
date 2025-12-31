@@ -32,6 +32,7 @@ const _schema = i.schema({
       reasoning: i.string().optional(),
       role: i.string(),
       model: i.string().optional(),
+      usage: i.json().optional(),
     }),
   },
   links: {

@@ -133,39 +133,39 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useThemeStore();
   const { showModal } = useModal();
   return (
-    <div className="fixed h-max w-full max-w-72 flex flex-col left-0 top-0 p-1.5 z-60 gap-1.5 ">
+    <div className="fixed h-max w-full max-w-72 flex flex-col max-h-dvh left-0 top-0 p-2 z-60 gap-2 ">
       <motion.div
         initial={false}
         animate={{ width: isOpen ? "100%" : "max-content" }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="p-1 bg-white dark:bg-gray-1 shadow-subtle border border-gray-3 dark:border-gray-2 rounded-lg flex flex-row items-center gap-1"
+        className="p-1 bg-white dark:bg-gray-2 shadow-subtle border border-gray-3 rounded-lg flex flex-row items-center gap-1"
       >
         <button
           type="button"
           aria-label="Toggle theme"
-          className="p-1 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+          className="p-1.5 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
           onClick={toggleTheme}
         >
           <SunIcon
             className="dark:block hidden text-gray-11 transition-colors group-hover:text-gray-12"
-            size={18}
+            size={16}
             weight="bold"
           />
           <MoonStarsIcon
             className="block dark:hidden text-gray-11 transition-colors group-hover:text-gray-12"
-            size={18}
+            size={16}
             weight="bold"
           />
         </button>
         <button
           type="button"
           aria-label="Settings"
-          className="p-1 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+          className="p-1.5 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
           onClick={() => showModal(<SettingsModal />)}
         >
           <FadersIcon
             className="text-gray-11 transition-colors group-hover:text-gray-12"
-            size={18}
+            size={16}
             weight="bold"
           />
         </button>
@@ -173,18 +173,18 @@ export default function Sidebar() {
           href="/"
           type="button"
           aria-label="Create new conversation"
-          className="p-1 hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+          className="p-1.5 hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
         >
           <PlusIcon
             className="text-gray-11 transition-colors group-hover:text-gray-12"
-            size={18}
+            size={16}
             weight="bold"
           />
         </Link>
         <button
           type="button"
           aria-label="Open sidebar"
-          className="ml-auto p-1 cursor-pointer hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
+          className="ml-auto p-1.5 cursor-pointer hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
           onClick={() => setIsOpen(!isOpen)}
         >
           <SidebarSimpleIcon
@@ -220,7 +220,7 @@ export default function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
-              className="bg-white flex flex-col subtle-shadow dark:bg-gray-1 rounded-lg border border-gray-3 dark:border-gray-2 backdrop-blur-sm h-full max-h-dvh"
+              className="bg-white flex flex-col subtle-shadow dark:bg-gray-2 rounded-lg border border-gray-3 backdrop-blur-sm flex-1 min-h-0"
             >
               <div className="flex flex-col">
                 <p className="text-gray-11 font-medium text-sm px-3 pt-3">
@@ -249,7 +249,7 @@ export default function Sidebar() {
                   ) : null}
                 </div>
               </div>
-              <div className="flex flex-col gap-px p-1 overflow-y-auto">
+              <div className="flex flex-col gap-px p-1 overflow-y-auto flex-1">
                 {filteredConversations.length === 0 ? (
                   <div className="text-gray-11 text-sm p-3">
                     {conversations.length === 0
