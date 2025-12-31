@@ -298,8 +298,13 @@ export default function ConversationPage({
             ? new Date(message.createdAt)
             : undefined,
           experimental_attachments: message.attachments?.map(
-            (a: { url: string; name?: string; contentType?: string }) => ({
-              url: a.url,
+            (a: {
+              url: string;
+              name?: string;
+              contentType?: string;
+              path?: string;
+            }) => ({
+              url: a.path || a.url, // Prefer path if available
               name: a.name,
               contentType: a.contentType,
             })
