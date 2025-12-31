@@ -292,7 +292,7 @@ export default function ChatInput({
         </motion.div>
       )}
       <textarea
-        className="w-full h-full p-4 resize-none focus:outline-none text-gray-12 text-sm placeholder:text-gray-10"
+        className="w-full h-full p-4 resize-none focus:outline-none text-gray-12 text-sm placeholder:text-gray-11"
         rows={2}
         placeholder="Ask me anything..."
         value={message}
@@ -314,10 +314,10 @@ export default function ChatInput({
           ref={setReference}
           {...getReferenceProps({
             className:
-              "bg-gray-2 dark:bg-gray-3 rounded-lg border border-gray-4 dark:border-gray-4 px-2 py-1 hover:bg-gray-4/70 dark:hover:bg-gray-4/40 transition-colors disabled:opacity-50",
+              "bg-gray-2 cursor-pointer dark:bg-gray-3 rounded-lg border border-gray-4 dark:border-gray-4 px-2 py-1 hover:bg-gray-4/70 dark:hover:bg-gray-4/40 transition-colors disabled:opacity-50",
           })}
         >
-          <p className="text-gray-10 text-xs">
+          <p className="text-gray-11 text-xs">
             {hasApiKey ? model : "Set API key"}
           </p>
         </button>

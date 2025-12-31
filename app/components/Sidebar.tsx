@@ -133,7 +133,7 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useThemeStore();
   const { showModal } = useModal();
   return (
-    <div className="fixed flex flex-col left-0 top-0 p-1.5 z-60 w-64 border-b border-gray-3 h-dvh gap-1.5 ">
+    <div className="fixed h-max w-full max-w-72 flex flex-col left-0 top-0 p-1.5 z-60 gap-1.5 ">
       <motion.div
         initial={false}
         animate={{ width: isOpen ? "100%" : "max-content" }}
@@ -148,12 +148,12 @@ export default function Sidebar() {
         >
           <SunIcon
             className="dark:block hidden text-gray-10 transition-colors group-hover:text-gray-12"
-            size={16}
+            size={18}
             weight="bold"
           />
           <MoonStarsIcon
             className="block dark:hidden text-gray-10 transition-colors group-hover:text-gray-12"
-            size={16}
+            size={18}
             weight="bold"
           />
         </button>
@@ -165,7 +165,7 @@ export default function Sidebar() {
         >
           <FadersIcon
             className="text-gray-10 transition-colors group-hover:text-gray-12"
-            size={16}
+            size={18}
             weight="bold"
           />
         </button>
@@ -177,7 +177,7 @@ export default function Sidebar() {
         >
           <PlusIcon
             className="text-gray-10 transition-colors group-hover:text-gray-12"
-            size={16}
+            size={18}
             weight="bold"
           />
         </Link>
@@ -189,7 +189,7 @@ export default function Sidebar() {
         >
           <SidebarSimpleIcon
             className="text-gray-10 transition-colors group-hover:text-gray-12"
-            size={16}
+            size={18}
             weight={isOpen ? "fill" : "bold"}
           />
         </button>
@@ -220,7 +220,7 @@ export default function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
-              className="bg-white flex flex-col subtle-shadow dark:bg-gray-1 rounded-lg border border-gray-3 dark:border-gray-2 backdrop-blur-sm h-full overflow-hidden"
+              className="bg-white flex flex-col subtle-shadow dark:bg-gray-1 rounded-lg border border-gray-3 dark:border-gray-2 backdrop-blur-sm h-dvh overflow-hidden"
             >
               <div className="flex flex-col">
                 <p className="text-gray-11 font-medium text-xs px-3 pt-3">

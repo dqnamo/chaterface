@@ -65,7 +65,7 @@ export default function ChatPage() {
         <h2 className="text-gray-12 text-xl font-medium">
           Any Model. Any Question.
         </h2>
-        <p className="text-gray-10 text-sm mt-1">What do you want to know?</p>
+        <p className="text-gray-11 text-sm mt-1">What do you want to know?</p>
       </motion.div>
 
       <ChatInput
