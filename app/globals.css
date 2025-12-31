@@ -41,6 +41,18 @@
   --color-sky-10: var(--sky-10);
   --color-sky-11: var(--sky-11);
   --color-sky-12: var(--sky-12);
+
+  --animate-collapsible-down: collapsible-down 0.2s ease-out;
+  --animate-collapsible-up: collapsible-up 0.2s ease-out;
+  
+  @keyframes collapsible-down {
+    from { height: 0; }
+    to { height: var(--radix-collapsible-content-height); }
+  }
+  @keyframes collapsible-up {
+    from { height: var(--radix-collapsible-content-height); }
+    to { height: 0; }
+  }
 }
 
 :root {
@@ -56,6 +68,8 @@
   --shadow-4: rgba(28, 40, 64, 0.18) 0px 14px 32px -14px,
     rgba(28, 40, 64, 0.22) 0px 28px 80px -28px;
   --shadow-outline: rgba(28, 40, 64, 0.06) 0px 0px 0px 1px;
+
+  --color-muted-foreground: var(--gray-11);
 }
 
 html, body {
@@ -82,6 +96,7 @@ html, body {
     rgba(0, 0, 0, 0.70) 0px 18px 44px -28px,
     rgba(0, 0, 0, 0.80) 0px 44px 130px -72px;
   --shadow-outline: rgba(255, 255, 255, 0.10) 0px 0px 0px 1px;
+
 }
 
 @utility no-scrollbar {

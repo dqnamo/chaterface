@@ -7,6 +7,9 @@ export type Model = {
   name: string;
   description?: string;
   context_length: number;
+  architecture?: {
+    modality?: string;
+  };
 };
 
 interface ModelState {

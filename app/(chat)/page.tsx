@@ -6,7 +6,6 @@ import { DateTime } from "luxon";
 import { useRouter } from "next/navigation";
 import ChatInput from "@/app/components/ChatInput";
 import { motion } from "motion/react";
-import Link from "next/link";
 import { userplexClient } from "@/lib/userplexClient";
 
 export default function ChatPage() {
@@ -14,7 +13,11 @@ export default function ChatPage() {
 
   const { db, user } = useData();
 
-  const handleNewMessage = async (message: string, model: string) => {
+  const handleNewMessage = async (
+    message: string,
+    model: string,
+    attachments: { id: string; url: string; name: string; type: string }[] = []
+  ) => {
     if (!user) return; // Shouldn't happen with guest auth, but safety check
 
     const messageContent = message.trim();
@@ -23,6 +26,19 @@ export default function ChatPage() {
     const messageId = id();
 
     // Create conversation and message in one transaction, linked to user
+    const tx = db.tx.messages[messageId]
+      .update({
+        content: messageContent,
+        role: "user",
+        createdAt: DateTime.now().toISO(),
+        model: model,
+      })
+      .link({ conversation: conversationId });
+
+    attachments.forEach((a) => {
+      if (a.id) tx.link({ attachments: a.id });
+    });
+
     db.transact([
       db.tx.conversations[conversationId]
         .update({
@@ -31,14 +47,7 @@ export default function ChatPage() {
           updatedAt: DateTime.now().toISO(),
         })
         .link({ user: user.id }),
-      db.tx.messages[messageId]
-        .update({
-          content: messageContent,
-          role: "user",
-          createdAt: DateTime.now().toISO(),
-          model: model,
-        })
-        .link({ conversation: conversationId }),
+      tx,
     ]);
 
     userplexClient.logs.new({
@@ -46,6 +55,7 @@ export default function ChatPage() {
       user_id: user?.id ?? "",
       data: {
         model: model,
+        hasAttachments: attachments.length > 0,
       },
     });
 
@@ -70,6 +80,9 @@ export default function ChatPage() {
 
       <ChatInput
         onSend={(message, model) => handleNewMessage(message, model)}
+        onSendWithAttachments={(message, model, attachments) =>
+          handleNewMessage(message, model, attachments)
+        }
       />
     </div>
   );

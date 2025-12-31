@@ -7,6 +7,8 @@ const _schema = i.schema({
     $files: i.entity({
       path: i.string().unique().indexed(),
       url: i.string(),
+      name: i.string().optional(),
+      contentType: i.string().optional(),
     }),
     $users: i.entity({
       email: i.string().unique().indexed().optional(),
@@ -27,6 +29,7 @@ const _schema = i.schema({
     messages: i.entity({
       createdAt: i.date().indexed(),
       content: i.string(),
+      reasoning: i.string().optional(),
       role: i.string(),
       model: i.string().optional(),
     }),
@@ -79,6 +82,18 @@ const _schema = i.schema({
         on: "conversations",
         has: "many",
         label: "messages",
+      },
+    },
+    messageAttachments: {
+      forward: {
+        on: "$files",
+        has: "one",
+        label: "message",
+      },
+      reverse: {
+        on: "messages",
+        has: "many",
+        label: "attachments",
       },
     },
   },
