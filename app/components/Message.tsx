@@ -18,7 +18,7 @@ export default function Message({
           animate={{ opacity: 1, y: 0 }}
           initial={animate ? { opacity: 0, y: 10 } : undefined}
           transition={{ duration: 0.2 }}
-          className="flex flex-row bg-linear-to-br from-blue-10 to-blue-8 px-3 py-1.5 rounded-xl max-w-lg w-max self-end"
+          className="flex flex-row bg-linear-to-br dark:from-blue-10 dark:to-blue-8 from-blue-8 to-blue-10 px-3 py-1.5 rounded-xl max-w-lg w-max self-end"
         >
           <p className="text-white whitespace-pre-wrap">{message.content}</p>
         </motion.div>
