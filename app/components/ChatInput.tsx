@@ -265,11 +265,11 @@ export default function ChatInput({
           <div className="flex flex-row bg-gray-2 rounded-lg p- 1.5 gap-2 items-center">
             <div className="flex flex-row items-center px-1.5 gap-2">
               <WarningIcon
-                className="text-red-500 text-xs"
+                className="text-red-500 text-sm"
                 size={16}
                 weight="bold"
               />
-              <h3 className="text-gray-11 text-xs font-medium">
+              <h3 className="text-gray-11 text-sm font-medium">
                 No OpenRouter API Key Set
               </h3>
             </div>
@@ -284,7 +284,7 @@ export default function ChatInput({
                 size={14}
                 weight="bold"
               />
-              <span className="text-gray-2 dark:text-gray-12 font-medium text-xs">
+              <span className="text-gray-2 dark:text-gray-12 font-medium text-sm">
                 Open Settings
               </span>
             </button>
@@ -317,7 +317,7 @@ export default function ChatInput({
               "bg-gray-2 cursor-pointer dark:bg-gray-3 rounded-lg border border-gray-4 dark:border-gray-4 px-2 py-1 hover:bg-gray-4/70 dark:hover:bg-gray-4/40 transition-colors disabled:opacity-50",
           })}
         >
-          <p className="text-gray-11 text-xs">
+          <p className="text-gray-11 text-sm">
             {hasApiKey ? model : "Set API key"}
           </p>
         </button>
@@ -333,9 +333,9 @@ export default function ChatInput({
             <div className="flex flex-col overflow-hidden max-h-80 divide-y divide-gray-3 dark:divide-gray-3">
               <div className="overflow-y-auto flex flex-col divide-y divide-gray-3 dark:divide-gray-3 no-scrollbar">
                 {modelsLoading ? (
-                  <div className="text-gray-9 text-xs p-3">Loading models…</div>
+                  <div className="text-gray-9 text-sm p-3">Loading models…</div>
                 ) : filteredModels.length === 0 ? (
-                  <div className="text-gray-9 text-xs p-3">
+                  <div className="text-gray-9 text-sm p-3">
                     {models.length === 0
                       ? "No models available."
                       : `No models found for “${modelSearch.trim()}”.`}
@@ -344,10 +344,10 @@ export default function ChatInput({
                   filteredModels.map((model) => (
                     <button
                       key={model.id}
-                      className="text-gray-10 text-xs p-2 text-start flex flex-col hover:bg-gray-3 dark:hover:bg-gray-3 transition-colors"
+                      className="text-gray-10 text-sm p-2 text-start flex flex-col hover:bg-gray-3 dark:hover:bg-gray-3 transition-colors"
                       onClick={() => handleModelSelect(model.id)}
                     >
-                      <p className="text-gray-11 text-xs">{model.name}</p>
+                      <p className="text-gray-11 text-sm">{model.name}</p>
                       <div className="flex flex-row items-center justify-between gap-2">
                         <p className="text-gray-9 text-[11px]">
                           {model.id.slice(0, 10)}...{model.id.slice(-10)}
@@ -366,7 +366,7 @@ export default function ChatInput({
                 type="text"
                 autoFocus
                 placeholder="Search models..."
-                className="w-full px-2 py-3 text-xs text-gray-12 placeholder:text-gray-9 focus:outline-none focus:ring-0 bg-gray-2/50"
+                className="w-full px-2 py-3 text-sm text-gray-12 placeholder:text-gray-9 focus:outline-none focus:ring-0 bg-gray-2/50"
                 onChange={(e) => setModelSearch(e.target.value)}
               />
             </div>

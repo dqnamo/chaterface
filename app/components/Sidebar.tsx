@@ -220,10 +220,10 @@ export default function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
-              className="bg-white flex flex-col subtle-shadow dark:bg-gray-1 rounded-lg border border-gray-3 dark:border-gray-2 backdrop-blur-sm h-dvh overflow-hidden"
+              className="bg-white flex flex-col subtle-shadow dark:bg-gray-1 rounded-lg border border-gray-3 dark:border-gray-2 backdrop-blur-sm h-full max-h-dvh"
             >
               <div className="flex flex-col">
-                <p className="text-gray-11 font-medium text-xs px-3 pt-3">
+                <p className="text-gray-11 font-medium text-sm px-3 pt-3">
                   Conversations
                 </p>
                 <div className="relative border-b border-gray-3">
@@ -235,7 +235,7 @@ export default function Sidebar() {
                       if (e.key === "Escape") setSearch("");
                     }}
                     placeholder="Search conversations"
-                    className="w-full text-gray-12 border-gray-3 dark:border-gray-2 placeholder:text-gray-10 text-xs p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-5 bg-transparent pr-12"
+                    className="w-full text-gray-12 border-gray-3 dark:border-gray-2 placeholder:text-gray-10 text-sm p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-5 bg-transparent pr-12"
                   />
                   {search.trim().length > 0 ? (
                     <button
@@ -251,7 +251,7 @@ export default function Sidebar() {
               </div>
               <div className="flex flex-col gap-px p-1 overflow-y-auto">
                 {filteredConversations.length === 0 ? (
-                  <div className="text-gray-9 text-xs p-3">
+                  <div className="text-gray-9 text-sm p-3">
                     {conversations.length === 0
                       ? "No conversations yet."
                       : `No conversations found for “${search.trim()}”.`}

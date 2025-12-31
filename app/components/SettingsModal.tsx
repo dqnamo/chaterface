@@ -191,7 +191,7 @@ function ApiKeySection() {
   return (
     <div className="">
       <h2 className="text-gray-11 text-sm font-medium">OpenRouter API Key</h2>
-      <p className="text-gray-9 text-xs mb-4 mt-1">
+      <p className="text-gray-9 text-sm mb-4 mt-1">
         Add your OpenRouter API key to use AI models. These keys are stored
         locally on your device. Get one at{" "}
         <a
@@ -225,7 +225,7 @@ function ApiKeySection() {
             <button
               type="button"
               onClick={() => setShowKey(!showKey)}
-              className="px-2 py-1 text-xs text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded transition-colors"
+              className="px-2 py-1 text-sm text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded transition-colors"
             >
               {showKey ? "Hide" : "Show"}
             </button>
@@ -238,7 +238,7 @@ function ApiKeySection() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="flex items-center gap-2 text-red-500 text-xs bg-red-500/10 p-2 rounded-lg border border-red-500/20"
+              className="flex items-center gap-2 text-red-500 text-sm bg-red-500/10 p-2 rounded-lg border border-red-500/20"
             >
               <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
               {error}
@@ -248,7 +248,7 @@ function ApiKeySection() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 text-emerald-500 text-xs bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20"
+              className="flex items-center gap-2 text-emerald-500 text-sm bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20"
             >
               <CheckIcon size={14} weight="bold" />
               API Key is valid
@@ -326,11 +326,11 @@ function AccountSection() {
             <p className="text-sm font-medium text-gray-12 truncate">
               {user.email}
             </p>
-            <p className="text-xs text-gray-10">Signed in</p>
+            <p className="text-sm text-gray-10">Signed in</p>
           </div>
           <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 rounded-full">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+            <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
               Synced
             </span>
           </div>
@@ -358,7 +358,7 @@ function AccountSection() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-12">Guest Account</p>
-            <p className="text-xs text-gray-10">
+            <p className="text-sm text-gray-10">
               Your data is saved on this device only
             </p>
           </div>
@@ -632,7 +632,7 @@ function ModelsSection() {
       <h2 className="text-sm font-semibold text-gray-11 mb-1 flex items-center gap-2">
         Models
       </h2>
-      <p className="text-xs text-gray-9">
+      <p className="text-sm text-gray-9">
         Select what models you want to enable. You can also set defaults and
         favorites.
       </p>
@@ -648,15 +648,15 @@ function ModelsSection() {
         <div className="flex flex-row gap-1 items-center justify-end">
           <button
             onClick={handleEnableAll}
-            className="px-2 py-1 text-xs text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded-lg transition-colors"
+            className="px-2 py-1 text-sm text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded-lg transition-colors"
           >
-            <p className="text-xs text-gray-11">Enable All</p>
+            <p className="text-sm text-gray-11">Enable All</p>
           </button>
           <button
             onClick={handleDisableAll}
-            className="px-2 py-1 text-xs text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded-lg transition-colors"
+            className="px-2 py-1 text-sm text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded-lg transition-colors"
           >
-            <p className="text-xs text-gray-11">Disable All</p>
+            <p className="text-sm text-gray-11">Disable All</p>
           </button>
         </div>
         {filteredModels.map((model) => {
@@ -673,7 +673,7 @@ function ModelsSection() {
             >
               <div className="flex flex-col gap-1">
                 <div className="flex flex-row items-center gap-2">
-                  <p className="text-xs font-medium text-gray-11">
+                  <p className="text-sm font-medium text-gray-11">
                     {model.name}
                   </p>
                   {userSettings?.defaultModel === model.id && (
@@ -690,36 +690,36 @@ function ModelsSection() {
                       />
                     )}
                 </div>
-                <p className="text-xs text-gray-9 truncate">{model.id}</p>
+                <p className="text-sm text-gray-9 truncate">{model.id}</p>
               </div>
               <div className="flex flex-row gap-2 items-center justify-center">
                 {!isDisabled && (
                   <button
                     onClick={() => setDefaultModel(model.id)}
-                    className=" text-xs rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
+                    className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
                   >
-                    <p className="text-xs text-gray-10">Make Default</p>
+                    <p className="text-sm text-gray-10">Make Default</p>
                   </button>
                 )}
 
                 {!isDisabled && (
                   <button
                     onClick={() => addToFavorites(model.id)}
-                    className=" text-xs rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
+                    className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
                   >
-                    <p className="text-xs text-gray-10">Add to Favorites</p>
+                    <p className="text-sm text-gray-10">Add to Favorites</p>
                   </button>
                 )}
 
                 {isDisabled ? (
                   <button
                     onClick={() => toggleModel(model.id, false)}
-                    className="h-4 w-4 text-xs rounded transition-colors text-gray-11 cursor-pointer hover:text-gray-12 bg-gray-3 hover:bg-gray-4"
+                    className="h-4 w-4 text-sm rounded transition-colors text-gray-11 cursor-pointer hover:text-gray-12 bg-gray-3 hover:bg-gray-4"
                   ></button>
                 ) : (
                   <button
                     onClick={() => toggleModel(model.id, true)}
-                    className="h-4 w-4 text-xs rounded transition-colors bg-gray-4 items-center justify-center flex cursor-pointer"
+                    className="h-4 w-4 text-sm rounded transition-colors bg-gray-4 items-center justify-center flex cursor-pointer"
                   >
                     <CheckIcon
                       size={12}
