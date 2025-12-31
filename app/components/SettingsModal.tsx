@@ -33,7 +33,7 @@ export default function SettingsModal() {
                   <GearIcon
                     size={14}
                     weight="bold"
-                    className="text-gray-10 z-10"
+                    className="text-gray-11 z-10"
                   />
                 ),
               },
@@ -43,7 +43,7 @@ export default function SettingsModal() {
                   <UserIcon
                     size={14}
                     weight="bold"
-                    className="text-gray-10 z-10"
+                    className="text-gray-11 z-10"
                   />
                 ),
               },
@@ -53,7 +53,7 @@ export default function SettingsModal() {
                   <HeadCircuitIcon
                     size={14}
                     weight="bold"
-                    className="text-gray-10 z-10"
+                    className="text-gray-11 z-10"
                   />
                 ),
               },
@@ -136,7 +136,7 @@ export function AnimatedTabs({
         <button
           key={tab.name}
           onClick={() => onTabChange(tab.name)}
-          className="relative flex items-center text-gray-10 flex-row gap-1.5 py-1 px-2 rounded-md focus:outline-none cursor-pointer transition-colors"
+          className="relative flex items-center text-gray-11 flex-row gap-1.5 py-1 px-2 rounded-md focus:outline-none cursor-pointer transition-colors"
         >
           {activeTab === tab.name && (
             <motion.div
@@ -146,7 +146,7 @@ export function AnimatedTabs({
             />
           )}
           {tab.icon}
-          <span className="relative z-10 text-gray-10 text-sm">{tab.name}</span>
+          <span className="relative z-10 text-gray-11 text-sm">{tab.name}</span>
         </button>
       ))}
     </div>
@@ -191,14 +191,14 @@ function ApiKeySection() {
   return (
     <div className="">
       <h2 className="text-gray-11 text-sm font-medium">OpenRouter API Key</h2>
-      <p className="text-gray-9 text-sm mb-4 mt-1">
+      <p className="text-gray-11 text-sm mb-4 mt-1">
         Add your OpenRouter API key to use AI models. These keys are stored
         locally on your device. Get one at{" "}
         <a
           href="https://openrouter.ai/keys"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-gray-9 hover:text-gray-12 underline underline-offset-2"
+          className="text-gray-11 hover:text-gray-12 underline underline-offset-2"
         >
           openrouter.ai/keys
         </a>
@@ -214,7 +214,7 @@ function ApiKeySection() {
             placeholder="sk-or-v1-..."
             className={`w-full px-3 py-2.5 pr-20 bg-gray-2 border ${
               error ? "border-red-500" : "border-gray-4"
-            } rounded-lg text-gray-12 placeholder:text-gray-8 focus:outline-none focus:ring-2 ${
+            } rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 ${
               error ? "focus:ring-red-500/20" : "focus:ring-sky-7"
             } focus:border-transparent transition-all font-mono text-sm`}
           />
@@ -326,7 +326,7 @@ function AccountSection() {
             <p className="text-sm font-medium text-gray-12 truncate">
               {user.email}
             </p>
-            <p className="text-sm text-gray-10">Signed in</p>
+            <p className="text-sm text-gray-11">Signed in</p>
           </div>
           <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 rounded-full">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
@@ -358,7 +358,7 @@ function AccountSection() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-12">Guest Account</p>
-            <p className="text-sm text-gray-10">
+            <p className="text-sm text-gray-11">
               Your data is saved on this device only
             </p>
           </div>
@@ -388,7 +388,7 @@ function AccountSection() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-3 py-2.5 bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-8 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
+              className="w-full px-3 py-2.5 bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
               autoFocus
             />
           </div>
@@ -432,7 +432,7 @@ function AccountSection() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Enter 6-digit code"
-              className="w-full px-3 py-2.5 bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-8 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all text-center tracking-widest font-mono text-lg"
+              className="w-full px-3 py-2.5 bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all text-center tracking-widest font-mono text-lg"
               autoFocus
               maxLength={6}
             />
@@ -632,14 +632,14 @@ function ModelsSection() {
       <h2 className="text-sm font-semibold text-gray-11 mb-1 flex items-center gap-2">
         Models
       </h2>
-      <p className="text-sm text-gray-9">
+      <p className="text-sm text-gray-11">
         Select what models you want to enable. You can also set defaults and
         favorites.
       </p>
       <input
         type="text"
         placeholder="Search models..."
-        className=" mt-4 w-full px-2 py-1 text-sm bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-8 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
+        className=" mt-4 w-full px-2 py-1 text-sm bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -677,7 +677,7 @@ function ModelsSection() {
                     {model.name}
                   </p>
                   {userSettings?.defaultModel === model.id && (
-                    <p className="text-[11px] text-gray-10 font-mono font-semibold uppercase">
+                    <p className="text-[11px] text-gray-11 font-mono font-semibold uppercase">
                       Default
                     </p>
                   )}
@@ -690,7 +690,7 @@ function ModelsSection() {
                       />
                     )}
                 </div>
-                <p className="text-sm text-gray-9 truncate">{model.id}</p>
+                <p className="text-sm text-gray-11 truncate">{model.id}</p>
               </div>
               <div className="flex flex-row gap-2 items-center justify-center">
                 {!isDisabled && (
@@ -698,7 +698,7 @@ function ModelsSection() {
                     onClick={() => setDefaultModel(model.id)}
                     className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
                   >
-                    <p className="text-sm text-gray-10">Make Default</p>
+                    <p className="text-sm text-gray-11">Make Default</p>
                   </button>
                 )}
 
@@ -707,7 +707,7 @@ function ModelsSection() {
                     onClick={() => addToFavorites(model.id)}
                     className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
                   >
-                    <p className="text-sm text-gray-10">Add to Favorites</p>
+                    <p className="text-sm text-gray-11">Add to Favorites</p>
                   </button>
                 )}
 
@@ -724,7 +724,7 @@ function ModelsSection() {
                     <CheckIcon
                       size={12}
                       weight="bold"
-                      className="text-gray-10"
+                      className="text-gray-11"
                     />
                   </button>
                 )}

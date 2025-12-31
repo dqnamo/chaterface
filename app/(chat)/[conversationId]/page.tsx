@@ -187,7 +187,7 @@ function LoadingSpinner() {
         height={20}
         className="block dark:hidden opacity-80"
       />
-      <p className="text-gray-10 text-sm">{text}</p>
+      <p className="text-gray-11 text-sm">{text}</p>
     </div>
   );
 }

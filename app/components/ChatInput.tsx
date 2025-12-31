@@ -333,9 +333,11 @@ export default function ChatInput({
             <div className="flex flex-col overflow-hidden max-h-80 divide-y divide-gray-3 dark:divide-gray-3">
               <div className="overflow-y-auto flex flex-col divide-y divide-gray-3 dark:divide-gray-3 no-scrollbar">
                 {modelsLoading ? (
-                  <div className="text-gray-9 text-sm p-3">Loading models…</div>
+                  <div className="text-gray-11 text-sm p-3">
+                    Loading models…
+                  </div>
                 ) : filteredModels.length === 0 ? (
-                  <div className="text-gray-9 text-sm p-3">
+                  <div className="text-gray-11 text-sm p-3">
                     {models.length === 0
                       ? "No models available."
                       : `No models found for “${modelSearch.trim()}”.`}
@@ -344,16 +346,16 @@ export default function ChatInput({
                   filteredModels.map((model) => (
                     <button
                       key={model.id}
-                      className="text-gray-10 text-sm p-2 text-start flex flex-col hover:bg-gray-3 dark:hover:bg-gray-3 transition-colors"
+                      className="text-gray-11 text-sm p-2 text-start flex flex-col hover:bg-gray-3 dark:hover:bg-gray-3 transition-colors"
                       onClick={() => handleModelSelect(model.id)}
                     >
                       <p className="text-gray-11 text-sm">{model.name}</p>
                       <div className="flex flex-row items-center justify-between gap-2">
-                        <p className="text-gray-9 text-[11px]">
+                        <p className="text-gray-11 text-[11px]">
                           {model.id.slice(0, 10)}...{model.id.slice(-10)}
                         </p>
                         <div className="flex flex-row items-center  gap-2">
-                          <p className="text-gray-9 text-[11px] ">
+                          <p className="text-gray-11 text-[11px] ">
                             {prettyContextLength(model.context_length)}
                           </p>
                         </div>
@@ -366,7 +368,7 @@ export default function ChatInput({
                 type="text"
                 autoFocus
                 placeholder="Search models..."
-                className="w-full px-2 py-3 text-sm text-gray-12 placeholder:text-gray-9 focus:outline-none focus:ring-0 bg-gray-2/50"
+                className="w-full px-2 py-3 text-sm text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-0 bg-gray-2/50"
                 onChange={(e) => setModelSearch(e.target.value)}
               />
             </div>

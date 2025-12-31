@@ -17,7 +17,7 @@ export default function DqnamoSignature({ className }: DqnamoSignatureProps) {
   return (
     <p
       className={cn(
-        "relative text-gray-9 text-xl cursor-pointer overflow-hidden transition-colors duration-300 hover:text-gray-12",
+        "relative text-gray-11 text-xl cursor-pointer overflow-hidden transition-colors duration-300 hover:text-gray-12",
         pirataOne.className,
         className
       )}

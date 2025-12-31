@@ -147,12 +147,12 @@ export default function Sidebar() {
           onClick={toggleTheme}
         >
           <SunIcon
-            className="dark:block hidden text-gray-10 transition-colors group-hover:text-gray-12"
+            className="dark:block hidden text-gray-11 transition-colors group-hover:text-gray-12"
             size={18}
             weight="bold"
           />
           <MoonStarsIcon
-            className="block dark:hidden text-gray-10 transition-colors group-hover:text-gray-12"
+            className="block dark:hidden text-gray-11 transition-colors group-hover:text-gray-12"
             size={18}
             weight="bold"
           />
@@ -164,7 +164,7 @@ export default function Sidebar() {
           onClick={() => showModal(<SettingsModal />)}
         >
           <FadersIcon
-            className="text-gray-10 transition-colors group-hover:text-gray-12"
+            className="text-gray-11 transition-colors group-hover:text-gray-12"
             size={18}
             weight="bold"
           />
@@ -176,7 +176,7 @@ export default function Sidebar() {
           className="p-1 hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
         >
           <PlusIcon
-            className="text-gray-10 transition-colors group-hover:text-gray-12"
+            className="text-gray-11 transition-colors group-hover:text-gray-12"
             size={18}
             weight="bold"
           />
@@ -188,7 +188,7 @@ export default function Sidebar() {
           onClick={() => setIsOpen(!isOpen)}
         >
           <SidebarSimpleIcon
-            className="text-gray-10 transition-colors group-hover:text-gray-12"
+            className="text-gray-11 transition-colors group-hover:text-gray-12"
             size={18}
             weight={isOpen ? "fill" : "bold"}
           />
@@ -235,13 +235,13 @@ export default function Sidebar() {
                       if (e.key === "Escape") setSearch("");
                     }}
                     placeholder="Search conversations"
-                    className="w-full text-gray-12 border-gray-3 dark:border-gray-2 placeholder:text-gray-10 text-sm p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-5 bg-transparent pr-12"
+                    className="w-full text-gray-12 border-gray-3 dark:border-gray-2 placeholder:text-gray-11 text-sm p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-5 bg-transparent pr-12"
                   />
                   {search.trim().length > 0 ? (
                     <button
                       type="button"
                       onClick={() => setSearch("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-10 hover:text-gray-12 transition-colors px-2 py-1 rounded-md hover:bg-gray-3"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-11 hover:text-gray-12 transition-colors px-2 py-1 rounded-md hover:bg-gray-3"
                       aria-label="Clear search"
                     >
                       Clear
@@ -251,7 +251,7 @@ export default function Sidebar() {
               </div>
               <div className="flex flex-col gap-px p-1 overflow-y-auto">
                 {filteredConversations.length === 0 ? (
-                  <div className="text-gray-9 text-sm p-3">
+                  <div className="text-gray-11 text-sm p-3">
                     {conversations.length === 0
                       ? "No conversations yet."
                       : `No conversations found for “${search.trim()}”.`}
@@ -274,7 +274,7 @@ export default function Sidebar() {
                       >
                         {conversation.name}
                       </p>
-                      <p className="text-gray-9 text-[11px] truncate">
+                      <p className="text-gray-11 text-[11px] truncate">
                         {DateTime.fromISO(
                           conversation.createdAt as string
                         ).toRelative()}
