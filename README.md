@@ -57,20 +57,9 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 
 Deploy Chaterface to your favorite platform:
 
-### Vercel
-
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/dqnamo/chaterface&env=NEXT_PUBLIC_INSTANT_APP_ID&envDescription=InstantDB%20App%20ID%20required%20for%20cloud%20sync&envLink=https://instantdb.com/dash)
-
-### Netlify
-
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/dqnamo/chaterface)
-
-### Railway
-
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/dqnamo/chaterface&envs=NEXT_PUBLIC_INSTANT_APP_ID)
-
-### Render
-
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dqnamo/chaterface)
 
 **Note:** After deploying, you'll need to add your environment variables in your platform's dashboard.
