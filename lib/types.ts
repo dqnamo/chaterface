@@ -20,5 +20,6 @@ export type UIMessage = {
     createdAt?: Date;
     experimental_attachments?: Attachment[];
     reasoning?: string;
+    model?: string;
 };
 

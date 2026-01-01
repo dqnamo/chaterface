@@ -1,26 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import { DataProvider } from "../providers/DataProvider";
-import { useThemeStore } from "../providers/ThemeProvider";
+import { ThemeSynchronizer } from "../providers/ThemeProvider";
 import DqnamoSignature from "./DqnamoSignature";
 import Sidebar from "./Sidebar";
 import { useModal } from "../providers/ModalProvider";
 import WelcomeModal from "./WelcomeModal";
+import InfoBar from "./InfoBar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { theme } = useThemeStore();
   const { showModal } = useModal();
-
-  // Sync theme class to html element for proper dark mode
-  useEffect(() => {
-    const body = document.body;
-    if (theme === "dark") {
-      body.classList.add("dark");
-    } else {
-      body.classList.remove("dark");
-    }
-  }, [theme]);
 
   // Show welcome modal if first time
   useEffect(() => {
@@ -28,14 +17,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!hasSeenWelcome) {
       showModal(<WelcomeModal />, "content");
     }
-  }, [showModal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="bg-gray-2 dark:bg-gray-1 h-dvh overflow-y-auto flex flex-col">
-      <DataProvider>
-        <Sidebar />
-        {children}
-      </DataProvider>
+    <div className="bg-gray-scale-2 dark:bg-gray-scale-1 h-dvh overflow-y-auto flex flex-col">
+      <ThemeSynchronizer />
+      <Sidebar />
+      {children}
+      <InfoBar />
     </div>
   );
 }

@@ -3,13 +3,13 @@
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import { cn } from "@/lib/utils";
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import * as React from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
 import CodeBlock, { PreBlock } from "../streamdown/CodeBlock";
 import HorizontalRule from "../streamdown/HorizontalRule";
+import { BrainIcon, CaretDownIcon } from "@phosphor-icons/react";
 
 // Define Collapsible components manually since @repo/shadcn-ui is not available
 const Collapsible = CollapsiblePrimitive.Root;
@@ -147,21 +147,16 @@ export const ReasoningTrigger = memo(
     return (
       <CollapsibleTrigger
         className={cn(
-          "flex w-full items-center gap-2 text-gray-11 text-sm transition-colors hover:text-gray-12",
+          "flex w-full items-center gap-2 text-gray-scale-11 text-sm transition-colors hover:text-gray-scale-12",
           className
         )}
         {...props}
       >
         {children ?? (
           <>
-            <BrainIcon className="size-4" />
+            <BrainIcon size={16} weight="bold" />
             {getThinkingMessage(isStreaming, duration)}
-            <ChevronDownIcon
-              className={cn(
-                "size-4 transition-transform",
-                isOpen ? "rotate-180" : "rotate-0"
-              )}
-            />
+            <CaretDownIcon size={16} weight="bold" />
           </>
         )}
       </CollapsibleTrigger>
@@ -179,7 +174,7 @@ export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
       className={cn(
-        "mt-4 text-sm text-gray-11",
+        "mt-4 text-sm text-gray-scale-11",
         "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
         className
       )}

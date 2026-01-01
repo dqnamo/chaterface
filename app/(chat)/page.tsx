@@ -7,55 +7,68 @@ import { useRouter } from "next/navigation";
 import ChatInput from "@/app/components/ChatInput";
 import { motion } from "motion/react";
 import { userplexClient } from "@/lib/userplexClient";
+import { encryptData } from "@/lib/encryption";
 
 export default function ChatPage() {
   const router = useRouter();
 
-  const { db, user } = useData();
+  const { db, localDb, user, masterKey } = useData();
 
-  const handleNewMessage = async (
-    message: string,
-    model: string,
-    attachments: { id: string; url: string; name: string; type: string }[] = []
-  ) => {
-    if (!user) return; // Shouldn't happen with guest auth, but safety check
-
+  const handleNewMessage = async (message: string, model: string) => {
     const messageContent = message.trim();
-
     const conversationId = id();
     const messageId = id();
+    const now = DateTime.now().toISO();
 
-    // Create conversation and message in one transaction, linked to user
-    const tx = db.tx.messages[messageId]
-      .update({
+    if (user && masterKey) {
+      // --- Encrypted Cloud Path ---
+      const encryptedContent = await encryptData(messageContent, masterKey);
+      const encryptedName = await encryptData(messageContent, masterKey); // Using msg as name
+
+      const tx = db.tx.messages[messageId]
+        .update({
+          content: encryptedContent,
+          role: "user",
+          createdAt: now,
+          model: model,
+        })
+        .link({ conversation: conversationId });
+
+      db.transact([
+        db.tx.conversations[conversationId]
+          .update({
+            name: encryptedName,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .link({ user: user.id }),
+        tx,
+      ]);
+    } else {
+      // --- Plain Text Local Path ---
+      await localDb.conversations.add({
+        id: conversationId,
+        name: messageContent,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await localDb.messages.add({
+        id: messageId,
+        conversationId,
         content: messageContent,
         role: "user",
-        createdAt: DateTime.now().toISO(),
+        createdAt: now,
         model: model,
-      })
-      .link({ conversation: conversationId });
-
-    attachments.forEach((a) => {
-      if (a.id) tx.link({ attachments: a.id });
-    });
-
-    db.transact([
-      db.tx.conversations[conversationId]
-        .update({
-          name: messageContent,
-          createdAt: DateTime.now().toISO(),
-          updatedAt: DateTime.now().toISO(),
-        })
-        .link({ user: user.id }),
-      tx,
-    ]);
+      });
+    }
 
     userplexClient.logs.new({
       name: "new_conversation_started",
       user_id: user?.id ?? "",
       data: {
         model: model,
-        hasAttachments: attachments.length > 0,
+        hasAttachments: false,
       },
     });
 
@@ -72,17 +85,16 @@ export default function ChatPage() {
         className="flex flex-col text-center"
         layoutId="chat-content"
       >
-        <h2 className="text-gray-12 text-xl font-medium">
+        <h2 className="text-gray-scale-12 text-xl font-medium">
           Any Model. Any Question.
         </h2>
-        <p className="text-gray-11 text-sm mt-1">What do you want to know?</p>
+        <p className="text-gray-scale-11 text-sm mt-1">
+          What do you want to know?
+        </p>
       </motion.div>
 
       <ChatInput
         onSend={(message, model) => handleNewMessage(message, model)}
-        onSendWithAttachments={(message, model, attachments) =>
-          handleNewMessage(message, model, attachments)
-        }
       />
     </div>
   );

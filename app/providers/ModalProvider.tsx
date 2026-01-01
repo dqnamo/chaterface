@@ -42,6 +42,11 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     setModalContent(null);
   }, []);
 
+  const value = useMemo(
+    () => ({ showModal, closeModal }),
+    [showModal, closeModal]
+  );
+
   // Lock body scroll when modal is open
   useEffect(() => {
     if (modalContent) {
@@ -61,11 +66,6 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     }
   }, [modalContent]);
 
-  const value = useMemo(
-    () => ({ showModal, closeModal }),
-    [showModal, closeModal]
-  );
-
   return (
     <ModalContext.Provider value={value}>
       {children}
@@ -75,16 +75,16 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex justify-center bg-white/80 dark:bg-black/80"
+            className="fixed inset-0 px-2 z-50 flex justify-center items-start bg-gray-scale-1/80 dark:bg-black/80 overflow-y-auto py-24 scrollbar-hide"
             onClick={closeModal}
           >
             <motion.div
               initial={{ scale: 1, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 1, opacity: 0, y: 10 }}
-              className={`bg-gray-1 border border-gray-3 dark:border-gray-2 rounded-xl better-shadow-md max-w-xl w-full ${
-                modalSize == "content" ? "h-max mt-20" : "h-3/4 mt-10"
-              } mx-4 overflow-hidden`}
+              className={`bg-white dark:bg-gray-scale-1 border border-gray-scale-3 dark:border-gray-scale-2 rounded-xl better-shadow-md max-w-xl w-full ${
+                modalSize == "content" ? "h-fit" : "h-3/4"
+              } mx-4 overflow-hidden flex flex-col shrink-0`}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="h-full overflow-y-auto">{modalContent}</div>

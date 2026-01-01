@@ -25,48 +25,39 @@ import {
   PaperPlaneTiltIcon,
   StopIcon,
   WarningIcon,
-  PaperclipIcon,
-  XIcon,
 } from "@phosphor-icons/react";
 import { userplexClient } from "@/lib/userplexClient";
 import { useIsPWA } from "@/lib/useIsPWA";
-import { id } from "@instantdb/react";
-
-import { useRef } from "react";
 
 export default function ChatInput({
   onSend,
-  onSendWithAttachments,
   onStop,
   status,
   style = "floating",
 }: {
   onSend: (message: string, model: string) => void;
-  onSendWithAttachments?: (
-    message: string,
-    model: string,
-    attachments: { id: string; url: string; name: string; type: string }[]
-  ) => void;
   onStop?: () => void;
   status?: "streaming" | "submitted" | "ready" | "error";
   style?: "floating" | "bottom";
 }) {
   const [message, setMessage] = useState("");
   const [modelSearch, setModelSearch] = useState("");
-  const [attachments, setAttachments] = useState<
-    { id?: string; url: string; name: string; type: string; path?: string }[]
-  >([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { showModal } = useModal();
   const { hasKey: hasApiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { user, db } = useData();
 
   const { data: userData } = db.useQuery(
-    user ? { $users: { $: { where: { id: user.id } } } } : null
+    user
+      ? {
+          $users: {
+            $: { where: { id: user.id } },
+          },
+        }
+      : null
   );
   const userSettings = userData?.$users?.[0]?.settings;
+
   const disabledModels = useMemo(
     () => (userSettings?.disabledModels as string[]) || [],
     [userSettings]
@@ -84,18 +75,6 @@ export default function ChatInput({
     isLoading: modelsLoading,
     fetchModels,
   } = useModelStore();
-
-  const selectedModelObj = useMemo(
-    () => models.find((m) => m.id === model),
-    [models, model]
-  );
-  const supportsImages = useMemo(() => {
-    if (!selectedModelObj?.architecture?.modality) return true; // Default to true if unknown
-    return (
-      selectedModelObj.architecture.modality.includes("image") ||
-      selectedModelObj.architecture.modality.includes("vision")
-    );
-  }, [selectedModelObj]);
 
   const isPWA = useIsPWA();
 
@@ -134,7 +113,7 @@ export default function ChatInput({
   ]);
 
   const isStreaming = status === "streaming" || status === "submitted";
-  const isInputEmpty = message.trim().length === 0 && attachments.length === 0;
+  const isInputEmpty = message.trim().length === 0;
 
   const handleSend = async () => {
     onSend(message.trim(), model);
@@ -145,84 +124,9 @@ export default function ChatInput({
       user_id: user?.id ?? "",
       data: {
         model: model,
-        hasAttachments: attachments.length > 0,
+        hasAttachments: false,
       },
     });
-  };
-
-  const uploadFile = async (file: File) => {
-    setIsUploading(true);
-    try {
-      const opts = {
-        contentType: file.type,
-        contentDisposition: "attachment",
-      };
-      const path = `${user?.id || "anonymous"}/${Date.now()}-${file.name}`;
-      const { data } = await db.storage.uploadFile(path, file, opts);
-
-      // Update metadata
-      await db.transact(
-        db.tx.$files[data.id].update({
-          name: file.name,
-          contentType: file.type,
-        })
-      );
-
-      return {
-        id: data.id,
-        path: path, // Save the path!
-        url: URL.createObjectURL(file), // Use local blob for preview
-        name: file.name,
-        type: file.type,
-      };
-    } catch (e) {
-      console.error("Upload failed", e);
-      return null;
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setIsUploading(true);
-      const uploaded = await Promise.all(files.map(uploadFile));
-      setAttachments((prev) => [
-        ...prev,
-        ...uploaded.filter((u) => u !== null),
-      ]);
-      setIsUploading(false);
-    }
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handlePaste = async (e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    const files: File[] = [];
-    for (const item of items) {
-      if (item.type.indexOf("image") !== -1) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          files.push(file);
-        }
-      }
-    }
-    if (files.length > 0) {
-      setIsUploading(true);
-      const uploaded = await Promise.all(files.map(uploadFile));
-      setAttachments((prev) => [
-        ...prev,
-        ...uploaded.filter((u) => u !== null),
-      ]);
-      setIsUploading(false);
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleModelSelect = (model: string) => {
@@ -350,7 +254,7 @@ export default function ChatInput({
   return (
     <motion.div
       layoutId="chat-input-container"
-      className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-gray-1 dark:bg-gray-2  border-gray-4 border w-full ${
+      className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-gray-scale-1 dark:bg-gray-scale-2  border-gray-scale-4 border w-full ${
         style === "bottom"
           ? `w-full max-w-2xl fixed bottom-0 md:border-b-0 md:pb-2 rounded-t-xl ${
               isPWA ? "pb-10 md:pb-0" : ""
@@ -366,14 +270,14 @@ export default function ChatInput({
           transition={{ duration: 0.2 }}
           className="flex flex-col p-1 shrink-0"
         >
-          <div className="flex flex-row bg-gray-2 rounded-lg p-1.5 gap-2 items-center">
+          <div className="flex flex-row bg-gray-scale-2 rounded-lg p-1.5 gap-2 items-center">
             <div className="flex flex-row items-center px-1.5 gap-2">
               <WarningIcon
                 className="text-orange-500 text-sm"
                 size={16}
                 weight="bold"
               />
-              <h3 className="text-gray-11 text-sm font-medium">
+              <h3 className="text-gray-scale-11 text-sm font-medium">
                 No OpenRouter API Key Set
               </h3>
             </div>
@@ -381,14 +285,14 @@ export default function ChatInput({
             <button
               type="button"
               onClick={() => showModal(<SettingsModal />)}
-              className="ml-auto bg-gray-12 dark:bg-gray-5 rounded-lg border border-transparent dark:border-gray-6 dark:hover:bg-gray-3 px-2 py-1 flex flex-row items-center justify-center gap-2"
+              className="ml-auto bg-gray-scale-12 dark:bg-gray-scale-5 rounded-lg border border-transparent dark:border-gray-scale-6 dark:hover:bg-gray-scale-3 px-2 py-1 flex flex-row items-center justify-center gap-2"
             >
               <FadersIcon
-                className="text-gray-2 dark:text-gray-12"
+                className="text-gray-scale-2 dark:text-gray-scale-12"
                 size={14}
                 weight="bold"
               />
-              <span className="text-gray-2 dark:text-gray-12 font-medium text-sm">
+              <span className="text-gray-scale-2 dark:text-gray-scale-12 font-medium text-sm">
                 Open Settings
               </span>
             </button>
@@ -396,41 +300,12 @@ export default function ChatInput({
         </motion.div>
       )}
 
-      {attachments.length > 0 && (
-        <div className="flex flex-row gap-2 p-2 overflow-x-auto">
-          {attachments.map((file, index) => (
-            <div key={index} className="relative group shrink-0">
-              <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-4 bg-gray-2 relative">
-                {file.type.startsWith("image/") ? (
-                  <img
-                    src={file.url} // Use the preview URL
-                    alt="preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-gray-11 p-1 text-center break-all">
-                    {file.name.slice(0, 8)}...
-                  </div>
-                )}
-                <button
-                  onClick={() => removeAttachment(index)}
-                  className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <XIcon size={12} weight="bold" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       <textarea
-        className="w-full h-full p-4 resize-none focus:outline-none text-gray-12 text-sm placeholder:text-gray-11 bg-transparent"
+        className="w-full h-full p-4 resize-none focus:outline-none text-gray-scale-12 text-sm placeholder:text-gray-scale-11 bg-transparent"
         rows={2}
         placeholder="Ask me anything..."
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        onPaste={handlePaste}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -440,30 +315,9 @@ export default function ChatInput({
           }
         }}
       />
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileSelect}
-        className="hidden"
-        multiple
-        accept="image/*" // Restrict to images as requested, or remove for all files
-      />
       <div className="flex flex-row items-end justify-between p-2">
         <div className="flex flex-row items-center gap-2">
-          <button
-            type="button"
-            disabled={!hasApiKey || isUploading || !supportsImages}
-            title={
-              !supportsImages
-                ? "Current model does not support images"
-                : "Attach image"
-            }
-            className="focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 text-gray-11 hover:text-gray-12 transition-colors p-1"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <PaperclipIcon size={18} />
-          </button>
-
+          {/* Model Selector */}
           <button
             type="button"
             disabled={!hasApiKey}
@@ -471,10 +325,10 @@ export default function ChatInput({
             ref={setReference}
             {...getReferenceProps({
               className:
-                "bg-gray-2 cursor-pointer dark:bg-gray-3 rounded-lg border border-gray-4 dark:border-gray-4 px-2 py-1 hover:bg-gray-4/70 dark:hover:bg-gray-4/40 transition-colors disabled:opacity-50",
+                "bg-gray-scale-2 cursor-pointer dark:bg-gray-scale-3 rounded-lg border border-gray-scale-4 dark:border-gray-scale-4 px-2 py-1 hover:bg-gray-scale-4/70 dark:hover:bg-gray-scale-4/40 transition-colors disabled:opacity-50",
             })}
           >
-            <p className="text-gray-11 text-sm">
+            <p className="text-gray-scale-11 text-sm">
               {hasApiKey ? model : "Set API key"}
             </p>
           </button>
@@ -485,17 +339,17 @@ export default function ChatInput({
             style={floatingStyles}
             {...getFloatingProps({
               className:
-                "bg-white dark:bg-gray-2 overflow-hidden border border-gray-4 dark:border-gray-4 shadow-1 rounded-lg z-50 text-sm text-gray-12 max-w-xs w-full",
+                "bg-white dark:bg-gray-scale-2 overflow-hidden border border-gray-scale-4 dark:border-gray-scale-4 shadow-1 rounded-lg z-50 text-sm text-gray-scale-12 max-w-xs w-full",
             })}
           >
-            <div className="flex flex-col overflow-hidden max-h-80 divide-y divide-gray-3 dark:divide-gray-3">
-              <div className="overflow-y-auto flex flex-col divide-y divide-gray-3 dark:divide-gray-3 no-scrollbar">
+            <div className="flex flex-col overflow-hidden max-h-80 divide-y divide-gray-scale-3 dark:divide-gray-scale-3">
+              <div className="overflow-y-auto flex flex-col divide-y divide-gray-scale-3 dark:divide-gray-scale-3 no-scrollbar">
                 {modelsLoading ? (
-                  <div className="text-gray-11 text-sm p-3">
+                  <div className="text-gray-scale-11 text-sm p-3">
                     Loading models…
                   </div>
                 ) : filteredModels.length === 0 ? (
-                  <div className="text-gray-11 text-sm p-3">
+                  <div className="text-gray-scale-11 text-sm p-3">
                     {models.length === 0
                       ? "No models available."
                       : `No models found for “${modelSearch.trim()}”.`}
@@ -504,16 +358,16 @@ export default function ChatInput({
                   filteredModels.map((model) => (
                     <button
                       key={model.id}
-                      className="text-gray-11 text-sm p-2 text-start flex flex-col hover:bg-gray-3 dark:hover:bg-gray-3 transition-colors"
+                      className="text-gray-scale-11 text-sm p-2 text-start flex flex-col hover:bg-gray-scale-3 dark:hover:bg-gray-scale-3 transition-colors"
                       onClick={() => handleModelSelect(model.id)}
                     >
-                      <p className="text-gray-11 text-sm">{model.name}</p>
+                      <p className="text-gray-scale-11 text-sm">{model.name}</p>
                       <div className="flex flex-row items-center justify-between gap-2">
-                        <p className="text-gray-11 text-[11px]">
+                        <p className="text-gray-scale-11 text-[11px]">
                           {model.id.slice(0, 10)}...{model.id.slice(-10)}
                         </p>
                         <div className="flex flex-row items-center  gap-2">
-                          <p className="text-gray-11 text-[11px] ">
+                          <p className="text-gray-scale-11 text-[11px] ">
                             {prettyContextLength(model.context_length)}
                           </p>
                         </div>
@@ -526,7 +380,7 @@ export default function ChatInput({
                 type="text"
                 autoFocus
                 placeholder="Search models..."
-                className="w-full px-2 py-3 text-sm text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-0 bg-gray-2/50"
+                className="w-full px-2 py-3 text-sm text-gray-scale-12 placeholder:text-gray-scale-11 focus:outline-none focus:ring-0 bg-gray-scale-2/50"
                 onChange={(e) => setModelSearch(e.target.value)}
               />
             </div>
@@ -536,33 +390,31 @@ export default function ChatInput({
           onClick={
             isStreaming
               ? onStop
-              : !isInputEmpty && hasApiKey && !isUploading
+              : !isInputEmpty && hasApiKey
               ? handleSend
               : undefined
           }
           className={`${
-            isStreaming || (!isInputEmpty && hasApiKey && !isUploading)
-              ? "bg-gray-12 dark:bg-gray-5 cursor-pointer dark:hover:bg-gray-3"
-              : "bg-gray-12/50 dark:bg-gray-5/50 cursor-not-allowed"
-          } rounded-lg border border-transparent dark:border-gray-6 px-2 py-1 flex flex-row items-center justify-center gap-2`}
+            isStreaming || (!isInputEmpty && hasApiKey)
+              ? "bg-gray-scale-12 dark:bg-gray-scale-5 cursor-pointer dark:hover:bg-gray-scale-3"
+              : "bg-gray-scale-12/50 dark:bg-gray-scale-5/50 cursor-not-allowed"
+          } rounded-lg border border-transparent dark:border-gray-scale-6 px-2 py-1 flex flex-row items-center justify-center gap-2`}
         >
-          {isStreaming || isUploading ? (
+          {isStreaming ? (
             <StopIcon
               weight="fill"
-              className={`text-gray-2 dark:text-gray-12 ${
-                isUploading ? "animate-spin" : ""
-              }`}
+              className={`text-gray-scale-2 dark:text-gray-scale-12`}
               size={14}
             />
           ) : (
             <PaperPlaneTiltIcon
               weight="fill"
-              className="text-gray-2 dark:text-gray-12"
+              className="text-gray-scale-2 dark:text-gray-scale-12"
               size={14}
             />
           )}
-          <p className="text-gray-2 dark:text-gray-12 font-medium text-sm">
-            {isStreaming ? "Stop" : isUploading ? "Sending..." : "Send"}
+          <p className="text-gray-scale-2 dark:text-gray-scale-12 font-medium text-sm">
+            {isStreaming ? "Stop" : "Send"}
           </p>
         </div>
       </div>

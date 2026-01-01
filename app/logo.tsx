@@ -29,7 +29,7 @@ export default function Logo({
         className="block dark:block"
       />
       {withText && (
-        <h1 className={`text-xl font-medium text-gray-12`}>Chaterface</h1>
+        <h1 className={`text-xl font-medium text-gray-scale-12`}>Chaterface</h1>
       )}
     </Link>
   );

@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "@radix-ui/colors/gray.css";
 @import "@radix-ui/colors/gray-dark.css";
+@import "@radix-ui/colors/sage.css";
+@import "@radix-ui/colors/sage-dark.css";
+@import "@radix-ui/colors/sand.css";
+@import "@radix-ui/colors/sand-dark.css";
+@import "@radix-ui/colors/slate.css";
+@import "@radix-ui/colors/slate-dark.css";
 @import "@radix-ui/colors/sky.css";
 @import "@radix-ui/colors/sky-dark.css";
 @import "@radix-ui/colors/blue.css";
@@ -17,6 +23,46 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-pirata-one: var(--font-pirata-one);
+
+  --color-gray-scale-1: var(--gray-1);
+  --color-gray-scale-2: var(--gray-2);
+  --color-gray-scale-3: var(--gray-3);
+  --color-gray-scale-4: var(--gray-4);
+  --color-gray-scale-5: var(--gray-5);
+  --color-gray-scale-6: var(--gray-6);
+  --color-gray-scale-7: var(--gray-7);
+  --color-gray-scale-8: var(--gray-8);
+  --color-gray-scale-9: var(--gray-9);
+  --color-gray-scale-10: var(--gray-10);
+  --color-gray-scale-11: var(--gray-11);
+  --color-gray-scale-12: var(--gray-12);
+
+  --color-sand-1: var(--sand-1);
+  --color-sand-2: var(--sand-2);
+  --color-sand-3: var(--sand-3);
+  --color-sand-4: var(--sand-4);
+  --color-sand-5: var(--sand-5);
+  --color-sand-6: var(--sand-6);
+  --color-sand-7: var(--sand-7);
+  --color-sand-8: var(--sand-8);
+  --color-sand-9: var(--sand-9);
+  --color-sand-10: var(--sand-10);
+  --color-sand-11: var(--sand-11);
+  --color-sand-12: var(--sand-12);
+
+  --color-sage-1: var(--sage-1);
+  --color-sage-2: var(--sage-2);
+  --color-sage-3: var(--sage-3);
+  --color-sage-4: var(--sage-4);
+  --color-sage-5: var(--sage-5);
+  --color-sage-6: var(--sage-6);
+  --color-sage-7: var(--sage-7);
+  --color-sage-8: var(--sage-8);
+  --color-sage-9: var(--sage-9);
+  --color-sage-10: var(--sage-10);
+  --color-sage-11: var(--sage-11);
+  --color-sage-12: var(--sage-12);
 
   --color-gray-1: var(--gray-1);
   --color-gray-2: var(--gray-2);

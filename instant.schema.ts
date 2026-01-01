@@ -15,11 +15,8 @@ const _schema = i.schema({
       imageURL: i.string().optional(),
       type: i.string().optional(),
       settings: i.json().optional(),
-    }),
-    interfaces: i.entity({
-      subdomain: i.string().unique().indexed(),
-      name: i.string(),
-      createdAt: i.date().indexed(),
+      systemPrompt: i.string().optional(),
+      enabledFeatures: i.json().optional(),
     }),
     conversations: i.entity({
       name: i.string(),
@@ -47,18 +44,6 @@ const _schema = i.schema({
         on: "$users",
         has: "many",
         label: "linkedGuestUsers",
-      },
-    },
-    interfaceConversations: {
-      forward: {
-        on: "conversations",
-        has: "one",
-        label: "interface",
-      },
-      reverse: {
-        on: "interfaces",
-        has: "many",
-        label: "conversations",
       },
     },
     userConversations: {

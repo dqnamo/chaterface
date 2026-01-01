@@ -1,3 +1,3 @@
 export default function HorizontalRule() {
-  return <hr className="border-gray-5 dark:border-gray-4" />;
+  return <hr className="border-gray-scale-5 dark:border-gray-scale-4" />;
 }

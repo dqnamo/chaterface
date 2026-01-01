@@ -6,15 +6,22 @@ import { useData } from "../providers/DataProvider";
 import { getLocalApiKey, setLocalApiKey } from "@/lib/crypto";
 import {
   CheckIcon,
+  CloudIcon,
+  FingerprintIcon,
   GearIcon,
   HeadCircuitIcon,
   StarIcon,
-  UserIcon,
+  SunIcon,
+  DesktopIcon,
+  PaletteIcon,
+  MoonStarsIcon,
 } from "@phosphor-icons/react";
+import { usePersonas } from "@/lib/usePersonas";
 import { useModelStore } from "@/lib/modelStore";
 import { userplexClient } from "@/lib/userplexClient";
+import { useThemeStore, Theme } from "../providers/ThemeProvider";
 
-type Tab = "general" | "account" | "models";
+type Tab = "general" | "appearance" | "cloud" | "models" | "personas";
 
 export default function SettingsModal() {
   const [activeTab, setActiveTab] = useState<Tab>("general");
@@ -22,8 +29,8 @@ export default function SettingsModal() {
   return (
     <div className="flex flex-col max-h-[70vh] max-w-2xl w-full overflow-hidden">
       {/* Header with tabs */}
-      <div className="border-b border-gray-3 dark:border-gray-2 p-2">
-        {/* <h1 className="text-gray-12 text-lg font-semibold mb-4">Settings</h1> */}
+      <div className="border-b border-gray-scale-3 dark:border-gray-scale-2 p-2">
+        {/* <h1 className="text-gray-scale-12 text-lg font-semibold mb-4">Settings</h1> */}
         <div className="flex gap-1">
           <AnimatedTabs
             tabs={[
@@ -33,17 +40,27 @@ export default function SettingsModal() {
                   <GearIcon
                     size={14}
                     weight="bold"
-                    className="text-gray-11 z-10"
+                    className="text-gray-scale-11 z-10"
                   />
                 ),
               },
               {
-                name: "Account",
+                name: "Appearance",
                 icon: (
-                  <UserIcon
+                  <PaletteIcon
                     size={14}
                     weight="bold"
-                    className="text-gray-11 z-10"
+                    className="text-gray-scale-11 z-10"
+                  />
+                ),
+              },
+              {
+                name: "Cloud",
+                icon: (
+                  <CloudIcon
+                    size={14}
+                    weight="bold"
+                    className="text-gray-scale-11 z-10"
                   />
                 ),
               },
@@ -53,7 +70,7 @@ export default function SettingsModal() {
                   <HeadCircuitIcon
                     size={14}
                     weight="bold"
-                    className="text-gray-11 z-10"
+                    className="text-gray-scale-11 z-10"
                   />
                 ),
               },
@@ -61,16 +78,20 @@ export default function SettingsModal() {
             activeTab={
               activeTab === "general"
                 ? "General"
-                : activeTab === "account"
-                ? "Account"
+                : activeTab === "appearance"
+                ? "Appearance"
+                : activeTab === "cloud"
+                ? "Cloud"
                 : "Models"
             }
             onTabChange={(tab) =>
               setActiveTab(
                 tab === "General"
                   ? "general"
-                  : tab === "Account"
-                  ? "account"
+                  : tab === "Appearance"
+                  ? "appearance"
+                  : tab === "Cloud"
+                  ? "cloud"
                   : "models"
               )
             }
@@ -88,19 +109,32 @@ export default function SettingsModal() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
+              className="flex flex-col gap-2"
             >
               <ApiKeySection />
+              <SystemPromptSection />
             </motion.div>
           )}
-          {activeTab === "account" && (
+          {activeTab === "appearance" && (
             <motion.div
-              key="account"
+              key="appearance"
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
             >
-              <AccountSection />
+              <AppearanceSection />
+            </motion.div>
+          )}
+          {activeTab === "cloud" && (
+            <motion.div
+              key="cloud"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+            >
+              <CloudSection />
             </motion.div>
           )}
 
@@ -136,19 +170,76 @@ export function AnimatedTabs({
         <button
           key={tab.name}
           onClick={() => onTabChange(tab.name)}
-          className="relative flex items-center text-gray-11 flex-row gap-1.5 py-1 px-2 rounded-md focus:outline-none cursor-pointer transition-colors"
+          className="relative flex items-center text-gray-scale-11 flex-row gap-1.5 py-1 px-2 rounded-md focus:outline-none cursor-pointer transition-colors"
         >
           {activeTab === tab.name && (
             <motion.div
               layoutId="active-tab-bg"
-              className="absolute inset-0 bg-gray-2 rounded-md"
+              className="absolute inset-0 bg-gray-scale-2 rounded-md"
               transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
             />
           )}
           {tab.icon}
-          <span className="relative z-10 text-gray-11 text-sm">{tab.name}</span>
+          <span className="relative z-10 text-gray-scale-11 text-sm">
+            {tab.name}
+          </span>
         </button>
       ))}
+    </div>
+  );
+}
+
+function AppearanceSection() {
+  const { theme, setTheme } = useThemeStore();
+
+  const themes: { id: Theme; label: string; icon: React.ReactNode }[] = [
+    {
+      id: "light",
+      label: "Light",
+      icon: <SunIcon size={20} />,
+    },
+    {
+      id: "dark",
+      label: "Dark",
+      icon: <MoonStarsIcon size={20} />,
+    },
+    {
+      id: "system",
+      label: "System",
+      icon: <DesktopIcon size={20} />,
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-gray-scale-11 text-sm font-medium">Theme</h2>
+        <p className="text-gray-scale-11 text-sm mb-4 mt-1">
+          Choose how Chaterface looks to you.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {themes.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setTheme(item.id)}
+            className={`
+              flex flex-col items-center gap-3 p-4 rounded-xl border transition-all
+              ${
+                theme === item.id
+                  ? "bg-gray-scale-3 border-gray-scale-4 text-gray-scale-12 shadow-xs"
+                  : "bg-gray-scale-2 border-gray-scale-3 text-gray-scale-11 hover:bg-gray-scale-3 hover:text-gray-scale-12"
+              }
+            `}
+          >
+            <div className={theme === item.id ? "text-sky-500" : ""}>
+              {item.icon}
+            </div>
+            <span className="text-sm font-medium">{item.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -189,16 +280,18 @@ function ApiKeySection() {
   }, [apiKey, fetchModels, user?.id, setError, models.length]);
 
   return (
-    <div className="">
-      <h2 className="text-gray-11 text-sm font-medium">OpenRouter API Key</h2>
-      <p className="text-gray-11 text-sm mb-4 mt-1">
+    <div className="flex flex-col gap-2">
+      <h2 className="text-gray-scale-11 text-sm font-medium">
+        OpenRouter API Key
+      </h2>
+      <p className="text-gray-scale-11 text-sm mb-4 mt-1">
         Add your OpenRouter API key to use AI models. These keys are stored
         locally on your device. Get one at{" "}
         <a
           href="https://openrouter.ai/keys"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-gray-11 hover:text-gray-12 underline underline-offset-2"
+          className="text-gray-scale-11 hover:text-gray-scale-12 underline underline-offset-2"
         >
           openrouter.ai/keys
         </a>
@@ -212,20 +305,20 @@ function ApiKeySection() {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="sk-or-v1-..."
-            className={`w-full px-3 py-2.5 pr-20 bg-gray-2 border ${
-              error ? "border-red-500" : "border-gray-4"
-            } rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 ${
+            className={`w-full px-3 py-2.5 pr-20 bg-gray-scale-2 border ${
+              error ? "border-red-500" : "border-gray-scale-4"
+            } rounded-lg text-gray-scale-12 placeholder:text-gray-scale-11 focus:outline-none focus:ring-2 ${
               error ? "focus:ring-red-500/20" : "focus:ring-sky-7"
             } focus:border-transparent transition-all font-mono text-sm`}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
             {isLoading && (
-              <div className="w-3 h-3 border-2 border-gray-6 border-t-gray-11 rounded-full animate-spin" />
+              <div className="w-3 h-3 border-2 border-gray-scale-6 border-t-gray-scale-11 rounded-full animate-spin" />
             )}
             <button
               type="button"
               onClick={() => setShowKey(!showKey)}
-              className="px-2 py-1 text-sm text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded transition-colors"
+              className="px-2 py-1 text-sm text-gray-scale-11 hover:text-gray-scale-12 bg-gray-scale-3 hover:bg-gray-scale-4 rounded transition-colors"
             >
               {showKey ? "Hide" : "Show"}
             </button>
@@ -260,13 +353,23 @@ function ApiKeySection() {
   );
 }
 
-function AccountSection() {
-  const { user, db, isAuthLoading, isGuest } = useData();
+function CloudSection() {
+  const { user, db } = useData();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isGuest = !user;
+
+  // if (isAuthLoading) {
+  //   return (
+  //     <div className="flex items-center justify-center h-48">
+  //       <div className="w-6 h-6 border-2 border-gray-scale-6 border-t-gray-scale-11 rounded-full animate-spin" />
+  //     </div>
+  //   );
+  // }
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,7 +398,6 @@ function AccountSection() {
     try {
       await db.auth.signInWithMagicCode({ email: sentTo, code });
       // Auth state will update automatically via useAuth
-      // If upgrading from guest, the user ID stays the same and data is preserved
     } catch (err: unknown) {
       const error = err as { body?: { message?: string } };
       setError(error.body?.message || "Invalid code. Please try again.");
@@ -307,7 +409,6 @@ function AccountSection() {
     setIsLoading(true);
     try {
       await db.auth.signOut();
-      // Will auto sign-in as guest again via DataProvider
     } catch (err) {
       console.error("Failed to sign out:", err);
     }
@@ -318,28 +419,39 @@ function AccountSection() {
   if (user && !isGuest) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4 p-4 bg-gray-2 rounded-xl border border-gray-3">
-          <div className="w-12 h-12 bg-linear-to-br from-sky-400 to-sky-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+        <div className="flex flex-col items-center justify-center py-8 gap-4">
+          <div className="w-20 h-20 bg-linear-to-br from-sky-400 to-sky-600 rounded-full flex items-center justify-center text-white font-semibold text-3xl shadow-lg">
             {user.email?.charAt(0).toUpperCase() || "U"}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-12 truncate">
+          <div className="text-center space-y-1">
+            <p className="text-lg font-medium text-gray-scale-12">
               {user.email}
             </p>
-            <p className="text-sm text-gray-11">Signed in</p>
+            <div className="flex items-center justify-center gap-1.5 text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full text-sm font-medium w-fit mx-auto">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              Cloud Sync Active
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 rounded-full">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-            <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-              Synced
-            </span>
+        </div>
+
+        <div className="bg-gray-scale-2 rounded-xl p-4 border border-gray-scale-3 space-y-3">
+          <div className="flex items-center gap-3">
+            <CloudIcon size={20} className="text-sky-500" weight="duotone" />
+            <div>
+              <p className="text-sm font-medium text-gray-scale-12">
+                Cloud Features
+              </p>
+              <p className="text-sm text-gray-scale-11">
+                Your conversations are backed up and accessible from any device.
+              </p>
+            </div>
           </div>
         </div>
 
         <button
           onClick={handleSignOut}
           disabled={isLoading}
-          className="w-full px-4 py-2.5 bg-gray-3 text-gray-11 rounded-lg font-medium text-sm hover:bg-gray-4 hover:text-gray-12 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="w-full px-4 py-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg font-medium text-sm hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {isLoading ? "Signing out..." : "Sign Out"}
         </button>
@@ -349,65 +461,51 @@ function AccountSection() {
 
   // Guest user - show upgrade flow
   return (
-    <div className="space-y-4">
-      {/* Guest status banner */}
-      {isGuest && (
-        <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-          <div className="w-10 h-10 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-            G
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-12">Guest Account</p>
-            <p className="text-sm text-gray-11">
-              Your data is saved on this device only
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div>
-        <h2 className="text-base font-semibold text-gray-12 mb-1 flex items-center gap-2">
-          {isGuest ? "Create your account" : "Sign in or create account"}
-          {isAuthLoading && (
-            <div className="w-3 h-3 border border-gray-6 border-t-gray-11 rounded-full animate-spin" />
-          )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center space-y-2 pb-2 mt-4">
+        <h2 className="text-lg font-semibold text-gray-scale-12">
+          {sentTo ? "Check your email" : "Sign in to Cloud"}
         </h2>
-        <p className="text-sm text-gray-11">
-          {isGuest
-            ? "Add your email to sync conversations across devices and keep your data safe."
-            : "Save your conversations and settings across devices."}
+        <p className="text-sm text-gray-scale-11 max-w-xs mx-auto">
+          {sentTo
+            ? `We sent a magic code to ${sentTo}`
+            : "Sync your conversations across devices and never lose your chat history."}
         </p>
       </div>
 
       {!sentTo ? (
         <form onSubmit={handleSendCode} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-12">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3 py-2.5 bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
+              placeholder="Enter your email"
+              className="w-full px-4 py-3 bg-gray-scale-2 border border-gray-scale-4 rounded-xl text-gray-scale-12 placeholder:text-gray-scale-11 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"
               autoFocus
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20 text-center"
+            >
               {error}
-            </p>
+            </motion.div>
           )}
 
           <button
             type="submit"
             disabled={isLoading || !email.trim()}
-            className="w-full px-4 py-2.5 bg-gray-12 text-gray-1 rounded-lg font-medium text-sm hover:bg-gray-11 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full px-4 py-3 bg-gray-scale-6 text-gray-scale-12 rounded-xl font-medium text-sm hover:bg-gray-scale-7 border border-gray-scale-8 hover:border-gray-scale-9 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all shadow-sm"
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-gray-6 border-t-gray-1 rounded-full animate-spin" />
-                Sending...
+                <div className="w-4 h-4 border-2 border-gray-scale-6 border-t-gray-scale-1 rounded-full animate-spin" />
+                Sending code...
               </span>
             ) : (
               "Continue with Email"
@@ -416,35 +514,29 @@ function AccountSection() {
         </form>
       ) : (
         <form onSubmit={handleVerifyCode} className="space-y-4">
-          <div className="bg-sky-2 border border-sky-6 rounded-lg p-3">
-            <p className="text-sm text-sky-11">
-              We sent a verification code to{" "}
-              <strong className="text-sky-12">{sentTo}</strong>
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-12">
-              Verification Code
-            </label>
+          <div className="space-y-4">
             <input
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Enter 6-digit code"
-              className="w-full px-3 py-2.5 bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all text-center tracking-widest font-mono text-lg"
+              placeholder="000000"
+              className="w-full px-4 py-3 bg-gray-scale-2 border border-gray-scale-4 rounded-xl text-gray-scale-12 placeholder:text-gray-scale-11 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all text-center tracking-[0.5em] font-mono text-xl"
               autoFocus
               maxLength={6}
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20 text-center"
+            >
               {error}
-            </p>
+            </motion.div>
           )}
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => {
@@ -452,80 +544,65 @@ function AccountSection() {
                 setCode("");
                 setError(null);
               }}
-              className="px-4 py-2.5 bg-gray-3 text-gray-11 rounded-lg font-medium text-sm hover:bg-gray-4 hover:text-gray-12 transition-all"
+              className="px-4 py-3 bg-gray-scale-3 text-gray-scale-11 rounded-xl font-medium text-sm hover:bg-gray-scale-4 hover:text-gray-scale-12 transition-all"
             >
               Back
             </button>
             <button
               type="submit"
               disabled={isLoading || !code.trim()}
-              className="flex-1 px-4 py-2.5 bg-gray-12 text-gray-1 rounded-lg font-medium text-sm hover:bg-gray-11 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-4 py-3 bg-gray-scale-12 text-gray-scale-1 rounded-xl font-medium text-sm hover:bg-gray-scale-11 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all shadow-sm"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-gray-6 border-t-gray-1 rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-gray-scale-6 border-t-gray-scale-1 rounded-full animate-spin" />
                   Verifying...
                 </span>
-              ) : isGuest ? (
-                "Verify & Upgrade Account"
               ) : (
-                "Verify & Sign In"
+                "Verify Code"
               )}
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleSendCode}
-            disabled={isLoading}
-            className="w-full text-sm text-gray-11 hover:text-gray-12 transition-colors"
-          >
-            Didn&apos;t receive a code? Send again
-          </button>
+          <p className="text-center">
+            <button
+              type="button"
+              onClick={handleSendCode}
+              disabled={isLoading}
+              className="text-sm text-gray-scale-11 hover:text-gray-scale-12 underline underline-offset-2 transition-colors"
+            >
+              Didn&apos;t receive a code? Send again
+            </button>
+          </p>
         </form>
       )}
 
-      {isGuest && (
-        <div className="space-y-2 pt-2">
-          <h3 className="text-sm font-medium text-gray-12">
-            Why create an account?
-          </h3>
-          <ul className="space-y-1.5 text-sm text-gray-11">
-            <li className="flex items-center gap-2">
-              <svg
-                className="w-4 h-4 text-sky-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Keep all your conversations when you upgrade
-            </li>
-            <li className="flex items-center gap-2">
-              <svg
-                className="w-4 h-4 text-sky-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Access from any device
-            </li>
-          </ul>
+      <div className="pt-4 border-t border-gray-scale-3 dark:border-gray-scale-2">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-2 p-3 rounded-lg bg-gray-scale-2/50">
+            <CloudIcon size={18} weight="duotone" className="text-sky-500" />
+            <p className="text-sm font-medium text-gray-scale-12">
+              Cross-device Sync
+            </p>
+            <p className="text-sm text-gray-scale-11 leading-relaxed">
+              Access your chats on any device with secure cloud sync.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 p-3 rounded-lg bg-gray-scale-2/50">
+            <FingerprintIcon
+              size={18}
+              weight="bold"
+              className="text-emerald-500"
+            />
+            <p className="text-sm font-medium text-gray-scale-12">
+              Always Encrypted
+            </p>
+            <p className="text-sm text-gray-scale-11 leading-relaxed">
+              Your data is encrypted locally before it touches the cloud.
+            </p>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -629,17 +706,17 @@ function ModelsSection() {
 
   return (
     <div className="flex flex-col">
-      <h2 className="text-sm font-semibold text-gray-11 mb-1 flex items-center gap-2">
+      <h2 className="text-sm font-semibold text-gray-scale-11 mb-1 flex items-center gap-2">
         Models
       </h2>
-      <p className="text-sm text-gray-11">
+      <p className="text-sm text-gray-scale-11">
         Select what models you want to enable. You can also set defaults and
         favorites.
       </p>
       <input
         type="text"
         placeholder="Search models..."
-        className=" mt-4 w-full px-2 py-1 text-sm bg-gray-2 border border-gray-4 rounded-lg text-gray-12 placeholder:text-gray-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
+        className=" mt-4 w-full px-2 py-1 text-sm bg-gray-scale-2 border border-gray-scale-4 rounded-lg text-gray-scale-12 placeholder:text-gray-scale-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -648,15 +725,15 @@ function ModelsSection() {
         <div className="flex flex-row gap-1 items-center justify-end">
           <button
             onClick={handleEnableAll}
-            className="px-2 py-1 text-sm text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded-lg transition-colors"
+            className="px-2 py-1 text-sm text-gray-scale-11 hover:text-gray-scale-12 bg-gray-scale-3 hover:bg-gray-scale-4 rounded-lg transition-colors"
           >
-            <p className="text-sm text-gray-11">Enable All</p>
+            <p className="text-sm text-gray-scale-11">Enable All</p>
           </button>
           <button
             onClick={handleDisableAll}
-            className="px-2 py-1 text-sm text-gray-11 hover:text-gray-12 bg-gray-3 hover:bg-gray-4 rounded-lg transition-colors"
+            className="px-2 py-1 text-sm text-gray-scale-11 hover:text-gray-scale-12 bg-gray-scale-3 hover:bg-gray-scale-4 rounded-lg transition-colors"
           >
-            <p className="text-sm text-gray-11">Disable All</p>
+            <p className="text-sm text-gray-scale-11">Disable All</p>
           </button>
         </div>
         {filteredModels.map((model) => {
@@ -673,11 +750,11 @@ function ModelsSection() {
             >
               <div className="flex flex-col gap-1">
                 <div className="flex flex-row items-center gap-2">
-                  <p className="text-sm font-medium text-gray-11">
+                  <p className="text-sm font-medium text-gray-scale-11">
                     {model.name}
                   </p>
                   {userSettings?.defaultModel === model.id && (
-                    <p className="text-[11px] text-gray-11 font-mono font-semibold uppercase">
+                    <p className="text-[11px] text-gray-scale-11 font-mono font-semibold uppercase">
                       Default
                     </p>
                   )}
@@ -690,41 +767,45 @@ function ModelsSection() {
                       />
                     )}
                 </div>
-                <p className="text-sm text-gray-11 truncate">{model.id}</p>
+                <p className="text-sm text-gray-scale-11 truncate">
+                  {model.id}
+                </p>
               </div>
               <div className="flex flex-row gap-2 items-center justify-center">
                 {!isDisabled && (
                   <button
                     onClick={() => setDefaultModel(model.id)}
-                    className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
+                    className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-scale-3 hover:bg-gray-scale-4 px-1 hidden"
                   >
-                    <p className="text-sm text-gray-11">Make Default</p>
+                    <p className="text-sm text-gray-scale-11">Make Default</p>
                   </button>
                 )}
 
                 {!isDisabled && (
                   <button
                     onClick={() => addToFavorites(model.id)}
-                    className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-3 hover:bg-gray-4 px-1 hidden"
+                    className=" text-sm rounded transition-colors cursor-pointer group-hover:block bg-gray-scale-3 hover:bg-gray-scale-4 px-1 hidden"
                   >
-                    <p className="text-sm text-gray-11">Add to Favorites</p>
+                    <p className="text-sm text-gray-scale-11">
+                      Add to Favorites
+                    </p>
                   </button>
                 )}
 
                 {isDisabled ? (
                   <button
                     onClick={() => toggleModel(model.id, false)}
-                    className="h-4 w-4 text-sm rounded transition-colors text-gray-11 cursor-pointer hover:text-gray-12 bg-gray-3 hover:bg-gray-4"
+                    className="h-4 w-4 text-sm rounded transition-colors text-gray-scale-11 cursor-pointer hover:text-gray-scale-12 bg-gray-scale-3 hover:bg-gray-scale-4"
                   ></button>
                 ) : (
                   <button
                     onClick={() => toggleModel(model.id, true)}
-                    className="h-4 w-4 text-sm rounded transition-colors bg-gray-4 items-center justify-center flex cursor-pointer"
+                    className="h-4 w-4 text-sm rounded transition-colors bg-gray-scale-4 items-center justify-center flex cursor-pointer"
                   >
                     <CheckIcon
                       size={12}
                       weight="bold"
-                      className="text-gray-11"
+                      className="text-gray-scale-11"
                     />
                   </button>
                 )}
@@ -733,6 +814,61 @@ function ModelsSection() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function SystemPromptSection() {
+  const { user, db } = useData();
+
+  // Cloud Data
+  const { data: userData } = db.useQuery(
+    user ? { $users: { $: { where: { id: user.id } } } } : null
+  );
+  // Note: Schema defines systemPrompt as a top-level field on $users, not inside settings JSON
+  const cloudSystemPrompt = userData?.$users?.[0]?.systemPrompt;
+
+  // Local Data
+  const [localSystemPrompt, setLocalSystemPrompt] = useState("");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("chaterface_system_prompt");
+    if (stored) setLocalSystemPrompt(stored);
+  }, []);
+
+  // Determine which value to show
+  // If user is logged in, we always prefer the cloud value (as requested)
+  const displayValue = user ? cloudSystemPrompt ?? "" : localSystemPrompt;
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+
+    if (user) {
+      // Update Cloud
+      db.transact(
+        db.tx.$users[user.id].update({
+          systemPrompt: newValue,
+        })
+      );
+    } else {
+      // Update Local
+      setLocalSystemPrompt(newValue);
+      localStorage.setItem("chaterface_system_prompt", newValue);
+    }
+  };
+
+  return (
+    <div className="flex flex-col mt-4">
+      <h2 className="text-gray-scale-11 text-sm font-medium">System Prompt</h2>
+      <p className="text-gray-scale-11 text-sm mt-1">
+        Set the system prompt for Chaterface.
+      </p>
+      <textarea
+        value={displayValue}
+        className="w-full px-2 py-1 mt-2 text-sm bg-gray-scale-2 border border-gray-scale-4 rounded-lg text-gray-scale-12 placeholder:text-gray-scale-11 focus:outline-none focus:ring-2 focus:ring-sky-7 focus:border-transparent transition-all"
+        onChange={handleChange}
+        placeholder="Enter your system prompt"
+      />
     </div>
   );
 }

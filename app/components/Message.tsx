@@ -1,16 +1,37 @@
-import { InstaQLEntity } from "@instantdb/react";
-import { AppSchema } from "@/instant.schema";
+import { UIMessage } from "@/lib/types";
 import { motion } from "motion/react";
 import { Streamdown } from "streamdown";
+import { useState, useEffect, useRef } from "react";
+import { BrainIcon, CaretRightIcon } from "@phosphor-icons/react";
 import CodeBlock, { PreBlock } from "./streamdown/CodeBlock";
 
 export default function Message({
   message,
   animate = false,
+  isStreaming = false,
 }: {
-  message: InstaQLEntity<AppSchema, "messages", object>;
+  message: UIMessage;
   animate?: boolean;
+  isStreaming?: boolean;
 }) {
+  const [isReasoningOpen, setIsReasoningOpen] = useState(false);
+  const hasContent = !!message.content;
+  const wasReasoning = useRef(false);
+
+  // Auto-open reasoning when streaming starts (and content is empty)
+  // Auto-close reasoning when content starts streaming
+  useEffect(() => {
+    if (isStreaming && message.reasoning && !hasContent) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setIsReasoningOpen((prev) => (!prev ? true : prev));
+      wasReasoning.current = true;
+    } else if (wasReasoning.current && hasContent) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setIsReasoningOpen((prev) => (prev ? false : prev));
+      wasReasoning.current = false;
+    }
+  }, [isStreaming, message.reasoning, hasContent]);
+
   if (message.role === "user") {
     return (
       <div className="flex flex-col">
@@ -18,7 +39,7 @@ export default function Message({
           animate={{ opacity: 1, y: 0 }}
           initial={animate ? { opacity: 0, y: 10 } : undefined}
           transition={{ duration: 0.2 }}
-          className="flex flex-row bg-linear-to-br dark:from-blue-10 dark:to-blue-8 from-blue-8 to-blue-10 px-3 py-1.5 rounded-xl max-w-lg w-max self-end"
+          className="flex flex-row bg-blue-9 px-3 py-1.5 rounded-xl max-w-[90%] md:max-w-[80%] self-end"
         >
           <p className="text-white whitespace-pre-wrap">{message.content}</p>
         </motion.div>
@@ -34,48 +55,83 @@ export default function Message({
       className="flex flex-col p-2 rounded-lg max-w-2xl w-full mx-auto my-2"
     >
       <div className="flex flex-col gap-2 mb-2">
-        <p className="text-sm text-gray-11 whitespace-pre-wrap">
+        <p className="text-sm text-gray-scale-11 whitespace-pre-wrap">
           {message.model}
         </p>
       </div>
 
-      {(message.content === "" || message.content === null) && (
-        <div className="flex flex-row items-center gap-1 p-2 bg-gray-2 rounded-lg w-max h-8">
+      {message.reasoning && (
+        <div className="flex flex-col gap-1 mb-3 border-gray-scale-6">
+          <button
+            onClick={() => setIsReasoningOpen(!isReasoningOpen)}
+            className="flex flex-row items-center gap-2 text-sm text-gray-scale-10 hover:text-gray-scale-11 transition-colors w-full text-left group"
+          >
+            <BrainIcon size={16} weight="bold" />
+            <span className="font-medium group-hover:underline decoration-gray-scale-6 underline-offset-4">
+              Reasoning
+            </span>
+            <motion.div
+              animate={{ rotate: isReasoningOpen ? 90 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <CaretRightIcon weight="bold" />
+            </motion.div>
+          </button>
           <motion.div
-            className="w-1.5 h-1.5 bg-gray-11 rounded-full"
-            animate={{ y: [0, -4, 0] }}
-            transition={{
-              duration: 0.6,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 0,
+            initial={false}
+            animate={{
+              height: isReasoningOpen ? "auto" : 0,
+              opacity: isReasoningOpen ? 1 : 0,
+              marginBottom: isReasoningOpen ? 8 : 0,
             }}
-          />
-          <motion.div
-            className="w-1.5 h-1.5 bg-gray-11 rounded-full"
-            animate={{ y: [0, -4, 0] }}
-            transition={{
-              duration: 0.6,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 0.2,
-            }}
-          />
-          <motion.div
-            className="w-1.5 h-1.5 bg-gray-11 rounded-full"
-            animate={{ y: [0, -4, 0] }}
-            transition={{
-              duration: 0.6,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 0.4,
-            }}
-          />
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <p className="text-gray-scale-10 text-sm whitespace-pre-wrap leading-relaxed opacity-90">
+              {message.reasoning}
+            </p>
+          </motion.div>
         </div>
       )}
 
+      {(message.content === "" || message.content === null) &&
+        !message.reasoning && (
+          <div className="flex flex-row items-center gap-1 p-2 bg-gray-scale-2 rounded-lg w-max h-8">
+            <motion.div
+              className="w-1.5 h-1.5 bg-gray-scale-11 rounded-full"
+              animate={{ y: [0, -4, 0] }}
+              transition={{
+                duration: 0.6,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0,
+              }}
+            />
+            <motion.div
+              className="w-1.5 h-1.5 bg-gray-scale-11 rounded-full"
+              animate={{ y: [0, -4, 0] }}
+              transition={{
+                duration: 0.6,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.2,
+              }}
+            />
+            <motion.div
+              className="w-1.5 h-1.5 bg-gray-scale-11 rounded-full"
+              animate={{ y: [0, -4, 0] }}
+              transition={{
+                duration: 0.6,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.4,
+              }}
+            />
+          </div>
+        )}
+
       <Streamdown
-        className="text-gray-12 whitespace-pre-wrap w-full"
+        className="text-gray-scale-12 whitespace-pre-wrap w-full"
         components={{
           code: ({ children, className, ...props }) => (
             <CodeBlock className={className} {...props}>

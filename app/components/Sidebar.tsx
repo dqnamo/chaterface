@@ -1,26 +1,24 @@
 "use client";
 
 import { useData } from "@/app/providers/DataProvider";
-import PiSidebarDefaultSolid from "./icons/PiSidebarDefaultSolid";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { DateTime } from "luxon";
-import { useParams } from "next/navigation";
-import PiChatPlusSolid from "./icons/PiChatPlusSolid";
-import PiUserSettingsSolid from "./icons/PiUserSettingsSolid";
-import PiSunStroke from "./icons/PiSunStroke";
+import { useParams, useRouter } from "next/navigation";
 import { useThemeStore } from "@/app/providers/ThemeProvider";
 import { useModal } from "../providers/ModalProvider";
 import SettingsModal from "./SettingsModal";
+import Tooltip from "./ui/Tooltip";
+import { useHotkeys } from "react-hotkeys-hook";
 import {
-  ChatIcon,
-  ChatsIcon,
   FadersIcon,
   MoonStarsIcon,
   PlusIcon,
   SidebarSimpleIcon,
   SunIcon,
+  CloudIcon,
+  HardDriveIcon,
 } from "@phosphor-icons/react";
 
 export default function Sidebar() {
@@ -28,6 +26,11 @@ export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { conversationId } = useParams();
+  const router = useRouter();
+
+  useHotkeys("n", () => router.push("/"), {
+    preventDefault: true,
+  });
 
   const filteredConversations = useMemo(() => {
     const normalize = (s: string) =>
@@ -130,7 +133,7 @@ export default function Sidebar() {
       .map(({ c }) => c);
   }, [conversations, search]);
 
-  const { theme, toggleTheme } = useThemeStore();
+  const { toggleTheme } = useThemeStore();
   const { showModal } = useModal();
   return (
     <div className="fixed h-max w-full max-w-72 flex flex-col max-h-dvh left-0 top-0 p-2 z-60 gap-2 ">
@@ -138,95 +141,85 @@ export default function Sidebar() {
         initial={false}
         animate={{ width: isOpen ? "100%" : "max-content" }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="p-1 bg-white dark:bg-gray-2 shadow-subtle border border-gray-3 rounded-lg flex flex-row items-center gap-1"
+        className="p-1 bg-white dark:bg-gray-scale-2 shadow-subtle border border-gray-scale-3 rounded-lg flex flex-row items-center gap-1"
       >
-        <button
-          type="button"
-          aria-label="Toggle theme"
-          className="p-1.5 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
-          onClick={toggleTheme}
-        >
-          <SunIcon
-            className="dark:block hidden text-gray-11 transition-colors group-hover:text-gray-12"
-            size={16}
-            weight="bold"
-          />
-          <MoonStarsIcon
-            className="block dark:hidden text-gray-11 transition-colors group-hover:text-gray-12"
-            size={16}
-            weight="bold"
-          />
-        </button>
-        <button
-          type="button"
-          aria-label="Settings"
-          className="p-1.5 hover:bg-gray-3 cursor-pointer dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
-          onClick={() => showModal(<SettingsModal />)}
-        >
-          <FadersIcon
-            className="text-gray-11 transition-colors group-hover:text-gray-12"
-            size={16}
-            weight="bold"
-          />
-        </button>
-        <Link
-          href="/"
-          type="button"
-          aria-label="Create new conversation"
-          className="p-1.5 hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
-        >
-          <PlusIcon
-            className="text-gray-11 transition-colors group-hover:text-gray-12"
-            size={16}
-            weight="bold"
-          />
-        </Link>
-        <button
-          type="button"
-          aria-label="Open sidebar"
-          className="ml-auto p-1.5 cursor-pointer hover:bg-gray-3 dark:hover:bg-gray-6 rounded-md group transition-all duration-200"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          <SidebarSimpleIcon
-            className="text-gray-11 transition-colors group-hover:text-gray-12"
-            size={18}
-            weight={isOpen ? "fill" : "bold"}
-          />
-        </button>
+        <Tooltip content="Toggle theme">
+          <button
+            type="button"
+            aria-label="Toggle theme"
+            className="p-1.5 hover:bg-gray-scale-3 cursor-pointer dark:hover:bg-gray-scale-6 rounded-md group transition-all duration-200"
+            onClick={toggleTheme}
+          >
+            <SunIcon
+              className="dark:block hidden text-gray-scale-11 transition-colors group-hover:text-gray-scale-12"
+              size={16}
+              weight="bold"
+            />
+            <MoonStarsIcon
+              className="block dark:hidden text-gray-scale-11 transition-colors group-hover:text-gray-scale-12"
+              size={16}
+              weight="bold"
+            />
+          </button>
+        </Tooltip>
+        <Tooltip content="Settings">
+          <button
+            type="button"
+            aria-label="Settings"
+            className="p-1.5 hover:bg-gray-scale-3 cursor-pointer dark:hover:bg-gray-scale-6 rounded-md group transition-all duration-200"
+            onClick={() => showModal(<SettingsModal />)}
+          >
+            <FadersIcon
+              className="text-gray-scale-11 transition-colors group-hover:text-gray-scale-12"
+              size={16}
+              weight="bold"
+            />
+          </button>
+        </Tooltip>
+        <Tooltip content="New chat (N)">
+          <Link
+            href="/"
+            type="button"
+            aria-label="Create new conversation"
+            className="p-1.5 hover:bg-gray-scale-3 dark:hover:bg-gray-scale-6 rounded-md group transition-all duration-200"
+          >
+            <PlusIcon
+              className="text-gray-scale-11 transition-colors group-hover:text-gray-scale-12"
+              size={16}
+              weight="bold"
+            />
+          </Link>
+        </Tooltip>
+        <Tooltip content={isOpen ? "Close sidebar" : "Open sidebar"}>
+          <button
+            type="button"
+            aria-label="Open sidebar"
+            className="ml-auto p-1.5 cursor-pointer hover:bg-gray-scale-3 dark:hover:bg-gray-scale-6 rounded-md group transition-all duration-200"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            <SidebarSimpleIcon
+              className="text-gray-scale-11 transition-colors group-hover:text-gray-scale-12"
+              size={18}
+              weight={isOpen ? "fill" : "bold"}
+            />
+          </button>
+        </Tooltip>
       </motion.div>
       <AnimatePresence>
         {isOpen ? (
           <>
-            {/* <motion.button
-              type="button"
-              aria-label="Close sidebar"
-              className="fixed inset-0 bg-black/20 backdrop-blur-[2px]"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              onClick={() => setIsOpen(false)}
-            /> */}
-
-            {/* <motion.div
-              className="max-w-[256px] w-full"
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
-            > */}
             <motion.div
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
-              className="bg-white flex flex-col subtle-shadow dark:bg-gray-2 rounded-lg border border-gray-3 backdrop-blur-sm flex-1 min-h-0"
+              className="bg-white flex flex-col subtle-shadow dark:bg-gray-scale-2 rounded-lg border border-gray-scale-3 backdrop-blur-sm flex-1 min-h-0"
             >
               <div className="flex flex-col">
-                <p className="text-gray-11 font-medium text-sm px-3 pt-3">
+                <p className="text-gray-scale-11 font-medium text-sm px-3 pt-3">
                   Conversations
                 </p>
-                <div className="relative border-b border-gray-3">
+                <div className="relative border-b border-gray-scale-3">
                   <input
                     type="text"
                     value={search}
@@ -235,13 +228,13 @@ export default function Sidebar() {
                       if (e.key === "Escape") setSearch("");
                     }}
                     placeholder="Search conversations"
-                    className="w-full text-gray-12 border-gray-3 dark:border-gray-2 placeholder:text-gray-11 text-sm p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-5 bg-transparent pr-12"
+                    className="w-full text-gray-scale-12 border-gray-scale-3 dark:border-gray-scale-2 placeholder:text-gray-scale-11 text-sm p-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-scale-5 bg-transparent pr-12"
                   />
                   {search.trim().length > 0 ? (
                     <button
                       type="button"
                       onClick={() => setSearch("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-11 hover:text-gray-12 transition-colors px-2 py-1 rounded-md hover:bg-gray-3"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-scale-11 hover:text-gray-scale-11 transition-colors px-2 py-1 rounded-md hover:bg-gray-scale-3"
                       aria-label="Clear search"
                     >
                       Clear
@@ -251,7 +244,7 @@ export default function Sidebar() {
               </div>
               <div className="flex flex-col gap-px p-1 overflow-y-auto flex-1">
                 {filteredConversations.length === 0 ? (
-                  <div className="text-gray-11 text-sm p-3">
+                  <div className="text-gray-scale-11 text-sm p-3">
                     {conversations.length === 0
                       ? "No conversations yet."
                       : `No conversations found for “${search.trim()}”.`}
@@ -261,20 +254,41 @@ export default function Sidebar() {
                     <Link
                       href={`/${conversation.id}`}
                       key={conversation.id}
-                      className={`flex flex-col rounded-md px-2 py-1 hover:bg-gray-2 transition-colors group ${
-                        conversationId === conversation.id ? "bg-gray-2" : ""
+                      className={`flex flex-col rounded-md px-2 py-1 hover:bg-gray-scale-2 dark:hover:bg-gray-scale-3 transition-colors group ${
+                        conversationId === conversation.id
+                          ? "bg-gray-scale-2 dark:bg-gray-scale-3"
+                          : ""
                       }`}
                     >
-                      <p
-                        className={`text-gray-11 text-sm truncate group-hover:text-gray-12 transition-all duration-200 ${
-                          conversationId === conversation.id
-                            ? "text-gray-12"
-                            : ""
-                        }`}
-                      >
-                        {conversation.name}
-                      </p>
-                      <p className="text-gray-11 text-[11px] truncate">
+                      <div className="flex flex-row items-center justify-between">
+                        <p
+                          className={`text-gray-scale-11 text-sm truncate group-hover:text-gray-scale-12 transition-all duration-200 ${
+                            conversationId === conversation.id
+                              ? "text-gray-scale-12"
+                              : ""
+                          }`}
+                        >
+                          {conversation.name}
+                        </p>
+                        {conversation.source === "cloud" ? (
+                          <Tooltip content="Cloud">
+                            <CloudIcon
+                              className="text-sky-500 shrink-0"
+                              weight="duotone"
+                              size={14}
+                            />
+                          </Tooltip>
+                        ) : (
+                          <Tooltip content="Local">
+                            <HardDriveIcon
+                              className="text-gray-scale-9 shrink-0"
+                              weight="duotone"
+                              size={14}
+                            />
+                          </Tooltip>
+                        )}
+                      </div>
+                      <p className="text-gray-scale-11 text-[11px] truncate">
                         {DateTime.fromISO(
                           conversation.createdAt as string
                         ).toRelative()}
@@ -284,7 +298,6 @@ export default function Sidebar() {
                 )}
               </div>
             </motion.div>
-            {/* </motion.div> */}
           </>
         ) : null}
       </AnimatePresence>

@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Pirata_One } from "next/font/google";
 import "./globals.css";
 import AppLayout from "./components/AppLayout";
 import { ModalProvider } from "./providers/ModalProvider";
+import { DataProvider } from "./providers/DataProvider";
 import WebAnalytics from "./components/WebAnalytics";
 import { headers } from "next/headers";
 import { Suspense } from "react";
@@ -15,6 +16,12 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const pirataOne = Pirata_One({
+  variable: "--font-pirata-one",
+  subsets: ["latin"],
+  weight: ["400"],
 });
 
 export const viewport: Viewport = {
@@ -53,14 +60,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans bg-gray-2 dark:bg-neutral-950`}
+        className={`${geistSans.variable} ${geistMono.variable} ${pirataOne.variable} antialiased font-sans bg-gray-scale-1`}
       >
         <Suspense>
           <AnalyticsWrapper />
         </Suspense>
-        <ModalProvider>
-          <AppLayout>{children}</AppLayout>
-        </ModalProvider>
+        <DataProvider>
+          <ModalProvider>
+            <AppLayout>{children}</AppLayout>
+          </ModalProvider>
+        </DataProvider>
       </body>
     </html>
   );

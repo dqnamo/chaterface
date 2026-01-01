@@ -34,14 +34,14 @@ export default function CodeBlock({
   // If it's a block (from PreBlock) or has a language class, render as block
   if (isBlock || language) {
     return (
-      <div className="relative group rounded-lg overflow-hidden my-4 border bg-gray-2 border-gray-4">
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-3 border-b border-gray-4">
-          <span className="text-[11px] font-medium text-gray-11 uppercase font-mono">
+      <div className="relative group rounded-lg overflow-hidden my-4 border bg-gray-scale-2 border-gray-scale-4">
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-scale-3 border-b border-gray-scale-4">
+          <span className="text-[11px] font-medium text-gray-scale-11 uppercase font-mono">
             {language || "text"}
           </span>
           <button
             onClick={copyToClipboard}
-            className="p-1 rounded-md hover:bg-gray-600 transition-colors text-gray-400 hover:text-white"
+            className="p-1 rounded-md hover:bg-gray-scale-600 transition-colors text-gray-scale-400 hover:text-white"
             aria-label="Copy code"
           >
             {isCopied ? <Check size={16} /> : <Copy size={16} />}
@@ -94,7 +94,7 @@ export default function CodeBlock({
   // Inline code
   return (
     <code
-      className={`bg-gray-2 px-1.5 py-0.5 rounded text-sm font-mono text-gray-12 ${
+      className={`bg-gray-scale-2 px-1.5 py-0.5 rounded text-sm font-mono text-gray-scale-12 ${
         className || ""
       }`}
       {...props}
