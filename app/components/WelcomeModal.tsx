@@ -268,7 +268,12 @@ export default function WelcomeModal() {
               title="One Click Self Hosting"
               description="One click self hosting for most major PaaS providers."
             >
-              <p className="text-gray-scale-11 text-sm underline underline-offset-2">
+              <p
+                className="text-gray-scale-11 text-sm underline underline-offset-2"
+                onClick={() =>
+                  window.open("https://github.com/dqnamo/chaterface", "_blank")
+                }
+              >
                 Learn more
               </p>
             </FeatureItem>
