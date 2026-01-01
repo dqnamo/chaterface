@@ -16,7 +16,6 @@ import {
   PaletteIcon,
   MoonStarsIcon,
 } from "@phosphor-icons/react";
-import { usePersonas } from "@/lib/usePersonas";
 import { useModelStore } from "@/lib/modelStore";
 import { userplexClient } from "@/lib/userplexClient";
 import { useThemeStore, Theme } from "../providers/ThemeProvider";
