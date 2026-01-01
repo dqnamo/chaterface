@@ -301,7 +301,7 @@ export default function WelcomeModal() {
                 </span>
               </Button>
 
-              <Button variant="primary">
+              <Button variant="primary" onClick={handleClose}>
                 <span className="text-xs font-medium">Get Started</span>
               </Button>
             </div>
