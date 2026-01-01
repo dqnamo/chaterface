@@ -25,6 +25,7 @@ import {
   PaperPlaneTiltIcon,
   StopIcon,
   WarningIcon,
+  GlobeIcon,
 } from "@phosphor-icons/react";
 import { userplexClient } from "@/lib/userplexClient";
 import { useIsPWA } from "@/lib/useIsPWA";
@@ -35,13 +36,14 @@ export default function ChatInput({
   status,
   style = "floating",
 }: {
-  onSend: (message: string, model: string) => void;
+  onSend: (message: string, model: string, webSearch: boolean) => void;
   onStop?: () => void;
   status?: "streaming" | "submitted" | "ready" | "error";
   style?: "floating" | "bottom";
 }) {
   const [message, setMessage] = useState("");
   const [modelSearch, setModelSearch] = useState("");
+  const [webSearch, setWebSearch] = useState(false);
 
   const { showModal } = useModal();
   const { hasKey: hasApiKey, isLoading: isApiKeyLoading } = useApiKey();
@@ -116,7 +118,7 @@ export default function ChatInput({
   const isInputEmpty = message.trim().length === 0;
 
   const handleSend = async () => {
-    onSend(message.trim(), model);
+    onSend(message.trim(), model, webSearch);
     setMessage("");
 
     userplexClient.logs.new({
@@ -331,6 +333,19 @@ export default function ChatInput({
             <p className="text-gray-scale-11 text-sm">
               {hasApiKey ? model : "Set API key"}
             </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWebSearch(!webSearch)}
+            className={`rounded-lg border px-2 py-1 flex flex-row items-center gap-2 transition-colors ${
+              webSearch
+                ? "bg-blue-9/10 border-blue-9/50 text-blue-9"
+                : "bg-gray-scale-2 dark:bg-gray-scale-3 border-gray-scale-4 dark:border-gray-scale-4 text-gray-scale-11 hover:bg-gray-scale-4/70 dark:hover:bg-gray-scale-4/40"
+            }`}
+          >
+            <GlobeIcon weight={webSearch ? "fill" : "regular"} size={16} />
+            <span className="text-sm font-medium">Web</span>
           </button>
         </div>
         {modelDropdownOpen && (

@@ -16,6 +16,8 @@ import { chatCompletion } from "@/lib/llm";
 import { useLiveQuery } from "dexie-react-hooks";
 import { UIMessage } from "@/lib/types";
 
+import { useSearchParams } from "next/navigation";
+
 export default function ConversationPage({
   params,
 }: {
@@ -23,11 +25,14 @@ export default function ConversationPage({
 }) {
   const { db, localDb, user, masterKey, conversations } = useData();
   const { apiKey } = useApiKey();
+  const searchParams = useSearchParams();
+  const initialWebSearch = searchParams.get("webSearch") === "true";
 
   const [streamingMessage, setStreamingMessage] = useState<{
     id: string;
     content: string;
     reasoning: string;
+    annotations?: UIMessage["annotations"];
   } | null>(null);
   const { conversationId } = use(params);
 
@@ -36,7 +41,6 @@ export default function ConversationPage({
   const isCloud = convo?.source === "cloud";
 
   // 2. Fetch Raw Data (Cloud)
-  // We only enable the subscription if it's a cloud conversation
   const { data: cloudData, isLoading: isCloudLoading } = db.useQuery(
     isCloud && user
       ? {
@@ -99,12 +103,14 @@ export default function ConversationPage({
               const content = await decryptData(m.content, masterKey);
               return {
                 ...m,
+                role: m.role as "system" | "user" | "assistant" | "data",
                 content,
                 reasoning: m.reasoning
                   ? await decryptData(m.reasoning, masterKey)
                   : undefined,
-                parts: [{ type: "text", text: content }],
+                parts: [{ type: "text" as const, text: content }],
                 createdAt: new Date(m.createdAt),
+                annotations: m.annotations,
               };
             }
           )
@@ -145,69 +151,19 @@ export default function ConversationPage({
     "ready" | "streaming" | "submitted" | "error"
   >("ready");
 
-  // Stop function for the user
   const stop = () => {
-    // With fetch(), we can abort via AbortController passed to signal, but chatCompletion helper doesn't expose it yet.
-    // For now we just reset UI state.
-    // Ideally we pass an abort signal down to chatCompletion.
     setStatus("ready");
   };
-
-  useEffect(() => {
-    // check if its first message in the conversation
-    // We rely on 'convo' object for length? Or messages length?
-    // Be careful with async decryption delays.
-    // If messages length is 1 and it's user role, trigger.
-    if (messages.length === 1 && messages[0].role === "user") {
-      // To avoid double triggering, we might need a better check or flag
-      // For now, let's skip auto-trigger on mount to be safe, or assume 'New Chat' logic handled it
-      // Actually, New Chat page pushes to here, so we might need to trigger if only 1 msg.
-      // But New Chat page creates the message.
-      // Let's assume the user wants to trigger it manually or we trigger if last message is User.
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.role === "user") {
-        // It's tricky to know if we already responded or if it's new.
-        // We can check if there is an assistant message after?
-        // Since we just loaded, if the last message is User, we probably need to reply.
-        // But wait, if we reload the page, we don't want to re-reply.
-        // So maybe only on "creation" of the page?
-        // Let's just rely on user interaction for now, EXCEPT for the very first message
-        // which we might want to trigger.
-        // The previous logic used `data?.conversations?.[0]?.messages?.length === 1`
-        // We'll stick to manual or explicit trigger from previous page if passed state, but Next.js router state is tricky.
-        // Let's keep it simple: If only 1 message and it is User, we trigger.
-        // But we need to be careful about not re-triggering on refresh.
-        // We can use a session storage flag or similar, or just let user click send?
-        // The original code had:
-        // if (data?.conversations?.[0]?.messages?.length === 1) { handleSendMessage("", selectedModel, true); }
-        // This implies if we land here and there's 1 msg, we stream.
-        // We will try to replicate this but guard it.
-        // Actually, `handleSendMessage` with `firstMessage=true` handles the "don't create user msg" part.
-        if (!initialLoadDone.current) return;
-        // We'll skip auto-trigger for now to be safe and robust.
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.length]);
-
-  // Re-enable auto-trigger for first message if safe
-  useEffect(() => {
-    if (!isLoading && messages.length === 1 && messages[0].role === "user") {
-      // We need a way to know if this is a "fresh" conversation or a refresh.
-      // For now, let's assume if it's 1 message, we want to reply.
-      // But 'handleSendMessage' expects to send a prompt.
-      // If we pass empty string and true, it skips creating user message.
-      // We'll skip this auto-trigger to avoid duplicate replies on refresh for now.
-    }
-  }, [isLoading, messages]);
 
   const handleSendMessage = async (
     message: string,
     model: string,
+    webSearch: boolean = false,
     firstMessage = false
   ) => {
     // 1. Optimistic Update / Save User Message
-    const now = DateTime.now().toISO();
+    const nowObj = DateTime.now();
+    const now = nowObj.toISO();
 
     if (!firstMessage) {
       const userMsgId = id();
@@ -239,17 +195,17 @@ export default function ConversationPage({
 
     // 2. Create Assistant Placeholder
     const assistantId = id();
+    // Ensure assistant message is created slightly after user message to maintain order
+    const assistantNow = nowObj.plus({ milliseconds: 50 }).toISO();
 
     if (isCloud && masterKey) {
-      // We encrypt empty string? Or just store empty?
-      // Let's encrypt empty string to be consistent
       const encEmpty = await encryptData("", masterKey);
       await db.transact(
         db.tx.messages[assistantId]
           .update({
             content: encEmpty,
             role: "assistant",
-            createdAt: now,
+            createdAt: assistantNow,
             model: model,
           })
           .link({ conversation: conversationId })
@@ -260,7 +216,7 @@ export default function ConversationPage({
         conversationId,
         content: "",
         role: "assistant",
-        createdAt: now,
+        createdAt: assistantNow,
         model,
       });
     }
@@ -269,27 +225,17 @@ export default function ConversationPage({
 
     try {
       // Prepare context messages
-      // We need plain text for the LLM
-      // 'messages' is already decrypted/plain in our state
       const contextMessages = [
         ...messages,
         {
           role: "user",
-          id: id(), // Temporary ID
+          id: id(),
           content: message,
         } as UIMessage,
       ];
 
-      // Remove the last message if we are "firstMessage" because it's already in 'messages'?
-      // If firstMessage is true, 'message' is empty string usually in previous logic?
-      // Wait, if firstMessage=true, it means the user message is ALREADY in the DB (from New Chat page).
-      // So 'messages' (from DB) includes the user prompt.
-      // So we don't need to append 'message' again if firstMessage=true.
-
       let messagesToSend = contextMessages;
       if (firstMessage) {
-        // If first message, 'messages' array should have the user prompt.
-        // And 'message' arg is likely empty or ignored.
         messagesToSend = messages as UIMessage[];
       }
 
@@ -314,18 +260,27 @@ export default function ConversationPage({
         apiKey,
         model,
         messagesToSend,
-        (chunkContent, chunkReasoning, chunkUsage) => {
+        (chunkContent, chunkReasoning, chunkAnnotations, chunkUsage) => {
           fullContent += chunkContent;
           fullReasoning += chunkReasoning;
           if (chunkUsage) fullUsage = chunkUsage;
+
+          const currentAnnotations =
+            chunkAnnotations.length > 0 ? chunkAnnotations : undefined;
+
+          // If we receive annotations, we should store them.
+          const annotationsToSet =
+            currentAnnotations || streamingMessage?.annotations;
 
           setStreamingMessage({
             id: assistantId,
             content: fullContent,
             reasoning: fullReasoning,
+            annotations: annotationsToSet,
           });
         },
-        systemPrompt
+        systemPrompt,
+        webSearch
       );
 
       // Update DB with final result
@@ -340,6 +295,7 @@ export default function ConversationPage({
             content: encContent,
             reasoning: encReasoning,
             usage: fullUsage,
+            annotations: streamingMessage?.annotations,
           })
         );
       } else {
@@ -347,6 +303,7 @@ export default function ConversationPage({
           content: fullContent,
           reasoning: fullReasoning,
           usage: fullUsage,
+          annotations: streamingMessage?.annotations,
         });
       }
 
@@ -369,8 +326,7 @@ export default function ConversationPage({
       status === "ready" &&
       !streamingMessage
     ) {
-      // We pass empty message because it's already in DB, and true for firstMessage
-      handleSendMessage("", selectedModel, true);
+      handleSendMessage("", selectedModel, initialWebSearch, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, messages.length, status, streamingMessage]);

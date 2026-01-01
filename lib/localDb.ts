@@ -9,6 +9,7 @@ export interface LocalMessage {
   reasoning?: string; // Plain text locally
   createdAt: string;
   usage?: any;
+  annotations?: any[];
 }
 
 export interface LocalConversation {
@@ -32,4 +33,3 @@ export class ChatDB extends Dexie {
 }
 
 export const localDb = new ChatDB();
-

@@ -4,8 +4,9 @@ export async function chatCompletion(
   apiKey: string,
   model: string,
   messages: UIMessage[],
-  onChunk: (content: string, reasoning: string, usage?: any) => void,
-  systemPrompt?: string
+  onChunk: (content: string, reasoning: string, annotations: any[], usage?: any) => void,
+  systemPrompt?: string,
+  webSearch: boolean = false
 ) {
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -28,6 +29,7 @@ export async function chatCompletion(
         ],
         stream: true,
         include_reasoning: true,
+        plugins: webSearch ? [{ id: "web" }] : undefined,
       }),
     });
 
@@ -68,8 +70,21 @@ export async function chatCompletion(
               const contentChunk = delta.content || "";
               const reasoningChunk = delta.reasoning || delta.reasoning_content || "";
               const usage = json.usage; // Might come in final chunk or with chunks depending on provider
+              
+              // Annotations for web search (usually in the message object in final response or delta?)
+              // OpenRouter standardizes this in the message.annotations field.
+              // In streaming, it might be in delta or choices[0].message?
+              // The docs say: "Web search results ... are available in the API and standardized ... in the OpenAI Chat Completion Message type"
+              // For streaming, we might need to check if it comes in chunks or final.
+              // Let's assume it might come in a chunk.
+              // But usually annotations are sent when available.
+              // Let's check for annotations in the delta or the choice object (some providers put it in different places, OpenRouter standardizes it)
+              // OpenRouter docs: "annotations" field in the message.
+              // In streaming, it might be in `delta.annotations`? Or maybe we need to wait for full response?
+              // Let's try to grab it if it exists.
+              const annotations = json.choices?.[0]?.message?.annotations || delta.annotations || [];
 
-              onChunk(contentChunk, reasoningChunk, usage);
+              onChunk(contentChunk, reasoningChunk, annotations, usage);
             }
           } catch (e) {
             console.error("Error parsing JSON line:", e);

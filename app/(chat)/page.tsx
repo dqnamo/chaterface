@@ -14,11 +14,22 @@ export default function ChatPage() {
 
   const { db, localDb, user, masterKey } = useData();
 
-  const handleNewMessage = async (message: string, model: string) => {
+  const handleNewMessage = async (
+    message: string,
+    model: string,
+    webSearch: boolean
+  ) => {
     const messageContent = message.trim();
     const conversationId = id();
     const messageId = id();
     const now = DateTime.now().toISO();
+
+    // Store web search preference temporarily if needed,
+    // or we can pass it via URL params or local storage?
+    // URL params is cleaner.
+    // Or we rely on the conversation page to pick it up?
+    // The conversation page doesn't know about the initial 'webSearch' toggle from here.
+    // We should append it to query string.
 
     if (user && masterKey) {
       // --- Encrypted Cloud Path ---
@@ -72,7 +83,7 @@ export default function ChatPage() {
       },
     });
 
-    router.push(`/${conversationId}`);
+    router.push(`/${conversationId}?webSearch=${webSearch}`);
   };
 
   return (
@@ -94,7 +105,9 @@ export default function ChatPage() {
       </motion.div>
 
       <ChatInput
-        onSend={(message, model) => handleNewMessage(message, model)}
+        onSend={(message, model, webSearch) =>
+          handleNewMessage(message, model, webSearch)
+        }
       />
     </div>
   );

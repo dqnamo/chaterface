@@ -30,6 +30,7 @@ const _schema = i.schema({
       role: i.string(),
       model: i.string().optional(),
       usage: i.json().optional(),
+      annotations: i.json().optional(),
     }),
   },
   links: {

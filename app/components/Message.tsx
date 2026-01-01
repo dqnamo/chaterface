@@ -22,11 +22,9 @@ export default function Message({
   // Auto-close reasoning when content starts streaming
   useEffect(() => {
     if (isStreaming && message.reasoning && !hasContent) {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       setIsReasoningOpen((prev) => (!prev ? true : prev));
       wasReasoning.current = true;
     } else if (wasReasoning.current && hasContent) {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       setIsReasoningOpen((prev) => (prev ? false : prev));
       wasReasoning.current = false;
     }
@@ -143,6 +141,36 @@ export default function Message({
       >
         {message.content}
       </Streamdown>
+
+      {message.annotations && message.annotations.length > 0 && (
+        <div className="flex flex-row flex-wrap gap-2 mt-2 pt-2 border-t border-gray-scale-4/50">
+          {message.annotations.map((annotation, index) => {
+            if (annotation.type !== "url_citation") return null;
+            const url = new URL(annotation.url_citation.url);
+            return (
+              <a
+                key={index}
+                href={annotation.url_citation.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-row items-center gap-1.5 px-2 py-1 bg-gray-scale-3 rounded-md hover:bg-gray-scale-4 transition-colors text-xs text-gray-scale-11 border border-gray-scale-4"
+              >
+                <div className="p-0.5 bg-gray-scale-1 rounded-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`}
+                    alt="favicon"
+                    className="w-3 h-3 opacity-70"
+                  />
+                </div>
+                <span className="truncate max-w-[150px]">
+                  {annotation.url_citation.title || url.hostname}
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      )}
     </motion.div>
   );
 }

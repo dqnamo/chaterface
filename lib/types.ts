@@ -21,5 +21,6 @@ export type UIMessage = {
     experimental_attachments?: Attachment[];
     reasoning?: string;
     model?: string;
+    annotations?: any[];
 };
 
