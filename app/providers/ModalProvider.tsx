@@ -84,7 +84,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               exit={{ scale: 1, opacity: 0, y: 10 }}
               className={`bg-white dark:bg-gray-scale-1 border border-gray-scale-3 dark:border-gray-scale-2 rounded-xl better-shadow-md max-w-xl w-full ${
                 modalSize == "content" ? "h-fit" : "h-3/4"
-              } mx-4 overflow-hidden flex flex-col shrink-0`}
+              } overflow-hidden flex flex-col shrink-0`}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="h-full overflow-y-auto">{modalContent}</div>
