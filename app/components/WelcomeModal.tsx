@@ -103,7 +103,7 @@ export default function WelcomeModal() {
             </h1>
           </div>
           <p className="text-gray-scale-11 z-50 font-medium text-sm mt-4">
-            Your Interface to Ephemeral Intelligence.
+            Your Interface to Intelligence
           </p>
         </div>
         <div className="p-3">
