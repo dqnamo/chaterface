@@ -241,8 +241,8 @@ export default function WelcomeModal() {
                   className="text-gray-scale-11"
                 />
               }
-              title="Encrypted Cloud Sync"
-              description="Sync your data across devices with E2EE encryption."
+              title="Zero Knowledge Sync"
+              description="Sync your data across devices with Zero Knowledge encryption."
             />
 
             <FeatureItem

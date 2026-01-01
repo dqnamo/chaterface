@@ -1,10 +1,10 @@
 # 🎯 Chaterface
 
-A privacy-first chat interface for AI conversations with end-to-end encryption and local-first storage.
+A privacy-first chat interface for AI conversations with Zero Knowledge encryption and local-first storage.
 
 ## ✨ Features
 
-- **🔒 Privacy First**: End-to-end encrypted cloud storage with zero-knowledge architecture
+- **🔒 Privacy First**: Cloud storage with Zero Knowledge encryption
 - **💾 Local-First**: Works offline with IndexedDB, sync when you want
 - **🎨 Beautiful UI**: Modern, minimal interface built with Next.js and Tailwind CSS
 - **🤖 Multi-Model**: Support for multiple AI models via OpenRouter
@@ -111,7 +111,7 @@ Chaterface uses a **Union Architecture** that combines two data stores:
 ### Logged In (User Mode)
 
 - Data stored in **InstantDB** (cloud)
-- End-to-end encrypted with AES-256-GCM
+- Zero Knowledge encryption with AES-256-GCM
 - Real-time sync across devices
 
 ### UI Layer
