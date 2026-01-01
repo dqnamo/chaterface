@@ -25,7 +25,7 @@ interface ModelState {
 export const useModelStore = create<ModelState>()(
   persist(
     (set, get) => ({
-      selectedModel: 'xai/grok-4.1-fast',
+      selectedModel: 'google/gemini-3-flash-preview',
       models: [],
       isLoading: false,
       error: null,
