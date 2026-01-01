@@ -69,7 +69,7 @@ export default function WelcomeModal() {
           <ArrowRightIcon
             size={14}
             weight="bold"
-            className="text-gray-scale-12"
+            className="text-gray-scale-2 dark:text-gray-scale-12"
           />
         </Button>
       </div>

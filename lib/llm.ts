@@ -1,5 +1,30 @@
 import { UIMessage } from "./types";
 
+export interface OpenRouterCredits {
+  total_credits: number;
+  total_usage: number;
+}
+
+export async function fetchCredits(apiKey: string): Promise<OpenRouterCredits> {
+  const response = await fetch("https://openrouter.ai/api/v1/credits", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Invalid API key");
+    }
+    const errorText = await response.text();
+    throw new Error(`OpenRouter API Error: ${errorText}`);
+  }
+
+  const json = await response.json();
+  return json.data;
+}
+
 export async function chatCompletion(
   apiKey: string,
   model: string,
@@ -97,4 +122,3 @@ export async function chatCompletion(
     throw error;
   }
 }
-

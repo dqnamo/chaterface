@@ -31,6 +31,7 @@ export const viewport: Viewport = {
   userScalable: false,
   themeColor: "#000000",
   interactiveWidget: "resizes-content",
+  minimumScale: 1, // Prevent zooming out
 };
 
 export const metadata: Metadata = {

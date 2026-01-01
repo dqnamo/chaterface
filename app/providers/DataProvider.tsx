@@ -33,6 +33,7 @@ interface DataContextType {
   user: User | null;
   isLoading: boolean;
   masterKey: string | null; // Changed from CryptoKey to string
+  setMasterKey: (key: string) => void;
 }
 
 export const DataContext = createContext<DataContextType>({
@@ -42,6 +43,7 @@ export const DataContext = createContext<DataContextType>({
   user: null,
   isLoading: true,
   masterKey: null,
+  setMasterKey: () => {},
 });
 
 export const useData = () => useContext(DataContext);
@@ -49,6 +51,11 @@ export const useData = () => useContext(DataContext);
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { user } = db.useAuth();
   const [masterKey, setMasterKey] = useState<string | null>(null);
+
+  const updateMasterKey = (newKey: string) => {
+    localStorage.setItem("chaterface_master_key", newKey);
+    setMasterKey(newKey);
+  };
 
   // 1. Key Management
   useEffect(() => {
@@ -135,6 +142,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         user: user ?? null,
         isLoading,
         masterKey,
+        setMasterKey: updateMasterKey,
       }}
     >
       {children}

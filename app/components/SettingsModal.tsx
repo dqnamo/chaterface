@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useData } from "../providers/DataProvider";
 import { getLocalApiKey, setLocalApiKey } from "@/lib/crypto";
+import { fetchCredits, OpenRouterCredits } from "@/lib/llm";
 import {
   CheckIcon,
   CloudIcon,
@@ -15,6 +16,10 @@ import {
   DesktopIcon,
   PaletteIcon,
   MoonStarsIcon,
+  LockKeyIcon,
+  CopyIcon,
+  WarningIcon,
+  PencilSimpleIcon,
 } from "@phosphor-icons/react";
 import { useModelStore } from "@/lib/modelStore";
 import { userplexClient } from "@/lib/userplexClient";
@@ -249,28 +254,55 @@ function ApiKeySection() {
   // Initialize with local storage value
   const [apiKey, setApiKey] = useState(() => getLocalApiKey() || "");
   const [showKey, setShowKey] = useState(false);
+  const [credits, setCredits] = useState<OpenRouterCredits | null>(null);
+  const [checkingCredits, setCheckingCredits] = useState(false);
   const initialKey = useRef(apiKey);
 
   useEffect(() => {
     // If the key is the same as when we opened the modal,
     // we only fetch if we don't have models yet.
     if (apiKey === initialKey.current) {
-      if (apiKey && models.length === 0) {
-        fetchModels();
+      if (apiKey) {
+        // Attempt to fetch credits if we have a key initially
+        fetchCredits(apiKey)
+          .then(setCredits)
+          .catch(() => setCredits(null));
+
+        if (models.length === 0) {
+          fetchModels();
+        }
       }
       return;
     }
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       setLocalApiKey(apiKey);
       if (apiKey) {
-        // Force fetch to verify the new key
-        fetchModels(true);
-        userplexClient.logs.new({
-          name: "api_key_set",
-          user_id: user?.id ?? "",
-        });
+        setCheckingCredits(true);
+        try {
+          // Check credits first as validation
+          const creditData = await fetchCredits(apiKey);
+          setCredits(creditData);
+          setError(null); // Clear any previous error if this succeeds
+
+          // Then fetch models
+          fetchModels(true);
+
+          userplexClient.logs.new({
+            name: "api_key_set",
+            user_id: user?.id ?? "",
+          });
+        } catch (err: unknown) {
+          console.error("API Key validation failed:", err);
+          setCredits(null);
+          const message =
+            err instanceof Error ? err.message : "Invalid API key";
+          setError(message);
+        } finally {
+          setCheckingCredits(false);
+        }
       } else {
+        setCredits(null);
         setError(null);
       }
     }, 500);
@@ -311,7 +343,7 @@ function ApiKeySection() {
             } focus:border-transparent transition-all font-mono text-sm`}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-            {isLoading && (
+            {(isLoading || checkingCredits) && (
               <div className="w-3 h-3 border-2 border-gray-scale-6 border-t-gray-scale-11 rounded-full animate-spin" />
             )}
             <button
@@ -336,15 +368,30 @@ function ApiKeySection() {
               {error}
             </motion.div>
           )}
-          {!error && apiKey && !isLoading && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 text-emerald-500 text-sm bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20"
-            >
-              <CheckIcon size={14} weight="bold" />
-              API Key is valid
-            </motion.div>
+          {!error && apiKey && !isLoading && !checkingCredits && (
+            <div className="flex flex-col gap-2">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 text-emerald-500 text-sm bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20"
+              >
+                <CheckIcon size={14} weight="bold" />
+                API Key is valid
+              </motion.div>
+
+              {credits && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex justify-between items-center text-xs px-2"
+                >
+                  <span className="text-gray-scale-11">Credits Remaining:</span>
+                  <span className="font-mono text-emerald-500 font-semibold">
+                    ${(credits.total_credits - credits.total_usage).toFixed(2)}
+                  </span>
+                </motion.div>
+              )}
+            </div>
           )}
         </AnimatePresence>
       </div>
@@ -353,14 +400,35 @@ function ApiKeySection() {
 }
 
 function CloudSection() {
-  const { user, db } = useData();
+  const { user, db, masterKey, setMasterKey } = useData();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Key Management
+  const [showMasterKey, setShowMasterKey] = useState(false);
+  const [isEditingKey, setIsEditingKey] = useState(false);
+  const [newKeyInput, setNewKeyInput] = useState("");
+  const [keyCopied, setKeyCopied] = useState(false);
+
   const isGuest = !user;
+
+  const handleCopyKey = () => {
+    if (masterKey) {
+      navigator.clipboard.writeText(masterKey);
+      setKeyCopied(true);
+      setTimeout(() => setKeyCopied(false), 2000);
+    }
+  };
+
+  const handleSaveKey = () => {
+    if (newKeyInput.trim()) {
+      setMasterKey(newKeyInput.trim());
+      setIsEditingKey(false);
+    }
+  };
 
   // if (isAuthLoading) {
   //   return (
@@ -443,6 +511,104 @@ function CloudSection() {
               <p className="text-sm text-gray-scale-11">
                 Your conversations are backed up and accessible from any device.
               </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-scale-2 rounded-xl p-4 border border-gray-scale-3 space-y-4">
+          <div className="flex items-start gap-3">
+            <LockKeyIcon
+              size={20}
+              className="text-amber-500 mt-0.5"
+              weight="duotone"
+            />
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-gray-scale-12">
+                  Encryption Key
+                </p>
+                <p className="text-sm text-gray-scale-11 mt-1">
+                  This key encrypts your data. To access your chats on another
+                  device, you must use this exact key.
+                </p>
+              </div>
+
+              {isEditingKey ? (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <WarningIcon
+                      className="text-red-500 shrink-0 mt-0.5"
+                      size={16}
+                    />
+                    <p className="text-xs text-red-500">
+                      Warning: Changing this key will make existing cloud
+                      messages unreadable unless they were encrypted with this
+                      new key. Only change this if you are importing a key from
+                      another device.
+                    </p>
+                  </div>
+                  <textarea
+                    value={newKeyInput}
+                    onChange={(e) => setNewKeyInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-scale-3 border border-gray-scale-4 rounded-lg text-sm font-mono focus:outline-none focus:border-amber-500 transition-colors resize-none"
+                    rows={2}
+                    placeholder="Paste your key here..."
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setIsEditingKey(false)}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-scale-11 hover:text-gray-scale-12 hover:bg-gray-scale-4 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveKey}
+                      disabled={!newKeyInput.trim()}
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Save Key
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="relative flex-1">
+                    <input
+                      type={showMasterKey ? "text" : "password"}
+                      value={masterKey || ""}
+                      readOnly
+                      className="w-full pl-3 pr-10 py-2 bg-gray-scale-3 border border-gray-scale-4 rounded-lg text-sm font-mono text-gray-scale-11 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => setShowMasterKey(!showMasterKey)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-scale-11 hover:text-gray-scale-12 px-1.5 py-0.5 rounded hover:bg-gray-scale-4 transition-colors"
+                    >
+                      {showMasterKey ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleCopyKey}
+                    className="p-2 text-gray-scale-11 hover:text-gray-scale-12 bg-gray-scale-3 hover:bg-gray-scale-4 border border-gray-scale-4 rounded-lg transition-colors"
+                    title="Copy Key"
+                  >
+                    {keyCopied ? (
+                      <CheckIcon size={16} className="text-emerald-500" />
+                    ) : (
+                      <CopyIcon size={16} />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewKeyInput(masterKey || "");
+                      setIsEditingKey(true);
+                    }}
+                    className="p-2 text-gray-scale-11 hover:text-gray-scale-12 bg-gray-scale-3 hover:bg-gray-scale-4 border border-gray-scale-4 rounded-lg transition-colors"
+                    title="Edit / Import Key"
+                  >
+                    <PencilSimpleIcon size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
