@@ -258,7 +258,7 @@ export default function ChatInput({
       layoutId="chat-input-container"
       className={`z-50 backdrop-blur-sm flex flex-col subtle-shadow bg-gray-scale-1 dark:bg-gray-scale-2  border-gray-scale-4 border w-full ${
         style === "bottom"
-          ? `w-full max-w-2xl fixed bottom-0 md:border-b-0 md:pb-2 rounded-t-xl ${
+          ? `w-full max-w-2xl fixed bottom-0 left-0 right-0 mx-auto md:border-b-0 md:pb-2 rounded-t-xl ${
               isPWA ? "pb-10 md:pb-0" : ""
             }`
           : "max-w-2xl mt-10 rounded-xl"

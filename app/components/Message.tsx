@@ -129,7 +129,7 @@ export default function Message({
         )}
 
       <Streamdown
-        className="text-gray-scale-12 whitespace-pre-wrap w-full"
+        className="text-gray-scale-12 whitespace-pre-wrap w-full break-words"
         components={{
           code: ({ children, className, ...props }) => (
             <CodeBlock className={className} {...props}>
