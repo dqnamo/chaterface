@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="bg-gray-scale-2 dark:bg-gray-scale-1 h-dvh overflow-y-auto flex flex-col">
+    <div className="bg-gray-scale-2 dark:bg-gray-scale-1 h-dvh overflow-y-auto overflow-x-hidden flex flex-col">
       <ThemeSynchronizer />
       <Sidebar />
       {children}
