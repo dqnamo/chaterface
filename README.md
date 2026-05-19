@@ -38,7 +38,8 @@ Configure these repository secrets:
 
 - `INSTANT_APP_ID`
 - `INSTANT_APP_ADMIN_TOKEN`
-- `TRIGGER_SECRET_KEY`
+- `TRIGGER_ACCESS_TOKEN`, a Trigger.dev personal access token from
+  https://cloud.trigger.dev/account/tokens
 
 ## InstantDB
 

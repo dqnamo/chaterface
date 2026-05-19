@@ -19,7 +19,7 @@ jobs:
     env:
       INSTANT_APP_ID: ${{ secrets.INSTANT_APP_ID }}
       INSTANT_APP_ADMIN_TOKEN: ${{ secrets.INSTANT_APP_ADMIN_TOKEN }}
-      TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
+      TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
 
     steps:
       - name: Checkout
