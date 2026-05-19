@@ -9,6 +9,8 @@ export type BoxCommandResult = {
 export const boxWorkspace = "/workspace/home";
 
 const factoryDir = `${boxWorkspace}/.factory`;
+const codexNpmPrefix = `${factoryDir}/npm-global`;
+const codexBinDir = `${codexNpmPrefix}/bin`;
 const codexModel = "gpt-5.5";
 
 export async function createFactoryBox(factoryId: string) {
@@ -98,7 +100,11 @@ export async function runBoxCommand(
 export async function ensureLatestCodexOnBox(box: Box) {
   const result = await runBoxCommand(
     box,
-    ["npm install -g @openai/codex@latest", "codex --version"].join(" && "),
+    [
+      `mkdir -p ${shellQuote(codexBinDir)}`,
+      `npm install -g --prefix ${shellQuote(codexNpmPrefix)} --cache ${shellQuote(`${factoryDir}/npm-cache`)} @openai/codex@latest`,
+      `${createCodexPathExport()} command -v codex && codex --version`,
+    ].join(" && "),
     120_000,
   );
 
@@ -238,11 +244,15 @@ function createCodexExecCommand({
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
-    `setsid sh -lc ${shellQuote(`${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}cd ${shellQuote(boxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
+    `setsid sh -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}cd ${shellQuote(boxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
     "pid=$!",
     `echo "$pid" > ${shellQuote(pidPath)}`,
     'wait "$pid"',
   ].join("\n");
+}
+
+function createCodexPathExport() {
+  return `export PATH=${shellQuote(codexBinDir)}:$PATH;`;
 }
 
 function getWorkerPidPath(workerId: string) {
