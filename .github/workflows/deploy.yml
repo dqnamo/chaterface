@@ -61,7 +61,10 @@ jobs:
           const source = fs.readFileSync(configPath, "utf8");
           fs.writeFileSync(
             configPath,
-            source.replaceAll("__TRIGGER_PROJECT_REF__", projectRef),
+            source.replace(
+              '"__TRIGGER_PROJECT_REF_VALUE__"',
+              JSON.stringify(projectRef),
+            ),
           );
           NODE
 
