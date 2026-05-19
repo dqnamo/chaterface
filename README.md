@@ -29,6 +29,17 @@ npm run trigger:dev
 npm run trigger:deploy
 ```
 
+## GitHub Deploys
+
+Pushes to `main` run `.github/workflows/deploy.yml`, which typechecks, runs
+Biome, pushes the Instant schema and permissions, then deploys Trigger.dev.
+
+Configure these repository secrets:
+
+- `INSTANT_APP_ID`
+- `INSTANT_APP_ADMIN_TOKEN`
+- `TRIGGER_SECRET_KEY`
+
 ## InstantDB
 
 The starter schema and permissions live in `instant.schema.ts` and
