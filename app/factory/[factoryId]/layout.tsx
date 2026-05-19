@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  GearSixIcon,
   KeyIcon,
   ListIcon,
   PlugIcon,
@@ -264,6 +265,19 @@ function WorkerSidebar({
           >
             <PlugIcon aria-hidden="true" size={14} weight="bold" />
             MCP
+          </Button>
+        </Link>
+        <Link href={`/factory/${factoryId}/settings`} onClick={onNavigate}>
+          <Button
+            variant="secondary"
+            className={cn(
+              "mt-2 w-full",
+              currentPathname === `/factory/${factoryId}/settings` &&
+                "bg-grayscale-3",
+            )}
+          >
+            <GearSixIcon aria-hidden="true" size={14} weight="bold" />
+            Settings
           </Button>
         </Link>
         <div className="flex flex-col gap-px">
