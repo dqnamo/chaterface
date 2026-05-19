@@ -41,10 +41,10 @@ jobs:
         run: npx biome check .
 
       - name: Push Instant schema
-        run: npx instant-cli@latest push schema --app "$INSTANT_APP_ID" --yes
+        run: npx instant-cli@latest --token "$INSTANT_APP_ADMIN_TOKEN" push schema --app "$INSTANT_APP_ID" --yes
 
       - name: Push Instant permissions
-        run: npx instant-cli@latest push perms --app "$INSTANT_APP_ID" --yes
+        run: npx instant-cli@latest --token "$INSTANT_APP_ADMIN_TOKEN" push perms --app "$INSTANT_APP_ID" --yes
 
       - name: Deploy Trigger.dev
         run: npx trigger.dev@latest deploy --env prod --skip-update-check
