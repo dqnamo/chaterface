@@ -149,7 +149,7 @@ function FactoryLayoutContent({
           aria-label="Close sidebar"
           onClick={() => setIsSidebarOpen(false)}
         />
-        <aside className="absolute inset-y-0 left-0 w-[min(22rem,92vw)] border-grayscale-3 border-r bg-grayscale-1 shadow-2xl">
+        <aside className="absolute inset-y-0 left-0 flex w-[min(22rem,92vw)] flex-col border-grayscale-3 border-r bg-grayscale-1 shadow-2xl">
           <div className="flex min-h-14 items-center justify-between border-grayscale-3 border-b px-4 pt-[env(safe-area-inset-top)]">
             <span className="font-semibold text-sm">Factory</span>
             <button
@@ -161,7 +161,18 @@ function FactoryLayoutContent({
               <XIcon size={16} weight="bold" aria-hidden="true" />
             </button>
           </div>
-          <SidebarContent factories={factories} />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="border-grayscale-3 border-b p-2">
+              <SidebarContent factories={factories} />
+            </div>
+            <WorkerSidebar
+              className="h-auto w-full"
+              currentPathname={pathname}
+              factoryId={factoryId}
+              onNavigate={() => setIsSidebarOpen(false)}
+              workers={workers}
+            />
+          </div>
         </aside>
       </div>
 
@@ -178,7 +189,7 @@ function FactoryLayoutContent({
           <div className="min-w-0">
             <p className="truncate font-semibold text-sm">{factory.name}</p>
             <p className="truncate text-grayscale-10 text-xs">
-              Open menu to switch factories
+              Open menu for workers and settings
             </p>
           </div>
         </div>
@@ -189,19 +200,24 @@ function FactoryLayoutContent({
 }
 
 function WorkerSidebar({
+  className,
   currentPathname,
   factoryId,
+  onNavigate,
   workers,
 }: {
+  className?: string;
   currentPathname: string;
   factoryId: string;
+  onNavigate?: () => void;
   workers: WorkerRecord[];
 }) {
   return (
-    <div className="flex h-dvh min-h-0 flex-col w-64">
+    <div className={cn("flex h-dvh min-h-0 w-64 flex-col", className)}>
       <nav className="min-h-0 flex-1 overflow-y-auto p-2">
         <Link
           href={`/factory/${factoryId}`}
+          onClick={onNavigate}
           className={cn(
             "",
             currentPathname === `/factory/${factoryId}` && "bg-grayscale-3",
@@ -211,7 +227,7 @@ function WorkerSidebar({
             New worker
           </Button>
         </Link>
-        <Link href={`/factory/${factoryId}/secrets`}>
+        <Link href={`/factory/${factoryId}/secrets`} onClick={onNavigate}>
           <Button
             variant="secondary"
             className={cn(
@@ -224,7 +240,7 @@ function WorkerSidebar({
             Secrets
           </Button>
         </Link>
-        <Link href={`/factory/${factoryId}/skills`}>
+        <Link href={`/factory/${factoryId}/skills`} onClick={onNavigate}>
           <Button
             variant="secondary"
             className={cn(
@@ -237,7 +253,7 @@ function WorkerSidebar({
             Skills
           </Button>
         </Link>
-        <Link href={`/factory/${factoryId}/mcp`}>
+        <Link href={`/factory/${factoryId}/mcp`} onClick={onNavigate}>
           <Button
             variant="secondary"
             className={cn(
@@ -258,6 +274,7 @@ function WorkerSidebar({
               <Link
                 href={href}
                 key={worker.id}
+                onClick={onNavigate}
                 className={cn(
                   "block rounded-lg p-2 text-sm transition-colors hover:bg-grayscale-2",
                   currentPathname === href && "bg-grayscale-2",
