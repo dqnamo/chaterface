@@ -1,0 +1,245 @@
+import { Box, type ExecStreamChunk } from "@upstash/box";
+
+export type BoxCommandResult = {
+  exitCode: number;
+  output: string;
+  success: boolean;
+};
+
+export const boxWorkspace = "/workspace/home";
+
+const factoryDir = `${boxWorkspace}/.factory`;
+
+export async function createFactoryBox(factoryId: string) {
+  return Box.create({
+    apiKey: process.env.UPSTASH_BOX_API_KEY,
+    name: `factory-${factoryId.slice(0, 8)}-default`,
+    runtime: "node",
+  });
+}
+
+export async function getBox(boxId: string) {
+  return Box.get(boxId, {
+    apiKey: process.env.UPSTASH_BOX_API_KEY,
+  });
+}
+
+export async function createWorkerBox({
+  factoryId,
+  snapshotId,
+  workerId,
+}: {
+  factoryId: string;
+  snapshotId: string;
+  workerId: string;
+}) {
+  return Box.fromSnapshot(snapshotId, {
+    apiKey: process.env.UPSTASH_BOX_API_KEY,
+    name: `factory-${factoryId.slice(0, 8)}-worker-${workerId.slice(0, 8)}`,
+    runtime: "node",
+  });
+}
+
+export async function createDefaultFactorySnapshot({
+  box,
+  codexAuthJson,
+  factoryId,
+}: {
+  box: Box;
+  codexAuthJson?: string;
+  factoryId: string;
+}) {
+  const preparedAt = new Date().toISOString();
+  const marker = JSON.stringify({ factoryId, preparedAt });
+  const commands = [
+    `mkdir -p ${shellQuote(factoryDir)}`,
+    `printf %s ${shellQuote(marker)} > ${shellQuote(`${factoryDir}/factory.json`)}`,
+  ];
+
+  if (codexAuthJson) {
+    commands.push(
+      'mkdir -p "$HOME/.codex"',
+      `printf %s ${shellQuote(codexAuthJson)} > "$HOME/.codex/auth.json"`,
+      'chmod 600 "$HOME/.codex/auth.json"',
+    );
+  }
+
+  const result = await runBoxCommand(box, commands.join(" && "), 30_000);
+
+  if (!result.success) {
+    throw new Error(
+      `Could not prepare factory snapshot: ${
+        cleanCommandOutput(result.output) || "No output"
+      }`,
+    );
+  }
+
+  return box.snapshot({ name: `factory-${factoryId.slice(0, 8)}-default` });
+}
+
+export async function runBoxCommand(
+  box: Box,
+  command: string,
+  timeoutMs?: number,
+): Promise<BoxCommandResult> {
+  const wrapped = createBoxCommand(command, timeoutMs);
+  const run = await box.exec.command(wrapped);
+  const output = String(run.result ?? "");
+  const exitCode = run.exitCode ?? (run.status === "completed" ? 0 : 1);
+
+  return {
+    exitCode,
+    output,
+    success: run.status === "completed" && exitCode === 0,
+  };
+}
+
+export async function streamCodexExec({
+  box,
+  prompt,
+  resume,
+  secrets,
+  sessionId,
+  workerId,
+}: {
+  box: Box;
+  prompt: string;
+  resume: boolean;
+  secrets?: Record<string, string>;
+  sessionId?: string;
+  workerId: string;
+}) {
+  return box.exec.stream(
+    createCodexExecCommand({
+      prompt,
+      resume,
+      secrets,
+      sessionId,
+      workerId,
+    }),
+  );
+}
+
+export async function waitForWorkerPid({
+  box,
+  workerId,
+}: {
+  box: Box;
+  workerId: string;
+}) {
+  const pidPath = getWorkerPidPath(workerId);
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const result = await runBoxCommand(
+      box,
+      `test -s ${shellQuote(pidPath)} && cat ${shellQuote(pidPath)}`,
+      2_000,
+    );
+    const pid = Number.parseInt(result.output.trim(), 10);
+
+    if (result.success && Number.isFinite(pid)) {
+      return pid;
+    }
+  }
+
+  return undefined;
+}
+
+export async function killWorkerPid({ box, pid }: { box: Box; pid: number }) {
+  await runBoxCommand(
+    box,
+    [
+      `kill -TERM -${pid} 2>/dev/null || kill -TERM ${pid} 2>/dev/null || true`,
+      "sleep 1",
+      `kill -KILL -${pid} 2>/dev/null || kill -KILL ${pid} 2>/dev/null || true`,
+    ].join("; "),
+    5_000,
+  );
+}
+
+export function getExecStreamChunkText(chunk: ExecStreamChunk) {
+  return chunk.type === "output" ? chunk.data : "";
+}
+
+function createBoxCommand(command: string, timeoutMs?: number) {
+  const timeoutSeconds = timeoutMs
+    ? Math.max(1, Math.ceil(timeoutMs / 1_000))
+    : null;
+  const timeoutPrefix = timeoutSeconds ? `timeout ${timeoutSeconds}s ` : "";
+
+  return [
+    `cd ${shellQuote(boxWorkspace)}`,
+    `${timeoutPrefix}sh -lc ${shellQuote(command)}`,
+  ].join(" && ");
+}
+
+function createCodexExecCommand({
+  prompt,
+  resume,
+  secrets = {},
+  sessionId,
+  workerId,
+}: {
+  prompt: string;
+  resume: boolean;
+  secrets?: Record<string, string>;
+  sessionId?: string;
+  workerId: string;
+}) {
+  const workerDir = `${factoryDir}/workers/${workerId}`;
+  const pidPath = getWorkerPidPath(workerId);
+  const promptPath = `${workerDir}/prompt.txt`;
+  const secretsPath = `${factoryDir}/secrets.env`;
+  const secretEnv = createSecretsEnv(secrets);
+  const codexCommand = resume
+    ? [
+        "codex exec resume",
+        sessionId ? shellQuote(sessionId) : "--last",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--skip-git-repo-check",
+        "--json",
+        "-",
+      ].join(" ")
+    : [
+        "codex exec",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--skip-git-repo-check",
+        "--json",
+        "-",
+      ].join(" ");
+
+  return [
+    `mkdir -p ${shellQuote(workerDir)}`,
+    `rm -f ${shellQuote(pidPath)}`,
+    `printf %s ${shellQuote(prompt)} > ${shellQuote(promptPath)}`,
+    secretEnv
+      ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
+      : `rm -f ${shellQuote(secretsPath)}`,
+    `setsid sh -lc ${shellQuote(`${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}cd ${shellQuote(boxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
+    "pid=$!",
+    `echo "$pid" > ${shellQuote(pidPath)}`,
+    'wait "$pid"',
+  ].join("\n");
+}
+
+function getWorkerPidPath(workerId: string) {
+  return `${factoryDir}/workers/${workerId}/codex.pid`;
+}
+
+export function cleanCommandOutput(output: string) {
+  return output
+    .replace(/^data:\s?/gm, "")
+    .replace(/^event:\s?.*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function shellQuote(value: string) {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function createSecretsEnv(secrets: Record<string, string>) {
+  return Object.entries(secrets)
+    .map(([name, value]) => `export ${name}=${shellQuote(value)}`)
+    .join("\n");
+}
