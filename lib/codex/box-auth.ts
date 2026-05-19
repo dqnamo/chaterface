@@ -95,6 +95,24 @@ export async function runBoxCommand(
   };
 }
 
+export async function ensureLatestCodexOnBox(box: Box) {
+  const result = await runBoxCommand(
+    box,
+    ["npm install -g @openai/codex@latest", "codex --version"].join(" && "),
+    120_000,
+  );
+
+  if (!result.success) {
+    throw new Error(
+      `Could not install latest Codex CLI: ${
+        cleanCommandOutput(result.output) || "No output"
+      }`,
+    );
+  }
+
+  return cleanCommandOutput(result.output);
+}
+
 export async function streamCodexExec({
   box,
   prompt,

@@ -2,6 +2,7 @@ import { id } from "@instantdb/admin";
 import { logger, metadata, task } from "@trigger.dev/sdk";
 import {
   createWorkerBox,
+  ensureLatestCodexOnBox,
   getBox,
   getExecStreamChunkText,
   killWorkerPid,
@@ -159,6 +160,21 @@ export const runWorkerTask = task({
           type: "worker_interrupted",
         });
       }
+
+      setRunMetadata("setting_up_box", {
+        sandboxId,
+        workerId: worker.id,
+      });
+      logTaskStep("info", "Installing latest Codex CLI on box", {
+        sandboxId,
+        workerId: worker.id,
+      });
+      const codexSetupOutput = await ensureLatestCodexOnBox(box);
+      logTaskStep("info", "Codex CLI setup complete", {
+        output: truncateForLog(codexSetupOutput),
+        sandboxId,
+        workerId: worker.id,
+      });
 
       await db.transact(
         db.tx.workers[worker.id].update({
