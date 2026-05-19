@@ -19,16 +19,18 @@ export default function Event({ event }: EventProps) {
   if (event.source === "codex") {
     const message = getAgentMessageText(event.data);
 
-    return message ? <MessageEvent label="Agent" message={message} /> : null;
+    return message ? <MessageEvent label="Codex" message={message} /> : null;
   }
 
-  if (event.type !== "user_message") {
-    return null;
+  if (event.type === "user_message") {
+    const message = getUserPrompt(event.data);
+
+    return message ? <MessageEvent label="You" message={message} /> : null;
   }
 
-  const message = getUserPrompt(event.data);
+  const message = getDiagnosticMessage(event.data);
 
-  return message ? <MessageEvent label="You" message={message} /> : null;
+  return message ? <MessageEvent label="System" message={message} /> : null;
 }
 
 export function MessageEvent({ label, message }: MessageEventProps) {
@@ -60,13 +62,21 @@ function getUserPrompt(data: unknown) {
 }
 
 function getAgentMessageText(data: unknown) {
+  if (isRecord(data) && isAssistantLikeMessage(data)) {
+    const directText = getTextValue(data);
+
+    if (directText) {
+      return directText;
+    }
+  }
+
   const messageItems = getMessageItems(data);
   const messageText = messageItems
     .map((item) => getTextValue(item))
     .filter(Boolean)
     .join("\n\n");
 
-  return messageText || null;
+  return messageText || getDiagnosticMessage(data);
 }
 
 function getMessageItems(data: unknown) {
@@ -107,14 +117,67 @@ function getTextValue(item: Record<string, unknown>) {
 
   if (Array.isArray(item.content)) {
     return item.content
-      .map((part) =>
-        isRecord(part) && typeof part.text === "string" ? part.text : null,
-      )
+      .map((part) => {
+        if (!isRecord(part)) {
+          return null;
+        }
+
+        if (typeof part.text === "string") {
+          return part.text;
+        }
+
+        if (typeof part.output_text === "string") {
+          return part.output_text;
+        }
+
+        if (typeof part.content === "string") {
+          return part.content;
+        }
+
+        return null;
+      })
       .filter(Boolean)
       .join("\n");
   }
 
   return null;
+}
+
+function getDiagnosticMessage(data: unknown) {
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  if (typeof data.message === "string") {
+    return data.message;
+  }
+
+  if (typeof data.raw === "string") {
+    return data.raw;
+  }
+
+  if (isRecord(data.error) && typeof data.error.message === "string") {
+    return data.error.message;
+  }
+
+  if (typeof data.error === "string") {
+    return data.error;
+  }
+
+  return null;
+}
+
+function isAssistantLikeMessage(item: Record<string, unknown>) {
+  const type = typeof item.type === "string" ? item.type : "";
+  const role = typeof item.role === "string" ? item.role : "";
+
+  return (
+    role === "assistant" ||
+    type === "agent_message" ||
+    type === "assistant_message" ||
+    type === "message" ||
+    type === "response.output_text"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

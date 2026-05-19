@@ -16,9 +16,20 @@ type RunWorkerRequest = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
+  const requestedAt = new Date().toISOString();
+  const { workerId } = await context.params;
+
+  logWorkerRunRoute("info", "Worker run request received", {
+    requestedAt,
+    workerId,
+  });
+
   const user = await getCurrentUserForApiRequest(request);
 
   if (!user) {
+    logWorkerRunRoute("warn", "Worker run request unauthorized", {
+      workerId,
+    });
     return unauthorizedResponse();
   }
 
@@ -27,13 +38,20 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     body = (await request.json()) as RunWorkerRequest;
   } catch {
+    logWorkerRunRoute("warn", "Worker run request invalid JSON", {
+      userId: user.id,
+      workerId,
+    });
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { workerId } = await context.params;
   const userMessageEventId = body.userMessageEventId?.trim();
 
   if (!userMessageEventId) {
+    logWorkerRunRoute("warn", "Worker run request missing message event", {
+      userId: user.id,
+      workerId,
+    });
     return Response.json(
       { error: "userMessageEventId is required" },
       { status: 400 },
@@ -60,17 +78,81 @@ export async function POST(request: Request, context: RouteContext) {
     | undefined;
 
   if (!worker || worker.factory?.owner?.id !== user.id) {
+    logWorkerRunRoute("warn", "Worker run request worker not found", {
+      userId: user.id,
+      userMessageEventId,
+      workerFound: Boolean(worker),
+      workerId,
+    });
     return Response.json({ error: "Worker not found" }, { status: 404 });
   }
 
   if (!worker.events?.some((event) => event.id === userMessageEventId)) {
+    logWorkerRunRoute("warn", "Worker run request message not found", {
+      userId: user.id,
+      userMessageEventId,
+      workerId,
+    });
     return Response.json({ error: "Message not found" }, { status: 404 });
   }
 
-  const handle = await tasks.trigger<typeof runWorkerTask>("run-worker", {
-    userMessageEventId,
-    workerId,
-  });
+  try {
+    const handle = await tasks.trigger<typeof runWorkerTask>(
+      "run-worker",
+      {
+        userMessageEventId,
+        workerId,
+      },
+      {
+        metadata: {
+          requestedAt,
+          userId: user.id,
+          userMessageEventId,
+          workerId,
+        },
+        tags: [`worker:${workerId}`],
+      },
+    );
 
-  return Response.json(handle);
+    logWorkerRunRoute("info", "Worker run task triggered", {
+      runId: handle.id,
+      userId: user.id,
+      userMessageEventId,
+      workerId,
+    });
+
+    return Response.json(handle);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Worker could not be started.";
+
+    logWorkerRunRoute("error", "Worker run task trigger failed", {
+      error: serializeError(error),
+      userId: user.id,
+      userMessageEventId,
+      workerId,
+    });
+
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
+
+function logWorkerRunRoute(
+  level: "error" | "info" | "warn",
+  message: string,
+  details: Record<string, unknown>,
+) {
+  console[level](`[worker-run-route] ${message}`, details);
+}
+
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    };
+  }
+
+  return { message: String(error) };
 }
