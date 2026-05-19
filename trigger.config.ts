@@ -1,8 +1,9 @@
 import { defineConfig } from "@trigger.dev/sdk";
 
-const project = process.env.TRIGGER_PROJECT_REF;
+const triggerProjectRefPlaceholder = "__TRIGGER_PROJECT_REF__";
+const project = process.env.TRIGGER_PROJECT_REF ?? triggerProjectRefPlaceholder;
 
-if (!project) {
+if (project === triggerProjectRefPlaceholder) {
   throw new Error("Missing TRIGGER_PROJECT_REF");
 }
 

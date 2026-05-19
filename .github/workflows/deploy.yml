@@ -47,5 +47,23 @@ jobs:
       - name: Push Instant permissions
         run: npx instant-cli@latest --token "$INSTANT_APP_ADMIN_TOKEN" push perms --app "$INSTANT_APP_ID" --yes
 
+      - name: Configure Trigger project
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const projectRef = process.env.TRIGGER_PROJECT_REF;
+
+          if (!projectRef) {
+            throw new Error("Missing TRIGGER_PROJECT_REF");
+          }
+
+          const configPath = "trigger.config.ts";
+          const source = fs.readFileSync(configPath, "utf8");
+          fs.writeFileSync(
+            configPath,
+            source.replaceAll("__TRIGGER_PROJECT_REF__", projectRef),
+          );
+          NODE
+
       - name: Deploy Trigger.dev
         run: npx trigger.dev@latest deploy --env prod --skip-update-check
