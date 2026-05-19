@@ -9,6 +9,7 @@ export type BoxCommandResult = {
 export const boxWorkspace = "/workspace/home";
 
 const factoryDir = `${boxWorkspace}/.factory`;
+const codexModel = "gpt-5.5";
 
 export async function createFactoryBox(factoryId: string) {
   return Box.create({
@@ -195,6 +196,8 @@ function createCodexExecCommand({
     ? [
         "codex exec resume",
         sessionId ? shellQuote(sessionId) : "--last",
+        "--model",
+        shellQuote(codexModel),
         "--dangerously-bypass-approvals-and-sandbox",
         "--skip-git-repo-check",
         "--json",
@@ -202,6 +205,8 @@ function createCodexExecCommand({
       ].join(" ")
     : [
         "codex exec",
+        "--model",
+        shellQuote(codexModel),
         "--dangerously-bypass-approvals-and-sandbox",
         "--skip-git-repo-check",
         "--json",
