@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Pirata_One } from "next/font/google";
 import "../styles/globals.css";
 import PwaRegister from "@/components/PwaRegister";
+import PwaThemeColor from "@/components/PwaThemeColor";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "FactoryPlane",
   },
   formatDetection: {
@@ -51,7 +52,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#111111" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
@@ -70,6 +74,7 @@ export default function RootLayout({
       <body className="min-h-full bg-grayscale-1 text-grayscale-12">
         <ThemeProvider>
           <PwaRegister />
+          <PwaThemeColor />
           <div className="root">{children}</div>
         </ThemeProvider>
       </body>
