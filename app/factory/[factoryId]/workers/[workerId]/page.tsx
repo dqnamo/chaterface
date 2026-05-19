@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import Event, { type EventRecord } from "@/components/Event";
+import { EventFeed, type EventRecord } from "@/components/Event";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { WorkerPromptForm, type WorkerRecord } from "../../worker-run-form";
@@ -61,11 +61,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
       <div className="flex flex-col overflow-y-auto">
         <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
           {events.length > 0 ? (
-            <ol className=" flex flex-col gap-4">
-              {events.map((event) => (
-                <Event event={event} key={event.id} />
-              ))}
-            </ol>
+            <EventFeed events={events} />
           ) : (
             <p>No events yet.</p>
           )}

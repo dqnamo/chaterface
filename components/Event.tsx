@@ -10,14 +10,50 @@ type EventProps = {
   event: EventRecord;
 };
 
+type EventFeedProps = {
+  events: EventRecord[];
+};
+
+type EventFeedItem =
+  | {
+      event: EventRecord;
+      id: string;
+      kind: "event";
+    }
+  | {
+      events: EventRecord[];
+      id: string;
+      kind: "codex-json-group";
+    };
+
 type MessageEventProps = {
   label: string;
   message: string;
 };
 
+type CodexJsonEventGroupProps = {
+  events: EventRecord[];
+};
+
+export function EventFeed({ events }: EventFeedProps) {
+  const items = getEventFeedItems(events);
+
+  return (
+    <ol className="flex flex-col gap-4">
+      {items.map((item) =>
+        item.kind === "codex-json-group" ? (
+          <CodexJsonEventGroup events={item.events} key={item.id} />
+        ) : (
+          <Event event={item.event} key={item.id} />
+        ),
+      )}
+    </ol>
+  );
+}
+
 export default function Event({ event }: EventProps) {
   if (event.source === "codex") {
-    const message = getAgentMessageText(event.data);
+    const message = getCodexAgentMessageText(event.data);
 
     return message ? <MessageEvent label="Codex" message={message} /> : null;
   }
@@ -53,6 +89,52 @@ export function MessageEvent({ label, message }: MessageEventProps) {
   );
 }
 
+function CodexJsonEventGroup({ events }: CodexJsonEventGroupProps) {
+  return (
+    <li>
+      <motion.div
+        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 8 }}
+        transition={{ duration: 0.1, ease: "easeOut" }}
+      >
+        <details className="rounded-lg border border-grayscale-3 bg-grayscale-1">
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm text-grayscale-11">
+            <span className="inline-flex max-w-full items-center gap-2 align-middle">
+              <span className="font-mono font-medium text-grayscale-10 text-xs uppercase">
+                Codex JSON
+              </span>
+              <span className="text-grayscale-9 text-xs">
+                {events.length} {events.length === 1 ? "event" : "events"}
+              </span>
+            </span>
+          </summary>
+          <ul className="flex flex-col gap-2 border-grayscale-3 border-t p-2">
+            {events.map((event) => (
+              <li key={event.id}>
+                <details className="rounded-md border border-grayscale-3 bg-grayscale-2">
+                  <summary className="cursor-pointer select-none px-2 py-1.5">
+                    <span className="flex min-w-0 items-center justify-between gap-3">
+                      <span className="min-w-0 truncate font-mono text-grayscale-11 text-xs">
+                        {getCodexEventTitle(event)}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-grayscale-9">
+                        {getShortEventId(event.id)}
+                      </span>
+                    </span>
+                  </summary>
+                  <pre className="max-h-96 overflow-auto border-grayscale-3 border-t p-3 font-mono text-[11px] text-grayscale-12 leading-relaxed">
+                    {formatJson(event.data)}
+                  </pre>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </motion.div>
+    </li>
+  );
+}
+
 function getUserPrompt(data: unknown) {
   if (!isRecord(data) || !("prompt" in data)) {
     return null;
@@ -61,7 +143,7 @@ function getUserPrompt(data: unknown) {
   return String(data.prompt ?? "");
 }
 
-function getAgentMessageText(data: unknown) {
+function getCodexAgentMessageText(data: unknown) {
   if (isRecord(data) && isAssistantLikeMessage(data)) {
     const directText = getTextValue(data);
 
@@ -76,7 +158,7 @@ function getAgentMessageText(data: unknown) {
     .filter(Boolean)
     .join("\n\n");
 
-  return messageText || getDiagnosticMessage(data);
+  return messageText || null;
 }
 
 function getMessageItems(data: unknown) {
@@ -165,6 +247,88 @@ function getDiagnosticMessage(data: unknown) {
   }
 
   return null;
+}
+
+function getEventFeedItems(events: EventRecord[]) {
+  const items: EventFeedItem[] = [];
+  let codexJsonEvents: EventRecord[] = [];
+
+  function flushCodexJsonEvents() {
+    if (codexJsonEvents.length === 0) {
+      return;
+    }
+
+    items.push({
+      events: codexJsonEvents,
+      id: `codex-json-${codexJsonEvents[0]?.id ?? items.length}`,
+      kind: "codex-json-group",
+    });
+    codexJsonEvents = [];
+  }
+
+  for (const event of events) {
+    if (isCodexJsonEvent(event)) {
+      codexJsonEvents.push(event);
+      continue;
+    }
+
+    flushCodexJsonEvents();
+    items.push({ event, id: event.id, kind: "event" });
+  }
+
+  flushCodexJsonEvents();
+
+  return items;
+}
+
+function isCodexJsonEvent(event: EventRecord) {
+  return (
+    event.source === "codex" && getCodexAgentMessageText(event.data) === null
+  );
+}
+
+function getCodexEventTitle(event: EventRecord) {
+  const payloadType = getPayloadType(event.data);
+  const diagnosticMessage = getDiagnosticMessage(event.data);
+  const title = payloadType ?? event.type ?? "codex_event";
+
+  if (!diagnosticMessage) {
+    return title;
+  }
+
+  return `${title}: ${diagnosticMessage}`;
+}
+
+function getPayloadType(data: unknown): string | null {
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  if (isRecord(data.item) && typeof data.item.type === "string") {
+    return data.item.type;
+  }
+
+  if (isRecord(data.msg) && typeof data.msg.type === "string") {
+    return data.msg.type;
+  }
+
+  if (typeof data.type === "string") {
+    return data.type;
+  }
+
+  return null;
+}
+
+function getShortEventId(eventId: string) {
+  return eventId.slice(0, 8);
+}
+
+function formatJson(value: unknown) {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function isAssistantLikeMessage(item: Record<string, unknown>) {
