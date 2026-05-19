@@ -1,7 +1,13 @@
 import { defineConfig } from "@trigger.dev/sdk";
 
+const project = process.env.TRIGGER_PROJECT_REF;
+
+if (!project) {
+  throw new Error("Missing TRIGGER_PROJECT_REF");
+}
+
 export default defineConfig({
-  project: "proj_base",
+  project,
   dirs: ["./jobs"],
   retries: {
     enabledInDev: false,

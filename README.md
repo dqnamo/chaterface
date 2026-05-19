@@ -38,6 +38,7 @@ Configure these repository secrets:
 
 - `INSTANT_APP_ID`
 - `INSTANT_APP_ADMIN_TOKEN`
+- `TRIGGER_PROJECT_REF`, the Trigger.dev project ref used by `trigger.config.ts`
 - `TRIGGER_ACCESS_TOKEN`, a Trigger.dev personal access token from
   https://cloud.trigger.dev/account/tokens
 
