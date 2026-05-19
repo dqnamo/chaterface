@@ -11,6 +11,8 @@ export const boxWorkspace = "/workspace/home";
 const factoryDir = `${boxWorkspace}/.factory`;
 const codexNpmPrefix = `${factoryDir}/npm-global`;
 const codexBinDir = `${codexNpmPrefix}/bin`;
+const codexAuthArchivePath = `${factoryDir}/codex-auth.tgz`;
+const codexHomeArchivePath = `${factoryDir}/codex-home.tgz`;
 const codexModel = "gpt-5.5";
 
 export async function createFactoryBox(factoryId: string) {
@@ -119,8 +121,57 @@ export async function ensureLatestCodexOnBox(box: Box) {
   return cleanCommandOutput(result.output);
 }
 
+export async function ensureCodexCli(box: Box) {
+  await ensureLatestCodexOnBox(box);
+}
+
+export async function snapshotCodexHome(box: Box, factoryId: string) {
+  const archiveResult = await runBoxCommand(
+    box,
+    [
+      `mkdir -p ${shellQuote(factoryDir)}`,
+      `paths=""`,
+      `if test -d "$HOME/.codex"; then paths="$paths .codex"; fi`,
+      `if test -d "$HOME/.agents"; then paths="$paths .agents"; fi`,
+      `if test -z "$paths"; then echo "Missing Codex home files"; exit 1; fi`,
+      `tar -C "$HOME" -czf ${shellQuote(codexHomeArchivePath)} $paths`,
+    ].join(" && "),
+    30_000,
+  );
+
+  if (!archiveResult.success) {
+    throw new Error(
+      `Could not archive Codex home: ${
+        cleanCommandOutput(archiveResult.output) || "No output"
+      }`,
+    );
+  }
+
+  return box.snapshot({ name: `factory-${factoryId.slice(0, 8)}-codex-home` });
+}
+
+export async function restoreCodexHome(box: Box) {
+  const result = await runBoxCommand(
+    box,
+    [
+      `if test -f ${shellQuote(codexHomeArchivePath)}; then tar -C "$HOME" -xzf ${shellQuote(codexHomeArchivePath)}; elif test -f ${shellQuote(codexAuthArchivePath)}; then tar -C "$HOME" -xzf ${shellQuote(codexAuthArchivePath)}; elif test -d "$HOME/.codex"; then true; else echo "Missing Codex home archive"; exit 1; fi`,
+      `test -d "$HOME/.codex"`,
+    ].join(" && "),
+    30_000,
+  );
+
+  if (!result.success) {
+    throw new Error(
+      `Codex home restore failed: ${
+        cleanCommandOutput(result.output) || "No output"
+      }`,
+    );
+  }
+}
+
 export async function streamCodexExec({
   box,
+  mcpConfig,
   prompt,
   resume,
   secrets,
@@ -128,6 +179,10 @@ export async function streamCodexExec({
   workerId,
 }: {
   box: Box;
+  mcpConfig?: {
+    gatewayUrl: string;
+    token: string;
+  };
   prompt: string;
   resume: boolean;
   secrets?: Record<string, string>;
@@ -136,6 +191,7 @@ export async function streamCodexExec({
 }) {
   return box.exec.stream(
     createCodexExecCommand({
+      mcpConfig,
       prompt,
       resume,
       secrets,
@@ -199,12 +255,17 @@ function createBoxCommand(command: string, timeoutMs?: number) {
 }
 
 function createCodexExecCommand({
+  mcpConfig,
   prompt,
   resume,
   secrets = {},
   sessionId,
   workerId,
 }: {
+  mcpConfig?: {
+    gatewayUrl: string;
+    token: string;
+  };
   prompt: string;
   resume: boolean;
   secrets?: Record<string, string>;
@@ -216,12 +277,26 @@ function createCodexExecCommand({
   const promptPath = `${workerDir}/prompt.txt`;
   const secretsPath = `${factoryDir}/secrets.env`;
   const secretEnv = createSecretsEnv(secrets);
+  const mcpEnv = mcpConfig
+    ? `export FACTORY_MCP_WORKER_TOKEN=${shellQuote(mcpConfig.token)}`
+    : "";
+  const mcpArgs = mcpConfig
+    ? [
+        "-c",
+        shellQuote(`mcp_servers.factory.url="${mcpConfig.gatewayUrl}"`),
+        "-c",
+        shellQuote(
+          'mcp_servers.factory.bearer_token_env_var="FACTORY_MCP_WORKER_TOKEN"',
+        ),
+      ].join(" ")
+    : "";
   const codexCommand = resume
     ? [
         "codex exec resume",
         sessionId ? shellQuote(sessionId) : "--last",
         "--model",
         shellQuote(codexModel),
+        mcpArgs,
         "--dangerously-bypass-approvals-and-sandbox",
         "--skip-git-repo-check",
         "--json",
@@ -231,6 +306,7 @@ function createCodexExecCommand({
         "codex exec",
         "--model",
         shellQuote(codexModel),
+        mcpArgs,
         "--dangerously-bypass-approvals-and-sandbox",
         "--skip-git-repo-check",
         "--json",
@@ -244,7 +320,7 @@ function createCodexExecCommand({
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
-    `setsid sh -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}cd ${shellQuote(boxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
+    `setsid sh -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(boxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
     "pid=$!",
     `echo "$pid" > ${shellQuote(pidPath)}`,
     'wait "$pid"',

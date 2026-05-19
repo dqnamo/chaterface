@@ -60,6 +60,54 @@ const rules = {
       delete: "false",
     },
   },
+  factorySkills: {
+    allow: {
+      view: "auth.id in data.ref('factory.owner.id')",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+  },
+  factoryMcpServers: {
+    allow: {
+      view: "auth.id in data.ref('factory.owner.id')",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+  },
+  factoryMcpCapabilities: {
+    allow: {
+      view: "auth.id in data.ref('mcpServer.factory.owner.id')",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+  },
+  factoryMcpCredentials: {
+    allow: {
+      view: "false",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+  },
+  factoryMcpOauthStates: {
+    allow: {
+      view: "false",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+  },
+  factoryMcpWorkerTokens: {
+    allow: {
+      view: "false",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+  },
   events: {
     allow: {
       view: "auth.id in data.ref('worker.factory.owner.id')",

@@ -1,5 +1,6 @@
 import { id } from "@instantdb/admin";
 import { logger, metadata, task } from "@trigger.dev/sdk";
+import { getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import {
   createWorkerBox,
   ensureLatestCodexOnBox,
@@ -11,6 +12,8 @@ import {
 } from "@/lib/codex/box-auth";
 import { decryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
+import { listEnabledMcpCapabilitiesForFactory } from "@/lib/mcp/records";
+import { createMcpWorkerToken } from "@/lib/mcp/run-tokens";
 
 type RunWorkerPayload = {
   userMessageEventId: string;
@@ -105,6 +108,10 @@ export const runWorkerTask = task({
 
       const defaultSnapshotId = worker.factory.defaultSanpshotId;
       const secrets = getFactorySecrets(worker.factory.secrets ?? []);
+      const mcpConfig = await getWorkerMcpConfig({
+        factoryId: worker.factory.id,
+        workerId: worker.id,
+      });
 
       if (!worker.sandboxId && !defaultSnapshotId) {
         await failWorker(
@@ -192,11 +199,13 @@ export const runWorkerTask = task({
       logTaskStep("info", "Worker marked running; starting Codex stream", {
         sandboxId,
         secretsCount: Object.keys(secrets).length,
+        mcpEnabled: Boolean(mcpConfig),
         workerId: worker.id,
       });
 
       const stream = await streamCodexExec({
         box,
+        mcpConfig,
         prompt,
         resume: Boolean(worker.sandboxId),
         secrets,
@@ -531,6 +540,35 @@ function getFactorySecrets(secrets: SecretRecord[]) {
 
 function isValidSecretName(value: string) {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+}
+
+async function getWorkerMcpConfig({
+  factoryId,
+  workerId,
+}: {
+  factoryId: string;
+  workerId: string;
+}) {
+  const capabilities = await listEnabledMcpCapabilitiesForFactory(factoryId);
+
+  if (capabilities.length === 0) {
+    return undefined;
+  }
+
+  const gatewayUrl = getFactoryMcpGatewayUrl();
+
+  if (!gatewayUrl.startsWith("https://")) {
+    throw new Error("APP_PUBLIC_URL must be HTTPS for MCP-enabled workers");
+  }
+
+  return {
+    gatewayUrl,
+    token: await createMcpWorkerToken({
+      capabilityIds: capabilities.map((capability) => capability.id),
+      factoryId,
+      workerId,
+    }),
+  };
 }
 
 function logTaskStep(

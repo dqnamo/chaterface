@@ -1,6 +1,12 @@
 "use client";
 
-import { KeyIcon, ListIcon, XIcon } from "@phosphor-icons/react";
+import {
+  KeyIcon,
+  ListIcon,
+  PlugIcon,
+  PuzzlePieceIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -216,6 +222,32 @@ function WorkerSidebar({
           >
             <KeyIcon aria-hidden="true" size={14} weight="bold" />
             Secrets
+          </Button>
+        </Link>
+        <Link href={`/factory/${factoryId}/skills`}>
+          <Button
+            variant="secondary"
+            className={cn(
+              "mt-2 w-full",
+              currentPathname === `/factory/${factoryId}/skills` &&
+                "bg-grayscale-3",
+            )}
+          >
+            <PuzzlePieceIcon aria-hidden="true" size={14} weight="bold" />
+            Skills
+          </Button>
+        </Link>
+        <Link href={`/factory/${factoryId}/mcp`}>
+          <Button
+            variant="secondary"
+            className={cn(
+              "mt-2 w-full",
+              currentPathname === `/factory/${factoryId}/mcp` &&
+                "bg-grayscale-3",
+            )}
+          >
+            <PlugIcon aria-hidden="true" size={14} weight="bold" />
+            MCP
           </Button>
         </Link>
         <div className="flex flex-col gap-px">
