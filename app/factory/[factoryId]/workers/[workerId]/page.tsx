@@ -55,10 +55,23 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   const events = [...(worker.events ?? [])].sort((a, b) =>
     (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
   );
+  const workerTitle = worker.name ?? `Worker ${worker.id.slice(0, 8)}`;
 
   return (
-    <div className="flex flex-col w-full h-dvh">
-      <div className="flex flex-col overflow-y-auto">
+    <div className="flex h-dvh w-full flex-col">
+      <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-grayscale-3 border-b px-4">
+        <div className="min-w-0">
+          <h1 className="truncate font-semibold text-base text-grayscale-12">
+            {workerTitle}
+          </h1>
+          <p className="text-grayscale-10 text-xs capitalize">
+            {worker.status}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2" />
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
           {events.length > 0 ? (
             <EventFeed events={events} />

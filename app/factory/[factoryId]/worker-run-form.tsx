@@ -3,7 +3,7 @@
 import { faker } from "@faker-js/faker";
 import { id } from "@instantdb/react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useState } from "react";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
 import type { AppDb } from "@/lib/db.client";
@@ -79,6 +79,7 @@ function NewWorkerFormContent({
           className="outline-none resize-none focus:border-accent-9 p-3 text-sm text-grayscale-12"
           placeholder="Send a message to the worker..."
           onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={submitTextareaOnEnter}
           rows={4}
         />
         {error ? <p>{error}</p> : null}
@@ -187,6 +188,7 @@ function WorkerPromptFormContent({
           className="outline-none resize-none focus:border-accent-9 p-3 text-sm text-grayscale-12"
           placeholder="Send a message to the worker..."
           onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={submitTextareaOnEnter}
           rows={4}
         />
         {error ? <p>{error}</p> : null}
@@ -209,6 +211,19 @@ function WorkerPromptFormContent({
       </form>
     </Card>
   );
+}
+
+function submitTextareaOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
+  if (
+    event.key !== "Enter" ||
+    event.shiftKey ||
+    event.nativeEvent.isComposing
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  event.currentTarget.form?.requestSubmit();
 }
 
 async function triggerWorkerRun({
