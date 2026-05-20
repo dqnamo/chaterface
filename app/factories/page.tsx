@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
+import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 
 type FactoryRecord = {
+  color?: FactoryColorValue;
   defaultSanpshotId?: string;
   id: string;
   name: string;
@@ -122,7 +124,7 @@ function FactoryCard({ factory }: { factory: FactoryRecord }) {
   return (
     <div className="group flex min-h-48 flex-col justify-between bg-grayscale-1 transition-colors hover:bg-grayscale-2">
       <div className="flex flex-col items-start gap-3 p-3">
-        <FactoryMonogram name={factory.name} />
+        <FactoryMonogram color={factory.color} name={factory.name} />
         <div className="min-w-0">
           <h2 className="font-medium text-grayscale-12 text-sm">
             {factory.name}

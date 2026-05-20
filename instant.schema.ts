@@ -14,6 +14,7 @@ const _schema = i.schema({
     factories: i.entity({
       status: i.string(),
       name: i.string(),
+      color: i.string().optional(),
       capabilityBoxId: i.string().indexed().optional(),
       defaultSanpshotId: i.string().optional(),
     }),

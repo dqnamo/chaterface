@@ -16,10 +16,12 @@ import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import Button from "@/components/public/Button";
 import { cn } from "@/helpers/classname-helper";
+import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 
 type FactoryRecord = {
+  color?: FactoryColorValue;
   id: string;
   name: string;
   status: string;
@@ -360,7 +362,7 @@ function SidebarContent({ factories }: { factories: FactoryRecord[] }) {
       <ul className="flex flex-col gap-2">
         {factories.map((candidate) => (
           <Link href={`/factory/${candidate.id}`} key={candidate.id}>
-            <FactoryMonogram name={candidate.name} />
+            <FactoryMonogram color={candidate.color} name={candidate.name} />
           </Link>
         ))}
       </ul>
