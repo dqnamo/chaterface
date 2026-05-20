@@ -247,6 +247,7 @@ async function callFactoryControlTool({
 
     if (name === "factory__list_public_urls") {
       const result = await box.listPublicURLs();
+      await syncWorkerPorts(workerToken.workerId, result.publicURLs);
 
       await createWorkerFactoryControlEvent({
         data: {
@@ -271,6 +272,7 @@ async function callFactoryControlTool({
 
     if (name === "factory__delete_public_url") {
       await box.deletePublicURL(port);
+      await deleteWorkerPort(workerToken.workerId, port);
       await createWorkerFactoryControlEvent({
         data: {
           durationMs: Date.now() - startedAt,
@@ -292,6 +294,12 @@ async function callFactoryControlTool({
         }
       : {};
     const publicUrl = await box.getPublicURL(port, options);
+    await upsertWorkerPort({
+      authType: getPublicUrlAuthType(publicUrl),
+      port: publicUrl.port,
+      url: publicUrl.url,
+      workerId: workerToken.workerId,
+    });
 
     await createWorkerFactoryControlEvent({
       data: {
@@ -447,6 +455,131 @@ async function getWorkerBox({
   }
 
   return getBox(worker.sandboxId);
+}
+
+type PublicUrlRecord = {
+  password?: string;
+  port: number;
+  token?: string;
+  url: string;
+  username?: string;
+};
+
+type PortRecord = {
+  createdAt: string;
+  id: string;
+  port: number;
+  url: string;
+  workerIdPort: string;
+};
+
+async function syncWorkerPorts(
+  workerId: string,
+  publicUrls: PublicUrlRecord[],
+) {
+  const livePorts = new Set(publicUrls.map((publicUrl) => publicUrl.port));
+  const existingPorts = await listWorkerPorts(workerId);
+
+  for (const publicUrl of publicUrls) {
+    await upsertWorkerPort({
+      authType: getPublicUrlAuthType(publicUrl),
+      port: publicUrl.port,
+      url: publicUrl.url,
+      workerId,
+    });
+  }
+
+  for (const existingPort of existingPorts) {
+    if (!livePorts.has(existingPort.port)) {
+      await deletePortRecord(existingPort.id);
+    }
+  }
+}
+
+async function upsertWorkerPort({
+  authType,
+  port,
+  url,
+  workerId,
+}: {
+  authType?: string;
+  port: number;
+  url: string;
+  workerId: string;
+}) {
+  const db = getAdminDbCore();
+  const now = new Date().toISOString();
+  const workerIdPort = getWorkerPortKey(workerId, port);
+  const existingPort = await getPortByWorkerIdPort(workerIdPort);
+  const portId = existingPort?.id ?? id();
+
+  await db.transact([
+    db.tx.ports[portId].update({
+      authType,
+      createdAt: existingPort?.createdAt ?? now,
+      port,
+      updatedAt: now,
+      url,
+      workerIdPort,
+    }),
+    db.tx.ports[portId].link({ worker: workerId }),
+  ]);
+}
+
+async function deleteWorkerPort(workerId: string, port: number) {
+  const existingPort = await getPortByWorkerIdPort(
+    getWorkerPortKey(workerId, port),
+  );
+
+  if (existingPort) {
+    await deletePortRecord(existingPort.id);
+  }
+}
+
+async function deletePortRecord(portId: string) {
+  const db = getAdminDbCore();
+
+  await db.transact(db.tx.ports[portId].delete());
+}
+
+async function getPortByWorkerIdPort(workerIdPort: string) {
+  const db = getAdminDbCore();
+  const result = await db.query({
+    ports: {
+      $: { where: { workerIdPort } },
+    },
+  });
+
+  return result.ports[0] as PortRecord | undefined;
+}
+
+async function listWorkerPorts(workerId: string) {
+  const db = getAdminDbCore();
+  const result = await db.query({
+    workers: {
+      $: { where: { id: workerId } },
+      ports: {},
+    },
+  });
+  const worker = result.workers[0] as { ports?: PortRecord[] } | undefined;
+
+  return worker?.ports ?? [];
+}
+
+function getWorkerPortKey(workerId: string, port: number) {
+  return `${workerId}:${port}`;
+}
+
+function getPublicUrlAuthType(publicUrl: PublicUrlRecord) {
+  if (publicUrl.token) {
+    return "bearer_token";
+  }
+
+  if (publicUrl.username || publicUrl.password) {
+    return "basic_auth";
+  }
+
+  return "none";
 }
 
 async function createWorkerFactoryControlEvent({

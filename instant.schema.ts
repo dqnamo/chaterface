@@ -37,6 +37,14 @@ const _schema = i.schema({
       status: i.string(),
       updatedAt: i.string().indexed().optional(),
     }),
+    ports: i.entity({
+      authType: i.string().indexed().optional(),
+      createdAt: i.string().indexed(),
+      port: i.number().indexed(),
+      updatedAt: i.string().indexed(),
+      url: i.string(),
+      workerIdPort: i.string().unique().indexed(),
+    }),
     factorySkills: i.entity({
       installedAt: i.string().indexed().optional(),
       lastError: i.string().optional(),
@@ -200,6 +208,18 @@ const _schema = i.schema({
         on: "workers",
         has: "many",
         label: "events",
+      },
+    },
+    workerPorts: {
+      forward: {
+        on: "ports",
+        has: "one",
+        label: "worker",
+      },
+      reverse: {
+        on: "workers",
+        has: "many",
+        label: "ports",
       },
     },
   },

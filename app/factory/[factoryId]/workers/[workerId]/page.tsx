@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowSquareOut } from "@phosphor-icons/react";
 import { useParams } from "next/navigation";
 import { EventFeed, type EventRecord } from "@/components/Event";
 import type { AppDb } from "@/lib/db.client";
@@ -11,6 +12,15 @@ type WorkerPageRecord = WorkerRecord & {
   factory?: {
     id: string;
   };
+  ports?: PortRecord[];
+};
+
+type PortRecord = {
+  authType?: string;
+  id: string;
+  port: number;
+  updatedAt: string;
+  url: string;
 };
 
 export default function WorkerPage() {
@@ -34,6 +44,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
             $: { where: { id: workerId } },
             events: {},
             factory: {},
+            ports: {},
           },
         }
       : null,
@@ -56,6 +67,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   const events = [...(worker.events ?? [])].sort((a, b) =>
     (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
   );
+  const ports = [...(worker.ports ?? [])].sort((a, b) => a.port - b.port);
   const workerTitle = worker.name ?? `Worker ${worker.id.slice(0, 8)}`;
 
   return (
@@ -69,7 +81,21 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
             {worker.status}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2" />
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {ports.map((port) => (
+            <a
+              href={port.url}
+              target="_blank"
+              rel="noreferrer"
+              key={port.id}
+              className="inline-flex items-center gap-1 rounded-lg border border-grayscale-4 bg-grayscale-1 px-2 py-1 font-medium text-grayscale-11 text-xs transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
+              title={port.url}
+            >
+              {port.port}
+              <ArrowSquareOut size={12} weight="bold" aria-hidden="true" />
+            </a>
+          ))}
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
