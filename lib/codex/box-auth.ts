@@ -1,5 +1,5 @@
 import { Box, type ExecStreamChunk } from "@upstash/box";
-import { getAppPublicHost, getAppPublicUrl } from "@/lib/app-url";
+import { getAppPublicUrl } from "@/lib/app-url";
 import { factoryWorkerTokenHeader } from "@/lib/factory/worker-api-auth";
 
 export type BoxCommandResult = {
@@ -23,7 +23,7 @@ You have access to the repository workspace at /workspace/home.
 When a local web server or previewable service is useful, start it inside the sandbox and run factory expose <port>. The factory will create a public URL and show it in the worker UI.
 Use factory ports to inspect currently exposed ports and factory delete-port <port> to remove a public URL.
 When you need an external MCP server or integration that is not currently available, run factory request-mcp --name <name> --url <http-mcp-url> --auth <oauth|bearer_token> with optional --scopes and --reason. The factory owner will complete connection from the worker chat.
-Do not ask for or handle the Upstash Box API key or Factory worker API token. Factory host-side operations authenticate automatically for HTTPS requests to the Factory API.
+Do not ask for or handle the Upstash Box API key. The factory CLI authenticates with FACTORY_WORKER_API_TOKEN; do not print or expose that token.
 `;
 
 export async function createFactoryBox(factoryId: string) {
@@ -53,11 +53,10 @@ export async function createWorkerBox({
 }) {
   return Box.fromSnapshot(snapshotId, {
     apiKey: process.env.UPSTASH_BOX_API_KEY,
-    attachHeaders: factoryApiToken
+    env: factoryApiToken
       ? {
-          [getAppPublicHost()]: {
-            [factoryWorkerTokenHeader]: factoryApiToken,
-          },
+          FACTORY_API_URL: getAppPublicUrl(),
+          FACTORY_WORKER_API_TOKEN: factoryApiToken,
         }
       : undefined,
     name: `factory-${factoryId.slice(0, 8)}-worker-${workerId.slice(0, 8)}`,
@@ -358,7 +357,9 @@ function createCodexPathExport() {
 
 function createFactoryCliScript(factoryApiBaseUrl: string) {
   return `#!/usr/bin/env node
-const factoryApiBaseUrl = ${JSON.stringify(factoryApiBaseUrl)};
+const factoryApiBaseUrl = process.env.FACTORY_API_URL || ${JSON.stringify(factoryApiBaseUrl)};
+const factoryWorkerApiToken = process.env.FACTORY_WORKER_API_TOKEN || "";
+const factoryWorkerTokenHeader = ${JSON.stringify(factoryWorkerTokenHeader)};
 
 function usage() {
   console.error(\`Usage:
@@ -387,6 +388,7 @@ async function request(path, options = {}) {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(factoryWorkerApiToken ? { [factoryWorkerTokenHeader]: factoryWorkerApiToken } : {}),
       ...(options.headers || {}),
     },
   });
