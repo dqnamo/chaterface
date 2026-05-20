@@ -26,6 +26,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
     factoryId: string;
     workerId: string;
   }>();
+  const { user } = instantDb.useAuth();
   const { data, isLoading, error } = instantDb.useQuery(
     workerId
       ? {
@@ -74,7 +75,11 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
           {events.length > 0 ? (
-            <EventFeed events={events} />
+            <EventFeed
+              events={events}
+              factoryId={factoryId}
+              userRefreshToken={user?.refresh_token}
+            />
           ) : (
             <p>No events yet.</p>
           )}

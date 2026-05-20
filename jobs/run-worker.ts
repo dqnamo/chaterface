@@ -551,7 +551,7 @@ async function getWorkerMcpConfig({
 }) {
   const capabilities = await listEnabledMcpCapabilitiesForFactory(factoryId);
 
-  if (capabilities.length === 0) {
+  if (!process.env.APP_PUBLIC_URL?.trim() && capabilities.length === 0) {
     return undefined;
   }
 

@@ -11,7 +11,12 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { getAdminDbCore } from "@/lib/admin-db-core";
 import { getMcpCallbackUrl } from "@/lib/app-url";
-import { callRemoteMcpTool, getErrorMessage } from "@/lib/mcp/client";
+import { getBox } from "@/lib/codex/box-auth";
+import {
+  callRemoteMcpTool,
+  getErrorMessage,
+  validateMcpServerUrl,
+} from "@/lib/mcp/client";
 import {
   getMcpCapabilityByNamespacedName,
   getMcpConnection,
@@ -21,6 +26,98 @@ import {
   updateMcpConnection,
 } from "@/lib/mcp/records";
 import { authenticateMcpWorkerToken } from "@/lib/mcp/run-tokens";
+
+const factoryControlTools = [
+  {
+    description:
+      "Expose a TCP port from this worker's Upstash Box as a temporary public URL. The process must already be listening on the port.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: {
+        basicAuth: {
+          description: "Require generated basic authentication credentials.",
+          type: "boolean",
+        },
+        bearerToken: {
+          description: "Require a generated bearer token.",
+          type: "boolean",
+        },
+        port: {
+          description: "Port number to expose from the worker box.",
+          maximum: 65535,
+          minimum: 1,
+          type: "integer",
+        },
+      },
+      required: ["port"],
+      type: "object",
+    },
+    name: "factory__expose_port",
+  },
+  {
+    description:
+      "List temporary public URLs currently exposed for this worker's Upstash Box.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: {},
+      type: "object",
+    },
+    name: "factory__list_public_urls",
+  },
+  {
+    description:
+      "Delete a temporary public URL for a port on this worker's Upstash Box.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: {
+        port: {
+          description: "Port number whose public URL should be deleted.",
+          maximum: 65535,
+          minimum: 1,
+          type: "integer",
+        },
+      },
+      required: ["port"],
+      type: "object",
+    },
+    name: "factory__delete_public_url",
+  },
+  {
+    description:
+      "Request that the factory owner connect an MCP server. This creates a chat event with a connect action; it does not connect or authorize the MCP server automatically.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: {
+        authType: {
+          description: "Authentication type the MCP server expects.",
+          enum: ["oauth", "bearer_token"],
+          type: "string",
+        },
+        name: {
+          description: "Human-readable MCP server name.",
+          minLength: 1,
+          type: "string",
+        },
+        reason: {
+          description: "Why this MCP server would help the worker.",
+          type: "string",
+        },
+        scopes: {
+          description: "Optional OAuth scopes to request.",
+          type: "string",
+        },
+        url: {
+          description: "HTTP MCP endpoint URL.",
+          minLength: 1,
+          type: "string",
+        },
+      },
+      required: ["name", "url"],
+      type: "object",
+    },
+    name: "factory__request_mcp_connection",
+  },
+] as const;
 
 export async function handleFactoryMcpGatewayRequest(request: Request) {
   const workerToken = await authenticateMcpWorkerToken(request);
@@ -56,14 +153,29 @@ function createGatewayServer(
     );
 
     return {
-      tools: capabilities
-        .filter((capability) => capability.enabled)
-        .filter((capability) => capability.capabilityType === "tool")
-        .map((capability) => toGatewayTool(capability)),
+      tools: [
+        ...factoryControlTools,
+        ...capabilities
+          .filter((capability) => capability.enabled)
+          .filter((capability) => capability.capabilityType === "tool")
+          .map((capability) => toGatewayTool(capability)),
+      ],
     };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (toolRequest) => {
+    const factoryControlTool = factoryControlTools.find(
+      (tool) => tool.name === toolRequest.params.name,
+    );
+
+    if (factoryControlTool) {
+      return callFactoryControlTool({
+        args: toolRequest.params.arguments,
+        name: factoryControlTool.name,
+        workerToken,
+      });
+    }
+
     const capability = await getMcpCapabilityByNamespacedName(
       workerToken.capabilityIds,
       toolRequest.params.name,
@@ -92,6 +204,134 @@ function createGatewayServer(
   });
 
   return server;
+}
+
+async function callFactoryControlTool({
+  args,
+  name,
+  workerToken,
+}: {
+  args: unknown;
+  name: (typeof factoryControlTools)[number]["name"];
+  workerToken: NonNullable<
+    Awaited<ReturnType<typeof authenticateMcpWorkerToken>>
+  >;
+}): Promise<CallToolResult> {
+  const startedAt = Date.now();
+
+  try {
+    if (name === "factory__request_mcp_connection") {
+      const request = getMcpConnectionRequestArgs(args);
+
+      await createWorkerFactoryControlEvent({
+        data: {
+          ...request,
+          durationMs: Date.now() - startedAt,
+          status: "requested",
+          toolName: name,
+        },
+        type: "factory.mcp.connection.requested",
+        workerId: workerToken.workerId,
+      });
+
+      return createJsonToolResult({
+        requested: true,
+        ...request,
+      });
+    }
+
+    const box = await getWorkerBox({
+      factoryId: workerToken.factoryId,
+      workerId: workerToken.workerId,
+    });
+
+    if (name === "factory__list_public_urls") {
+      const result = await box.listPublicURLs();
+
+      await createWorkerFactoryControlEvent({
+        data: {
+          durationMs: Date.now() - startedAt,
+          publicUrlCount: result.publicURLs.length,
+          status: "success",
+          toolName: name,
+        },
+        type: "factory.control.called",
+        workerId: workerToken.workerId,
+      });
+
+      return createJsonToolResult({
+        publicUrls: result.publicURLs.map((publicUrl) => ({
+          port: publicUrl.port,
+          url: publicUrl.url,
+        })),
+      });
+    }
+
+    const port = getPortArg(args);
+
+    if (name === "factory__delete_public_url") {
+      await box.deletePublicURL(port);
+      await createWorkerFactoryControlEvent({
+        data: {
+          durationMs: Date.now() - startedAt,
+          port,
+          status: "success",
+          toolName: name,
+        },
+        type: "factory.control.called",
+        workerId: workerToken.workerId,
+      });
+
+      return createJsonToolResult({ deleted: true, port });
+    }
+
+    const options = isRecord(args)
+      ? {
+          basicAuth: args.basicAuth === true,
+          bearerToken: args.bearerToken === true,
+        }
+      : {};
+    const publicUrl = await box.getPublicURL(port, options);
+
+    await createWorkerFactoryControlEvent({
+      data: {
+        auth: {
+          basicAuth: Boolean(publicUrl.username),
+          bearerToken: Boolean(publicUrl.token),
+        },
+        durationMs: Date.now() - startedAt,
+        port,
+        status: "success",
+        toolName: name,
+        url: publicUrl.url,
+      },
+      type: "factory.control.called",
+      workerId: workerToken.workerId,
+    });
+
+    return createJsonToolResult({
+      password: publicUrl.password,
+      port: publicUrl.port,
+      token: publicUrl.token,
+      url: publicUrl.url,
+      username: publicUrl.username,
+    });
+  } catch (error) {
+    const message = getErrorMessage(error);
+
+    await createWorkerFactoryControlEvent({
+      data: {
+        durationMs: Date.now() - startedAt,
+        error: message,
+        status: "failed",
+        toolName: name,
+      },
+      type: "factory.control.failed",
+      workerId: workerToken.workerId,
+    });
+
+    return createToolError(message);
+  }
 }
 
 async function callGatewayTool({
@@ -180,6 +420,61 @@ async function callGatewayTool({
   }
 }
 
+async function getWorkerBox({
+  factoryId,
+  workerId,
+}: {
+  factoryId: string;
+  workerId: string;
+}) {
+  const db = getAdminDbCore();
+  const result = await db.query({
+    workers: {
+      $: { where: { id: workerId } },
+      factory: {},
+    },
+  });
+  const worker = result.workers[0] as
+    | { factory?: { id?: string }; sandboxId?: string }
+    | undefined;
+
+  if (!worker || worker.factory?.id !== factoryId) {
+    throw new Error("Worker not found.");
+  }
+
+  if (!worker.sandboxId) {
+    throw new Error("Worker does not have a box yet.");
+  }
+
+  return getBox(worker.sandboxId);
+}
+
+async function createWorkerFactoryControlEvent({
+  data,
+  workerId,
+  type,
+}: {
+  data: Record<string, unknown>;
+  workerId: string;
+  type:
+    | "factory.control.called"
+    | "factory.control.failed"
+    | "factory.mcp.connection.requested";
+}) {
+  const db = getAdminDbCore();
+  const eventId = id();
+
+  await db.transact([
+    db.tx.events[eventId].update({
+      createdAt: new Date().toISOString(),
+      data,
+      source: "factory",
+      type,
+    }),
+    db.tx.events[eventId].link({ worker: workerId }),
+  ]);
+}
+
 function toGatewayTool(capability: McpCapabilityRecord) {
   return {
     description:
@@ -237,6 +532,63 @@ function createToolError(message: string): CallToolResult {
     content: [{ text: message, type: "text" }],
     isError: true,
   };
+}
+
+function createJsonToolResult(value: unknown): CallToolResult {
+  return {
+    content: [{ text: JSON.stringify(value, null, 2), type: "text" }],
+  };
+}
+
+function getMcpConnectionRequestArgs(args: unknown) {
+  if (!isRecord(args)) {
+    throw new Error("Expected arguments object.");
+  }
+
+  const name = typeof args.name === "string" ? args.name.trim() : "";
+  const rawUrl = typeof args.url === "string" ? args.url.trim() : "";
+  const authType = args.authType === "bearer_token" ? "bearer_token" : "oauth";
+  const scopes = typeof args.scopes === "string" ? args.scopes.trim() : "";
+  const reason = typeof args.reason === "string" ? args.reason.trim() : "";
+
+  if (!name) {
+    throw new Error("MCP name is required.");
+  }
+
+  if (!rawUrl) {
+    throw new Error("MCP URL is required.");
+  }
+
+  return {
+    authType,
+    name,
+    reason: reason || undefined,
+    scopes: scopes || undefined,
+    url: validateMcpServerUrl(rawUrl),
+  };
+}
+
+function getPortArg(args: unknown): number {
+  if (!isRecord(args)) {
+    throw new Error("Expected arguments object.");
+  }
+
+  const port = args.port;
+
+  if (
+    typeof port !== "number" ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535
+  ) {
+    throw new Error("Port must be an integer from 1 to 65535.");
+  }
+
+  return port;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isObjectSchema(value: unknown): value is {
