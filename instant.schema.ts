@@ -106,6 +106,13 @@ const _schema = i.schema({
       tokenHash: i.string().unique().indexed(),
       workerId: i.string().indexed(),
     }),
+    factoryWorkerApiTokens: i.entity({
+      createdAt: i.string().indexed(),
+      factoryId: i.string().indexed(),
+      revokedAt: i.string().indexed().optional(),
+      tokenHash: i.string().unique().indexed(),
+      workerId: i.string().indexed(),
+    }),
     events: i.entity({
       createdAt: i.string().indexed().optional(),
       data: i.json(),

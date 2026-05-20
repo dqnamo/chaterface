@@ -12,6 +12,7 @@ import {
 } from "@/lib/codex/box-auth";
 import { decryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
+import { createFactoryWorkerApiToken } from "@/lib/factory/worker-api-auth";
 import { listEnabledMcpCapabilitiesForFactory } from "@/lib/mcp/records";
 import { createMcpWorkerToken } from "@/lib/mcp/run-tokens";
 
@@ -132,9 +133,16 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
 
+      const factoryApiToken = worker.sandboxId
+        ? undefined
+        : await createFactoryWorkerApiToken({
+            factoryId: worker.factory.id,
+            workerId: worker.id,
+          });
       const box = worker.sandboxId
         ? await getBox(worker.sandboxId)
         : await createWorkerBox({
+            factoryApiToken,
             factoryId: worker.factory.id,
             snapshotId: defaultSnapshotId ?? "",
             workerId: worker.id,
