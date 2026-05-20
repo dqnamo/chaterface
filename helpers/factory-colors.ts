@@ -1,10 +1,4 @@
 export const FACTORY_COLOR_OPTIONS = [
-  { id: "gray", label: "Gray" },
-  { id: "mauve", label: "Mauve" },
-  { id: "slate", label: "Slate" },
-  { id: "sage", label: "Sage" },
-  { id: "olive", label: "Olive" },
-  { id: "sand", label: "Sand" },
   { id: "bronze", label: "Bronze" },
   { id: "gold", label: "Gold" },
   { id: "brown", label: "Brown" },
