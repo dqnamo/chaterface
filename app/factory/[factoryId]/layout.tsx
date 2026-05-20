@@ -93,10 +93,10 @@ function FactoryLayoutContent({
     setIsSidebarOpen(false);
   }, [pathname]);
 
-  if (isAuthLoading || !user || isLoading) {
+  if (isAuthLoading || !user) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-grayscale-1 text-grayscale-11 text-sm">
-        Loading factory...
+        Loading session...
       </div>
     );
   }
@@ -122,7 +122,7 @@ function FactoryLayoutContent({
     (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
   );
 
-  if (!factory) {
+  if (!isLoading && !factory) {
     return (
       <FactoryLoadState
         detail="This factory may have been deleted or the link may be wrong."
@@ -169,12 +169,12 @@ function FactoryLayoutContent({
               <XIcon size={16} weight="bold" aria-hidden="true" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="border-grayscale-3 border-b p-2">
               <SidebarContent factories={factories} />
             </div>
             <WorkerSidebar
-              className="h-auto w-full"
+              className="w-full"
               currentPathname={pathname}
               factoryId={factoryId}
               onNavigate={() => setIsSidebarOpen(false)}
@@ -195,7 +195,9 @@ function FactoryLayoutContent({
             <ListIcon size={18} weight="bold" aria-hidden="true" />
           </button>
           <div className="min-w-0">
-            <p className="truncate font-semibold text-sm">{factory.name}</p>
+            <p className="truncate font-semibold text-sm">
+              {factory?.name ?? "Factory"}
+            </p>
             <p className="truncate text-grayscale-10 text-xs">
               Open menu for workers and settings
             </p>
@@ -226,73 +228,75 @@ function WorkerSidebar({
   );
 
   return (
-    <div className={cn("flex h-dvh min-h-0 w-64 flex-col", className)}>
-      <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-        <Link
-          href={`/factory/${factoryId}`}
-          onClick={onNavigate}
-          className={cn(
-            "",
-            currentPathname === `/factory/${factoryId}` && "bg-grayscale-3",
-          )}
-        >
-          <Button variant="secondary" className="w-full">
-            New worker
-          </Button>
-        </Link>
-        <Link href={`/factory/${factoryId}/secrets`} onClick={onNavigate}>
-          <Button
-            variant="secondary"
+    <div className={cn("flex h-full min-h-0 w-64 flex-col", className)}>
+      <nav className="flex min-h-0 flex-1 flex-col p-2">
+        <div className="shrink-0">
+          <Link
+            href={`/factory/${factoryId}`}
+            onClick={onNavigate}
             className={cn(
-              "mt-2 w-full",
-              currentPathname === `/factory/${factoryId}/secrets` &&
-                "bg-grayscale-3",
+              "",
+              currentPathname === `/factory/${factoryId}` && "bg-grayscale-3",
             )}
           >
-            <KeyIcon aria-hidden="true" size={14} weight="bold" />
-            Secrets
-          </Button>
-        </Link>
-        <Link href={`/factory/${factoryId}/skills`} onClick={onNavigate}>
-          <Button
-            variant="secondary"
-            className={cn(
-              "mt-2 w-full",
-              currentPathname === `/factory/${factoryId}/skills` &&
-                "bg-grayscale-3",
-            )}
-          >
-            <PuzzlePieceIcon aria-hidden="true" size={14} weight="bold" />
-            Skills
-          </Button>
-        </Link>
-        <Link href={`/factory/${factoryId}/mcp`} onClick={onNavigate}>
-          <Button
-            variant="secondary"
-            className={cn(
-              "mt-2 w-full",
-              currentPathname === `/factory/${factoryId}/mcp` &&
-                "bg-grayscale-3",
-            )}
-          >
-            <PlugIcon aria-hidden="true" size={14} weight="bold" />
-            MCP
-          </Button>
-        </Link>
-        <Link href={`/factory/${factoryId}/settings`} onClick={onNavigate}>
-          <Button
-            variant="secondary"
-            className={cn(
-              "mt-2 w-full",
-              currentPathname === `/factory/${factoryId}/settings` &&
-                "bg-grayscale-3",
-            )}
-          >
-            <GearSixIcon aria-hidden="true" size={14} weight="bold" />
-            Settings
-          </Button>
-        </Link>
-        <div className="mt-4 flex flex-col gap-4">
+            <Button variant="secondary" className="w-full">
+              New worker
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/secrets`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/secrets` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <KeyIcon aria-hidden="true" size={14} weight="bold" />
+              Secrets
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/skills`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/skills` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <PuzzlePieceIcon aria-hidden="true" size={14} weight="bold" />
+              Skills
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/mcp`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/mcp` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <PlugIcon aria-hidden="true" size={14} weight="bold" />
+              MCP
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/settings`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/settings` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <GearSixIcon aria-hidden="true" size={14} weight="bold" />
+              Settings
+            </Button>
+          </Link>
+        </div>
+        <div className="scroll-mask-y scroll-mask-y-from-8 mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
           <WorkerSidebarSection
             currentPathname={currentPathname}
             factoryId={factoryId}
