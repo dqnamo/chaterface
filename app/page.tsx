@@ -18,7 +18,8 @@ export default function Home() {
             </h1>
           </div>
           <p className="max-w-md text-balance text-sm leading-6 text-grayscale-11">
-            Cloud software factory using your existing coding agents.
+            Your software factory in the cloud running your existing coding
+            agents as workers.
           </p>
           <div className="mt-4 flex flex-row flex-wrap items-center gap-2">
             <Button className="text-xs" href="/login" variant="primary">

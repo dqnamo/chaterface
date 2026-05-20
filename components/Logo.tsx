@@ -43,7 +43,7 @@ export default function Logo({ className }: LogoProps) {
   return (
     <div
       className={cn(
-        "flex aspect-square w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-4 dark:bg-grayscale-3",
+        "small-shadow flex aspect-square w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-grayscale-3 bg-white dark:border-grayscale-4 dark:bg-grayscale-3",
         className,
       )}
     >

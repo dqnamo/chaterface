@@ -71,7 +71,7 @@ function NewWorkerFormContent({
   }
 
   return (
-    <Card layer={0} className="max-w-2xl mx-auto p-0 w-full">
+    <Card layer={0} className="max-w-2xl bg-white mx-auto p-0 w-full">
       <form onSubmit={onSubmit} className="flex flex-col">
         <textarea
           id="worker-task"
