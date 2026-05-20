@@ -32,6 +32,11 @@ type WorkerRecord = {
   status: string;
 };
 
+type WorkerStatusTone = {
+  className: string;
+  label: string;
+};
+
 type FactoryWithWorkersRecord = FactoryRecord & {
   workers?: WorkerRecord[];
 };
@@ -283,6 +288,7 @@ function WorkerSidebar({
         <div className="flex flex-col gap-px">
           {workers.map((worker) => {
             const href = `/factory/${factoryId}/workers/${worker.id}`;
+            const statusTone = getWorkerStatusTone(worker.status);
 
             return (
               <Link
@@ -294,10 +300,24 @@ function WorkerSidebar({
                   currentPathname === href && "bg-grayscale-2",
                 )}
               >
-                {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
-                <br />
-                <span className="text-grayscale-10 text-xs">
-                  {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
+                <span className="flex min-w-0 items-start gap-2">
+                  <span
+                    aria-label={statusTone.label}
+                    className={cn(
+                      "mt-1.5 size-2 shrink-0 rounded-full",
+                      statusTone.className,
+                    )}
+                    role="img"
+                    title={statusTone.label}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate">
+                      {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
+                    </span>
+                    <span className="block truncate text-grayscale-10 text-xs">
+                      {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
+                    </span>
+                  </span>
                 </span>
               </Link>
             );
@@ -306,6 +326,32 @@ function WorkerSidebar({
       </nav>
     </div>
   );
+}
+
+function getWorkerStatusTone(status: string): WorkerStatusTone {
+  switch (status) {
+    case "failed":
+      return {
+        className: "bg-red-9",
+        label: "Failed",
+      };
+    case "idle":
+      return {
+        className: "bg-green-9",
+        label: "Idle and awaiting input",
+      };
+    case "queued":
+    case "running":
+      return {
+        className: "bg-orange-9",
+        label: "Working",
+      };
+    default:
+      return {
+        className: "bg-grayscale-8",
+        label: status || "Status unknown",
+      };
+  }
 }
 
 function SidebarContent({ factories }: { factories: FactoryRecord[] }) {
