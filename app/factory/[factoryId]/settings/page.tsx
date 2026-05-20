@@ -1,7 +1,7 @@
 "use client";
 
-import { MoonIcon } from "@phosphor-icons/react";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { SwatchesIcon } from "@phosphor-icons/react";
+import { ThemeModeSelector } from "@/components/ThemeModeSelector";
 
 export default function FactorySettingsPage() {
   return (
@@ -20,21 +20,19 @@ export default function FactorySettingsPage() {
               Appearance
             </h2>
           </div>
-          <div className="flex items-center justify-between gap-4 px-3 py-3">
+          <div className="flex flex-col gap-4 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
-                <MoonIcon aria-hidden="true" size={16} weight="bold" />
+                <SwatchesIcon aria-hidden="true" size={16} weight="bold" />
               </div>
               <div className="min-w-0">
-                <p className="font-medium text-grayscale-12 text-sm">
-                  Dark mode
-                </p>
+                <p className="font-medium text-grayscale-12 text-sm">Theme</p>
                 <p className="text-grayscale-10 text-xs">
-                  Use the darker color theme across FactoryPlane.
+                  Choose a light, dark, or system-matched appearance.
                 </p>
               </div>
             </div>
-            <ThemeToggle size={18} />
+            <ThemeModeSelector />
           </div>
         </section>
       </div>
