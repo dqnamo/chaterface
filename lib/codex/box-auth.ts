@@ -14,6 +14,14 @@ const codexBinDir = `${codexNpmPrefix}/bin`;
 const codexAuthArchivePath = `${factoryDir}/codex-auth.tgz`;
 const codexHomeArchivePath = `${factoryDir}/codex-home.tgz`;
 const codexModel = "gpt-5.5";
+const factoryWorkerInstructions = `You are running inside a Software Factory worker sandbox.
+
+You have access to the repository workspace at /workspace/home.
+When a local web server or previewable service is useful, start it inside the sandbox and use the factory MCP tool factory__expose_port with the listening port. The factory will create a public URL and show it in the worker UI.
+Use factory__list_public_urls to inspect currently exposed ports and factory__delete_public_url to remove a public URL.
+When you need an external MCP server or integration that is not currently available, use factory__request_mcp_connection with the server name, HTTP MCP URL, auth type, optional scopes, and a short reason. The factory owner will complete connection from the worker chat.
+Do not ask for or handle the Upstash Box API key. Factory MCP tools perform host-side operations for you.
+`;
 
 export async function createFactoryBox(factoryId: string) {
   return Box.create({
@@ -275,6 +283,7 @@ function createCodexExecCommand({
   const workerDir = `${factoryDir}/workers/${workerId}`;
   const pidPath = getWorkerPidPath(workerId);
   const promptPath = `${workerDir}/prompt.txt`;
+  const workerPrompt = `${factoryWorkerInstructions}\n\nUser task:\n${prompt}`;
   const secretsPath = `${factoryDir}/secrets.env`;
   const secretEnv = createSecretsEnv(secrets);
   const mcpEnv = mcpConfig
@@ -316,7 +325,7 @@ function createCodexExecCommand({
   return [
     `mkdir -p ${shellQuote(workerDir)}`,
     `rm -f ${shellQuote(pidPath)}`,
-    `printf %s ${shellQuote(prompt)} > ${shellQuote(promptPath)}`,
+    `printf %s ${shellQuote(workerPrompt)} > ${shellQuote(promptPath)}`,
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
