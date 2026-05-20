@@ -74,6 +74,7 @@ export async function POST(request: Request, context: RouteContext) {
     | {
         events?: { id: string; type?: string }[];
         factory?: { owner?: { id?: string } };
+        status?: string;
       }
     | undefined;
 
@@ -85,6 +86,18 @@ export async function POST(request: Request, context: RouteContext) {
       workerId,
     });
     return Response.json({ error: "Worker not found" }, { status: 404 });
+  }
+
+  if (worker.status === "retired") {
+    logWorkerRunRoute("warn", "Worker run request worker retired", {
+      userId: user.id,
+      userMessageEventId,
+      workerId,
+    });
+    return Response.json(
+      { error: "This worker has been retired." },
+      { status: 400 },
+    );
   }
 
   if (!worker.events?.some((event) => event.id === userMessageEventId)) {

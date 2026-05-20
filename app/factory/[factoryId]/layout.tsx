@@ -220,6 +220,11 @@ function WorkerSidebar({
   onNavigate?: () => void;
   workers: WorkerRecord[];
 }) {
+  const activeWorkers = workers.filter((worker) => worker.status !== "retired");
+  const retiredWorkers = workers.filter(
+    (worker) => worker.status === "retired",
+  );
+
   return (
     <div className={cn("flex h-dvh min-h-0 w-64 flex-col", className)}>
       <nav className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -287,46 +292,107 @@ function WorkerSidebar({
             Settings
           </Button>
         </Link>
-        <div className="flex flex-col gap-px">
-          {workers.map((worker) => {
-            const href = `/factory/${factoryId}/workers/${worker.id}`;
-            const statusTone = getWorkerStatusTone(worker.status);
-
-            return (
-              <Link
-                href={href}
-                key={worker.id}
-                onClick={onNavigate}
-                className={cn(
-                  "block rounded-lg p-2 text-sm transition-colors hover:bg-grayscale-2",
-                  currentPathname === href && "bg-grayscale-2",
-                )}
-              >
-                <span className="flex min-w-0 items-start gap-2">
-                  <span
-                    aria-label={statusTone.label}
-                    className={cn(
-                      "mt-1.5 size-2 shrink-0 rounded-full",
-                      statusTone.className,
-                    )}
-                    role="img"
-                    title={statusTone.label}
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate">
-                      {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
-                    </span>
-                    <span className="block truncate text-grayscale-10 text-xs">
-                      {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
-                    </span>
-                  </span>
-                </span>
-              </Link>
-            );
-          })}
+        <div className="mt-4 flex flex-col gap-4">
+          <WorkerSidebarSection
+            currentPathname={currentPathname}
+            factoryId={factoryId}
+            onNavigate={onNavigate}
+            title="Active workers"
+            workers={activeWorkers}
+          />
+          <WorkerSidebarSection
+            currentPathname={currentPathname}
+            factoryId={factoryId}
+            onNavigate={onNavigate}
+            title="Retired workers"
+            workers={retiredWorkers}
+          />
         </div>
       </nav>
     </div>
+  );
+}
+
+function WorkerSidebarSection({
+  currentPathname,
+  factoryId,
+  onNavigate,
+  title,
+  workers,
+}: {
+  currentPathname: string;
+  factoryId: string;
+  onNavigate?: () => void;
+  title: string;
+  workers: WorkerRecord[];
+}) {
+  if (workers.length === 0) {
+    return null;
+  }
+
+  return (
+    <section>
+      <h2 className="px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
+        {title}
+      </h2>
+      <div className="flex flex-col gap-px">
+        {workers.map((worker) => (
+          <WorkerSidebarLink
+            currentPathname={currentPathname}
+            factoryId={factoryId}
+            key={worker.id}
+            onNavigate={onNavigate}
+            worker={worker}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WorkerSidebarLink({
+  currentPathname,
+  factoryId,
+  onNavigate,
+  worker,
+}: {
+  currentPathname: string;
+  factoryId: string;
+  onNavigate?: () => void;
+  worker: WorkerRecord;
+}) {
+  const href = `/factory/${factoryId}/workers/${worker.id}`;
+  const statusTone = getWorkerStatusTone(worker.status);
+
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={cn(
+        "block rounded-lg p-2 text-sm transition-colors hover:bg-grayscale-2",
+        currentPathname === href && "bg-grayscale-2",
+      )}
+    >
+      <span className="flex min-w-0 items-start gap-2">
+        <span
+          aria-label={statusTone.label}
+          className={cn(
+            "mt-1.5 size-2 shrink-0 rounded-full",
+            statusTone.className,
+          )}
+          role="img"
+          title={statusTone.label}
+        />
+        <span className="min-w-0">
+          <span className="block truncate">
+            {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
+          </span>
+          <span className="block truncate text-grayscale-10 text-xs">
+            {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
+          </span>
+        </span>
+      </span>
+    </Link>
   );
 }
 
@@ -341,6 +407,11 @@ function getWorkerStatusTone(status: string): WorkerStatusTone {
       return {
         className: "bg-green-9",
         label: "Idle and awaiting input",
+      };
+    case "retired":
+      return {
+        className: "bg-grayscale-8",
+        label: "Retired",
       };
     case "queued":
     case "running":

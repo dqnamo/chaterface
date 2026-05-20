@@ -2,7 +2,9 @@
 
 import { ArrowSquareOut } from "@phosphor-icons/react";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { EventFeed, type EventRecord } from "@/components/Event";
+import Button from "@/components/public/Button";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { WorkerPromptForm, type WorkerRecord } from "../../worker-run-form";
@@ -37,6 +39,8 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
     workerId: string;
   }>();
   const { user } = instantDb.useAuth();
+  const [retireError, setRetireError] = useState<string | null>(null);
+  const [isRetiring, setIsRetiring] = useState(false);
   const { data, isLoading, error } = instantDb.useQuery(
     workerId
       ? {
@@ -69,6 +73,45 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   );
   const ports = [...(worker.ports ?? [])].sort((a, b) => a.port - b.port);
   const workerTitle = worker.name ?? `Worker ${worker.id.slice(0, 8)}`;
+  const selectedWorkerId = worker.id;
+  const isRetired = worker.status === "retired";
+
+  async function onRetireWorker() {
+    if (isRetired || isRetiring) {
+      return;
+    }
+
+    if (!user) {
+      setRetireError("You must be signed in to retire a worker.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    setIsRetiring(true);
+    setRetireError(null);
+
+    try {
+      await instantDb.transact(
+        instantDb.tx.workers[selectedWorkerId].update({
+          activeCommandId: null,
+          activePid: null,
+          retiredAt: now,
+          status: "retired",
+          updatedAt: now,
+        }),
+      );
+    } catch (retireWorkerError) {
+      console.error(retireWorkerError);
+      setRetireError(
+        retireWorkerError instanceof Error
+          ? retireWorkerError.message
+          : "Worker could not be retired.",
+      );
+    } finally {
+      setIsRetiring(false);
+    }
+  }
 
   return (
     <div className="flex h-dvh w-full flex-col">
@@ -95,8 +138,21 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
               <ArrowSquareOut size={12} weight="bold" aria-hidden="true" />
             </a>
           ))}
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isRetired || isRetiring}
+            onClick={onRetireWorker}
+          >
+            {isRetiring ? "Retiring..." : "Retire worker"}
+          </Button>
         </div>
       </header>
+      {retireError ? (
+        <p className="border-grayscale-3 border-b px-4 py-2 text-red-11 text-sm">
+          {retireError}
+        </p>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">

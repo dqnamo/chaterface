@@ -34,6 +34,7 @@ const _schema = i.schema({
       codexSessionId: i.string().indexed().optional(),
       createdAt: i.string().indexed().optional(),
       name: i.string().indexed().optional(),
+      retiredAt: i.string().indexed().optional(),
       sandboxId: i.string().indexed().optional(),
       status: i.string(),
       updatedAt: i.string().indexed().optional(),

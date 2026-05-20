@@ -107,6 +107,21 @@ export const runWorkerTask = task({
         throw new Error("Worker prompt not found");
       }
 
+      if (worker.status === "retired") {
+        setRunMetadata("retired", {
+          userMessageEventId: payload.userMessageEventId,
+          workerId: worker.id,
+        });
+        logTaskStep("info", "Worker is retired; skipping run", {
+          userMessageEventId: payload.userMessageEventId,
+          workerId: worker.id,
+        });
+        return {
+          skipped: true,
+          workerId: worker.id,
+        };
+      }
+
       const defaultSnapshotId = worker.factory.defaultSanpshotId;
       const secrets = getFactorySecrets(worker.factory.secrets ?? []);
       const mcpConfig = await getWorkerMcpConfig({
@@ -493,6 +508,10 @@ async function finalizeWorker({
   const currentWorker = await getWorker(workerId);
 
   if (currentWorker?.activeCommandId !== userMessageEventId) {
+    return;
+  }
+
+  if (currentWorker.status === "retired") {
     return;
   }
 
