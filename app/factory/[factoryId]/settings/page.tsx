@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  CheckIcon,
-  SwatchesIcon,
-  TrashIcon,
-  WarningIcon,
-} from "@phosphor-icons/react";
+import { SwatchesIcon, TrashIcon, WarningIcon } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
-import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import Button from "@/components/public/Button";
@@ -225,37 +219,31 @@ function FactorySettingsPageContent({
               <FactoryMonogram color={selectedColor} name={factory.name} />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="flex flex-row flex-wrap items-center gap-2">
               {FACTORY_COLOR_OPTIONS.map((option) => {
                 const isSelected = selectedColor === option.id;
 
                 return (
                   <button
+                    aria-label={`Use ${option.label} factory color`}
                     aria-pressed={isSelected}
                     className={cn(
-                      "flex min-h-10 items-center justify-between gap-2 rounded-lg border bg-grayscale-1 px-2 py-2 text-left text-sm transition-colors hover:bg-grayscale-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-9 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
-                      isSelected
-                        ? "border-grayscale-8 text-grayscale-12"
-                        : "border-grayscale-3 text-grayscale-11",
+                      "group relative flex size-5 aspect-square items-center justify-center border-grayscale-6 bg-grayscale-2 transition-colors hover:border-grayscale-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-9 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
                     )}
                     disabled={isSaving}
                     key={option.id}
                     onClick={() => saveColor(option.id)}
+                    title={option.label}
                     type="button"
                   >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="size-4 shrink-0 rounded-md border"
-                        style={getColorSwatchStyle(option.id)}
-                      />
-                      <span className="truncate">{option.label}</span>
-                    </span>
+                    <span
+                      className="relative size-5 aspect-square rounded-md transition-transform group-hover:scale-110"
+                      style={{ backgroundColor: `var(--${option.id}-9)` }}
+                    />
                     {isSelected ? (
-                      <CheckIcon
-                        aria-hidden="true"
-                        className="shrink-0 text-grayscale-11"
-                        size={14}
-                        weight="bold"
+                      <div
+                        className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-xs bg-white"
+                        style={{ backgroundColor: `var(--${option.id}-5)` }}
                       />
                     ) : null}
                   </button>
@@ -321,11 +309,4 @@ function FactorySettingsPageContent({
       </div>
     </main>
   );
-}
-
-function getColorSwatchStyle(color: FactoryColorValue): CSSProperties {
-  return {
-    backgroundColor: `var(--${color}-9)`,
-    borderColor: `var(--${color}-7)`,
-  };
 }
