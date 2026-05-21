@@ -44,12 +44,16 @@ export default function FactoryMonogram({
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
 
-  if (parts.length === 0) {
-    return "F";
+  const wordInitials = parts
+    .map((part) => part.match(/[A-Za-z]/)?.[0])
+    .filter((letter): letter is string => Boolean(letter))
+    .slice(0, 2)
+    .join("");
+
+  if (wordInitials.length >= 2) {
+    return wordInitials.toUpperCase();
   }
 
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("");
+  const letters = name.match(/[A-Za-z]/g)?.join("") ?? "FA";
+  return letters.slice(0, 2).padEnd(2, "F").toUpperCase();
 }
