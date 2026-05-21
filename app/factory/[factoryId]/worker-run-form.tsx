@@ -165,9 +165,6 @@ function WorkerPromptFormContent({
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [snapshotStatus, setSnapshotStatus] = useState<
-    "error" | "idle" | "saving" | "saved"
-  >("idle");
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -217,49 +214,6 @@ function WorkerPromptFormContent({
     }
   }
 
-  async function onMakeDefault() {
-    if (!user?.refresh_token) {
-      setError("You must be signed in.");
-      return;
-    }
-
-    setSnapshotStatus("saving");
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/workers/${worker.id}/snapshot`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${user.refresh_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-
-        throw new Error(body?.error ?? "Could not save snapshot.");
-      }
-
-      setSnapshotStatus("saved");
-    } catch (snapshotError) {
-      console.error(snapshotError);
-      setSnapshotStatus("error");
-      setError(
-        snapshotError instanceof Error
-          ? snapshotError.message
-          : "Could not save snapshot.",
-      );
-    }
-  }
-
-  const snapshotLabel =
-    snapshotStatus === "saving"
-      ? "Saving snapshot..."
-      : snapshotStatus === "saved"
-        ? "Snapshot saved"
-        : "Make worker state default";
   const isRetired = worker.status === "retired";
   const isRunning = worker.status === "running";
   const isInputDisabled = isRetired || isSending;
@@ -305,16 +259,6 @@ function WorkerPromptFormContent({
       prompt={prompt}
       setPrompt={setPrompt}
       submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}
-      startActions={
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={snapshotStatus === "saving"}
-          onClick={onMakeDefault}
-        >
-          {snapshotLabel}
-        </Button>
-      }
       uploadingLabel="Uploading..."
     />
   );
@@ -333,7 +277,6 @@ function WorkerComposer({
   placeholder = "Send a message to the worker...",
   prompt,
   setPrompt,
-  startActions,
   submitLabel,
   uploadingLabel,
 }: {
@@ -349,7 +292,6 @@ function WorkerComposer({
   placeholder?: string;
   prompt: string;
   setPrompt: Dispatch<SetStateAction<string>>;
-  startActions?: ReactNode;
   submitLabel: string;
   uploadingLabel: string;
 }) {
@@ -406,7 +348,6 @@ function WorkerComposer({
               <ImageSquare size={16} weight="bold" aria-hidden="true" />
               {attachments.length > 0 ? "Add image" : "Attach image"}
             </Button>
-            {startActions}
           </div>
           <div className="ml-auto flex flex-row items-center gap-2">
             {endActions}
