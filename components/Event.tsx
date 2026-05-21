@@ -10,6 +10,12 @@ import type schema from "@/instant.schema";
 
 export type EventRecord = InstaQLEntity<typeof schema, "events">;
 
+type EventAttachment = {
+  id: string;
+  path?: string;
+  url?: string;
+};
+
 type EventProps = {
   event: EventRecord;
   factoryId?: string;
@@ -35,6 +41,7 @@ type EventFeedItem =
     };
 
 type MessageEventProps = {
+  attachments?: EventAttachment[];
   label: string;
   message: string;
 };
@@ -81,8 +88,11 @@ export default function Event({
 
   if (event.type === "user_message") {
     const message = getUserPrompt(event.data);
+    const attachments = getEventAttachments(event);
 
-    return message ? <MessageEvent label="You" message={message} /> : null;
+    return message ? (
+      <MessageEvent attachments={attachments} label="You" message={message} />
+    ) : null;
   }
 
   if (event.type === "factory.mcp.connection.requested") {
@@ -102,7 +112,11 @@ export default function Event({
   return message ? <MessageEvent label="System" message={message} /> : null;
 }
 
-export function MessageEvent({ label, message }: MessageEventProps) {
+export function MessageEvent({
+  attachments = [],
+  label,
+  message,
+}: MessageEventProps) {
   return (
     <li>
       <motion.div
@@ -117,6 +131,25 @@ export function MessageEvent({ label, message }: MessageEventProps) {
         <div className="whitespace-pre-wrap text-sm text-grayscale-12">
           {message}
         </div>
+        {attachments.length > 0 ? (
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {attachments.map((attachment) => (
+              <li
+                className="size-24 overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-2"
+                key={attachment.id}
+              >
+                {attachment.url ? (
+                  <div
+                    aria-label={attachment.path ?? "Attached image"}
+                    className="size-full bg-cover bg-center"
+                    role="img"
+                    style={{ backgroundImage: `url(${attachment.url})` }}
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </motion.div>
     </li>
   );
@@ -441,6 +474,25 @@ function getUserPrompt(data: unknown) {
   }
 
   return String(data.prompt ?? "");
+}
+
+function getEventAttachments(event: EventRecord) {
+  const attachments = "attachments" in event ? event.attachments : undefined;
+
+  if (!Array.isArray(attachments)) {
+    return [];
+  }
+
+  return attachments.filter(isEventAttachment);
+}
+
+function isEventAttachment(value: unknown): value is EventAttachment {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    (typeof value.url === "string" || value.url === undefined) &&
+    (typeof value.path === "string" || value.path === undefined)
+  );
 }
 
 function getCodexAgentMessageText(data: unknown) {

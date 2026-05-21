@@ -219,6 +219,18 @@ const _schema = i.schema({
         label: "events",
       },
     },
+    eventAttachments: {
+      forward: {
+        on: "events",
+        has: "many",
+        label: "attachments",
+      },
+      reverse: {
+        on: "$files",
+        has: "one",
+        label: "event",
+      },
+    },
     workerPorts: {
       forward: {
         on: "ports",

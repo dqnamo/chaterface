@@ -2,11 +2,14 @@ import { id } from "@instantdb/admin";
 import { logger, metadata, task } from "@trigger.dev/sdk";
 import { getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import {
+  cleanCommandOutput,
   createWorkerBox,
   ensureLatestCodexOnBox,
   getBox,
   getExecStreamChunkText,
   killWorkerPid,
+  runBoxCommand,
+  shellQuote,
   streamCodexExec,
   waitForWorkerPid,
 } from "@/lib/codex/box-auth";
@@ -41,10 +44,17 @@ type SecretRecord = {
 };
 
 type EventRecord = {
+  attachments?: AttachmentRecord[];
   data?: {
     prompt?: string;
   };
   id: string;
+};
+
+type AttachmentRecord = {
+  id: string;
+  path?: string;
+  url?: string;
 };
 
 type JsonValue =
@@ -205,6 +215,18 @@ export const runWorkerTask = task({
         sandboxId,
         workerId: worker.id,
       });
+      const imagePaths = await stageWorkerImageAttachments({
+        attachments: userMessageEvent?.attachments ?? [],
+        box,
+        eventId: payload.userMessageEventId,
+        workerId: worker.id,
+      });
+
+      logTaskStep("info", "Worker image attachments staged", {
+        attachmentCount: imagePaths.length,
+        sandboxId,
+        workerId: worker.id,
+      });
 
       await db.transact(
         db.tx.workers[worker.id].update({
@@ -228,6 +250,7 @@ export const runWorkerTask = task({
 
       const stream = await streamCodexExec({
         box,
+        imagePaths,
         mcpConfig,
         prompt,
         resume: Boolean(worker.sandboxId),
@@ -415,10 +438,90 @@ async function getUserMessageEvent(eventId: string) {
   const result = await db.query({
     events: {
       $: { where: { id: eventId } },
+      attachments: {},
     },
   });
 
   return result.events[0] as EventRecord | undefined;
+}
+
+async function stageWorkerImageAttachments({
+  attachments,
+  box,
+  eventId,
+  workerId,
+}: {
+  attachments: AttachmentRecord[];
+  box: Awaited<ReturnType<typeof getBox>>;
+  eventId: string;
+  workerId: string;
+}) {
+  const imageAttachments = attachments.filter(isImageAttachment);
+
+  if (imageAttachments.length === 0) {
+    return [];
+  }
+
+  const attachmentDir = `/workspace/home/.factory/workers/${workerId}/attachments/${eventId}`;
+  const stagedAttachments = imageAttachments.map((attachment, index) => ({
+    path: `${attachmentDir}/image-${index + 1}${getAttachmentExtension(attachment)}`,
+    url: attachment.url,
+  }));
+  const script = `
+const fs = require("node:fs/promises");
+const items = JSON.parse(process.argv[1]);
+
+async function main() {
+  for (const item of items) {
+    const response = await fetch(item.url);
+
+    if (!response.ok) {
+      throw new Error(\`Could not download attachment: \${response.status}\`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    await fs.writeFile(item.path, Buffer.from(arrayBuffer));
+  }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});
+`.trim();
+  const result = await runBoxCommand(
+    box,
+    [
+      `mkdir -p ${shellQuote(attachmentDir)}`,
+      `node -e ${shellQuote(script)} ${shellQuote(JSON.stringify(stagedAttachments))}`,
+    ].join(" && "),
+    120_000,
+  );
+
+  if (!result.success) {
+    throw new Error(
+      `Could not stage image attachments: ${
+        cleanCommandOutput(result.output) || "No output"
+      }`,
+    );
+  }
+
+  return stagedAttachments.map((attachment) => attachment.path);
+}
+
+function isImageAttachment(attachment: AttachmentRecord) {
+  return (
+    typeof attachment.url === "string" &&
+    attachment.url.length > 0 &&
+    /\.(avif|gif|jpe?g|png|webp)$/i.test(attachment.path ?? attachment.url)
+  );
+}
+
+function getAttachmentExtension(attachment: AttachmentRecord) {
+  const source = attachment.path ?? attachment.url ?? "";
+  const match = source.match(/\.(avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i);
+
+  return match ? `.${match[1].toLowerCase()}` : ".png";
 }
 
 async function persistCodexLine(workerId: string, line: string) {

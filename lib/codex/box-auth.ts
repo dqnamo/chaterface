@@ -190,6 +190,7 @@ export async function restoreCodexHome(box: Box) {
 
 export async function streamCodexExec({
   box,
+  imagePaths,
   mcpConfig,
   prompt,
   resume,
@@ -198,6 +199,7 @@ export async function streamCodexExec({
   workerId,
 }: {
   box: Box;
+  imagePaths?: string[];
   mcpConfig?: {
     gatewayUrl: string;
     token: string;
@@ -210,6 +212,7 @@ export async function streamCodexExec({
 }) {
   return box.exec.stream(
     createCodexExecCommand({
+      imagePaths,
       mcpConfig,
       prompt,
       resume,
@@ -274,6 +277,7 @@ function createBoxCommand(command: string, timeoutMs?: number) {
 }
 
 function createCodexExecCommand({
+  imagePaths = [],
   mcpConfig,
   prompt,
   resume,
@@ -281,6 +285,7 @@ function createCodexExecCommand({
   sessionId,
   workerId,
 }: {
+  imagePaths?: string[];
   mcpConfig?: {
     gatewayUrl: string;
     token: string;
@@ -312,12 +317,16 @@ function createCodexExecCommand({
         ),
       ].join(" ")
     : "";
+  const imageArgs = imagePaths
+    .map((imagePath) => `--image ${shellQuote(imagePath)}`)
+    .join(" ");
   const codexCommand = resume
     ? [
         "codex exec resume",
         sessionId ? shellQuote(sessionId) : "--last",
         "--model",
         shellQuote(codexModel),
+        imageArgs,
         mcpArgs,
         "--dangerously-bypass-approvals-and-sandbox",
         "--skip-git-repo-check",
@@ -328,6 +337,7 @@ function createCodexExecCommand({
         "codex exec",
         "--model",
         shellQuote(codexModel),
+        imageArgs,
         mcpArgs,
         "--dangerously-bypass-approvals-and-sandbox",
         "--skip-git-repo-check",
