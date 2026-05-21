@@ -1,7 +1,8 @@
-import { tasks } from "@trigger.dev/sdk";
-import type { runWorkerTask } from "@/jobs/run-worker";
 import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
-import { getAdminDb } from "@/lib/db.server";
+import {
+  getWorkerForUserMessage,
+  triggerWorkerRunTask,
+} from "@/lib/worker-run-trigger";
 
 export const runtime = "nodejs";
 
@@ -58,25 +59,10 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const db = getAdminDb();
-  const result = await db.query({
-    workers: {
-      $: { where: { id: workerId } },
-      events: {
-        $: { where: { id: userMessageEventId } },
-      },
-      factory: {
-        owner: {},
-      },
-    },
+  const worker = await getWorkerForUserMessage({
+    userMessageEventId,
+    workerId,
   });
-  const worker = result.workers[0] as
-    | {
-        events?: { id: string; type?: string }[];
-        factory?: { owner?: { id?: string } };
-        status?: string;
-      }
-    | undefined;
 
   if (!worker || worker.factory?.owner?.id !== user.id) {
     logWorkerRunRoute("warn", "Worker run request worker not found", {
@@ -110,22 +96,14 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const handle = await tasks.trigger<typeof runWorkerTask>(
-      "run-worker",
-      {
-        userMessageEventId,
-        workerId,
-      },
-      {
-        metadata: {
-          requestedAt,
-          userId: user.id,
-          userMessageEventId,
-          workerId,
-        },
-        tags: [`worker:${workerId}`],
-      },
-    );
+    const handle = await triggerWorkerRunTask({
+      idempotencyKey: `api:${userMessageEventId}`,
+      requestedAt,
+      triggerSource: "api",
+      userId: user.id,
+      userMessageEventId,
+      workerId,
+    });
 
     logWorkerRunRoute("info", "Worker run task triggered", {
       runId: handle.id,

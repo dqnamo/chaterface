@@ -448,25 +448,6 @@ async function triggerWorkerRun({
 
     await instantDb.transact(transactions);
 
-    const response = await fetch(`/api/workers/${workerId}/run`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${userRefreshToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userMessageEventId: eventId,
-      }),
-    });
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      throw new Error(body?.error ?? "Worker could not be started.");
-    }
-
     return workerId;
   } catch (runError) {
     console.error(runError);

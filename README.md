@@ -17,6 +17,7 @@ Copy the variables from `.env.example` into `.env.local` and fill them in:
 
 - `NEXT_PUBLIC_INSTANT_APP_ID` from InstantDB
 - `TRIGGER_SECRET_KEY` from Trigger.dev
+- `APP_PUBLIC_URL`, the public HTTPS origin used for callbacks and webhooks
 - `NEXT_PUBLIC_POSTHOG_TOKEN` from PostHog
 - `NEXT_PUBLIC_POSTHOG_HOST` from PostHog, defaults to `https://us.i.posthog.com`
 
@@ -46,6 +47,15 @@ Configure these repository secrets:
 
 The starter schema and permissions live in `instant.schema.ts` and
 `instant.perms.ts`.
+
+Configure an Instant webhook for the `events` namespace and `create` action:
+
+```text
+https://your-public-origin.example/api/instant-webhook
+```
+
+New `user_message` events trigger worker execution through this webhook; the
+client only writes the worker and event records.
 
 ## PostHog
 
