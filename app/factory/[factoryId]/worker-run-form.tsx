@@ -210,6 +210,7 @@ function WorkerPromptFormContent({
   const [snapshotStatus, setSnapshotStatus] = useState<
     "error" | "idle" | "saving" | "saved"
   >("idle");
+  const isRunning = worker.status === "running";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -230,6 +231,29 @@ function WorkerPromptFormContent({
     setIsSending(false);
 
     if (workerId) {
+      cleanupAttachments(attachments);
+      setAttachments([]);
+      setPrompt("");
+    }
+  }
+
+  async function onQueueMessage() {
+    setIsSending(true);
+
+    const queued = await queueWorkerMessage({
+      attachments,
+      factoryId,
+      instantDb,
+      prompt,
+      userId: user?.id,
+      userRefreshToken: user?.refresh_token,
+      worker,
+      onError: setError,
+    });
+
+    setIsSending(false);
+
+    if (queued) {
       cleanupAttachments(attachments);
       setAttachments([]);
       setPrompt("");
@@ -344,15 +368,27 @@ function WorkerPromptFormContent({
               {snapshotLabel}
             </Button>
           </div>
-          <Button type="submit" className="ml-auto" disabled={isInputDisabled}>
-            {isSending
-              ? attachments.length > 0
-                ? "Uploading..."
-                : "Sending..."
-              : worker.status === "running"
-                ? "Interrupt and send"
-                : "Send"}
-          </Button>
+          <div className="ml-auto flex flex-row items-center gap-2">
+            {isRunning ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isInputDisabled}
+                onClick={onQueueMessage}
+              >
+                Queue message
+              </Button>
+            ) : null}
+            <Button type="submit" disabled={isInputDisabled}>
+              {isSending
+                ? attachments.length > 0
+                  ? "Uploading..."
+                  : "Sending..."
+                : isRunning
+                  ? "Send now"
+                  : "Send"}
+            </Button>
+          </div>
         </div>
       </form>
     </Card>
@@ -482,6 +518,97 @@ async function triggerWorkerRun({
         : "Worker could not be started.",
     );
     return null;
+  }
+}
+
+async function queueWorkerMessage({
+  attachments = [],
+  factoryId,
+  instantDb,
+  onError,
+  prompt,
+  userId,
+  userRefreshToken,
+  worker,
+}: {
+  attachments?: ImageAttachment[];
+  factoryId?: string;
+  instantDb: AppDb;
+  onError: (error: string | null) => void;
+  prompt: string;
+  userId?: string;
+  userRefreshToken?: string;
+  worker: WorkerRecord;
+}) {
+  const trimmedPrompt = prompt.trim();
+
+  if (!trimmedPrompt) {
+    onError("Enter a task before queueing it for this worker.");
+    return false;
+  }
+
+  if (worker.status === "retired") {
+    onError("This worker has been retired.");
+    return false;
+  }
+
+  if (!userRefreshToken) {
+    onError("You must be signed in to queue a message.");
+    return false;
+  }
+
+  if (!userId) {
+    onError("You must be signed in to upload images.");
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  const eventId = id();
+
+  onError(null);
+
+  try {
+    const attachmentFileIds = await uploadImageAttachments({
+      attachments,
+      eventId,
+      factoryId,
+      instantDb,
+      userId,
+      workerId: worker.id,
+    });
+
+    await instantDb.transact([
+      instantDb.tx.events[eventId].update({
+        createdAt: now,
+        data: {
+          prompt: trimmedPrompt,
+          queuedAt: now,
+        },
+        source: "factory",
+        type: "queued_user_message",
+      }),
+      instantDb.tx.events[eventId].link({
+        worker: worker.id,
+      }),
+      ...attachmentFileIds.map((attachmentFileId) =>
+        instantDb.tx.events[eventId].link({
+          attachments: attachmentFileId,
+        }),
+      ),
+      instantDb.tx.workers[worker.id].update({
+        updatedAt: now,
+      }),
+    ]);
+
+    return true;
+  } catch (queueError) {
+    console.error(queueError);
+    onError(
+      queueError instanceof Error
+        ? queueError.message
+        : "Message could not be queued.",
+    );
+    return false;
   }
 }
 

@@ -96,6 +96,19 @@ export default function Event({
     ) : null;
   }
 
+  if (event.type === "queued_user_message") {
+    const message = getUserPrompt(event.data);
+    const attachments = getEventAttachments(event);
+
+    return message ? (
+      <MessageEvent
+        attachments={attachments}
+        label="Queued"
+        message={message}
+      />
+    ) : null;
+  }
+
   if (event.type === "factory.mcp.connection.requested") {
     const request = getMcpConnectionRequest(event.data);
 

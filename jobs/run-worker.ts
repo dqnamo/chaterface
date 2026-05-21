@@ -1,5 +1,5 @@
 import { id } from "@instantdb/admin";
-import { logger, metadata, task } from "@trigger.dev/sdk";
+import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
 import { getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import {
   cleanCommandOutput,
@@ -45,10 +45,13 @@ type SecretRecord = {
 
 type EventRecord = {
   attachments?: AttachmentRecord[];
-  data?: {
+  createdAt?: string;
+  data?: Record<string, unknown> & {
     prompt?: string;
   };
   id: string;
+  source?: string;
+  type?: string;
 };
 
 type AttachmentRecord = {
@@ -626,6 +629,98 @@ async function finalizeWorker({
       updatedAt: new Date().toISOString(),
     }),
   );
+
+  await triggerNextQueuedWorkerRun(workerId);
+}
+
+async function triggerNextQueuedWorkerRun(workerId: string) {
+  const db = getAdminDb();
+  const now = new Date().toISOString();
+  const queuedEvent = await getNextQueuedUserMessageEvent(workerId);
+
+  if (!queuedEvent) {
+    return;
+  }
+
+  await db.transact([
+    db.tx.events[queuedEvent.id].update({
+      createdAt: queuedEvent.createdAt ?? now,
+      data: {
+        ...queuedEvent.data,
+        startedAt: now,
+      },
+      source: queuedEvent.source ?? "factory",
+      type: "user_message",
+    }),
+    db.tx.workers[workerId].update({
+      status: "queued",
+      updatedAt: now,
+    }),
+  ]);
+
+  try {
+    const handle = await tasks.trigger<typeof runWorkerTask>(
+      "run-worker",
+      {
+        userMessageEventId: queuedEvent.id,
+        workerId,
+      },
+      {
+        metadata: {
+          requestedAt: now,
+          userMessageEventId: queuedEvent.id,
+          workerId,
+        },
+        tags: [`worker:${workerId}`],
+      },
+    );
+
+    logTaskStep("info", "Queued worker message triggered", {
+      runId: handle.id,
+      userMessageEventId: queuedEvent.id,
+      workerId,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Queued worker message could not be started.";
+
+    logTaskStep("error", "Queued worker message trigger failed", {
+      error: serializeError(error),
+      userMessageEventId: queuedEvent.id,
+      workerId,
+    });
+    await appendWorkerEvent(workerId, {
+      createdAt: new Date().toISOString(),
+      data: { message },
+      source: "factory",
+      type: "codex_event",
+    });
+    await db.transact(
+      db.tx.workers[workerId].update({
+        status: "failed",
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  }
+}
+
+async function getNextQueuedUserMessageEvent(workerId: string) {
+  const db = getAdminDb();
+  const result = await db.query({
+    workers: {
+      $: { where: { id: workerId } },
+      events: {
+        $: { where: { type: "queued_user_message" } },
+      },
+    },
+  });
+  const worker = result.workers[0] as { events?: EventRecord[] } | undefined;
+
+  return [...(worker?.events ?? [])].sort((a, b) =>
+    (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
+  )[0];
 }
 
 function findCodexSessionId(value: unknown): string | undefined {
