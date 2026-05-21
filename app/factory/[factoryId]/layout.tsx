@@ -282,8 +282,13 @@ function WorkerSidebar({
           />
         </div>
         <div className="p-2 scroll-mask-y scroll-mask-y-from-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-          <Button variant="secondary" className="w-full text-sm">
-            {/* <PlusIcon aria-hidden="true" size={16} weight="bold" /> */}
+          <Button
+            href={`/factory/${factoryId}`}
+            onClick={onNavigate}
+            variant="secondary"
+            className="w-full justify-center text-sm"
+          >
+            <PlusIcon aria-hidden="true" size={16} weight="bold" />
             New worker
           </Button>
           <WorkerSidebarSection
