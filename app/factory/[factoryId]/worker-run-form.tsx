@@ -2,8 +2,18 @@
 
 import { faker } from "@faker-js/faker";
 import { id } from "@instantdb/react";
+import { ImageSquare, X } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type KeyboardEvent, useState } from "react";
+import {
+  type ChangeEvent,
+  type Dispatch,
+  type FormEvent,
+  type KeyboardEvent,
+  type RefObject,
+  type SetStateAction,
+  useRef,
+  useState,
+} from "react";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
 import type { AppDb } from "@/lib/db.client";
@@ -19,6 +29,21 @@ export type WorkerRecord = {
   status: string;
   updatedAt?: string;
 };
+
+type ImageAttachment = {
+  file: File;
+  id: string;
+  previewUrl: string;
+};
+
+const maxImageAttachments = 5;
+const maxImageAttachmentBytes = 20 * 1024 * 1024;
+const supportedImageTypes = new Set([
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 export function NewWorkerForm({ factoryId }: { factoryId: string }) {
   if (!db) {
@@ -37,8 +62,11 @@ function NewWorkerFormContent({
 }) {
   const router = useRouter();
   const { user } = instantDb.useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,17 +86,27 @@ function NewWorkerFormContent({
     const workerId = id();
 
     setError(null);
-    setPrompt("");
-    router.push(`/factory/${factoryId}/workers/${workerId}`);
+    setIsSending(true);
 
-    triggerWorkerRun({
+    const startedWorkerId = await triggerWorkerRun({
+      attachments,
       factoryId,
       instantDb,
       prompt: trimmedPrompt,
+      userId: user.id,
       userRefreshToken: user.refresh_token,
       workerId,
       onError: setError,
     });
+
+    setIsSending(false);
+
+    if (startedWorkerId) {
+      cleanupAttachments(attachments);
+      setAttachments([]);
+      setPrompt("");
+      router.push(`/factory/${factoryId}/workers/${workerId}`);
+    }
   }
 
   return (
@@ -83,14 +121,36 @@ function NewWorkerFormContent({
           onKeyDown={submitTextareaOnEnter}
           rows={4}
         />
+        <ImageAttachmentTray
+          attachments={attachments}
+          disabled={isSending}
+          fileInputRef={fileInputRef}
+          onAdd={(event) =>
+            addImageAttachments({
+              currentAttachments: attachments,
+              event,
+              onError: setError,
+              setAttachments,
+            })
+          }
+          onRemove={(attachmentId) =>
+            setAttachments((current) =>
+              removeImageAttachment(current, attachmentId),
+            )
+          }
+        />
         {error ? <p>{error}</p> : null}
         <div className="flex flex-row items-center justify-between p-2">
           <div className="flex flex-row items-center gap-2">
             {/*<p className="text-sm text-grayscale-11">Create more</p>
             <Switch />*/}
           </div>
-          <Button type="submit" className="ml-auto">
-            Send
+          <Button type="submit" className="ml-auto" disabled={isSending}>
+            {isSending
+              ? attachments.length > 0
+                ? "Uploading..."
+                : "Sending..."
+              : "Send"}
           </Button>
         </div>
       </form>
@@ -98,24 +158,41 @@ function NewWorkerFormContent({
   );
 }
 
-export function WorkerPromptForm({ worker }: { worker: WorkerRecord }) {
+export function WorkerPromptForm({
+  factoryId,
+  worker,
+}: {
+  factoryId?: string;
+  worker: WorkerRecord;
+}) {
   if (!db) {
     return <p>InstantDB is not configured.</p>;
   }
 
-  return <WorkerPromptFormContent instantDb={db} worker={worker} />;
+  return (
+    <WorkerPromptFormContent
+      factoryId={factoryId}
+      instantDb={db}
+      worker={worker}
+    />
+  );
 }
 
 function WorkerPromptFormContent({
+  factoryId,
   instantDb,
   worker,
 }: {
+  factoryId?: string;
   instantDb: AppDb;
   worker: WorkerRecord;
 }) {
   const { user } = instantDb.useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const [snapshotStatus, setSnapshotStatus] = useState<
     "error" | "idle" | "saving" | "saved"
   >("idle");
@@ -123,15 +200,24 @@ function WorkerPromptFormContent({
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    setIsSending(true);
+
     const workerId = await triggerWorkerRun({
+      attachments,
+      factoryId,
       instantDb,
       prompt,
+      userId: user?.id,
       userRefreshToken: user?.refresh_token,
       worker,
       onError: setError,
     });
 
+    setIsSending(false);
+
     if (workerId) {
+      cleanupAttachments(attachments);
+      setAttachments([]);
       setPrompt("");
     }
   }
@@ -198,6 +284,24 @@ function WorkerPromptFormContent({
           onKeyDown={submitTextareaOnEnter}
           rows={4}
         />
+        <ImageAttachmentTray
+          attachments={attachments}
+          disabled={isRetired || isSending}
+          fileInputRef={fileInputRef}
+          onAdd={(event) =>
+            addImageAttachments({
+              currentAttachments: attachments,
+              event,
+              onError: setError,
+              setAttachments,
+            })
+          }
+          onRemove={(attachmentId) =>
+            setAttachments((current) =>
+              removeImageAttachment(current, attachmentId),
+            )
+          }
+        />
         {error ? <p>{error}</p> : null}
         <div className="flex flex-row items-center justify-between p-2">
           <div className="flex flex-row items-center gap-2">
@@ -211,8 +315,18 @@ function WorkerPromptFormContent({
               {snapshotLabel}
             </Button>
           </div>
-          <Button type="submit" className="ml-auto" disabled={isRetired}>
-            {worker.status === "running" ? "Interrupt and send" : "Send"}
+          <Button
+            type="submit"
+            className="ml-auto"
+            disabled={isRetired || isSending}
+          >
+            {isSending
+              ? attachments.length > 0
+                ? "Uploading..."
+                : "Sending..."
+              : worker.status === "running"
+                ? "Interrupt and send"
+                : "Send"}
           </Button>
         </div>
       </form>
@@ -234,18 +348,22 @@ function submitTextareaOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
 }
 
 async function triggerWorkerRun({
+  attachments = [],
   factoryId,
   instantDb,
   onError,
   prompt,
+  userId,
   userRefreshToken,
   worker,
   workerId: preGeneratedWorkerId,
 }: {
+  attachments?: ImageAttachment[];
   factoryId?: string;
   instantDb: AppDb;
   onError: (error: string | null) => void;
   prompt: string;
+  userId?: string;
   userRefreshToken?: string;
   worker?: WorkerRecord;
   workerId?: string;
@@ -265,6 +383,11 @@ async function triggerWorkerRun({
     return null;
   }
 
+  if (!userId) {
+    onError("You must be signed in to upload images.");
+    return null;
+  }
+
   const now = new Date().toISOString();
   const workerId = preGeneratedWorkerId ?? worker?.id ?? id();
   const eventId = id();
@@ -274,6 +397,14 @@ async function triggerWorkerRun({
   onError(null);
 
   try {
+    const attachmentFileIds = await uploadImageAttachments({
+      attachments,
+      eventId,
+      factoryId,
+      instantDb,
+      userId,
+      workerId,
+    });
     const transactions = [
       instantDb.tx.events[eventId].update({
         createdAt: now,
@@ -286,6 +417,11 @@ async function triggerWorkerRun({
       instantDb.tx.events[eventId].link({
         worker: workerId,
       }),
+      ...attachmentFileIds.map((attachmentFileId) =>
+        instantDb.tx.events[eventId].link({
+          attachments: attachmentFileId,
+        }),
+      ),
       instantDb.tx.workers[workerId].update({
         status: nextStatus,
         updatedAt: now,
@@ -341,4 +477,187 @@ async function triggerWorkerRun({
     );
     return null;
   }
+}
+
+function ImageAttachmentTray({
+  attachments,
+  disabled,
+  fileInputRef,
+  onAdd,
+  onRemove,
+}: {
+  attachments: ImageAttachment[];
+  disabled?: boolean;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  onAdd: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRemove: (attachmentId: string) => void;
+}) {
+  return (
+    <div className="border-grayscale-3 border-t px-3 py-2">
+      {attachments.length > 0 ? (
+        <ul className="mb-2 flex flex-wrap gap-2">
+          {attachments.map((attachment) => (
+            <li
+              className="group relative size-16 overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-2"
+              key={attachment.id}
+            >
+              <div
+                aria-hidden="true"
+                className="size-full bg-cover bg-center"
+                style={{ backgroundImage: `url(${attachment.previewUrl})` }}
+              />
+              <button
+                aria-label={`Remove ${attachment.file.name}`}
+                className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full border border-grayscale-5 bg-white/90 text-grayscale-11 shadow-sm transition hover:bg-grayscale-1 hover:text-grayscale-12"
+                disabled={disabled}
+                onClick={() => onRemove(attachment.id)}
+                type="button"
+              >
+                <X size={12} weight="bold" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <input
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="sr-only"
+        disabled={disabled}
+        multiple
+        onChange={onAdd}
+        ref={fileInputRef}
+        type="file"
+      />
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={disabled || attachments.length >= maxImageAttachments}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <ImageSquare size={16} weight="bold" aria-hidden="true" />
+        {attachments.length > 0 ? "Add image" : "Attach image"}
+      </Button>
+    </div>
+  );
+}
+
+function addImageAttachments({
+  currentAttachments,
+  event,
+  onError,
+  setAttachments,
+}: {
+  currentAttachments: ImageAttachment[];
+  event: ChangeEvent<HTMLInputElement>;
+  onError: (error: string | null) => void;
+  setAttachments: Dispatch<SetStateAction<ImageAttachment[]>>;
+}) {
+  const selectedFiles = Array.from(event.target.files ?? []);
+  event.target.value = "";
+
+  if (selectedFiles.length === 0) {
+    return;
+  }
+
+  const remainingSlots = maxImageAttachments - currentAttachments.length;
+  const validAttachments: ImageAttachment[] = [];
+
+  for (const file of selectedFiles.slice(0, remainingSlots)) {
+    if (!supportedImageTypes.has(file.type)) {
+      onError("Attach PNG, JPEG, WebP, or GIF images.");
+      continue;
+    }
+
+    if (file.size > maxImageAttachmentBytes) {
+      onError("Images must be 20 MB or smaller.");
+      continue;
+    }
+
+    validAttachments.push({
+      file,
+      id: id(),
+      previewUrl: URL.createObjectURL(file),
+    });
+  }
+
+  if (selectedFiles.length > remainingSlots) {
+    onError(`Attach up to ${maxImageAttachments} images.`);
+  } else if (validAttachments.length > 0) {
+    onError(null);
+  }
+
+  if (validAttachments.length > 0) {
+    setAttachments((current) => [...current, ...validAttachments]);
+  }
+}
+
+function removeImageAttachment(
+  attachments: ImageAttachment[],
+  attachmentId: string,
+) {
+  const attachment = attachments.find((item) => item.id === attachmentId);
+
+  if (attachment) {
+    URL.revokeObjectURL(attachment.previewUrl);
+  }
+
+  return attachments.filter((item) => item.id !== attachmentId);
+}
+
+function cleanupAttachments(attachments: ImageAttachment[]) {
+  for (const attachment of attachments) {
+    URL.revokeObjectURL(attachment.previewUrl);
+  }
+}
+
+async function uploadImageAttachments({
+  attachments,
+  eventId,
+  factoryId,
+  instantDb,
+  userId,
+  workerId,
+}: {
+  attachments: ImageAttachment[];
+  eventId: string;
+  factoryId?: string;
+  instantDb: AppDb;
+  userId: string;
+  workerId: string;
+}) {
+  return Promise.all(
+    attachments.map(async (attachment) => {
+      const extension = getImageExtension(attachment.file);
+      const path = [
+        userId,
+        "factories",
+        factoryId ?? "existing-worker",
+        "workers",
+        workerId,
+        "events",
+        eventId,
+        `${attachment.id}.${extension}`,
+      ].join("/");
+      const response = await instantDb.storage.uploadFile(
+        path,
+        attachment.file,
+        {
+          contentDisposition: "inline",
+          contentType: attachment.file.type || "application/octet-stream",
+        },
+      );
+
+      return response.data.id;
+    }),
+  );
+}
+
+function getImageExtension(file: File) {
+  const extensionFromName = file.name.split(".").pop()?.toLowerCase();
+
+  if (extensionFromName && /^[a-z0-9]+$/.test(extensionFromName)) {
+    return extensionFromName;
+  }
+
+  return file.type.split("/")[1]?.replace(/\W/g, "") || "image";
 }

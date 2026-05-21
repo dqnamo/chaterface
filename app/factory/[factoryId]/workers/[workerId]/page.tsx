@@ -46,7 +46,9 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
       ? {
           workers: {
             $: { where: { id: workerId } },
-            events: {},
+            events: {
+              attachments: {},
+            },
             factory: {},
             ports: {},
           },
@@ -116,11 +118,11 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   return (
     <div className="flex h-dvh w-full flex-col">
       <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-grayscale-3 border-b px-4">
-        <div className="min-w-0">
-          <h1 className="truncate font-semibold text-base text-grayscale-12">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="min-w-0 truncate font-semibold text-base text-grayscale-12">
             {workerTitle}
           </h1>
-          <p className="text-grayscale-10 text-xs capitalize">
+          <p className="shrink-0 text-grayscale-10 text-xs capitalize">
             {worker.status}
           </p>
         </div>
@@ -169,7 +171,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
       </div>
 
       <div className="w-full mt-auto mb-4">
-        <WorkerPromptForm worker={worker} />
+        <WorkerPromptForm factoryId={factoryId} worker={worker} />
       </div>
     </div>
   );
