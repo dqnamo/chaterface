@@ -5,6 +5,7 @@ import {
   KeyIcon,
   ListIcon,
   PlugIcon,
+  PlusIcon,
   PuzzlePieceIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -435,6 +436,15 @@ function SidebarContent({ factories }: { factories: FactoryRecord[] }) {
   return (
     <nav>
       <ul className="flex flex-col gap-2">
+        <Link
+          aria-label="Create factory"
+          href="/factories/new"
+          title="Create factory"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 bg-grayscale-2 text-grayscale-11 transition-colors hover:border-accent-7 hover:bg-accent-3 hover:text-accent-11">
+            <PlusIcon aria-hidden="true" size={18} weight="bold" />
+          </span>
+        </Link>
         {factories.map((candidate) => (
           <Link href={`/factory/${candidate.id}`} key={candidate.id}>
             <FactoryMonogram color={candidate.color} name={candidate.name} />
