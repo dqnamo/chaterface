@@ -15,6 +15,7 @@ export type WorkerRecord = {
   createdAt?: string;
   id: string;
   name?: string;
+  retiredAt?: string;
   status: string;
   updatedAt?: string;
 };
@@ -71,7 +72,7 @@ function NewWorkerFormContent({
   }
 
   return (
-    <Card layer={0} className="max-w-2xl mx-auto p-0 w-full">
+    <Card layer={0} className="max-w-2xl bg-white mx-auto p-0 w-full">
       <form onSubmit={onSubmit} className="flex flex-col">
         <textarea
           id="worker-task"
@@ -178,6 +179,7 @@ function WorkerPromptFormContent({
       : snapshotStatus === "saved"
         ? "Snapshot saved"
         : "Make worker state default";
+  const isRetired = worker.status === "retired";
 
   return (
     <Card layer={0} className="max-w-2xl mx-auto p-0 ">
@@ -186,7 +188,12 @@ function WorkerPromptFormContent({
           id="worker-task"
           value={prompt}
           className="outline-none resize-none focus:border-accent-9 p-3 text-sm text-grayscale-12"
-          placeholder="Send a message to the worker..."
+          disabled={isRetired}
+          placeholder={
+            isRetired
+              ? "This worker has been retired."
+              : "Send a message to the worker..."
+          }
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={submitTextareaOnEnter}
           rows={4}
@@ -204,7 +211,7 @@ function WorkerPromptFormContent({
               {snapshotLabel}
             </Button>
           </div>
-          <Button type="submit" className="ml-auto">
+          <Button type="submit" className="ml-auto" disabled={isRetired}>
             {worker.status === "running" ? "Interrupt and send" : "Send"}
           </Button>
         </div>
@@ -245,6 +252,11 @@ async function triggerWorkerRun({
 }) {
   if (!prompt.trim()) {
     onError("Enter a task before sending it to a worker.");
+    return null;
+  }
+
+  if (worker?.status === "retired") {
+    onError("This worker has been retired.");
     return null;
   }
 

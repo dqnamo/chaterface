@@ -12,6 +12,7 @@ import {
 } from "@/lib/codex/box-auth";
 import { decryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
+import { createFactoryWorkerApiToken } from "@/lib/factory/worker-api-auth";
 import { listEnabledMcpCapabilitiesForFactory } from "@/lib/mcp/records";
 import { createMcpWorkerToken } from "@/lib/mcp/run-tokens";
 
@@ -106,6 +107,21 @@ export const runWorkerTask = task({
         throw new Error("Worker prompt not found");
       }
 
+      if (worker.status === "retired") {
+        setRunMetadata("retired", {
+          userMessageEventId: payload.userMessageEventId,
+          workerId: worker.id,
+        });
+        logTaskStep("info", "Worker is retired; skipping run", {
+          userMessageEventId: payload.userMessageEventId,
+          workerId: worker.id,
+        });
+        return {
+          skipped: true,
+          workerId: worker.id,
+        };
+      }
+
       const defaultSnapshotId = worker.factory.defaultSanpshotId;
       const secrets = getFactorySecrets(worker.factory.secrets ?? []);
       const mcpConfig = await getWorkerMcpConfig({
@@ -132,9 +148,16 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
 
+      const factoryApiToken = worker.sandboxId
+        ? undefined
+        : await createFactoryWorkerApiToken({
+            factoryId: worker.factory.id,
+            workerId: worker.id,
+          });
       const box = worker.sandboxId
         ? await getBox(worker.sandboxId)
         : await createWorkerBox({
+            factoryApiToken,
             factoryId: worker.factory.id,
             snapshotId: defaultSnapshotId ?? "",
             workerId: worker.id,
@@ -488,6 +511,10 @@ async function finalizeWorker({
     return;
   }
 
+  if (currentWorker.status === "retired") {
+    return;
+  }
+
   await db.transact(
     db.tx.workers[workerId].update({
       activeCommandId: null,
@@ -551,7 +578,7 @@ async function getWorkerMcpConfig({
 }) {
   const capabilities = await listEnabledMcpCapabilitiesForFactory(factoryId);
 
-  if (capabilities.length === 0) {
+  if (!process.env.APP_PUBLIC_URL?.trim() && capabilities.length === 0) {
     return undefined;
   }
 

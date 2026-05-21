@@ -40,8 +40,11 @@ export function AuthForm({
           {error ? <p className="text-sm">{error}</p> : null}
         </div>
         <Input
+          key={isCodeStep ? "code" : "email"}
           variant="underline"
           className="w-full px-4"
+          autoComplete={isCodeStep ? "one-time-code" : "email"}
+          inputMode={isCodeStep ? "numeric" : "email"}
           name={isCodeStep ? "code" : "email"}
           placeholder={isCodeStep ? "123456" : "email@example.com"}
           required

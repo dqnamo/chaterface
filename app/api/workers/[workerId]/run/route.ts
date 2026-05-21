@@ -74,6 +74,18 @@ export async function POST(request: Request, context: RouteContext) {
     return Response.json({ error: "Worker not found" }, { status: 404 });
   }
 
+  if (worker.status === "retired") {
+    logWorkerRunRoute("warn", "Worker run request worker retired", {
+      userId: user.id,
+      userMessageEventId,
+      workerId,
+    });
+    return Response.json(
+      { error: "This worker has been retired." },
+      { status: 400 },
+    );
+  }
+
   if (!worker.events?.some((event) => event.id === userMessageEventId)) {
     logWorkerRunRoute("warn", "Worker run request message not found", {
       userId: user.id,

@@ -98,6 +98,7 @@ function CapabilitiesPanelContent({
   const [mcpAuthType, setMcpAuthType] = useState<McpAuthType>("oauth");
   const [mcpBearerToken, setMcpBearerToken] = useState("");
   const [mcpName, setMcpName] = useState("");
+  const [mcpScopes, setMcpScopes] = useState("");
   const [mcpUrl, setMcpUrl] = useState("");
   const [mcpActionId, setMcpActionId] = useState<string | null>(null);
   const [mcpError, setMcpError] = useState<string | null>(null);
@@ -283,6 +284,7 @@ function CapabilitiesPanelContent({
           bearerToken:
             mcpAuthType === "bearer_token" ? mcpBearerToken.trim() : undefined,
           name,
+          scopes: mcpScopes.trim() || undefined,
           url,
         }),
       });
@@ -299,6 +301,7 @@ function CapabilitiesPanelContent({
       setMcpAuthType("oauth");
       setMcpBearerToken("");
       setMcpName("");
+      setMcpScopes("");
       setMcpUrl("");
     } catch (error) {
       console.error(error);
@@ -595,6 +598,14 @@ function CapabilitiesPanelContent({
                   value={mcpUrl}
                   onChange={(event) => setMcpUrl(event.target.value)}
                   placeholder="https://example.com/mcp"
+                  disabled={isStartingMcp}
+                />
+              </Field>
+              <Field label="OAuth scopes">
+                <Input
+                  value={mcpScopes}
+                  onChange={(event) => setMcpScopes(event.target.value)}
+                  placeholder="Optional"
                   disabled={isStartingMcp}
                 />
               </Field>

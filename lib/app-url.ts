@@ -1,3 +1,5 @@
+const defaultAppPublicUrl = "https://factoryplane.com";
+
 export function getAppPublicUrl(request?: Request) {
   const configuredUrl = process.env.APP_PUBLIC_URL?.trim();
 
@@ -5,13 +7,17 @@ export function getAppPublicUrl(request?: Request) {
     return configuredUrl.replace(/\/$/, "");
   }
 
-  if (!request) {
-    throw new Error("APP_PUBLIC_URL is required.");
+  if (request) {
+    const url = new URL(request.url);
+
+    return url.origin.replace(/\/$/, "");
   }
 
-  const url = new URL(request.url);
+  return defaultAppPublicUrl;
+}
 
-  return url.origin.replace(/\/$/, "");
+export function getAppPublicHost() {
+  return new URL(getAppPublicUrl()).host;
 }
 
 export function getMcpCallbackUrl({

@@ -1,8 +1,83 @@
 @import "tailwindcss";
 @import "./theme.css";
+@source "../node_modules/streamdown/dist/*.js";
+
+@property --scroll-mask-t-from {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+
+@property --scroll-mask-b-from {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+
+@keyframes scroll-mask-y-scroll {
+  0% {
+    --scroll-mask-t-from: 100%;
+    --scroll-mask-b-from: var(--scroll-mask-fade-from-b, 100%);
+  }
+
+  10%,
+  90% {
+    --scroll-mask-t-from: var(--scroll-mask-fade-from-t, 100%);
+    --scroll-mask-b-from: var(--scroll-mask-fade-from-b, 100%);
+  }
+
+  100% {
+    --scroll-mask-t-from: var(--scroll-mask-fade-from-t, 100%);
+    --scroll-mask-b-from: 100%;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  :where(.scroll-mask-y) {
+    mask-image:
+      linear-gradient(
+        to top,
+        black,
+        black var(--scroll-mask-t-from),
+        transparent
+      ),
+      linear-gradient(
+        to bottom,
+        black,
+        black var(--scroll-mask-b-from),
+        transparent
+      );
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
+    animation: scroll-mask-y-scroll linear;
+    animation-timeline: scroll(self block);
+  }
+}
+
+@utility scroll-mask-y {
+  --scroll-mask-fade-from-t: calc(100% - 2rem);
+  --scroll-mask-fade-from-b: calc(100% - 2rem);
+}
+
+@utility scroll-mask-y-from-* {
+  --scroll-mask-fade-from-t: --spacing(--value(integer));
+  --scroll-mask-fade-from-t: --value(percentage);
+  --scroll-mask-fade-from-t: --value([length], [percentage]);
+  --scroll-mask-fade-from-b: --spacing(--value(integer));
+  --scroll-mask-fade-from-b: --value(percentage);
+  --scroll-mask-fade-from-b: --value([length], [percentage]);
+}
 
 body {
   position: relative;
+}
+
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 .root {

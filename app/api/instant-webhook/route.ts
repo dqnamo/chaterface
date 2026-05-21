@@ -49,6 +49,18 @@ export async function POST(request: Request) {
         );
       }
 
+      if (worker.status === "retired") {
+        logInstantWebhook(
+          "warn",
+          "User message event ignored for retired worker",
+          {
+            userMessageEventId: event.id,
+            workerId,
+          },
+        );
+        return;
+      }
+
       const handle = await triggerWorkerRunTask({
         idempotencyKey: record.idempotencyKey,
         triggerSource: "instant-webhook",

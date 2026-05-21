@@ -16,6 +16,7 @@ type WorkerRunTriggerInput = {
 type WorkerForMessage = {
   events?: { id: string; type?: string }[];
   factory?: { owner?: { id?: string } };
+  status?: string;
 };
 
 export async function getWorkerForUserMessage({

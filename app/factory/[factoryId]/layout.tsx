@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  GearSixIcon,
   KeyIcon,
   ListIcon,
   PlugIcon,
@@ -15,10 +16,12 @@ import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import Button from "@/components/public/Button";
 import { cn } from "@/helpers/classname-helper";
+import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 
 type FactoryRecord = {
+  color?: FactoryColorValue;
   id: string;
   name: string;
   status: string;
@@ -29,6 +32,11 @@ type WorkerRecord = {
   id: string;
   name?: string;
   status: string;
+};
+
+type WorkerStatusTone = {
+  className: string;
+  label: string;
 };
 
 type FactoryWithWorkersRecord = FactoryRecord & {
@@ -85,10 +93,10 @@ function FactoryLayoutContent({
     setIsSidebarOpen(false);
   }, [pathname]);
 
-  if (isAuthLoading || !user || isLoading) {
+  if (isAuthLoading || !user) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-grayscale-1 text-grayscale-11 text-sm">
-        Loading factory...
+        Loading session...
       </div>
     );
   }
@@ -114,7 +122,7 @@ function FactoryLayoutContent({
     (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
   );
 
-  if (!factory) {
+  if (!isLoading && !factory) {
     return (
       <FactoryLoadState
         detail="This factory may have been deleted or the link may be wrong."
@@ -149,7 +157,7 @@ function FactoryLayoutContent({
           aria-label="Close sidebar"
           onClick={() => setIsSidebarOpen(false)}
         />
-        <aside className="absolute inset-y-0 left-0 w-[min(22rem,92vw)] border-grayscale-3 border-r bg-grayscale-1 shadow-2xl">
+        <aside className="absolute inset-y-0 left-0 flex w-[min(22rem,92vw)] flex-col border-grayscale-3 border-r bg-grayscale-1 shadow-2xl">
           <div className="flex min-h-14 items-center justify-between border-grayscale-3 border-b px-4 pt-[env(safe-area-inset-top)]">
             <span className="font-semibold text-sm">Factory</span>
             <button
@@ -161,7 +169,18 @@ function FactoryLayoutContent({
               <XIcon size={16} weight="bold" aria-hidden="true" />
             </button>
           </div>
-          <SidebarContent factories={factories} />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="border-grayscale-3 border-b p-2">
+              <SidebarContent factories={factories} />
+            </div>
+            <WorkerSidebar
+              className="w-full"
+              currentPathname={pathname}
+              factoryId={factoryId}
+              onNavigate={() => setIsSidebarOpen(false)}
+              workers={workers}
+            />
+          </div>
         </aside>
       </div>
 
@@ -176,9 +195,11 @@ function FactoryLayoutContent({
             <ListIcon size={18} weight="bold" aria-hidden="true" />
           </button>
           <div className="min-w-0">
-            <p className="truncate font-semibold text-sm">{factory.name}</p>
+            <p className="truncate font-semibold text-sm">
+              {factory?.name ?? "Factory"}
+            </p>
             <p className="truncate text-grayscale-10 text-xs">
-              Open menu to switch factories
+              Open menu for workers and settings
             </p>
           </div>
         </div>
@@ -189,92 +210,225 @@ function FactoryLayoutContent({
 }
 
 function WorkerSidebar({
+  className,
   currentPathname,
   factoryId,
+  onNavigate,
   workers,
 }: {
+  className?: string;
   currentPathname: string;
   factoryId: string;
+  onNavigate?: () => void;
   workers: WorkerRecord[];
 }) {
-  return (
-    <div className="flex h-dvh min-h-0 flex-col w-64">
-      <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-        <Link
-          href={`/factory/${factoryId}`}
-          className={cn(
-            "",
-            currentPathname === `/factory/${factoryId}` && "bg-grayscale-3",
-          )}
-        >
-          <Button variant="secondary" className="w-full">
-            New worker
-          </Button>
-        </Link>
-        <Link href={`/factory/${factoryId}/secrets`}>
-          <Button
-            variant="secondary"
-            className={cn(
-              "mt-2 w-full",
-              currentPathname === `/factory/${factoryId}/secrets` &&
-                "bg-grayscale-3",
-            )}
-          >
-            <KeyIcon aria-hidden="true" size={14} weight="bold" />
-            Secrets
-          </Button>
-        </Link>
-        <Link href={`/factory/${factoryId}/skills`}>
-          <Button
-            variant="secondary"
-            className={cn(
-              "mt-2 w-full",
-              currentPathname === `/factory/${factoryId}/skills` &&
-                "bg-grayscale-3",
-            )}
-          >
-            <PuzzlePieceIcon aria-hidden="true" size={14} weight="bold" />
-            Skills
-          </Button>
-        </Link>
-        <Link href={`/factory/${factoryId}/mcp`}>
-          <Button
-            variant="secondary"
-            className={cn(
-              "mt-2 w-full",
-              currentPathname === `/factory/${factoryId}/mcp` &&
-                "bg-grayscale-3",
-            )}
-          >
-            <PlugIcon aria-hidden="true" size={14} weight="bold" />
-            MCP
-          </Button>
-        </Link>
-        <div className="flex flex-col gap-px">
-          {workers.map((worker) => {
-            const href = `/factory/${factoryId}/workers/${worker.id}`;
+  const activeWorkers = workers.filter((worker) => worker.status !== "retired");
+  const retiredWorkers = workers.filter(
+    (worker) => worker.status === "retired",
+  );
 
-            return (
-              <Link
-                href={href}
-                key={worker.id}
-                className={cn(
-                  "block rounded-lg p-2 text-sm transition-colors hover:bg-grayscale-2",
-                  currentPathname === href && "bg-grayscale-2",
-                )}
-              >
-                {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
-                <br />
-                <span className="text-grayscale-10 text-xs">
-                  {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
-                </span>
-              </Link>
-            );
-          })}
+  return (
+    <div className={cn("flex h-full min-h-0 w-64 flex-col", className)}>
+      <nav className="flex min-h-0 flex-1 flex-col p-2">
+        <div className="shrink-0">
+          <Link
+            href={`/factory/${factoryId}`}
+            onClick={onNavigate}
+            className={cn(
+              "",
+              currentPathname === `/factory/${factoryId}` && "bg-grayscale-3",
+            )}
+          >
+            <Button variant="secondary" className="w-full">
+              New worker
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/secrets`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/secrets` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <KeyIcon aria-hidden="true" size={14} weight="bold" />
+              Secrets
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/skills`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/skills` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <PuzzlePieceIcon aria-hidden="true" size={14} weight="bold" />
+              Skills
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/mcp`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/mcp` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <PlugIcon aria-hidden="true" size={14} weight="bold" />
+              MCP
+            </Button>
+          </Link>
+          <Link href={`/factory/${factoryId}/settings`} onClick={onNavigate}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "mt-2 w-full",
+                currentPathname === `/factory/${factoryId}/settings` &&
+                  "bg-grayscale-3",
+              )}
+            >
+              <GearSixIcon aria-hidden="true" size={14} weight="bold" />
+              Settings
+            </Button>
+          </Link>
+        </div>
+        <div className="scroll-mask-y scroll-mask-y-from-8 mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+          <WorkerSidebarSection
+            currentPathname={currentPathname}
+            factoryId={factoryId}
+            onNavigate={onNavigate}
+            title="Active workers"
+            workers={activeWorkers}
+          />
+          <WorkerSidebarSection
+            currentPathname={currentPathname}
+            factoryId={factoryId}
+            onNavigate={onNavigate}
+            title="Retired workers"
+            workers={retiredWorkers}
+          />
         </div>
       </nav>
     </div>
   );
+}
+
+function WorkerSidebarSection({
+  currentPathname,
+  factoryId,
+  onNavigate,
+  title,
+  workers,
+}: {
+  currentPathname: string;
+  factoryId: string;
+  onNavigate?: () => void;
+  title: string;
+  workers: WorkerRecord[];
+}) {
+  if (workers.length === 0) {
+    return null;
+  }
+
+  return (
+    <section>
+      <h2 className="px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
+        {title}
+      </h2>
+      <div className="flex flex-col gap-px">
+        {workers.map((worker) => (
+          <WorkerSidebarLink
+            currentPathname={currentPathname}
+            factoryId={factoryId}
+            key={worker.id}
+            onNavigate={onNavigate}
+            worker={worker}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WorkerSidebarLink({
+  currentPathname,
+  factoryId,
+  onNavigate,
+  worker,
+}: {
+  currentPathname: string;
+  factoryId: string;
+  onNavigate?: () => void;
+  worker: WorkerRecord;
+}) {
+  const href = `/factory/${factoryId}/workers/${worker.id}`;
+  const statusTone = getWorkerStatusTone(worker.status);
+
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={cn(
+        "block rounded-lg p-2 text-sm transition-colors hover:bg-grayscale-2",
+        currentPathname === href && "bg-grayscale-2",
+      )}
+    >
+      <span className="flex min-w-0 items-start gap-2">
+        <span
+          aria-label={statusTone.label}
+          className={cn(
+            "mt-1.5 size-2 shrink-0 rounded-full",
+            statusTone.className,
+          )}
+          role="img"
+          title={statusTone.label}
+        />
+        <span className="min-w-0">
+          <span className="block truncate">
+            {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
+          </span>
+          <span className="block truncate text-grayscale-10 text-xs">
+            {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
+          </span>
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+function getWorkerStatusTone(status: string): WorkerStatusTone {
+  switch (status) {
+    case "failed":
+      return {
+        className: "bg-red-9",
+        label: "Failed",
+      };
+    case "idle":
+      return {
+        className: "bg-green-9",
+        label: "Idle and awaiting input",
+      };
+    case "retired":
+      return {
+        className: "bg-grayscale-8",
+        label: "Retired",
+      };
+    case "queued":
+    case "running":
+      return {
+        className: "bg-orange-9",
+        label: "Working",
+      };
+    default:
+      return {
+        className: "bg-grayscale-8",
+        label: status || "Status unknown",
+      };
+  }
 }
 
 function SidebarContent({ factories }: { factories: FactoryRecord[] }) {
@@ -283,7 +437,7 @@ function SidebarContent({ factories }: { factories: FactoryRecord[] }) {
       <ul className="flex flex-col gap-2">
         {factories.map((candidate) => (
           <Link href={`/factory/${candidate.id}`} key={candidate.id}>
-            <FactoryMonogram name={candidate.name} />
+            <FactoryMonogram color={candidate.color} name={candidate.name} />
           </Link>
         ))}
       </ul>
