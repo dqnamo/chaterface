@@ -521,26 +521,37 @@ function getMessageItems(data: unknown) {
   if (
     isRecord(data) &&
     isRecord(data.item) &&
-    data.item.type === "agent_message"
+    isAssistantLikeMessage(data.item)
   ) {
     return [data.item];
+  }
+
+  if (
+    isRecord(data) &&
+    isRecord(data.message) &&
+    isAssistantLikeMessage(data.message)
+  ) {
+    return [data.message];
   }
 
   if (isRecord(data) && Array.isArray(data.items)) {
     return data.items.filter(
       (item): item is Record<string, unknown> =>
-        isRecord(item) && item.type === "agent_message",
+        isRecord(item) && isAssistantLikeMessage(item),
     );
   }
 
-  if (isRecord(data) && data.type === "agent_message") {
-    return [data];
+  if (isRecord(data) && Array.isArray(data.output)) {
+    return data.output.filter(
+      (item): item is Record<string, unknown> =>
+        isRecord(item) && isAssistantLikeMessage(item),
+    );
   }
 
   return [];
 }
 
-function getTextValue(item: Record<string, unknown>) {
+function getTextValue(item: Record<string, unknown>): string | null {
   if (typeof item.text === "string") {
     return item.text;
   }
@@ -549,8 +560,24 @@ function getTextValue(item: Record<string, unknown>) {
     return item.message;
   }
 
+  if (isRecord(item.message)) {
+    const messageText = getTextValue(item.message);
+
+    if (messageText) {
+      return messageText;
+    }
+  }
+
   if (typeof item.content === "string") {
     return item.content;
+  }
+
+  if (isRecord(item.content)) {
+    const contentText = getTextValue(item.content);
+
+    if (contentText) {
+      return contentText;
+    }
   }
 
   if (Array.isArray(item.content)) {
@@ -695,7 +722,7 @@ function isAssistantLikeMessage(item: Record<string, unknown>) {
     role === "assistant" ||
     type === "agent_message" ||
     type === "assistant_message" ||
-    type === "message" ||
+    (type === "message" && !role) ||
     type === "response.output_text"
   );
 }
