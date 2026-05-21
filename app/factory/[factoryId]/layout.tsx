@@ -286,9 +286,8 @@ function WorkerSidebar({
             href={`/factory/${factoryId}`}
             onClick={onNavigate}
             variant="secondary"
-            className="w-full justify-center text-sm"
+            className="w-full text-sm"
           >
-            <PlusIcon aria-hidden="true" size={16} weight="bold" />
             New worker
           </Button>
           <WorkerSidebarSection
