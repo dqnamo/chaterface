@@ -371,6 +371,14 @@ function WorkerSidebarLink({
       )}
     >
       <span className="flex min-w-0 items-start gap-2">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">
+            {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
+          </span>
+          <span className="block truncate text-grayscale-10 text-xs">
+            {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
+          </span>
+        </span>
         <span
           aria-label={statusTone.label}
           className={cn(
@@ -380,14 +388,6 @@ function WorkerSidebarLink({
           role="img"
           title={statusTone.label}
         />
-        <span className="min-w-0">
-          <span className="block truncate">
-            {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
-          </span>
-          <span className="block truncate text-grayscale-10 text-xs">
-            {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
-          </span>
-        </span>
       </span>
     </Link>
   );
