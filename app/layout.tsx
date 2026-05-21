@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Pirata_One } from "next/font/google";
+import "streamdown/styles.css";
 import "../styles/globals.css";
 import PwaRegister from "@/components/PwaRegister";
 import PwaThemeColor from "@/components/PwaThemeColor";

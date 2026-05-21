@@ -4,6 +4,7 @@ import type { InstaQLEntity } from "@instantdb/react";
 import { Plug } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { type FormEvent, useId, useState } from "react";
+import { Streamdown } from "streamdown";
 import Button from "@/components/public/Button";
 import Input from "@/components/public/Input";
 import type schema from "@/instant.schema";
@@ -128,9 +129,12 @@ export function MessageEvent({
         <p className="font-mono text-grayscale-10 text-xs font-medium uppercase">
           {label}
         </p>
-        <div className="whitespace-pre-wrap text-sm text-grayscale-12">
+        <Streamdown
+          className="text-sm text-grayscale-12 [overflow-wrap:anywhere]"
+          mode="static"
+        >
           {message}
-        </div>
+        </Streamdown>
         {attachments.length > 0 ? (
           <ul className="mt-2 flex flex-wrap gap-2">
             {attachments.map((attachment) => (
