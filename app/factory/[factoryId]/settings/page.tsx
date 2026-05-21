@@ -1,11 +1,10 @@
 "use client";
 
-import { SwatchesIcon, TrashIcon, WarningIcon } from "@phosphor-icons/react";
+import { TrashIcon, WarningIcon } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import Button from "@/components/public/Button";
-import { ThemeModeSelector } from "@/components/ThemeModeSelector";
 import { cn } from "@/helpers/classname-helper";
 import {
   DEFAULT_FACTORY_COLOR,
@@ -24,14 +23,6 @@ type FactoryRecord = {
 
 export default function FactorySettingsPage() {
   const { factoryId } = useParams<{ factoryId: string }>();
-
-  if (!db) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center p-4 text-sm text-grayscale-11">
-        InstantDB is not configured.
-      </main>
-    );
-  }
 
   return <FactorySettingsPageContent factoryId={factoryId} instantDb={db} />;
 }
@@ -62,7 +53,6 @@ function FactorySettingsPageContent({
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -75,32 +65,15 @@ function FactorySettingsPageContent({
   }, [currentColor]);
 
   async function saveColor(color: FactoryColorValue) {
-    if (!user?.refresh_token) {
-      setFormError("You must be signed in to update factory settings.");
-      return;
-    }
-
     setSelectedColor(color);
-    setIsSaving(true);
     setFormError(null);
 
     try {
-      const response = await fetch(`/api/factories/${factoryId}/settings`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${user.refresh_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ color }),
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-
-        throw new Error(body?.error ?? "Factory settings could not be saved.");
-      }
+      await instantDb.transact(
+        instantDb.tx.factories[factoryId].update({
+          color,
+        }),
+      );
     } catch (saveError) {
       console.error(saveError);
       setSelectedColor(currentColor);
@@ -109,8 +82,6 @@ function FactorySettingsPageContent({
           ? saveError.message
           : "Factory settings could not be saved.",
       );
-    } finally {
-      setIsSaving(false);
     }
   }
 
@@ -174,31 +145,9 @@ function FactorySettingsPageContent({
         <div className="flex flex-col py-2">
           <h1>Factory settings</h1>
           <p className="text-grayscale-10 text-sm">
-            Configure preferences for this factory workspace.
+            Configure this factory workspace.
           </p>
         </div>
-
-        <section className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1">
-          <div className="border-grayscale-3 border-b px-3 py-2">
-            <h2 className="font-mono font-bold text-[11px] text-grayscale-10 uppercase tracking-wide">
-              Appearance
-            </h2>
-          </div>
-          <div className="flex flex-col gap-4 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
-                <SwatchesIcon aria-hidden="true" size={16} weight="bold" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-grayscale-12 text-sm">Theme</p>
-                <p className="text-grayscale-10 text-xs">
-                  Choose a light, dark, or system-matched appearance.
-                </p>
-              </div>
-            </div>
-            <ThemeModeSelector />
-          </div>
-        </section>
 
         <section className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1">
           <div className="border-grayscale-3 border-b px-3 py-2">
@@ -228,9 +177,8 @@ function FactorySettingsPageContent({
                     aria-label={`Use ${option.label} factory color`}
                     aria-pressed={isSelected}
                     className={cn(
-                      "group relative flex size-5 aspect-square items-center justify-center border-grayscale-6 bg-grayscale-2 transition-colors hover:border-grayscale-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-9 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+                      "group relative flex size-5 aspect-square items-center justify-center border-grayscale-6 bg-grayscale-2 transition-colors hover:border-grayscale-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-9 focus-visible:outline-offset-2",
                     )}
-                    disabled={isSaving}
                     key={option.id}
                     onClick={() => saveColor(option.id)}
                     title={option.label}
@@ -241,8 +189,9 @@ function FactorySettingsPageContent({
                       style={{ backgroundColor: `var(--${option.id}-9)` }}
                     />
                     {isSelected ? (
-                      <div
-                        className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-xs bg-white"
+                      <span
+                        aria-hidden="true"
+                        className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 size-2 rounded-xs"
                         style={{ backgroundColor: `var(--${option.id}-5)` }}
                       />
                     ) : null}
@@ -256,12 +205,6 @@ function FactorySettingsPageContent({
                 {formError}
               </p>
             ) : null}
-
-            <div className="flex justify-end">
-              <Button disabled className="w-max opacity-70" variant="secondary">
-                {isSaving ? "Saving..." : "Saved automatically"}
-              </Button>
-            </div>
           </div>
         </section>
 

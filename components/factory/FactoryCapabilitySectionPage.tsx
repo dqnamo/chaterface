@@ -42,14 +42,6 @@ export default function FactoryCapabilitySectionPage({
   const copy = sectionCopy[section];
   const Icon = copy.icon;
 
-  if (!db) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center text-grayscale-11 text-sm">
-        InstantDB is not configured.
-      </div>
-    );
-  }
-
   return (
     <FactoryCapabilitySectionPageContent
       factoryId={factoryId}

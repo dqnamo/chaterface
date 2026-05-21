@@ -18,14 +18,6 @@ type FactoryRecord = {
 };
 
 export default function FactoriesPage() {
-  if (!db) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center p-4 text-sm text-grayscale-11">
-        InstantDB is not configured.
-      </main>
-    );
-  }
-
   return <FactoriesPageContent instantDb={db} />;
 }
 

@@ -1,4 +1,9 @@
 import type { InstantRules } from "@instantdb/react";
+import { FACTORY_COLOR_OPTIONS } from "./helpers/factory-colors";
+
+const supportedFactoryColors = FACTORY_COLOR_OPTIONS.map(
+  (option) => `'${option.id}'`,
+).join(", ");
 
 const rules = {
   $default: {
@@ -26,11 +31,17 @@ const rules = {
     },
   },
   factories: {
+    bind: {
+      colorIsSupported: `!('color' in request.modifiedFields) || newData.color in [${supportedFactoryColors}]`,
+      isOwner: "auth.id in data.ref('owner.id')",
+      onlyModifiesColor:
+        "request.modifiedFields.all(field, field in ['color'])",
+    },
     allow: {
       view: "auth.id in data.ref('owner.id')",
       create: "false",
-      update: "false",
-      delete: "auth.id in data.ref('owner.id')",
+      update: "isOwner && onlyModifiesColor && colorIsSupported",
+      delete: "isOwner",
     },
   },
   agents: {

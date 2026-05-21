@@ -4,23 +4,14 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { AuthForm } from "@/components/auth/AuthForm";
+import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 
-type InstantDb = NonNullable<typeof db>;
-
 export default function LoginPage() {
-  if (!db) {
-    return (
-      <main className="flex min-h-screen items-center justify-center p-4">
-        <p>InstantDB is not configured.</p>
-      </main>
-    );
-  }
-
   return <MagicCodeLogin instantDb={db} />;
 }
 
-function MagicCodeLogin({ instantDb }: { instantDb: InstantDb }) {
+function MagicCodeLogin({ instantDb }: { instantDb: AppDb }) {
   const router = useRouter();
   const { error: authError, isLoading, user } = instantDb.useAuth();
   const [sentEmail, setSentEmail] = useState("");

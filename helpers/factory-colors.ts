@@ -3,7 +3,6 @@ export const FACTORY_COLOR_OPTIONS = [
   { id: "gold", label: "Gold" },
   { id: "brown", label: "Brown" },
   { id: "orange", label: "Orange" },
-  { id: "amber", label: "Amber" },
   { id: "tomato", label: "Tomato" },
   { id: "red", label: "Red" },
   { id: "ruby", label: "Ruby" },
@@ -15,14 +14,11 @@ export const FACTORY_COLOR_OPTIONS = [
   { id: "iris", label: "Iris" },
   { id: "indigo", label: "Indigo" },
   { id: "blue", label: "Blue" },
-  { id: "sky", label: "Sky" },
   { id: "cyan", label: "Cyan" },
   { id: "teal", label: "Teal" },
-  { id: "mint", label: "Mint" },
   { id: "jade", label: "Jade" },
   { id: "green", label: "Green" },
   { id: "grass", label: "Grass" },
-  { id: "lime", label: "Lime" },
 ] as const;
 
 export type FactoryColorValue = (typeof FACTORY_COLOR_OPTIONS)[number]["id"];

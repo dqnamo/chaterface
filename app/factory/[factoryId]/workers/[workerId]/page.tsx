@@ -1,5 +1,6 @@
 "use client";
 
+import { Dialog } from "@base-ui/react/dialog";
 import { ArrowSquareOut } from "@phosphor-icons/react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -15,6 +16,7 @@ type WorkerPageRecord = WorkerRecord & {
     id: string;
   };
   ports?: PortRecord[];
+  sandboxId?: string;
 };
 
 type PortRecord = {
@@ -26,10 +28,6 @@ type PortRecord = {
 };
 
 export default function WorkerPage() {
-  if (!db) {
-    return <p>InstantDB is not configured.</p>;
-  }
-
   return <WorkerPageContent instantDb={db} />;
 }
 
@@ -39,6 +37,11 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
     workerId: string;
   }>();
   const { user } = instantDb.useAuth();
+  const [baselineDialogOpen, setBaselineDialogOpen] = useState(false);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
+  const [baselineStatus, setBaselineStatus] = useState<
+    "idle" | "saving" | "saved"
+  >("idle");
   const [retireError, setRetireError] = useState<string | null>(null);
   const [isRetiring, setIsRetiring] = useState(false);
   const { data, isLoading, error } = instantDb.useQuery(
@@ -77,6 +80,11 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   const workerTitle = worker.name ?? `Worker ${worker.id.slice(0, 8)}`;
   const selectedWorkerId = worker.id;
   const isRetired = worker.status === "retired";
+  const isUpdatingBaseline = baselineStatus === "saving";
+  const baselineButtonLabel = isUpdatingBaseline
+    ? "Updating baseline..."
+    : "Set as factory baseline";
+  const baselineDisabled = isRetired || isUpdatingBaseline || !worker.sandboxId;
 
   async function onRetireWorker() {
     if (isRetired || isRetiring) {
@@ -115,6 +123,54 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
     }
   }
 
+  async function onSetFactoryBaseline() {
+    if (isUpdatingBaseline) {
+      return;
+    }
+
+    if (!user?.refresh_token) {
+      setBaselineError("You must be signed in to update the factory baseline.");
+      setBaselineDialogOpen(false);
+      return;
+    }
+
+    setBaselineStatus("saving");
+    setBaselineError(null);
+
+    try {
+      const response = await fetch(
+        `/api/workers/${selectedWorkerId}/snapshot`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${user.refresh_token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        throw new Error(
+          body?.error ?? "Factory baseline could not be updated.",
+        );
+      }
+
+      setBaselineStatus("saved");
+      setBaselineDialogOpen(false);
+    } catch (baselineUpdateError) {
+      console.error(baselineUpdateError);
+      setBaselineStatus("idle");
+      setBaselineError(
+        baselineUpdateError instanceof Error
+          ? baselineUpdateError.message
+          : "Factory baseline could not be updated.",
+      );
+    }
+  }
+
   return (
     <div className="flex h-dvh w-full flex-col">
       <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-grayscale-3 border-b px-4">
@@ -143,6 +199,22 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
           <Button
             type="button"
             variant="secondary"
+            disabled={baselineDisabled}
+            onClick={() => {
+              setBaselineError(null);
+              setBaselineDialogOpen(true);
+            }}
+            title={
+              worker.sandboxId
+                ? "Set this worker's current files as the starting point for new workers"
+                : "This worker does not have a sandbox yet"
+            }
+          >
+            {baselineButtonLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
             disabled={isRetired || isRetiring}
             onClick={onRetireWorker}
           >
@@ -150,6 +222,48 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
           </Button>
         </div>
       </header>
+      <Dialog.Root
+        open={baselineDialogOpen}
+        onOpenChange={(nextOpen) => setBaselineDialogOpen(nextOpen)}
+      >
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-100 bg-grayscale-12/20 backdrop-blur-sm" />
+          <Dialog.Popup className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-100 w-[calc(100vw-2rem)] max-w-md rounded-lg border border-grayscale-3 bg-white p-4 shadow-xl outline-none">
+            <Dialog.Title className="font-semibold text-base text-grayscale-12">
+              Update factory baseline?
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-grayscale-11 text-sm">
+              New workers will start from this worker's current files. Existing
+              workers will not change.
+            </Dialog.Description>
+            <div className="mt-5 flex justify-end gap-2">
+              <Dialog.Close
+                className="flex cursor-pointer flex-row gap-1.5 rounded-lg border border-b-2 border-grayscale-3 bg-white px-2 py-1 font-medium text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:border-grayscale-4"
+                disabled={isUpdatingBaseline}
+              >
+                Cancel
+              </Dialog.Close>
+              <Button
+                type="button"
+                disabled={isUpdatingBaseline}
+                onClick={onSetFactoryBaseline}
+              >
+                {isUpdatingBaseline ? "Updating..." : "Update baseline"}
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+      {baselineError ? (
+        <p className="border-grayscale-3 border-b px-4 py-2 text-red-11 text-sm">
+          {baselineError}
+        </p>
+      ) : null}
+      {baselineStatus === "saved" ? (
+        <p className="border-grayscale-3 border-b px-4 py-2 text-green-11 text-sm">
+          Factory baseline updated.
+        </p>
+      ) : null}
       {retireError ? (
         <p className="border-grayscale-3 border-b px-4 py-2 text-red-11 text-sm">
           {retireError}

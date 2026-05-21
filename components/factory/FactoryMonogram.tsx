@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { cn } from "@/helpers/classname-helper";
 import {
   type FactoryColorValue,
   getFactoryColor,
@@ -7,21 +8,27 @@ import {
 export default function FactoryMonogram({
   color,
   name,
+  selected,
 }: {
   color?: FactoryColorValue | null | string;
   name: string;
+  selected?: boolean;
 }) {
   const initials = getInitials(name);
   const factoryColor = getFactoryColor(color);
   const style = {
-    "--factory-monogram-bg": `var(--${factoryColor}-3)`,
-    "--factory-monogram-border": `var(--${factoryColor}-6)`,
-    "--factory-monogram-fg": `var(--${factoryColor}-11)`,
+    "--factory-monogram-bg": `var(--${factoryColor}-9)`,
+    "--factory-monogram-border": `var(--${factoryColor}-10)`,
+    "--factory-monogram-fg": `white`,
   } as CSSProperties;
 
   return (
     <div
-      className="flex size-10 shrink-0 items-center justify-center rounded-lg border font-mono text-xs font-bold uppercase"
+      className={cn(
+        "flex size-10 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold uppercase transition-opacity",
+        selected === false && "opacity-50 hover:opacity-75",
+        selected === true && "opacity-100",
+      )}
       style={{
         ...style,
         backgroundColor: "var(--factory-monogram-bg)",

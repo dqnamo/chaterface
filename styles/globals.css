@@ -60,12 +60,12 @@
 }
 
 @utility scroll-mask-y-from-* {
-  --scroll-mask-fade-from-t: --spacing(--value(integer));
+  --scroll-mask-fade-from-t: calc(100% - --spacing(--value(integer)));
+  --scroll-mask-fade-from-t: calc(100% - --value([length]));
   --scroll-mask-fade-from-t: --value(percentage);
-  --scroll-mask-fade-from-t: --value([length], [percentage]);
-  --scroll-mask-fade-from-b: --spacing(--value(integer));
+  --scroll-mask-fade-from-b: calc(100% - --spacing(--value(integer)));
+  --scroll-mask-fade-from-b: calc(100% - --value([length]));
   --scroll-mask-fade-from-b: --value(percentage);
-  --scroll-mask-fade-from-b: --value([length], [percentage]);
 }
 
 body {

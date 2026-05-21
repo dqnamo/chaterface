@@ -3,14 +3,14 @@ import schema from "@/instant.schema";
 
 const instantAppId = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
 
-export const hasInstantConfig = Boolean(instantAppId);
+if (!instantAppId) {
+  throw new Error("Missing NEXT_PUBLIC_INSTANT_APP_ID");
+}
 
-export const db = instantAppId
-  ? init({
-      appId: instantAppId,
-      schema,
-      useDateObjects: true,
-    })
-  : null;
+export const db = init({
+  appId: instantAppId,
+  schema,
+  useDateObjects: true,
+});
 
-export type AppDb = NonNullable<typeof db>;
+export type AppDb = typeof db;

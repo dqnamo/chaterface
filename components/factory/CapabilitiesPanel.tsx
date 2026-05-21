@@ -59,14 +59,6 @@ export default function CapabilitiesPanel({
   factoryId: string;
   section?: "all" | "mcp" | "skills";
 }) {
-  if (!db) {
-    return (
-      <div className="rounded-lg border border-grayscale-3 p-4 text-grayscale-11 text-sm">
-        InstantDB is not configured.
-      </div>
-    );
-  }
-
   return (
     <CapabilitiesPanelContent
       factoryId={factoryId}

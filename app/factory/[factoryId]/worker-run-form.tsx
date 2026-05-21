@@ -6,11 +6,10 @@ import { ImageSquare, X } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import {
   type ChangeEvent,
-  type ClipboardEvent,
   type Dispatch,
-  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
   type RefObject,
   type SetStateAction,
   useRef,
@@ -48,10 +47,6 @@ const supportedImageTypes = new Set([
 ]);
 
 export function NewWorkerForm({ factoryId }: { factoryId: string }) {
-  if (!db) {
-    return <p>InstantDB is not configured.</p>;
-  }
-
   return <NewWorkerFormContent factoryId={factoryId} instantDb={db} />;
 }
 
@@ -111,64 +106,31 @@ function NewWorkerFormContent({
     }
   }
 
-  function onAddImageFiles(files: File[]) {
-    addImageAttachmentFiles({
-      currentAttachments: attachments,
-      files,
-      onError: setError,
-      setAttachments,
-    });
-  }
-
   return (
-    <Card layer={0} className="max-w-2xl bg-white mx-auto p-0 w-full">
-      <form
-        onDragOver={(event) => handleImageDragOver(event, isSending)}
-        onDrop={(event) => handleImageDrop(event, isSending, onAddImageFiles)}
-        onSubmit={onSubmit}
-        className="flex flex-col"
-      >
-        <textarea
-          id="worker-task"
-          value={prompt}
-          className="outline-none resize-none focus:border-accent-9 p-3 text-sm text-grayscale-12"
-          placeholder="Send a message to the worker..."
-          onChange={(event) => setPrompt(event.target.value)}
-          onKeyDown={submitTextareaOnEnter}
-          onPaste={(event) =>
-            handleImagePaste(event, isSending, onAddImageFiles)
-          }
-          rows={4}
-        />
-        <ImageAttachmentTray
-          attachments={attachments}
-          disabled={isSending}
-          fileInputRef={fileInputRef}
-          onAdd={(event) =>
-            addImageAttachmentsFromInput(event, onAddImageFiles)
-          }
-          onRemove={(attachmentId) =>
-            setAttachments((current) =>
-              removeImageAttachment(current, attachmentId),
-            )
-          }
-        />
-        {error ? <p>{error}</p> : null}
-        <div className="flex flex-row items-center justify-between p-2">
-          <div className="flex flex-row items-center gap-2">
-            {/*<p className="text-sm text-grayscale-11">Create more</p>
-            <Switch />*/}
-          </div>
-          <Button type="submit" className="ml-auto" disabled={isSending}>
-            {isSending
-              ? attachments.length > 0
-                ? "Uploading..."
-                : "Sending..."
-              : "Send"}
-          </Button>
-        </div>
-      </form>
-    </Card>
+    <WorkerComposer
+      attachments={attachments}
+      error={error}
+      fileInputRef={fileInputRef}
+      isSending={isSending}
+      onAddAttachment={(event) =>
+        addImageAttachments({
+          currentAttachments: attachments,
+          event,
+          onError: setError,
+          setAttachments,
+        })
+      }
+      onRemoveAttachment={(attachmentId) =>
+        setAttachments((current) =>
+          removeImageAttachment(current, attachmentId),
+        )
+      }
+      onSubmit={onSubmit}
+      prompt={prompt}
+      setPrompt={setPrompt}
+      submitLabel={isSending ? "Sending..." : "Send"}
+      uploadingLabel="Uploading..."
+    />
   );
 }
 
@@ -179,10 +141,6 @@ export function WorkerPromptForm({
   factoryId?: string;
   worker: WorkerRecord;
 }) {
-  if (!db) {
-    return <p>InstantDB is not configured.</p>;
-  }
-
   return (
     <WorkerPromptFormContent
       factoryId={factoryId}
@@ -210,7 +168,6 @@ function WorkerPromptFormContent({
   const [snapshotStatus, setSnapshotStatus] = useState<
     "error" | "idle" | "saving" | "saved"
   >("idle");
-  const isRunning = worker.status === "running";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -299,94 +256,162 @@ function WorkerPromptFormContent({
 
   const snapshotLabel =
     snapshotStatus === "saving"
-      ? "Saving snapshot…"
+      ? "Saving snapshot..."
       : snapshotStatus === "saved"
         ? "Snapshot saved"
         : "Make worker state default";
   const isRetired = worker.status === "retired";
+  const isRunning = worker.status === "running";
   const isInputDisabled = isRetired || isSending;
 
-  function onAddImageFiles(files: File[]) {
-    addImageAttachmentFiles({
-      currentAttachments: attachments,
-      files,
-      onError: setError,
-      setAttachments,
-    });
-  }
+  return (
+    <WorkerComposer
+      attachments={attachments}
+      disabled={isRetired}
+      endActions={
+        isRunning ? (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isInputDisabled}
+            onClick={onQueueMessage}
+          >
+            Queue message
+          </Button>
+        ) : null
+      }
+      error={error}
+      fileInputRef={fileInputRef}
+      isSending={isSending}
+      onAddAttachment={(event) =>
+        addImageAttachments({
+          currentAttachments: attachments,
+          event,
+          onError: setError,
+          setAttachments,
+        })
+      }
+      onRemoveAttachment={(attachmentId) =>
+        setAttachments((current) =>
+          removeImageAttachment(current, attachmentId),
+        )
+      }
+      onSubmit={onSubmit}
+      placeholder={
+        isRetired
+          ? "This worker has been retired."
+          : "Send a message to the worker..."
+      }
+      prompt={prompt}
+      setPrompt={setPrompt}
+      submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}
+      startActions={
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={snapshotStatus === "saving"}
+          onClick={onMakeDefault}
+        >
+          {snapshotLabel}
+        </Button>
+      }
+      uploadingLabel="Uploading..."
+    />
+  );
+}
+
+function WorkerComposer({
+  attachments,
+  disabled = false,
+  endActions,
+  error,
+  fileInputRef,
+  isSending,
+  onAddAttachment,
+  onRemoveAttachment,
+  onSubmit,
+  placeholder = "Send a message to the worker...",
+  prompt,
+  setPrompt,
+  startActions,
+  submitLabel,
+  uploadingLabel,
+}: {
+  attachments: ImageAttachment[];
+  disabled?: boolean;
+  endActions?: ReactNode;
+  error: string | null;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  isSending: boolean;
+  onAddAttachment: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRemoveAttachment: (attachmentId: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  placeholder?: string;
+  prompt: string;
+  setPrompt: Dispatch<SetStateAction<string>>;
+  startActions?: ReactNode;
+  submitLabel: string;
+  uploadingLabel: string;
+}) {
+  const isSubmitDisabled = disabled || isSending;
+  const attachmentDisabled = disabled || isSending;
+  const displayedSubmitLabel =
+    isSending && attachments.length > 0 ? uploadingLabel : submitLabel;
 
   return (
-    <Card layer={0} className="max-w-2xl mx-auto p-0 ">
-      <form
-        onDragOver={(event) => handleImageDragOver(event, isInputDisabled)}
-        onDrop={(event) =>
-          handleImageDrop(event, isInputDisabled, onAddImageFiles)
-        }
-        onSubmit={onSubmit}
-        className="flex flex-col"
-      >
+    <Card
+      layer={0}
+      className="mx-auto w-full max-w-2xl bg-white dark:bg-grayscale-2 p-0"
+    >
+      <form onSubmit={onSubmit} className="flex flex-col">
         <textarea
           id="worker-task"
           value={prompt}
-          className="outline-none resize-none focus:border-accent-9 p-3 text-sm text-grayscale-12"
-          disabled={isRetired}
-          placeholder={
-            isRetired
-              ? "This worker has been retired."
-              : "Send a message to the worker..."
-          }
+          className="resize-none p-3 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10"
+          disabled={disabled}
+          placeholder={placeholder}
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={submitTextareaOnEnter}
-          onPaste={(event) =>
-            handleImagePaste(event, isInputDisabled, onAddImageFiles)
-          }
           rows={4}
         />
-        <ImageAttachmentTray
+        <ImageAttachmentPreviews
           attachments={attachments}
-          disabled={isInputDisabled}
-          fileInputRef={fileInputRef}
-          onAdd={(event) =>
-            addImageAttachmentsFromInput(event, onAddImageFiles)
-          }
-          onRemove={(attachmentId) =>
-            setAttachments((current) =>
-              removeImageAttachment(current, attachmentId),
-            )
-          }
+          disabled={attachmentDisabled}
+          onRemove={onRemoveAttachment}
         />
-        {error ? <p>{error}</p> : null}
-        <div className="flex flex-row items-center justify-between p-2">
+        {error ? (
+          <p className="border-grayscale-3 border-t px-3 py-2 text-red-11 text-sm">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex flex-row items-center justify-between gap-2 border-grayscale-3 border-t p-2">
           <div className="flex flex-row items-center gap-2">
+            <input
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="sr-only"
+              disabled={attachmentDisabled}
+              multiple
+              onChange={onAddAttachment}
+              ref={fileInputRef}
+              type="file"
+            />
             <Button
               type="button"
-              className="ml-auto"
               variant="secondary"
-              disabled={snapshotStatus === "saving"}
-              onClick={onMakeDefault}
+              disabled={
+                attachmentDisabled || attachments.length >= maxImageAttachments
+              }
+              onClick={() => fileInputRef.current?.click()}
             >
-              {snapshotLabel}
+              <ImageSquare size={16} weight="bold" aria-hidden="true" />
+              {attachments.length > 0 ? "Add image" : "Attach image"}
             </Button>
+            {startActions}
           </div>
           <div className="ml-auto flex flex-row items-center gap-2">
-            {isRunning ? (
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={isInputDisabled}
-                onClick={onQueueMessage}
-              >
-                Queue message
-              </Button>
-            ) : null}
-            <Button type="submit" disabled={isInputDisabled}>
-              {isSending
-                ? attachments.length > 0
-                  ? "Uploading..."
-                  : "Sending..."
-                : isRunning
-                  ? "Send now"
-                  : "Send"}
+            {endActions}
+            <Button type="submit" disabled={isSubmitDisabled}>
+              {displayedSubmitLabel}
             </Button>
           </div>
         </div>
@@ -612,149 +637,59 @@ async function queueWorkerMessage({
   }
 }
 
-function ImageAttachmentTray({
+function ImageAttachmentPreviews({
   attachments,
   disabled,
-  fileInputRef,
-  onAdd,
   onRemove,
 }: {
   attachments: ImageAttachment[];
   disabled?: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  onAdd: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemove: (attachmentId: string) => void;
 }) {
+  if (attachments.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="border-grayscale-3 border-t px-3 py-2">
-      {attachments.length > 0 ? (
-        <ul className="mb-2 flex flex-wrap gap-2">
-          {attachments.map((attachment) => (
-            <li
-              className="group relative size-16 overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-2"
-              key={attachment.id}
-            >
-              <div
-                aria-hidden="true"
-                className="size-full bg-cover bg-center"
-                style={{ backgroundImage: `url(${attachment.previewUrl})` }}
-              />
-              <button
-                aria-label={`Remove ${attachment.file.name}`}
-                className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full border border-grayscale-5 bg-white/90 text-grayscale-11 shadow-sm transition hover:bg-grayscale-1 hover:text-grayscale-12"
-                disabled={disabled}
-                onClick={() => onRemove(attachment.id)}
-                type="button"
-              >
-                <X size={12} weight="bold" aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <input
-        accept="image/png,image/jpeg,image/webp,image/gif"
-        className="sr-only"
-        disabled={disabled}
-        multiple
-        onChange={onAdd}
-        ref={fileInputRef}
-        type="file"
-      />
-      <Button
-        type="button"
-        variant="secondary"
-        disabled={disabled || attachments.length >= maxImageAttachments}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <ImageSquare size={16} weight="bold" aria-hidden="true" />
-        {attachments.length > 0 ? "Add image" : "Attach image"}
-      </Button>
-    </div>
+    <ul className="flex flex-wrap gap-2 border-grayscale-3 border-t px-3 py-2">
+      {attachments.map((attachment) => (
+        <li
+          className="group relative size-16 overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-2"
+          key={attachment.id}
+        >
+          <div
+            aria-hidden="true"
+            className="size-full bg-cover bg-center"
+            style={{ backgroundImage: `url(${attachment.previewUrl})` }}
+          />
+          <button
+            aria-label={`Remove ${attachment.file.name}`}
+            className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full border border-grayscale-5 bg-white/90 text-grayscale-11 shadow-sm transition hover:bg-grayscale-1 hover:text-grayscale-12"
+            disabled={disabled}
+            onClick={() => onRemove(attachment.id)}
+            type="button"
+          >
+            <X size={12} weight="bold" aria-hidden="true" />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function addImageAttachmentsFromInput(
-  event: ChangeEvent<HTMLInputElement>,
-  onAdd: (files: File[]) => void,
-) {
-  const selectedFiles = Array.from(event.target.files ?? []);
-  event.target.value = "";
-  onAdd(selectedFiles);
-}
-
-function handleImagePaste(
-  event: ClipboardEvent<HTMLTextAreaElement>,
-  disabled: boolean,
-  onAdd: (files: File[]) => void,
-) {
-  if (disabled) {
-    return;
-  }
-
-  const files = getImageFiles(Array.from(event.clipboardData.files));
-
-  if (files.length === 0) {
-    return;
-  }
-
-  event.preventDefault();
-  onAdd(files);
-}
-
-function handleImageDragOver(
-  event: DragEvent<HTMLFormElement>,
-  disabled: boolean,
-) {
-  if (disabled || !hasImageTransfer(event.dataTransfer)) {
-    return;
-  }
-
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "copy";
-}
-
-function handleImageDrop(
-  event: DragEvent<HTMLFormElement>,
-  disabled: boolean,
-  onAdd: (files: File[]) => void,
-) {
-  if (disabled) {
-    return;
-  }
-
-  const files = getImageFiles(Array.from(event.dataTransfer.files));
-
-  if (files.length === 0) {
-    return;
-  }
-
-  event.preventDefault();
-  onAdd(files);
-}
-
-function hasImageTransfer(dataTransfer: DataTransfer) {
-  return Array.from(dataTransfer.items).some(
-    (item) => item.kind === "file" && item.type.startsWith("image/"),
-  );
-}
-
-function getImageFiles(files: File[]) {
-  return files.filter((file) => file.type.startsWith("image/"));
-}
-
-function addImageAttachmentFiles({
+function addImageAttachments({
   currentAttachments,
-  files,
+  event,
   onError,
   setAttachments,
 }: {
   currentAttachments: ImageAttachment[];
-  files: File[];
+  event: ChangeEvent<HTMLInputElement>;
   onError: (error: string | null) => void;
   setAttachments: Dispatch<SetStateAction<ImageAttachment[]>>;
 }) {
-  const selectedFiles = files;
+  const selectedFiles = Array.from(event.target.files ?? []);
+  event.target.value = "";
 
   if (selectedFiles.length === 0) {
     return;

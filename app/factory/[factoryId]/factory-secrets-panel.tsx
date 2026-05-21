@@ -21,10 +21,6 @@ type FactoryWithSecretsRecord = {
 };
 
 export function FactorySecretsPanel({ factoryId }: { factoryId: string }) {
-  if (!db) {
-    return null;
-  }
-
   return <FactorySecretsPanelContent factoryId={factoryId} instantDb={db} />;
 }
 

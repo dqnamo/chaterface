@@ -1,12 +1,15 @@
 "use client";
 
 import {
+  FadersIcon,
+  FilesIcon,
   GearSixIcon,
-  KeyIcon,
   ListIcon,
-  PlugIcon,
+  LockKeyIcon,
+  PlugsConnectedIcon,
   PlusIcon,
-  PuzzlePieceIcon,
+  SignOutIcon,
+  UserCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { DateTime } from "luxon";
@@ -15,7 +18,9 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
+import FactorySidebarNavLink from "@/components/factory/FactorySidebarNavLink";
 import Button from "@/components/public/Button";
+import { Menu } from "@/components/public/Menu";
 import { cn } from "@/helpers/classname-helper";
 import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { AppDb } from "@/lib/db.client";
@@ -45,14 +50,6 @@ type FactoryWithWorkersRecord = FactoryRecord & {
 };
 
 export default function FactoryLayout({ children }: { children: ReactNode }) {
-  if (!db) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center p-4 text-sm text-grayscale-11">
-        InstantDB is not configured.
-      </div>
-    );
-  }
-
   return <FactoryLayoutContent instantDb={db}>{children}</FactoryLayoutContent>;
 }
 
@@ -134,8 +131,13 @@ function FactoryLayoutContent({
 
   return (
     <div className="flex min-h-dvh w-full flex-row bg-grayscale-1 text-grayscale-12">
-      <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh p-2">
-        <SidebarContent factories={factories} />
+      <aside className="hidden border-grayscale-3 dark:border-grayscale-3 border-r p-2 md:sticky md:top-0 md:flex md:h-dvh md:flex-col">
+        <SidebarContent
+          activeFactoryId={factoryId}
+          factories={factories}
+          instantDb={instantDb}
+          userEmail={user.email}
+        />
       </aside>
 
       <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
@@ -172,7 +174,13 @@ function FactoryLayoutContent({
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="border-grayscale-3 border-b p-2">
-              <SidebarContent factories={factories} />
+              <SidebarContent
+                activeFactoryId={factoryId}
+                factories={factories}
+                instantDb={instantDb}
+                onNavigate={() => setIsSidebarOpen(false)}
+                userEmail={user.email}
+              />
             </div>
             <WorkerSidebar
               className="w-full"
@@ -230,74 +238,54 @@ function WorkerSidebar({
 
   return (
     <div className={cn("flex h-full min-h-0 w-64 flex-col", className)}>
-      <nav className="flex min-h-0 flex-1 flex-col p-2">
-        <div className="shrink-0">
-          <Link
+      <nav className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 flex-col gap-1 border-b border-grayscale-3 p-2">
+          {/* <FactorySidebarNavLink
+            currentPathname={currentPathname}
             href={`/factory/${factoryId}`}
-            onClick={onNavigate}
-            className={cn(
-              "",
-              currentPathname === `/factory/${factoryId}` && "bg-grayscale-3",
-            )}
-          >
-            <Button variant="secondary" className="w-full">
-              New worker
-            </Button>
-          </Link>
-          <Link href={`/factory/${factoryId}/secrets`} onClick={onNavigate}>
-            <Button
-              variant="secondary"
-              className={cn(
-                "mt-2 w-full",
-                currentPathname === `/factory/${factoryId}/secrets` &&
-                  "bg-grayscale-3",
-              )}
-            >
-              <KeyIcon aria-hidden="true" size={14} weight="bold" />
-              Secrets
-            </Button>
-          </Link>
-          <Link href={`/factory/${factoryId}/skills`} onClick={onNavigate}>
-            <Button
-              variant="secondary"
-              className={cn(
-                "mt-2 w-full",
-                currentPathname === `/factory/${factoryId}/skills` &&
-                  "bg-grayscale-3",
-              )}
-            >
-              <PuzzlePieceIcon aria-hidden="true" size={14} weight="bold" />
-              Skills
-            </Button>
-          </Link>
-          <Link href={`/factory/${factoryId}/mcp`} onClick={onNavigate}>
-            <Button
-              variant="secondary"
-              className={cn(
-                "mt-2 w-full",
-                currentPathname === `/factory/${factoryId}/mcp` &&
-                  "bg-grayscale-3",
-              )}
-            >
-              <PlugIcon aria-hidden="true" size={14} weight="bold" />
-              MCP
-            </Button>
-          </Link>
-          <Link href={`/factory/${factoryId}/settings`} onClick={onNavigate}>
-            <Button
-              variant="secondary"
-              className={cn(
-                "mt-2 w-full",
-                currentPathname === `/factory/${factoryId}/settings` &&
-                  "bg-grayscale-3",
-              )}
-            >
-              <GearSixIcon aria-hidden="true" size={14} weight="bold" />
-              Settings
-            </Button>
-          </Link>
+            icon={<PlusIcon aria-hidden="true" size={14} weight="bold" />}
+            label="New worker"
+            onNavigate={onNavigate}
+          /> */}
+          <h2 className="px-2 pb-1 mt-2 font-mono font-semibold text-grayscale-10 text-xs uppercase">
+            Factory
+          </h2>
+          <FactorySidebarNavLink
+            currentPathname={currentPathname}
+            href={`/factory/${factoryId}/secrets`}
+            icon={<LockKeyIcon aria-hidden="true" size={15} weight="bold" />}
+            label="Secrets"
+            onNavigate={onNavigate}
+          />
+          <FactorySidebarNavLink
+            currentPathname={currentPathname}
+            href={`/factory/${factoryId}/skills`}
+            icon={<FilesIcon aria-hidden="true" size={15} weight="bold" />}
+            label="Skills"
+            onNavigate={onNavigate}
+          />
+          <FactorySidebarNavLink
+            currentPathname={currentPathname}
+            href={`/factory/${factoryId}/mcp`}
+            icon={
+              <PlugsConnectedIcon aria-hidden="true" size={15} weight="bold" />
+            }
+            label="MCP"
+            onNavigate={onNavigate}
+          />
+          <FactorySidebarNavLink
+            currentPathname={currentPathname}
+            href={`/factory/${factoryId}/settings`}
+            icon={<FadersIcon aria-hidden="true" size={15} weight="bold" />}
+            label="Settings"
+            onNavigate={onNavigate}
+          />
         </div>
-        <div className="scroll-mask-y scroll-mask-y-from-8 mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+        <div className="p-2 scroll-mask-y scroll-mask-y-from-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <Button variant="secondary" className="w-full text-sm">
+            {/* <PlusIcon aria-hidden="true" size={16} weight="bold" /> */}
+            New worker
+          </Button>
           <WorkerSidebarSection
             currentPathname={currentPathname}
             factoryId={factoryId}
@@ -375,7 +363,7 @@ function WorkerSidebarLink({
       onClick={onNavigate}
       className={cn(
         "block rounded-lg p-2 text-sm transition-colors hover:bg-grayscale-2",
-        currentPathname === href && "bg-grayscale-2",
+        currentPathname === href && "bg-grayscale-3 hover:bg-grayscale-3",
       )}
     >
       <span className="flex min-w-0 items-start gap-2">
@@ -432,26 +420,115 @@ function getWorkerStatusTone(status: string): WorkerStatusTone {
   }
 }
 
-function SidebarContent({ factories }: { factories: FactoryRecord[] }) {
+function SidebarContent({
+  activeFactoryId,
+  factories,
+  instantDb,
+  onNavigate,
+  userEmail,
+}: {
+  activeFactoryId: string;
+  factories: FactoryRecord[];
+  instantDb: AppDb;
+  onNavigate?: () => void;
+  userEmail?: null | string;
+}) {
   return (
-    <nav>
-      <ul className="flex flex-col gap-2">
-        <Link
-          aria-label="Create factory"
-          href="/factories/new"
-          title="Create factory"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 bg-grayscale-2 text-grayscale-11 transition-colors hover:border-accent-7 hover:bg-accent-3 hover:text-accent-11">
-            <PlusIcon aria-hidden="true" size={18} weight="bold" />
-          </span>
-        </Link>
-        {factories.map((candidate) => (
-          <Link href={`/factory/${candidate.id}`} key={candidate.id}>
-            <FactoryMonogram color={candidate.color} name={candidate.name} />
+    <div className="flex h-full flex-col justify-between gap-4">
+      <nav>
+        <ul className="flex flex-col gap-2">
+          <Link
+            aria-label="Create factory"
+            className="flex aspect-square w-full items-center justify-center rounded-lg border border-b-2 border-grayscale-3 bg-white text-grayscale-11 transition-colors hover:border-grayscale-4 hover:bg-grayscale-2 dark:border-grayscale-4 dark:bg-grayscale-3 dark:hover:border-grayscale-5 dark:hover:bg-grayscale-4"
+            href="/factories/new"
+            onClick={onNavigate}
+            title="Create factory"
+          >
+            <PlusIcon aria-hidden="true" size={16} weight="bold" />
           </Link>
-        ))}
-      </ul>
-    </nav>
+          {factories.map((candidate) => (
+            <Link
+              href={`/factory/${candidate.id}`}
+              key={candidate.id}
+              onClick={onNavigate}
+            >
+              <FactoryMonogram
+                color={candidate.color}
+                name={candidate.name}
+                selected={candidate.id === activeFactoryId}
+              />
+            </Link>
+          ))}
+        </ul>
+      </nav>
+      <UserRailMenu
+        instantDb={instantDb}
+        onNavigate={onNavigate}
+        userEmail={userEmail}
+      />
+    </div>
+  );
+}
+
+function UserRailMenu({
+  instantDb,
+  onNavigate,
+  userEmail,
+}: {
+  instantDb: AppDb;
+  onNavigate?: () => void;
+  userEmail?: null | string;
+}) {
+  const router = useRouter();
+
+  async function logOut() {
+    try {
+      await instantDb.auth.signOut();
+    } finally {
+      onNavigate?.();
+      router.replace("/login");
+    }
+  }
+
+  function openSettings() {
+    onNavigate?.();
+    router.push("/settings");
+  }
+
+  return (
+    <Menu.Composed
+      positionerProps={{ align: "end", side: "right", sideOffset: 8 }}
+      popupProps={{ className: "min-w-48" }}
+      trigger={<UserCircleIcon aria-hidden="true" size={22} weight="bold" />}
+      triggerProps={{
+        "aria-label": "Open user menu",
+        className:
+          "size-10 justify-center rounded-lg border-grayscale-3 bg-grayscale-1 p-0 text-grayscale-11 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2 dark:bg-grayscale-2 dark:hover:bg-grayscale-3 dark:data-[popup-open]:bg-grayscale-3",
+        title: userEmail ?? "User menu",
+      }}
+    >
+      {userEmail ? (
+        <>
+          <Menu.Group>
+            <Menu.GroupLabel className="normal-case tracking-normal">
+              Signed in as
+            </Menu.GroupLabel>
+            <div className="max-w-56 truncate px-2 pb-1 text-grayscale-11 text-xs">
+              {userEmail}
+            </div>
+          </Menu.Group>
+          <Menu.Separator />
+        </>
+      ) : null}
+      <Menu.Item onClick={openSettings}>
+        <GearSixIcon aria-hidden="true" size={14} weight="bold" />
+        Settings
+      </Menu.Item>
+      <Menu.Item onClick={logOut}>
+        <SignOutIcon aria-hidden="true" size={14} weight="bold" />
+        Log out
+      </Menu.Item>
+    </Menu.Composed>
   );
 }
 

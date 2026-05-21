@@ -18,14 +18,6 @@ import { db } from "@/lib/db.client";
 type WizardStep = "factory" | "agent";
 
 export default function NewFactoryPage() {
-  if (!db) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center p-4 text-sm text-grayscale-11">
-        InstantDB is not configured.
-      </main>
-    );
-  }
-
   return <NewFactoryWizard instantDb={db} />;
 }
 
