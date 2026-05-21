@@ -6,7 +6,9 @@ import { ImageSquare, X } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import {
   type ChangeEvent,
+  type ClipboardEvent,
   type Dispatch,
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
   type RefObject,
@@ -109,9 +111,23 @@ function NewWorkerFormContent({
     }
   }
 
+  function onAddImageFiles(files: File[]) {
+    addImageAttachmentFiles({
+      currentAttachments: attachments,
+      files,
+      onError: setError,
+      setAttachments,
+    });
+  }
+
   return (
     <Card layer={0} className="max-w-2xl bg-white mx-auto p-0 w-full">
-      <form onSubmit={onSubmit} className="flex flex-col">
+      <form
+        onDragOver={(event) => handleImageDragOver(event, isSending)}
+        onDrop={(event) => handleImageDrop(event, isSending, onAddImageFiles)}
+        onSubmit={onSubmit}
+        className="flex flex-col"
+      >
         <textarea
           id="worker-task"
           value={prompt}
@@ -119,6 +135,9 @@ function NewWorkerFormContent({
           placeholder="Send a message to the worker..."
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={submitTextareaOnEnter}
+          onPaste={(event) =>
+            handleImagePaste(event, isSending, onAddImageFiles)
+          }
           rows={4}
         />
         <ImageAttachmentTray
@@ -126,12 +145,7 @@ function NewWorkerFormContent({
           disabled={isSending}
           fileInputRef={fileInputRef}
           onAdd={(event) =>
-            addImageAttachments({
-              currentAttachments: attachments,
-              event,
-              onError: setError,
-              setAttachments,
-            })
+            addImageAttachmentsFromInput(event, onAddImageFiles)
           }
           onRemove={(attachmentId) =>
             setAttachments((current) =>
@@ -266,10 +280,27 @@ function WorkerPromptFormContent({
         ? "Snapshot saved"
         : "Make worker state default";
   const isRetired = worker.status === "retired";
+  const isInputDisabled = isRetired || isSending;
+
+  function onAddImageFiles(files: File[]) {
+    addImageAttachmentFiles({
+      currentAttachments: attachments,
+      files,
+      onError: setError,
+      setAttachments,
+    });
+  }
 
   return (
     <Card layer={0} className="max-w-2xl mx-auto p-0 ">
-      <form onSubmit={onSubmit} className="flex flex-col">
+      <form
+        onDragOver={(event) => handleImageDragOver(event, isInputDisabled)}
+        onDrop={(event) =>
+          handleImageDrop(event, isInputDisabled, onAddImageFiles)
+        }
+        onSubmit={onSubmit}
+        className="flex flex-col"
+      >
         <textarea
           id="worker-task"
           value={prompt}
@@ -282,19 +313,17 @@ function WorkerPromptFormContent({
           }
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={submitTextareaOnEnter}
+          onPaste={(event) =>
+            handleImagePaste(event, isInputDisabled, onAddImageFiles)
+          }
           rows={4}
         />
         <ImageAttachmentTray
           attachments={attachments}
-          disabled={isRetired || isSending}
+          disabled={isInputDisabled}
           fileInputRef={fileInputRef}
           onAdd={(event) =>
-            addImageAttachments({
-              currentAttachments: attachments,
-              event,
-              onError: setError,
-              setAttachments,
-            })
+            addImageAttachmentsFromInput(event, onAddImageFiles)
           }
           onRemove={(attachmentId) =>
             setAttachments((current) =>
@@ -315,11 +344,7 @@ function WorkerPromptFormContent({
               {snapshotLabel}
             </Button>
           </div>
-          <Button
-            type="submit"
-            className="ml-auto"
-            disabled={isRetired || isSending}
-          >
+          <Button type="submit" className="ml-auto" disabled={isInputDisabled}>
             {isSending
               ? attachments.length > 0
                 ? "Uploading..."
@@ -522,19 +547,87 @@ function ImageAttachmentTray({
   );
 }
 
-function addImageAttachments({
+function addImageAttachmentsFromInput(
+  event: ChangeEvent<HTMLInputElement>,
+  onAdd: (files: File[]) => void,
+) {
+  const selectedFiles = Array.from(event.target.files ?? []);
+  event.target.value = "";
+  onAdd(selectedFiles);
+}
+
+function handleImagePaste(
+  event: ClipboardEvent<HTMLTextAreaElement>,
+  disabled: boolean,
+  onAdd: (files: File[]) => void,
+) {
+  if (disabled) {
+    return;
+  }
+
+  const files = getImageFiles(Array.from(event.clipboardData.files));
+
+  if (files.length === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  onAdd(files);
+}
+
+function handleImageDragOver(
+  event: DragEvent<HTMLFormElement>,
+  disabled: boolean,
+) {
+  if (disabled || !hasImageTransfer(event.dataTransfer)) {
+    return;
+  }
+
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+}
+
+function handleImageDrop(
+  event: DragEvent<HTMLFormElement>,
+  disabled: boolean,
+  onAdd: (files: File[]) => void,
+) {
+  if (disabled) {
+    return;
+  }
+
+  const files = getImageFiles(Array.from(event.dataTransfer.files));
+
+  if (files.length === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  onAdd(files);
+}
+
+function hasImageTransfer(dataTransfer: DataTransfer) {
+  return Array.from(dataTransfer.items).some(
+    (item) => item.kind === "file" && item.type.startsWith("image/"),
+  );
+}
+
+function getImageFiles(files: File[]) {
+  return files.filter((file) => file.type.startsWith("image/"));
+}
+
+function addImageAttachmentFiles({
   currentAttachments,
-  event,
+  files,
   onError,
   setAttachments,
 }: {
   currentAttachments: ImageAttachment[];
-  event: ChangeEvent<HTMLInputElement>;
+  files: File[];
   onError: (error: string | null) => void;
   setAttachments: Dispatch<SetStateAction<ImageAttachment[]>>;
 }) {
-  const selectedFiles = Array.from(event.target.files ?? []);
-  event.target.value = "";
+  const selectedFiles = files;
 
   if (selectedFiles.length === 0) {
     return;
