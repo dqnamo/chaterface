@@ -72,6 +72,7 @@ _Avoid_: worker, run
 - A **Worker Interrupted Event** stores the killed process id and the prompt that caused the interruption.
 - A new prompt sent to a running **Worker** always interrupts the **Active Codex Process** before resuming the **Codex Session**.
 - The client creates the **Worker** and **User Message Event** immediately so the UI reflects the submitted prompt before background execution starts.
+- Instant webhooks observe new **User Message Events** and trigger the **Worker Trigger Task**; the client does not make a second server request to start execution.
 - A **Worker Trigger Task** is infrastructure for executing a Worker; it is not the Worker itself.
 - A **Factory** has zero or one **Default Snapshot**.
 
