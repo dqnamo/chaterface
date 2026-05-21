@@ -1,6 +1,11 @@
 "use client";
 
-import { CheckIcon, SwatchesIcon } from "@phosphor-icons/react";
+import {
+  CheckIcon,
+  SwatchesIcon,
+  TrashIcon,
+  WarningIcon,
+} from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
@@ -61,6 +66,8 @@ function FactorySettingsPageContent({
     DEFAULT_FACTORY_COLOR,
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -110,6 +117,37 @@ function FactorySettingsPageContent({
       );
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function deleteFactory() {
+    if (!factory) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${factory.name}"? This permanently removes the factory from Factoryplane.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await instantDb.transact(instantDb.tx.factories[factoryId].delete());
+      router.replace("/factories");
+      router.refresh();
+    } catch (deleteFactoryError) {
+      console.error(deleteFactoryError);
+      setDeleteError(
+        deleteFactoryError instanceof Error
+          ? deleteFactoryError.message
+          : "Factory could not be deleted.",
+      );
+      setIsDeleting(false);
     }
   }
 
@@ -234,6 +272,48 @@ function FactorySettingsPageContent({
             <div className="flex justify-end">
               <Button disabled className="w-max opacity-70" variant="secondary">
                 {isSaving ? "Saving..." : "Saved automatically"}
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-red-6 bg-red-2">
+          <div className="border-red-6 border-b px-3 py-2">
+            <h2 className="font-mono font-bold text-[11px] text-red-11 uppercase tracking-wide">
+              Danger zone
+            </h2>
+          </div>
+          <div className="flex flex-col gap-4 px-3 py-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-red-6 bg-red-3 text-red-11">
+                <WarningIcon aria-hidden="true" size={16} weight="bold" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium text-red-12 text-sm">
+                  Delete factory
+                </p>
+                <p className="text-red-11 text-xs">
+                  Permanently removes this factory. Downstream cleanup should
+                  run from the factory delete event.
+                </p>
+              </div>
+            </div>
+
+            {deleteError ? (
+              <p className="text-red-11 text-sm" role="alert">
+                {deleteError}
+              </p>
+            ) : null}
+
+            <div className="flex justify-end">
+              <Button
+                className="border-red-8 bg-red-9 text-white hover:border-red-9 hover:bg-red-10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isDeleting}
+                onClick={deleteFactory}
+                type="button"
+              >
+                <TrashIcon aria-hidden="true" size={14} weight="bold" />
+                {isDeleting ? "Deleting..." : "Delete factory"}
               </Button>
             </div>
           </div>

@@ -30,7 +30,7 @@ const rules = {
       view: "auth.id in data.ref('owner.id')",
       create: "false",
       update: "false",
-      delete: "false",
+      delete: "auth.id in data.ref('owner.id')",
     },
   },
   agents: {
