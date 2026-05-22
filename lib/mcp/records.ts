@@ -206,14 +206,20 @@ export async function listMcpCapabilitiesByIds(capabilityIds: string[]) {
   }
 
   const db = getAdminDbCore();
-  const result = await db.query({
-    factoryMcpCapabilities: {},
-  });
+  const results = await Promise.all(
+    capabilityIds.map((capabilityId) =>
+      db.query({
+        factoryMcpCapabilities: {
+          $: { where: { id: capabilityId } },
+        },
+      }),
+    ),
+  );
   const ids = new Set(capabilityIds);
 
-  return (result.factoryMcpCapabilities as McpCapabilityRecord[]).filter(
-    (capability) => ids.has(capability.id),
-  );
+  return results
+    .flatMap((result) => result.factoryMcpCapabilities as McpCapabilityRecord[])
+    .filter((capability) => ids.has(capability.id));
 }
 
 export async function listEnabledMcpCapabilitiesForFactory(factoryId: string) {
@@ -221,30 +227,31 @@ export async function listEnabledMcpCapabilitiesForFactory(factoryId: string) {
   const result = await db.query({
     factories: {
       $: { where: { id: factoryId } },
-      mcpServers: {},
+      mcpServers: {
+        capabilities: {},
+      },
     },
-    factoryMcpCapabilities: {},
   });
   const factory = result.factories[0] as
-    | { mcpServers?: McpConnectionRecord[] }
+    | {
+        mcpServers?: (McpConnectionRecord & {
+          capabilities?: McpCapabilityRecord[];
+        })[];
+      }
     | undefined;
-  const readyServerIds = new Set(
-    (factory?.mcpServers ?? [])
-      .filter((server) => server.enabled !== false)
-      .filter(
-        (server) =>
-          server.authStatus !== "authorization_required" &&
-          server.authStatus !== "failed",
-      )
-      .filter(
-        (server) =>
-          server.status === "authenticated" || server.syncStatus === "ready",
-      )
-      .map((server) => server.id),
-  );
 
-  return (result.factoryMcpCapabilities as McpCapabilityRecord[])
-    .filter((capability) => readyServerIds.has(capability.mcpServerId))
+  return (factory?.mcpServers ?? [])
+    .filter((server) => server.enabled !== false)
+    .filter(
+      (server) =>
+        server.authStatus !== "authorization_required" &&
+        server.authStatus !== "failed",
+    )
+    .filter(
+      (server) =>
+        server.status === "authenticated" || server.syncStatus === "ready",
+    )
+    .flatMap((server) => server.capabilities ?? [])
     .filter((capability) => capability.enabled)
     .filter((capability) => capability.capabilityType === "tool");
 }
@@ -253,14 +260,31 @@ export async function getMcpCapabilityByNamespacedName(
   capabilityIds: string[],
   namespacedName: string,
 ) {
-  const capabilities = await listMcpCapabilitiesByIds(capabilityIds);
+  if (capabilityIds.length === 0) {
+    return undefined;
+  }
 
-  return capabilities.find(
-    (capability) =>
-      capability.enabled &&
-      capability.capabilityType === "tool" &&
-      capability.namespacedName === namespacedName,
-  );
+  const db = getAdminDbCore();
+  const result = await db.query({
+    factoryMcpCapabilities: {
+      $: { where: { namespacedName } },
+    },
+  });
+  const capability = result.factoryMcpCapabilities[0] as
+    | McpCapabilityRecord
+    | undefined;
+  const ids = new Set(capabilityIds);
+
+  if (
+    !capability ||
+    !ids.has(capability.id) ||
+    !capability.enabled ||
+    capability.capabilityType !== "tool"
+  ) {
+    return undefined;
+  }
+
+  return capability;
 }
 
 export async function updateMcpCapability(

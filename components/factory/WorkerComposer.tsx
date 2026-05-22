@@ -1,0 +1,252 @@
+"use client";
+
+import { id } from "@instantdb/react";
+import { ImageSquare, X } from "@phosphor-icons/react";
+import type {
+  ChangeEvent,
+  Dispatch,
+  FormEvent,
+  KeyboardEvent,
+  ReactNode,
+  RefObject,
+  SetStateAction,
+} from "react";
+import Button from "@/components/public/Button";
+import Card from "@/components/public/Card";
+
+export type ImageAttachment = {
+  file: File;
+  id: string;
+  previewUrl: string;
+};
+
+const maxImageAttachments = 5;
+const maxImageAttachmentBytes = 20 * 1024 * 1024;
+const supportedImageTypes = new Set([
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+export function WorkerComposer({
+  attachments,
+  disabled = false,
+  endActions,
+  error,
+  fileInputRef,
+  isSending,
+  onAddAttachment,
+  onRemoveAttachment,
+  onSubmit,
+  placeholder = "Send a message to the worker...",
+  prompt,
+  setPrompt,
+  startActions,
+  submitLabel,
+  uploadingLabel,
+}: {
+  attachments: ImageAttachment[];
+  disabled?: boolean;
+  endActions?: ReactNode;
+  error: string | null;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  isSending: boolean;
+  onAddAttachment: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRemoveAttachment: (attachmentId: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  placeholder?: string;
+  prompt: string;
+  setPrompt: Dispatch<SetStateAction<string>>;
+  startActions?: ReactNode;
+  submitLabel: string;
+  uploadingLabel: string;
+}) {
+  const isSubmitDisabled = disabled || isSending;
+  const attachmentDisabled = disabled || isSending;
+  const displayedSubmitLabel =
+    isSending && attachments.length > 0 ? uploadingLabel : submitLabel;
+
+  return (
+    <Card
+      layer={0}
+      className="mx-auto w-full max-w-2xl bg-white dark:bg-grayscale-2 p-0"
+    >
+      <form onSubmit={onSubmit} className="flex flex-col">
+        <textarea
+          id="worker-task"
+          value={prompt}
+          className="resize-none p-3 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10"
+          disabled={disabled}
+          placeholder={placeholder}
+          onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={submitTextareaOnEnter}
+          rows={4}
+        />
+        <ImageAttachmentPreviews
+          attachments={attachments}
+          disabled={attachmentDisabled}
+          onRemove={onRemoveAttachment}
+        />
+        {error ? (
+          <p className="border-grayscale-3 border-t px-3 py-2 text-red-11 text-sm">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex flex-row items-center justify-between gap-2 border-grayscale-3 border-t p-2">
+          <div className="flex flex-row items-center gap-2">
+            <input
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="sr-only"
+              disabled={attachmentDisabled}
+              multiple
+              onChange={onAddAttachment}
+              ref={fileInputRef}
+              type="file"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={
+                attachmentDisabled || attachments.length >= maxImageAttachments
+              }
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImageSquare size={16} weight="bold" aria-hidden="true" />
+              {attachments.length > 0 ? "Add image" : "Attach image"}
+            </Button>
+            {startActions}
+          </div>
+          <div className="ml-auto flex flex-row items-center gap-2">
+            {endActions}
+            <Button type="submit" disabled={isSubmitDisabled}>
+              {displayedSubmitLabel}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+export function addImageAttachments({
+  currentAttachments,
+  event,
+  onError,
+  setAttachments,
+}: {
+  currentAttachments: ImageAttachment[];
+  event: ChangeEvent<HTMLInputElement>;
+  onError: (error: string | null) => void;
+  setAttachments: Dispatch<SetStateAction<ImageAttachment[]>>;
+}) {
+  const selectedFiles = Array.from(event.target.files ?? []);
+  event.target.value = "";
+
+  if (selectedFiles.length === 0) {
+    return;
+  }
+
+  const remainingSlots = maxImageAttachments - currentAttachments.length;
+  const validAttachments: ImageAttachment[] = [];
+
+  for (const file of selectedFiles.slice(0, remainingSlots)) {
+    if (!supportedImageTypes.has(file.type)) {
+      onError("Attach PNG, JPEG, WebP, or GIF images.");
+      continue;
+    }
+
+    if (file.size > maxImageAttachmentBytes) {
+      onError("Images must be 20 MB or smaller.");
+      continue;
+    }
+
+    validAttachments.push({
+      file,
+      id: id(),
+      previewUrl: URL.createObjectURL(file),
+    });
+  }
+
+  if (selectedFiles.length > remainingSlots) {
+    onError(`Attach up to ${maxImageAttachments} images.`);
+  } else if (validAttachments.length > 0) {
+    onError(null);
+  }
+
+  if (validAttachments.length > 0) {
+    setAttachments((current) => [...current, ...validAttachments]);
+  }
+}
+
+export function removeImageAttachment(
+  attachments: ImageAttachment[],
+  attachmentId: string,
+) {
+  const attachment = attachments.find((item) => item.id === attachmentId);
+
+  if (attachment) {
+    URL.revokeObjectURL(attachment.previewUrl);
+  }
+
+  return attachments.filter((item) => item.id !== attachmentId);
+}
+
+export function cleanupAttachments(attachments: ImageAttachment[]) {
+  for (const attachment of attachments) {
+    URL.revokeObjectURL(attachment.previewUrl);
+  }
+}
+
+function submitTextareaOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
+  if (
+    event.key !== "Enter" ||
+    event.shiftKey ||
+    event.nativeEvent.isComposing
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  event.currentTarget.form?.requestSubmit();
+}
+
+function ImageAttachmentPreviews({
+  attachments,
+  disabled,
+  onRemove,
+}: {
+  attachments: ImageAttachment[];
+  disabled?: boolean;
+  onRemove: (attachmentId: string) => void;
+}) {
+  if (attachments.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="flex flex-wrap gap-2 border-grayscale-3 border-t px-3 py-2">
+      {attachments.map((attachment) => (
+        <li
+          className="group relative size-16 overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-2"
+          key={attachment.id}
+        >
+          <div
+            aria-hidden="true"
+            className="size-full bg-cover bg-center"
+            style={{ backgroundImage: `url(${attachment.previewUrl})` }}
+          />
+          <button
+            aria-label={`Remove ${attachment.file.name}`}
+            className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full border border-grayscale-5 bg-white/90 text-grayscale-11 shadow-sm transition hover:bg-grayscale-1 hover:text-grayscale-12"
+            disabled={disabled}
+            onClick={() => onRemove(attachment.id)}
+            type="button"
+          >
+            <X size={12} weight="bold" aria-hidden="true" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
