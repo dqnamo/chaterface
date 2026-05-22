@@ -4,7 +4,6 @@ import { Plug, PuzzlePiece } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import CapabilitiesPanel from "@/components/factory/CapabilitiesPanel";
-import FactorySettingsShell from "@/components/factory/FactorySettingsShell";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 
@@ -106,8 +105,8 @@ function FactoryCapabilitySectionPageContent({
   }
 
   return (
-    <FactorySettingsShell factoryId={factoryId}>
-      <div className="flex max-w-4xl flex-col gap-6">
+    <div className="px-4 py-5 sm:p-6">
+      <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <header className="flex flex-col gap-3 border-b border-grayscale-3 pb-6">
           <div className="flex min-w-0 flex-col gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg border border-grayscale-4 bg-grayscale-2 text-accent-11">
@@ -126,7 +125,7 @@ function FactoryCapabilitySectionPageContent({
 
         <CapabilitiesPanel factoryId={factoryId} section={section} />
       </div>
-    </FactorySettingsShell>
+    </div>
   );
 }
 

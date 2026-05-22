@@ -18,6 +18,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
+import FactorySettingsSidebar from "@/components/factory/FactorySettingsSidebar";
 import Button from "@/components/public/Button";
 import { Menu } from "@/components/public/Menu";
 import { cn } from "@/helpers/classname-helper";
@@ -122,6 +123,7 @@ function FactoryLayoutContent({
   const workers = [...(factoryWithWorkers?.workers ?? [])].sort((a, b) =>
     (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
   );
+  const isSettingsSection = isFactorySettingsPath(pathname, factoryId);
 
   if (!isLoading && !factory) {
     return (
@@ -148,11 +150,15 @@ function FactoryLayoutContent({
       </aside>
 
       <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
-        <WorkerSidebar
-          currentPathname={pathname}
-          factoryId={factoryId}
-          workers={workers}
-        />
+        {isSettingsSection ? (
+          <FactorySettingsSidebar factoryId={factoryId} />
+        ) : (
+          <WorkerSidebar
+            currentPathname={pathname}
+            factoryId={factoryId}
+            workers={workers}
+          />
+        )}
       </aside>
 
       <div
@@ -195,13 +201,21 @@ function FactoryLayoutContent({
               factoryId={factoryId}
               onNavigate={() => setIsSidebarOpen(false)}
             />
-            <WorkerSidebar
-              className="w-full"
-              currentPathname={pathname}
-              factoryId={factoryId}
-              onNavigate={() => setIsSidebarOpen(false)}
-              workers={workers}
-            />
+            {isSettingsSection ? (
+              <FactorySettingsSidebar
+                className="w-full"
+                factoryId={factoryId}
+                onNavigate={() => setIsSidebarOpen(false)}
+              />
+            ) : (
+              <WorkerSidebar
+                className="w-full"
+                currentPathname={pathname}
+                factoryId={factoryId}
+                onNavigate={() => setIsSidebarOpen(false)}
+                workers={workers}
+              />
+            )}
           </div>
         </aside>
       </div>
@@ -285,6 +299,15 @@ function FactoryToolsRail({
       ))}
     </nav>
   );
+}
+
+function isFactorySettingsPath(pathname: string, factoryId: string) {
+  return [
+    `/factory/${factoryId}/settings`,
+    `/factory/${factoryId}/secrets`,
+    `/factory/${factoryId}/skills`,
+    `/factory/${factoryId}/mcp`,
+  ].includes(pathname);
 }
 
 function FactoryToolsRailLink({
