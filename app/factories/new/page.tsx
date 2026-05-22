@@ -14,6 +14,7 @@ import Input from "@/components/public/Input";
 import { cn } from "@/helpers/classname-helper";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
+import { saveLastFactoryId } from "@/lib/factory/last-factory";
 
 type WizardStep = "factory" | "agent";
 
@@ -103,6 +104,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
         throw new Error(body?.error ?? "Factory could not be created.");
       }
 
+      saveLastFactoryId(body.factoryId);
       router.push(`/factory/${body.factoryId}`);
       router.refresh();
     } catch (createError) {

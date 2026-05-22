@@ -27,6 +27,7 @@ import { cn } from "@/helpers/classname-helper";
 import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
+import { saveLastFactoryId } from "@/lib/factory/last-factory";
 
 type FactoryRecord = {
   color?: FactoryColorValue;
@@ -85,6 +86,19 @@ function FactoryLayoutContent({
         }
       : null,
   );
+  const currentUser = data?.$users?.[0];
+  const factories = [
+    ...((currentUser?.ownedFactories ?? []) as FactoryRecord[]),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  const factory = factories.find((candidate) => candidate.id === factoryId);
+  const factoryWithWorkers = data?.factories?.[0] as
+    | FactoryWithWorkersRecord
+    | undefined;
+  const workers = [...(factoryWithWorkers?.workers ?? [])].sort((a, b) =>
+    (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
+  );
+  const isSettingsSection = isFactorySettingsPath(pathname, factoryId);
+  const isComputerSection = isFactoryComputerPath(pathname, factoryId);
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -96,6 +110,12 @@ function FactoryLayoutContent({
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isLoading && factory?.id) {
+      saveLastFactoryId(factory.id);
+    }
+  }, [factory?.id, isLoading]);
 
   if (isAuthLoading || !user) {
     return (
@@ -113,20 +133,6 @@ function FactoryLayoutContent({
       />
     );
   }
-
-  const currentUser = data?.$users?.[0];
-  const factories = (
-    (currentUser?.ownedFactories ?? []) as FactoryRecord[]
-  ).sort((a, b) => a.name.localeCompare(b.name));
-  const factory = factories.find((candidate) => candidate.id === factoryId);
-  const factoryWithWorkers = data?.factories?.[0] as
-    | FactoryWithWorkersRecord
-    | undefined;
-  const workers = [...(factoryWithWorkers?.workers ?? [])].sort((a, b) =>
-    (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
-  );
-  const isSettingsSection = isFactorySettingsPath(pathname, factoryId);
-  const isComputerSection = isFactoryComputerPath(pathname, factoryId);
 
   if (!isLoading && !factory) {
     return (

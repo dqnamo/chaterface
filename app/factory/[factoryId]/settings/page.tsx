@@ -14,6 +14,7 @@ import {
 } from "@/helpers/factory-colors";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
+import { clearLastFactoryId } from "@/lib/factory/last-factory";
 
 type FactoryRecord = {
   color?: FactoryColorValue;
@@ -103,6 +104,7 @@ function FactorySettingsPageContent({
 
     try {
       await instantDb.transact(instantDb.tx.factories[factoryId].delete());
+      clearLastFactoryId(factoryId);
       router.replace("/factories");
       router.refresh();
     } catch (deleteFactoryError) {

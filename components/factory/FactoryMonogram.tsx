@@ -28,20 +28,32 @@ export default function FactoryMonogram({
   return (
     <div
       className={cn(
-        "relative flex size-10 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold uppercase transition-opacity",
-        selected === false && "opacity-50 hover:opacity-75",
-        selected === true && "opacity-100",
+        "group relative flex size-10 shrink-0 items-center justify-center text-sm font-semibold uppercase",
       )}
-      style={{
-        ...style,
-        backgroundColor: "var(--factory-monogram-bg)",
-        borderColor: "var(--factory-monogram-border)",
-        color: "var(--factory-monogram-fg)",
-      }}
+      style={style}
     >
-      {initials}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-0 rounded-lg border border-transparent transition-opacity",
+          selected === false && "opacity-50 group-hover:opacity-75",
+        )}
+        style={{
+          backgroundColor: "var(--factory-monogram-bg)",
+          // borderColor: "var(--factory-monogram-border)",
+        }}
+      />
+      <span
+        className={cn(
+          "relative transition-opacity",
+          selected === false && "opacity-50 group-hover:opacity-75",
+        )}
+        style={{ color: "var(--factory-monogram-fg)" }}
+      >
+        {initials}
+      </span>
       {badgeCount > 0 ? (
-        <span className="-top-1.5 -right-1.5 absolute flex min-w-5 items-center justify-center rounded-full border border-grayscale-1 bg-green-9 px-1 text-center font-mono text-[11px] text-white leading-4 shadow-sm">
+        <span className="-top-1.5 -right-1.5 absolute flex min-w-5 items-center justify-center rounded-md border-2 border-grayscale-1 bg-accent-9 px-1 text-center font-mono text-[11px] text-white leading-4">
           <NumberFlow value={badgeCount} />
         </span>
       ) : null}
