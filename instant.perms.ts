@@ -33,15 +33,36 @@ const rules = {
   factories: {
     bind: {
       colorIsSupported: `!('color' in request.modifiedFields) || newData.color in [${supportedFactoryColors}]`,
+      isFactoryMember:
+        "auth.id in data.ref('owner.id') || auth.id in data.ref('supervisors.user.id') || auth.email in data.ref('supervisors.email')",
       isOwner: "auth.id in data.ref('owner.id')",
       onlyModifiesColor:
         "request.modifiedFields.all(field, field in ['color'])",
     },
     allow: {
-      view: "auth.id in data.ref('owner.id')",
+      view: "isFactoryMember",
       create: "false",
       update: "isOwner && onlyModifiesColor && colorIsSupported",
       delete: "isOwner",
+    },
+  },
+  supervisors: {
+    bind: {
+      canAcceptInvite:
+        "auth.email == data.email && data.status == 'invited' && newData.status == 'active' && request.modifiedFields.all(field, field in ['acceptedAt', 'status', 'updatedAt'])",
+      canCreateInvite:
+        "auth.id in newData.ref('factory.owner.id') && newData.status == 'invited' && newData.email != auth.email",
+      canRemoveInvite:
+        "isOwner && newData.status == 'removed' && request.modifiedFields.all(field, field in ['status', 'updatedAt'])",
+      isInvitedEmail: "auth.email == data.email",
+      isLinkedSupervisor: "auth.id in data.ref('user.id')",
+      isOwner: "auth.id in data.ref('factory.owner.id')",
+    },
+    allow: {
+      view: "isOwner || isLinkedSupervisor || isInvitedEmail",
+      create: "canCreateInvite",
+      update: "canAcceptInvite || canRemoveInvite",
+      delete: "false",
     },
   },
   agents: {
@@ -64,10 +85,14 @@ const rules = {
     },
   },
   workers: {
+    bind: {
+      isFactoryMember:
+        "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
+    },
     allow: {
-      view: "auth.id in data.ref('factory.owner.id')",
-      create: "auth.id in data.ref('factory.owner.id')",
-      update: "auth.id in data.ref('factory.owner.id')",
+      view: "isFactoryMember",
+      create: "isFactoryMember",
+      update: "isFactoryMember",
       delete: "false",
     },
   },
@@ -120,9 +145,13 @@ const rules = {
     },
   },
   events: {
+    bind: {
+      isFactoryMember:
+        "auth.id in data.ref('worker.factory.owner.id') || auth.id in data.ref('worker.factory.supervisors.user.id')",
+    },
     allow: {
-      view: "auth.id in data.ref('worker.factory.owner.id')",
-      create: "auth.id in data.ref('worker.factory.owner.id')",
+      view: "isFactoryMember",
+      create: "isFactoryMember",
       update: "false",
       delete: "false",
     },

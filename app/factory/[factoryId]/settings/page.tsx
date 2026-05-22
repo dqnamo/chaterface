@@ -1,8 +1,14 @@
 "use client";
 
-import { TrashIcon, WarningIcon } from "@phosphor-icons/react";
+import { id } from "@instantdb/react";
+import {
+  TrashIcon,
+  UserPlusIcon,
+  WarningIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import Button from "@/components/public/Button";
 import { cn } from "@/helpers/classname-helper";
@@ -20,6 +26,19 @@ type FactoryRecord = {
   color?: FactoryColorValue;
   id: string;
   name: string;
+  owner?: { id?: string };
+  supervisors?: SupervisorRecord[];
+};
+
+type SupervisorRecord = {
+  acceptedAt?: string;
+  email: string;
+  id: string;
+  inviteEmailError?: string;
+  inviteEmailSentAt?: string;
+  invitedAt: string;
+  status: string;
+  user?: { id?: string };
 };
 
 export default function FactorySettingsPage() {
@@ -37,11 +56,16 @@ function FactorySettingsPageContent({
 }) {
   const router = useRouter();
   const { isLoading: isAuthLoading, user } = instantDb.useAuth();
+  const userEmail = user?.email ?? undefined;
   const { data, error, isLoading } = instantDb.useQuery(
     user?.id
       ? {
           factories: {
             $: { where: { id: factoryId } },
+            owner: {},
+            supervisors: {
+              user: {},
+            },
           },
         }
       : null,
@@ -52,8 +76,19 @@ function FactorySettingsPageContent({
     DEFAULT_FACTORY_COLOR,
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [supervisorEmail, setSupervisorEmail] = useState("");
+  const [supervisorError, setSupervisorError] = useState<string | null>(null);
+  const [supervisorNotice, setSupervisorNotice] = useState<string | null>(null);
+  const [isInvitingSupervisor, setIsInvitingSupervisor] = useState(false);
+  const [removingSupervisorId, setRemovingSupervisorId] = useState<
+    string | null
+  >(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isOwner = factory?.owner?.id === user?.id;
+  const supervisors = [...(factory?.supervisors ?? [])]
+    .filter((supervisor) => supervisor.status !== "removed")
+    .sort((a, b) => a.email.localeCompare(b.email));
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -115,6 +150,105 @@ function FactorySettingsPageContent({
           : "Factory could not be deleted.",
       );
       setIsDeleting(false);
+    }
+  }
+
+  async function inviteSupervisor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!isOwner) {
+      setSupervisorError("Only the factory owner can invite supervisors.");
+      return;
+    }
+
+    const email = normalizeSupervisorEmail(supervisorEmail);
+
+    if (!isValidEmail(email)) {
+      setSupervisorError("Enter a valid supervisor email.");
+      return;
+    }
+
+    if (userEmail && normalizeSupervisorEmail(userEmail) === email) {
+      setSupervisorError("Factory owners are already supervisors.");
+      return;
+    }
+
+    if (
+      supervisors.some(
+        (supervisor) =>
+          normalizeSupervisorEmail(supervisor.email) === email &&
+          supervisor.status !== "removed",
+      )
+    ) {
+      setSupervisorError("That supervisor has already been invited.");
+      return;
+    }
+
+    setIsInvitingSupervisor(true);
+    setSupervisorError(null);
+    setSupervisorNotice(null);
+
+    try {
+      const supervisorId = id();
+      const now = new Date().toISOString();
+
+      await instantDb.transact([
+        instantDb.tx.supervisors[supervisorId].update({
+          email,
+          invitedAt: now,
+          invitedByEmail: userEmail,
+          status: "invited",
+          updatedAt: now,
+        }),
+        instantDb.tx.supervisors[supervisorId].link({
+          factory: factoryId,
+        }),
+      ]);
+
+      setSupervisorEmail("");
+      setSupervisorNotice("Supervisor invite created.");
+      router.refresh();
+    } catch (inviteError) {
+      console.error(inviteError);
+      setSupervisorError(
+        inviteError instanceof Error
+          ? inviteError.message
+          : "Supervisor could not be invited.",
+      );
+    } finally {
+      setIsInvitingSupervisor(false);
+    }
+  }
+
+  async function removeSupervisor(supervisorId: string) {
+    if (!isOwner) {
+      setSupervisorError("Only the factory owner can remove supervisors.");
+      return;
+    }
+
+    setRemovingSupervisorId(supervisorId);
+    setSupervisorError(null);
+    setSupervisorNotice(null);
+
+    try {
+      await instantDb.transact(
+        instantDb.tx.supervisors[supervisorId].update({
+          status: "removed",
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+
+      setSupervisorNotice("Supervisor removed.");
+      router.refresh();
+    } catch (removeError) {
+      console.error(removeError);
+      setSupervisorError(
+        removeError instanceof Error
+          ? removeError.message
+          : "Supervisor could not be removed.",
+      );
+    } finally {
+      setRemovingSupervisorId(null);
     }
   }
 
@@ -214,6 +348,94 @@ function FactorySettingsPageContent({
         </section>
 
         <section
+          className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1"
+          id="supervisors"
+        >
+          <div className="border-grayscale-3 border-b px-3 py-2">
+            <h2 className="font-mono font-bold text-[11px] text-grayscale-10 uppercase tracking-wide">
+              Supervisors
+            </h2>
+          </div>
+          <div className="flex flex-col gap-4 px-3 py-3">
+            {isOwner ? (
+              <form
+                className="flex flex-col gap-2 sm:flex-row"
+                onSubmit={inviteSupervisor}
+              >
+                <label className="sr-only" htmlFor="supervisor-email">
+                  Supervisor email
+                </label>
+                <input
+                  className="min-h-9 min-w-0 flex-1 rounded-lg border border-grayscale-4 bg-grayscale-1 px-3 text-grayscale-12 text-sm outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-8"
+                  id="supervisor-email"
+                  onChange={(event) => setSupervisorEmail(event.target.value)}
+                  placeholder="teammate@example.com"
+                  type="email"
+                  value={supervisorEmail}
+                />
+                <Button disabled={isInvitingSupervisor} type="submit">
+                  <UserPlusIcon aria-hidden="true" size={14} weight="bold" />
+                  {isInvitingSupervisor ? "Inviting..." : "Invite"}
+                </Button>
+              </form>
+            ) : (
+              <p className="text-grayscale-10 text-sm">
+                Factory owners manage supervisor access.
+              </p>
+            )}
+
+            {supervisorError ? (
+              <p className="text-red-11 text-sm" role="alert">
+                {supervisorError}
+              </p>
+            ) : null}
+            {supervisorNotice ? (
+              <p className="text-green-11 text-sm" role="status">
+                {supervisorNotice}
+              </p>
+            ) : null}
+
+            <div className="overflow-hidden rounded-lg border border-grayscale-3">
+              {supervisors.length > 0 ? (
+                supervisors.map((supervisor) => (
+                  <div
+                    className="flex min-h-12 items-center justify-between gap-3 border-grayscale-3 border-b px-3 py-2 last:border-b-0"
+                    key={supervisor.id}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-grayscale-12 text-sm">
+                        {supervisor.email}
+                      </p>
+                      <p className="text-grayscale-10 text-xs">
+                        {supervisor.status === "active"
+                          ? "Active"
+                          : "Invite pending"}
+                      </p>
+                    </div>
+                    {isOwner && supervisor.status !== "removed" ? (
+                      <button
+                        aria-label={`Remove ${supervisor.email}`}
+                        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-10 transition-colors hover:border-red-7 hover:bg-red-2 hover:text-red-11 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={removingSupervisorId === supervisor.id}
+                        onClick={() => removeSupervisor(supervisor.id)}
+                        title="Remove supervisor"
+                        type="button"
+                      >
+                        <XIcon aria-hidden="true" size={14} weight="bold" />
+                      </button>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <p className="px-3 py-6 text-center text-grayscale-10 text-sm">
+                  No supervisors yet.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section
           className="overflow-hidden rounded-lg border border-red-6 bg-red-2"
           id="danger-zone"
         >
@@ -260,4 +482,12 @@ function FactorySettingsPageContent({
       </div>
     </div>
   );
+}
+
+function normalizeSupervisorEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

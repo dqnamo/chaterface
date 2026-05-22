@@ -18,6 +18,17 @@ const _schema = i.schema({
       capabilityBoxId: i.string().indexed().optional(),
       defaultSanpshotId: i.string().optional(),
     }),
+    supervisors: i.entity({
+      acceptedAt: i.string().indexed().optional(),
+      email: i.string().indexed(),
+      inviteEmailError: i.string().optional(),
+      inviteEmailSentAt: i.string().indexed().optional(),
+      invitedAt: i.string().indexed(),
+      invitedByEmail: i.string().optional(),
+      resendEmailId: i.string().optional(),
+      status: i.string().indexed(),
+      updatedAt: i.string().indexed(),
+    }),
     agents: i.entity({
       type: i.string(),
       authEncrypted: i.string(),
@@ -145,6 +156,30 @@ const _schema = i.schema({
         on: "factories",
         has: "many",
         label: "agents",
+      },
+    },
+    factorySupervisors: {
+      forward: {
+        on: "supervisors",
+        has: "one",
+        label: "factory",
+      },
+      reverse: {
+        on: "factories",
+        has: "many",
+        label: "supervisors",
+      },
+    },
+    supervisorUsers: {
+      forward: {
+        on: "supervisors",
+        has: "one",
+        label: "user",
+      },
+      reverse: {
+        on: "$users",
+        has: "many",
+        label: "supervisedMemberships",
       },
     },
     factorySecrets: {

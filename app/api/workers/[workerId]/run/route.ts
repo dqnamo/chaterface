@@ -1,4 +1,8 @@
-import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
+import {
+  canAccessFactory,
+  getCurrentUserForApiRequest,
+  unauthorizedResponse,
+} from "@/lib/auth";
 import {
   getWorkerForUserMessage,
   triggerWorkerRunTask,
@@ -65,7 +69,7 @@ export async function POST(request: Request, context: RouteContext) {
     workerId,
   });
 
-  if (!worker || worker.factory?.owner?.id !== user.id) {
+  if (!worker || !canAccessFactory(worker.factory, user)) {
     logWorkerRunRoute("warn", "Worker run request worker not found", {
       userId: user.id,
       userMessageEventId,
