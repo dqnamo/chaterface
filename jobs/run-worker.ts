@@ -797,6 +797,13 @@ async function getWorkerMcpConfig({
     workerId,
   });
 
+  logTaskStep("info", "Preflighting Factory MCP gateway", {
+    capabilityCount: capabilities.length,
+    factoryId,
+    gatewayUrl,
+    workerId,
+  });
+
   await verifyFactoryMcpGateway({
     gatewayUrl,
     token,
@@ -827,13 +834,25 @@ async function verifyFactoryMcpGateway({
   try {
     await client.connect(transport);
     const tools = await client.listTools();
+    const toolNames = tools.tools.map((tool) => tool.name);
 
-    if (!tools.tools.some((tool) => tool.name === "factory__expose_port")) {
+    logTaskStep("info", "Factory MCP gateway preflight succeeded", {
+      gatewayUrl,
+      toolCount: toolNames.length,
+      toolNames,
+    });
+
+    if (!toolNames.includes("factory__expose_port")) {
       throw new Error("Factory MCP gateway did not list factory control tools");
     }
   } catch (error) {
+    logTaskStep("error", "Factory MCP gateway preflight failed", {
+      error: serializeError(error),
+      gatewayUrl,
+    });
+
     throw new Error(
-      `Factory MCP gateway preflight failed: ${serializeError(error)}`,
+      `Factory MCP gateway preflight failed: ${formatErrorForMessage(error)}`,
     );
   } finally {
     await client.close().catch(() => null);
@@ -868,14 +887,38 @@ async function flushRunMetadata() {
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
-    return {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-    };
+    return Object.fromEntries(
+      Object.entries({
+        ...error,
+        cause: "cause" in error ? error.cause : undefined,
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      }).filter(([, value]) => value !== undefined),
+    );
+  }
+
+  if (typeof error === "object" && error !== null) {
+    return toJsonValue(error);
   }
 
   return { message: String(error) };
+}
+
+function formatErrorForMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    try {
+      return JSON.stringify(toJsonValue(error));
+    } catch {
+      return String(error);
+    }
+  }
+
+  return String(error);
 }
 
 function truncateForLog(value: string, maxLength = 2_000) {
