@@ -259,6 +259,7 @@ function createCodexExecCommand({
   const secretEnv = createSecretsEnv(secrets);
   const factoryCliPath = `${factoryBinDir}/factory`;
   const factoryCliScript = createFactoryCliScript(getAppPublicUrl());
+  const factoryCliInstallCommands = createFactoryCliInstallCommands(factoryCliPath);
   const mcpEnv = mcpConfig
     ? `export FACTORY_MCP_WORKER_TOKEN=${shellQuote(mcpConfig.token)}`
     : "";
@@ -304,6 +305,7 @@ function createCodexExecCommand({
     `mkdir -p ${shellQuote(workerDir)}`,
     `mkdir -p ${shellQuote(factoryBinDir)}`,
     `printf %s ${shellQuote(factoryCliScript)} > ${shellQuote(factoryCliPath)} && chmod +x ${shellQuote(factoryCliPath)}`,
+    ...factoryCliInstallCommands,
     `rm -f ${shellQuote(pidPath)}`,
     `printf %s ${shellQuote(workerPrompt)} > ${shellQuote(promptPath)}`,
     secretEnv
@@ -314,6 +316,20 @@ function createCodexExecCommand({
     `echo "$pid" > ${shellQuote(pidPath)}`,
     'wait "$pid"',
   ].join("\n");
+}
+
+function createFactoryCliInstallCommands(factoryCliPath: string) {
+  const pathExport = `export PATH=${factoryBinDir}:$HOME/.local/bin:$PATH`;
+
+  return [
+    `mkdir -p "$HOME/.local/bin"`,
+    `ln -sf ${shellQuote(factoryCliPath)} "$HOME/.local/bin/factory"`,
+    `if test -d /usr/local/bin; then ln -sf ${shellQuote(factoryCliPath)} /usr/local/bin/factory 2>/dev/null || sudo -n ln -sf ${shellQuote(factoryCliPath)} /usr/local/bin/factory 2>/dev/null || true; fi`,
+    ...["$HOME/.bash_profile", "$HOME/.bashrc", "$HOME/.profile"].map(
+      (profilePath) =>
+        `touch ${profilePath} && grep -qxF ${shellQuote(pathExport)} ${profilePath} || printf '\\n%s\\n' ${shellQuote(pathExport)} >> ${profilePath}`,
+    ),
+  ];
 }
 
 function createCodexPathExport() {
