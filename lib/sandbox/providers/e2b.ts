@@ -13,6 +13,7 @@ import type {
 
 const sandboxWorkspace = "/home/user/workspace";
 const sandboxIdleTimeoutMs = 120_000;
+const workerSandboxIdleTimeoutMs = 10 * 60_000;
 const sandboxStreamTimeoutMs = 0;
 
 function getSandboxTemplate() {
@@ -67,7 +68,11 @@ export const e2bSandboxProvider: SandboxProvider = {
     return toAppSandbox(
       await Sandbox.create(checkpointId, {
         envs: env,
-        timeoutMs: sandboxIdleTimeoutMs,
+        lifecycle: {
+          autoResume: true,
+          onTimeout: "pause",
+        },
+        timeoutMs: workerSandboxIdleTimeoutMs,
       }),
     );
   },
