@@ -1,4 +1,6 @@
 import { id } from "@instantdb/admin";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
 import { getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import {
@@ -776,6 +778,10 @@ async function getWorkerMcpConfig({
   factoryId: string;
   workerId: string;
 }) {
+  if (!process.env.APP_PUBLIC_URL?.trim()) {
+    throw new Error("APP_PUBLIC_URL is required for worker MCP gateway access");
+  }
+
   const capabilities = await listEnabledMcpCapabilitiesForFactory(factoryId);
   const gatewayUrl = getFactoryMcpGatewayUrl();
 
@@ -785,14 +791,53 @@ async function getWorkerMcpConfig({
     );
   }
 
-  return {
+  const token = await createMcpWorkerToken({
+    capabilityIds: capabilities.map((capability) => capability.id),
+    factoryId,
+    workerId,
+  });
+
+  await verifyFactoryMcpGateway({
     gatewayUrl,
-    token: await createMcpWorkerToken({
-      capabilityIds: capabilities.map((capability) => capability.id),
-      factoryId,
-      workerId,
-    }),
-  };
+    token,
+  });
+
+  return { gatewayUrl, token };
+}
+
+async function verifyFactoryMcpGateway({
+  gatewayUrl,
+  token,
+}: {
+  gatewayUrl: string;
+  token: string;
+}) {
+  const client = new Client(
+    { name: "software-factory-worker-preflight", version: "0.1.0" },
+    { capabilities: {} },
+  );
+  const transport = new StreamableHTTPClientTransport(new URL(gatewayUrl), {
+    requestInit: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+
+  try {
+    await client.connect(transport);
+    const tools = await client.listTools();
+
+    if (!tools.tools.some((tool) => tool.name === "factory__expose_port")) {
+      throw new Error("Factory MCP gateway did not list factory control tools");
+    }
+  } catch (error) {
+    throw new Error(
+      `Factory MCP gateway preflight failed: ${serializeError(error)}`,
+    );
+  } finally {
+    await client.close().catch(() => null);
+  }
 }
 
 function logTaskStep(
