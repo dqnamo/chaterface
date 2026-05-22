@@ -2,13 +2,11 @@
 
 import NumberFlow from "@number-flow/react";
 import {
+  ChatsTeardropIcon,
   CircleNotchIcon,
   FadersIcon,
-  FilesIcon,
   GearSixIcon,
   ListIcon,
-  LockKeyIcon,
-  PlugsConnectedIcon,
   PlusIcon,
   SignOutIcon,
   UserCircleIcon,
@@ -246,23 +244,22 @@ function FactoryToolsRail({
 }) {
   const links = [
     {
-      href: `/factory/${factoryId}/secrets`,
-      icon: <LockKeyIcon aria-hidden="true" size={17} weight="bold" />,
-      label: "Secrets",
-    },
-    {
-      href: `/factory/${factoryId}/skills`,
-      icon: <FilesIcon aria-hidden="true" size={17} weight="bold" />,
-      label: "Skills",
-    },
-    {
-      href: `/factory/${factoryId}/mcp`,
-      icon: <PlugsConnectedIcon aria-hidden="true" size={17} weight="bold" />,
-      label: "MCP",
+      href: `/factory/${factoryId}`,
+      icon: <ChatsTeardropIcon aria-hidden="true" size={17} weight="bold" />,
+      isActive:
+        currentPathname === `/factory/${factoryId}` ||
+        currentPathname.startsWith(`/factory/${factoryId}/workers/`),
+      label: "Workers",
     },
     {
       href: `/factory/${factoryId}/settings`,
       icon: <FadersIcon aria-hidden="true" size={17} weight="bold" />,
+      isActive: [
+        `/factory/${factoryId}/settings`,
+        `/factory/${factoryId}/secrets`,
+        `/factory/${factoryId}/skills`,
+        `/factory/${factoryId}/mcp`,
+      ].includes(currentPathname),
       label: "Settings",
     },
   ];
@@ -278,9 +275,9 @@ function FactoryToolsRail({
     >
       {links.map((link) => (
         <FactoryToolsRailLink
-          currentPathname={currentPathname}
           href={link.href}
           icon={link.icon}
+          isActive={link.isActive}
           key={link.href}
           label={link.label}
           onNavigate={onNavigate}
@@ -291,20 +288,18 @@ function FactoryToolsRail({
 }
 
 function FactoryToolsRailLink({
-  currentPathname,
   href,
   icon,
+  isActive,
   label,
   onNavigate,
 }: {
-  currentPathname: string;
   href: string;
   icon: ReactNode;
+  isActive: boolean;
   label: string;
   onNavigate?: () => void;
 }) {
-  const isActive = currentPathname === href;
-
   return (
     <Link
       aria-label={label}
