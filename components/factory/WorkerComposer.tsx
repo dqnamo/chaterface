@@ -47,6 +47,7 @@ export function WorkerComposer({
   setPrompt,
   startActions,
   submitLabel,
+  topSection,
   uploadingLabel,
 }: {
   attachments: ImageAttachment[];
@@ -63,6 +64,7 @@ export function WorkerComposer({
   setPrompt: Dispatch<SetStateAction<string>>;
   startActions?: ReactNode;
   submitLabel: string;
+  topSection?: ReactNode;
   uploadingLabel: string;
 }) {
   const isSubmitDisabled = disabled || isSending;
@@ -145,6 +147,9 @@ export function WorkerComposer({
         onSubmit={onSubmit}
         className="flex flex-col"
       >
+        {topSection ? (
+          <div className="border-grayscale-3 border-b">{topSection}</div>
+        ) : null}
         <textarea
           id="worker-task"
           value={prompt}
@@ -183,6 +188,7 @@ export function WorkerComposer({
                 attachmentDisabled || attachments.length >= maxImageAttachments
               }
               onClick={() => fileInputRef.current?.click()}
+              className="flex flex-row items-center gap-1.5"
             >
               <ImageSquare size={16} weight="bold" aria-hidden="true" />
               {attachments.length > 0 ? "Add image" : "Attach image"}

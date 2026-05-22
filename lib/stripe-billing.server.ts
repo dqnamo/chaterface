@@ -75,7 +75,7 @@ export async function createStripeBillingPortalSession({
 }) {
   return getStripe().billingPortal.sessions.create({
     customer: customerId,
-    return_url: `${getAppPublicUrl(request)}/factory/${factoryId}/settings#billing`,
+    return_url: `${getAppPublicUrl(request)}/factory/${factoryId}/settings/billing`,
   });
 }
 

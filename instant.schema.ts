@@ -7,6 +7,7 @@ const _schema = i.schema({
       url: i.string(),
     }),
     $users: i.entity({
+      avatarColor: i.string().optional(),
       email: i.string().unique().indexed().optional(),
       imageURL: i.string().optional(),
       type: i.string().optional(),
@@ -42,7 +43,7 @@ const _schema = i.schema({
       inviteEmailSentAt: i.string().indexed().optional(),
       invitedAt: i.string().indexed(),
       invitedByEmail: i.string().optional(),
-      resendEmailId: i.string().optional(),
+      cloudflareEmailStatus: i.string().optional(),
       status: i.string().indexed(),
       updatedAt: i.string().indexed(),
     }),

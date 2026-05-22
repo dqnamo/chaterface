@@ -125,8 +125,8 @@ export async function POST(request: Request) {
           ...(inviteResult.skipped
             ? { inviteEmailError: inviteResult.reason }
             : {}),
-          ...(!inviteResult.skipped && inviteResult.emailId
-            ? { resendEmailId: inviteResult.emailId }
+          ...(!inviteResult.skipped
+            ? { cloudflareEmailStatus: inviteResult.status }
             : {}),
         };
 

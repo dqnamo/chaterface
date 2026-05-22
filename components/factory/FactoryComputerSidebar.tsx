@@ -8,11 +8,12 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/helpers/classname-helper";
+import { TextboxIcon } from "@phosphor-icons/react/dist/ssr";
 
 const computerSections = [
   {
     icon: <PlugsConnectedIcon aria-hidden="true" size={15} weight="bold" />,
-    label: "MCP",
+    label: "Integrations",
     path: "mcp",
   },
   {
@@ -21,7 +22,7 @@ const computerSections = [
     path: "skills",
   },
   {
-    icon: <LockKeyIcon aria-hidden="true" size={15} weight="bold" />,
+    icon: <TextboxIcon aria-hidden="true" size={15} weight="bold" />,
     label: "Secrets",
     path: "secrets",
   },
@@ -42,7 +43,7 @@ export default function FactoryComputerSidebar({
     <div className={cn("flex h-full min-h-0 w-64 flex-col p-2", className)}>
       <nav aria-label="Factory computer" className="flex flex-col gap-1">
         <h2 className="mt-2 px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
-          Computer
+          Computer Setup
         </h2>
         {computerSections.map((section) => {
           const href = `/factory/${factoryId}/${section.path}`;
@@ -51,7 +52,7 @@ export default function FactoryComputerSidebar({
           return (
             <Link
               className={cn(
-                "flex h-9 items-center gap-2 rounded-md px-2 text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+                "flex py-1 items-center gap-2 rounded-md px-2 text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
                 isActive &&
                   "bg-grayscale-3 text-grayscale-12 hover:bg-grayscale-3",
               )}

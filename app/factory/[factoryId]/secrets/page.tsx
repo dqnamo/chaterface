@@ -9,10 +9,10 @@ export default function FactorySecretsPage() {
   return (
     <div className="min-h-dvh px-4 py-8">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <div className="flex flex-col py-2">
-          <h1>Factory secrets</h1>
-          <p className="text-gray-500 text-sm">
-            These are exposed as environment variables during Codex worker runs.
+        <div className="flex flex-col p-2">
+          <h1 className="font-medium text-grayscale-12">Secrets</h1>
+          <p className="text-grayscale-10 text-sm">
+            These are added to the coding agents computer environment.
           </p>
         </div>
         <FactorySecretsPanel factoryId={factoryId} />

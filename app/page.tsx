@@ -56,10 +56,10 @@ export default function Home() {
           >
             <Card
               layer={0}
-              className="p-0 bg-grayscale-1 rounded-[13px] small-shadow"
+              className="p-0 bg-grayscale-1 dark:bg-grayscale-3 dark:border-grayscale-5 rounded-[13px] small-shadow"
             >
               <div className="flex flex-col h-full">
-                <div className="p-2 px-4 border-b border-grayscale-3">
+                <div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
                   <p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
                     Open source
                   </p>
@@ -71,13 +71,13 @@ export default function Home() {
                     </h3>
                     <p className="text-xs text-grayscale-10">Forever</p>
                   </div>
-                  <p className="text-sm text-grayscale-11 mt-4">
+                  <p className="text-sm text-grayscale-10 mt-4">
                     Run it yourself on your own infrastructure.
                   </p>
                 </div>
                 <div className="flex flex-row p-2 mt-auto w-full">
                   <Button
-                    className="text-xs px-2 w-full flex flex-row items-center justify-between"
+                    className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
                     href="https://github.com/dqnamo/factoryplane"
                     target="_blank"
                     variant="secondary"
@@ -90,10 +90,10 @@ export default function Home() {
             </Card>
             <Card
               layer={0}
-              className="p-0 bg-grayscale-1 col-span-2 grid grid-cols-2 divide-x divide-grayscale-3 rounded-[13px] small-shadow"
+              className="p-0 bg-grayscale-1 dark:bg-grayscale-3 dark:border-grayscale-5 dark:divide-grayscale-4 col-span-2 grid grid-cols-2 divide-x divide-grayscale-3 rounded-[13px] small-shadow"
             >
               <div className="flex flex-col">
-                <div className="p-2 px-4 border-b border-grayscale-3">
+                <div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
                   <p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
                     Basic
                   </p>
@@ -114,7 +114,7 @@ export default function Home() {
                       <CheckCircleIcon
                         size={14}
                         weight="fill"
-                        className="text-accent-11"
+                        className="text-accent-9"
                       />
                     </div>
                     <div className="flex flex-row items-center justify-between">
@@ -122,7 +122,7 @@ export default function Home() {
                       <CheckCircleIcon
                         size={14}
                         weight="fill"
-                        className="text-accent-11"
+                        className="text-accent-9"
                       />
                     </div>
                     <div className="flex flex-row items-center justify-between">
@@ -132,14 +132,14 @@ export default function Home() {
                       <CheckCircleIcon
                         size={14}
                         weight="fill"
-                        className="text-accent-11"
+                        className="text-accent-9 "
                       />
                     </div>
                   </div>
                 </div>
                 <div className="flex flex-row p-2 w-full mt-auto">
                   <Button
-                    className="text-xs px-2 w-full flex flex-row items-center justify-between"
+                    className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
                     href="/login"
                     variant="secondary"
                   >
@@ -150,7 +150,7 @@ export default function Home() {
               </div>
 
               <div className="flex flex-col">
-                <div className="p-2 px-4 border-b border-grayscale-3">
+                <div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
                   <p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
                     Pro
                   </p>
@@ -171,7 +171,7 @@ export default function Home() {
                       <CheckCircleIcon
                         size={14}
                         weight="fill"
-                        className="text-accent-11"
+                        className="text-accent-9"
                       />
                     </div>
                     <div className="flex flex-row items-center justify-between">
@@ -181,7 +181,7 @@ export default function Home() {
                       <CheckCircleIcon
                         size={14}
                         weight="fill"
-                        className="text-accent-11"
+                        className="text-accent-9"
                       />
                     </div>
                     <div className="flex flex-row items-center justify-between">
@@ -191,7 +191,7 @@ export default function Home() {
                       <CheckCircleIcon
                         size={14}
                         weight="fill"
-                        className="text-accent-11"
+                        className="text-accent-9"
                       />
                     </div>
                   </div>
@@ -199,7 +199,7 @@ export default function Home() {
 
                 <div className="flex flex-row p-2 w-full mt-auto">
                   <Button
-                    className="text-xs px-2 w-full flex flex-row items-center justify-between"
+                    className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
                     href="/login"
                     variant="secondary"
                   >

@@ -5,6 +5,7 @@ import { ArrowSquareOut } from "@phosphor-icons/react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { EventFeed, type EventRecord } from "@/components/Event";
+import WorkerStatusIndicator from "@/components/factory/WorkerStatusIndicator";
 import Button from "@/components/public/Button";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
@@ -209,68 +210,63 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
     }
   }
 
-  return (
-    <div className="flex h-dvh w-full flex-col">
-      <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-grayscale-3 border-b px-4">
+  const composerHeader = (
+    <section className="flex flex-col gap-3 p-1.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 px-1.5">
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="min-w-0 truncate font-semibold text-base text-grayscale-12">
+          <h1 className="min-w-0 truncate font-medium text-xs text-grayscale-12">
             {workerTitle}
           </h1>
-          <p className="shrink-0 text-grayscale-10 text-xs capitalize">
-            {worker.status}
-          </p>
+          <WorkerStatusIndicator showLabel status={worker.status} />
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          {ports.map((port) => (
-            <a
-              href={port.url}
-              target="_blank"
-              rel="noreferrer"
-              key={port.id}
-              className="inline-flex items-center gap-1 rounded-lg border border-grayscale-4 bg-grayscale-1 px-2 py-1 font-medium text-grayscale-11 text-xs transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
-              title={port.url}
-            >
-              {port.port}
-              <ArrowSquareOut size={12} weight="bold" aria-hidden="true" />
-            </a>
-          ))}
+        
+        
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={baselineDisabled}
+          onClick={() => {
+            setBaselineError(null);
+            setBaselineDialogOpen(true);
+          }}
+          className="whitespace-nowrap text-xs"
+          title={
+            worker.sandboxId
+              ? "Set this worker's current files as the starting point for new workers"
+              : "This worker does not have a sandbox yet"
+          }
+        >
+          {baselineButtonLabel}
+        </Button>
+        {isRetired ? (
           <Button
             type="button"
             variant="secondary"
-            disabled={baselineDisabled}
-            onClick={() => {
-              setBaselineError(null);
-              setBaselineDialogOpen(true);
-            }}
-            title={
-              worker.sandboxId
-                ? "Set this worker's current files as the starting point for new workers"
-                : "This worker does not have a sandbox yet"
-            }
+            disabled={isUnretiring}
+            onClick={onUnretireWorker}
+            className="whitespace-nowrap text-xs"
           >
-            {baselineButtonLabel}
+            {isUnretiring ? "Unretiring..." : "Unretire worker"}
           </Button>
-          {isRetired ? (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isUnretiring}
-              onClick={onUnretireWorker}
-            >
-              {isUnretiring ? "Unretiring..." : "Unretire worker"}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isRetiring}
-              onClick={onRetireWorker}
-            >
-              {isRetiring ? "Retiring..." : "Retire worker"}
-            </Button>
-          )}
-        </div>
-      </header>
+        ) : (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isRetiring}
+            onClick={onRetireWorker}
+            className="whitespace-nowrap text-xs"
+          >
+            {isRetiring ? "Retiring..." : "Retire worker"}
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+
+  return (
+    <div className="flex h-dvh w-full flex-col">
       <Dialog.Root
         open={baselineDialogOpen}
         onOpenChange={(nextOpen) => setBaselineDialogOpen(nextOpen)}
@@ -303,21 +299,6 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
           </Dialog.Popup>
         </Dialog.Portal>
       </Dialog.Root>
-      {baselineError ? (
-        <p className="border-grayscale-3 border-b px-4 py-2 text-red-11 text-sm">
-          {baselineError}
-        </p>
-      ) : null}
-      {baselineStatus === "saved" ? (
-        <p className="border-grayscale-3 border-b px-4 py-2 text-green-11 text-sm">
-          Factory baseline updated.
-        </p>
-      ) : null}
-      {retireError ? (
-        <p className="border-grayscale-3 border-b px-4 py-2 text-red-11 text-sm">
-          {retireError}
-        </p>
-      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
@@ -334,7 +315,11 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
       </div>
 
       <div className="w-full mt-auto mb-4">
-        <WorkerPromptForm factoryId={factoryId} worker={worker} />
+        <WorkerPromptForm
+          factoryId={factoryId}
+          topSection={composerHeader}
+          worker={worker}
+        />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { id } from "@instantdb/react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useRef, useState } from "react";
 import {
   addImageAttachments,
   cleanupAttachments,
@@ -116,15 +116,18 @@ function NewWorkerFormContent({
 
 export function WorkerPromptForm({
   factoryId,
+  topSection,
   worker,
 }: {
   factoryId?: string;
+  topSection?: ReactNode;
   worker: WorkerRecord;
 }) {
   return (
     <WorkerPromptFormContent
       factoryId={factoryId}
       instantDb={db}
+      topSection={topSection}
       worker={worker}
     />
   );
@@ -133,10 +136,12 @@ export function WorkerPromptForm({
 function WorkerPromptFormContent({
   factoryId,
   instantDb,
+  topSection,
   worker,
 }: {
   factoryId?: string;
   instantDb: AppDb;
+  topSection?: ReactNode;
   worker: WorkerRecord;
 }) {
   const { user } = instantDb.useAuth();
@@ -238,6 +243,7 @@ function WorkerPromptFormContent({
       prompt={prompt}
       setPrompt={setPrompt}
       submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}
+      topSection={topSection}
       uploadingLabel="Uploading..."
     />
   );

@@ -10,7 +10,6 @@ import {
   ListIcon,
   PlusIcon,
   SignOutIcon,
-  UserIcon,
   UsersThreeIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -24,8 +23,12 @@ import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import FactorySettingsSidebar from "@/components/factory/FactorySettingsSidebar";
 import Button from "@/components/public/Button";
 import { Menu } from "@/components/public/Menu";
+import UserAvatar from "@/components/UserAvatar";
+import UserSettingsModal from "@/components/UserSettingsModal";
 import { cn } from "@/helpers/classname-helper";
 import type { FactoryColorValue } from "@/helpers/factory-colors";
+import type { UserAvatarColorValue } from "@/helpers/user-avatar-colors";
+import { getWorkerStatusTone } from "@/helpers/worker-status";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { saveLastFactoryId } from "@/lib/factory/last-factory";
@@ -52,10 +55,12 @@ type SupervisorMembershipRecord = {
   user?: { id?: string };
 };
 
-type WorkerStatusTone = {
-  className: string;
-  isSpinner?: boolean;
-  label: string;
+type UserRecord = {
+  avatarColor?: UserAvatarColorValue;
+  email?: string;
+  id: string;
+  ownedFactories?: FactoryRecord[];
+  supervisedMemberships?: SupervisorMembershipRecord[];
 };
 
 type FactoryWithWorkersRecord = FactoryRecord & {
@@ -108,7 +113,7 @@ function FactoryLayoutContent({
         }
       : null,
   );
-  const currentUser = data?.$users?.[0];
+  const currentUser = data?.$users?.[0] as UserRecord | undefined;
   const ownedFactories = (
     (currentUser?.ownedFactories ?? []) as FactoryRecord[]
   ).sort((a, b) => a.name.localeCompare(b.name));
@@ -236,6 +241,7 @@ function FactoryLayoutContent({
           activeFactoryId={factoryId}
           factories={factories}
           instantDb={instantDb}
+          userAvatarColor={currentUser?.avatarColor}
           userEmail={user.email}
         />
       </aside>
@@ -291,6 +297,7 @@ function FactoryLayoutContent({
                 factories={factories}
                 instantDb={instantDb}
                 onNavigate={() => setIsSidebarOpen(false)}
+                userAvatarColor={currentUser?.avatarColor}
                 userEmail={user.email}
               />
             </div>
@@ -387,9 +394,9 @@ function FactoryToolsRail({
       label: "Computer",
     },
     {
-      href: `/factory/${factoryId}/settings`,
+      href: `/factory/${factoryId}/settings/general`,
       icon: <FadersIcon aria-hidden="true" size={18} weight="bold" />,
-      isActive: currentPathname === `/factory/${factoryId}/settings`,
+      isActive: isFactorySettingsPath(currentPathname, factoryId),
       label: "Settings",
     },
   ];
@@ -418,7 +425,9 @@ function FactoryToolsRail({
 }
 
 function isFactorySettingsPath(pathname: string, factoryId: string) {
-  return pathname === `/factory/${factoryId}/settings`;
+  const settingsPath = `/factory/${factoryId}/settings`;
+
+  return pathname === settingsPath || pathname.startsWith(`${settingsPath}/`);
 }
 
 function isFactoryComputerPath(pathname: string, factoryId: string) {
@@ -487,8 +496,9 @@ function WorkerSidebar({
           <Button
             href={`/factory/${factoryId}`}
             onClick={onNavigate}
-            variant="secondary"
+            variant="primary"
             className="w-full text-sm"
+            shortcut="n"
           >
             New worker
           </Button>
@@ -608,49 +618,19 @@ function WorkerSidebarLink({
   );
 }
 
-function getWorkerStatusTone(status: string): WorkerStatusTone {
-  switch (status) {
-    case "failed":
-      return {
-        className: "bg-red-9",
-        label: "Failed",
-      };
-    case "idle":
-      return {
-        className: "bg-green-9",
-        label: "Idle and awaiting input",
-      };
-    case "retired":
-      return {
-        className: "bg-grayscale-8",
-        label: "Retired",
-      };
-    case "queued":
-    case "running":
-      return {
-        className: "text-orange-9",
-        isSpinner: true,
-        label: "Working",
-      };
-    default:
-      return {
-        className: "bg-grayscale-8",
-        label: status || "Status unknown",
-      };
-  }
-}
-
 function SidebarContent({
   activeFactoryId,
   factories,
   instantDb,
   onNavigate,
+  userAvatarColor,
   userEmail,
 }: {
   activeFactoryId: string;
   factories: FactoryRecord[];
   instantDb: AppDb;
   onNavigate?: () => void;
+  userAvatarColor?: UserAvatarColorValue | null | string;
   userEmail?: null | string;
 }) {
   return (
@@ -685,6 +665,7 @@ function SidebarContent({
       <UserRailMenu
         instantDb={instantDb}
         onNavigate={onNavigate}
+        userAvatarColor={userAvatarColor}
         userEmail={userEmail}
       />
     </div>
@@ -698,13 +679,16 @@ function getIdleWorkerCount(workers?: WorkerRecord[]) {
 function UserRailMenu({
   instantDb,
   onNavigate,
+  userAvatarColor,
   userEmail,
 }: {
   instantDb: AppDb;
   onNavigate?: () => void;
+  userAvatarColor?: UserAvatarColorValue | null | string;
   userEmail?: null | string;
 }) {
   const router = useRouter();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function logOut() {
     try {
@@ -717,47 +701,58 @@ function UserRailMenu({
 
   function openSettings() {
     onNavigate?.();
-    router.push("/settings");
+    setSettingsOpen(true);
   }
 
   return (
-    <Menu.Composed
-      positionerProps={{ align: "end", side: "right", sideOffset: 8 }}
-      popupProps={{ className: "min-w-48" }}
-      trigger={
-        <div className="size-10 flex items-center justify-center rounded-lg border-grayscale-3 bg-grayscale-1 p-0 text-grayscale-11 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2 dark:bg-grayscale-2 dark:hover:bg-grayscale-3 dark:data-[popup-open]:bg-grayscale-3">
-          <UserIcon aria-hidden="true" size={22} weight="bold" />
-        </div>
-      }
-      triggerProps={{
-        "aria-label": "Open user menu",
-        className:
-          "size-10 justify-center rounded-lg border-grayscale-3 bg-grayscale-1 p-0 text-grayscale-11 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2 dark:bg-grayscale-2 dark:hover:bg-grayscale-3 dark:data-[popup-open]:bg-grayscale-3",
-        title: userEmail ?? "User menu",
-      }}
-    >
-      {userEmail ? (
-        <>
-          <Menu.Group>
-            <Menu.GroupLabel className="normal-case tracking-normal">
-              Signed in as
-            </Menu.GroupLabel>
-            <div className="max-w-56 truncate px-2 pb-1 text-grayscale-11 text-sm">
-              {userEmail}
-            </div>
-          </Menu.Group>
-          <Menu.Separator />
-        </>
-      ) : null}
-      <Menu.Item onClick={openSettings}>
-        <GearSixIcon aria-hidden="true" size={14} weight="bold" />
-        Settings
-      </Menu.Item>
-      <Menu.Item onClick={logOut}>
-        <SignOutIcon aria-hidden="true" size={14} weight="bold" />
-        Log out
-      </Menu.Item>
-    </Menu.Composed>
+    <>
+      <Menu.Composed
+        positionerProps={{ align: "end", side: "right", sideOffset: 8 }}
+        popupProps={{ className: "min-w-48" }}
+        trigger={
+          <div className="flex size-10 items-center justify-center">
+            <UserAvatar
+              color={userAvatarColor}
+              name={userEmail ?? "User"}
+              size={40}
+            />
+          </div>
+        }
+        triggerProps={{
+          "aria-label": "Open user menu",
+          className:
+            "size-10 justify-center rounded-lg border-grayscale-3 bg-grayscale-1 p-0 text-grayscale-11 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2 dark:bg-grayscale-2 dark:hover:bg-grayscale-3 dark:data-[popup-open]:bg-grayscale-3",
+          title: userEmail ?? "User menu",
+        }}
+      >
+        {userEmail ? (
+          <>
+            <Menu.Group>
+              <Menu.GroupLabel className="normal-case tracking-normal">
+                Signed in as
+              </Menu.GroupLabel>
+              <div className="max-w-56 truncate px-2 pb-1 text-grayscale-11 text-sm">
+                {userEmail}
+              </div>
+            </Menu.Group>
+            <Menu.Separator />
+          </>
+        ) : null}
+        <Menu.Item onClick={openSettings}>
+          <GearSixIcon aria-hidden="true" size={14} weight="bold" />
+          Settings
+        </Menu.Item>
+        <Menu.Item onClick={logOut}>
+          <SignOutIcon aria-hidden="true" size={14} weight="bold" />
+          Log out
+        </Menu.Item>
+      </Menu.Composed>
+      <UserSettingsModal
+        instantDb={instantDb}
+        onOpenChange={setSettingsOpen}
+        open={settingsOpen}
+      />
+    </>
   );
 }
 

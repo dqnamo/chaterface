@@ -23,10 +23,16 @@ const rules = {
     },
   },
   $users: {
+    bind: {
+      avatarColorIsSupported: `!('avatarColor' in request.modifiedFields) || newData.avatarColor in [${supportedFactoryColors}]`,
+      onlyModifiesAvatarColor:
+        "request.modifiedFields.all(field, field in ['avatarColor'])",
+    },
     allow: {
       view: "auth.id == data.id",
       create: "true",
-      update: "false",
+      update:
+        "auth.id == data.id && onlyModifiesAvatarColor && avatarColorIsSupported",
       delete: "false",
     },
   },
@@ -89,11 +95,14 @@ const rules = {
     },
   },
   secrets: {
+    bind: {
+      isOwner: "auth.id in data.ref('factory.owner.id')",
+    },
     allow: {
-      view: "auth.id in data.ref('factory.owner.id')",
+      view: "isOwner",
       create: "false",
       update: "false",
-      delete: "false",
+      delete: "isOwner",
     },
     fields: {
       valueEncrypted: "false",

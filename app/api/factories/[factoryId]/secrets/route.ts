@@ -65,13 +65,6 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  if (!value) {
-    return Response.json(
-      { error: "Secret value is required" },
-      { status: 400 },
-    );
-  }
-
   if (value.length > maxSecretValueLength) {
     return Response.json(
       { error: "Secret value must be 64 KB or smaller" },
