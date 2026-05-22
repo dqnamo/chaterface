@@ -2,15 +2,15 @@ import "server-only";
 
 import { id } from "@instantdb/admin";
 import { getAdminDbCore } from "@/lib/admin-db-core";
-import { getBox } from "@/lib/codex/box-auth";
 import { validateMcpServerUrl } from "@/lib/mcp/client";
+import { connectSandbox } from "@/lib/sandbox/service";
 
 export type AuthenticatedFactoryWorker = {
   factoryId: string;
   workerId: string;
 };
 
-export async function getAuthenticatedWorkerBox({
+export async function getAuthenticatedWorkerSandbox({
   factoryId,
   workerId,
 }: AuthenticatedFactoryWorker) {
@@ -30,10 +30,10 @@ export async function getAuthenticatedWorkerBox({
   }
 
   if (!worker.sandboxId) {
-    throw new Error("Worker does not have a box yet.");
+    throw new Error("Worker does not have a sandbox yet.");
   }
 
-  return getBox(worker.sandboxId);
+  return connectSandbox(worker.sandboxId);
 }
 
 export async function createWorkerMcpConnectionRequestEvent({

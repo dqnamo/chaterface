@@ -6,7 +6,7 @@ import {
   unauthorizedResponse,
 } from "@/lib/auth";
 import {
-  getFactoryCapabilityBox,
+  getFactoryCapabilitySandbox,
   installSkills,
   type SkillCandidate,
   snapshotFactoryCapabilities,
@@ -58,8 +58,8 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const factory = await getOwnedFactory<{
-      capabilityBoxId?: string;
-      defaultSanpshotId?: string;
+      capabilitySandboxId?: string;
+      defaultSandboxCheckpointId?: string;
       id: string;
       owner?: { id?: string };
     }>(factoryId, user);
@@ -69,19 +69,19 @@ export async function POST(request: Request, context: RouteContext) {
     }
     canRecordFailure = true;
 
-    const box = await getFactoryCapabilityBox({
+    const sandbox = await getFactoryCapabilitySandbox({
       factory,
       factoryId,
     });
 
     await installSkills({
-      box,
       repoUrl,
+      sandbox,
       skillPaths: skills.map((skill) => skill.path),
     });
     await snapshotFactoryCapabilities({
-      box,
       factoryId,
+      sandbox,
     });
 
     const installedAt = new Date().toISOString();

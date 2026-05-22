@@ -1,16 +1,21 @@
-import { Box, type ExecStreamChunk } from "@upstash/box";
 import { getAppPublicUrl } from "@/lib/app-url";
 import { factoryWorkerTokenHeader } from "@/lib/factory/worker-api-auth";
+import {
+  type AppSandbox,
+  createCheckpoint,
+  runSandboxCommand,
+  type SandboxCommandResult,
+  type SandboxStreamChunk,
+  streamSandboxCommand,
+} from "@/lib/sandbox/service";
 
-export type BoxCommandResult = {
-  exitCode: number;
-  output: string;
-  success: boolean;
-};
+export type { SandboxCommandResult };
 
-export const boxWorkspace = "/workspace/home";
+export const sandboxWorkspace = "/home/user/workspace";
 
-const factoryDir = `${boxWorkspace}/.factory`;
+export const sandboxFactoryDir = "/home/user/.factoryplane";
+
+const factoryDir = sandboxFactoryDir;
 const factoryBinDir = `${factoryDir}/bin`;
 const codexNpmPrefix = `${factoryDir}/npm-global`;
 const codexBinDir = `${codexNpmPrefix}/bin`;
@@ -19,59 +24,21 @@ const codexHomeArchivePath = `${factoryDir}/codex-home.tgz`;
 const codexModel = "gpt-5.5";
 const factoryWorkerInstructions = `You are running inside a Software Factory worker sandbox.
 
-You have access to the repository workspace at /workspace/home.
+You have access to the repository workspace at /home/user/workspace.
 When a local web server or previewable service is useful, start it inside the sandbox and run factory expose <port>. The factory will create a public URL and show it in the worker UI.
 Use factory ports to inspect currently exposed ports and factory delete-port <port> to remove a public URL.
 When you need an external MCP server or integration that is not currently available, run factory request-mcp --name <name> --url <http-mcp-url> --auth <oauth|bearer_token> with optional --scopes and --reason. The factory owner will complete connection from the worker chat.
-Do not ask for or handle the Upstash Box API key. The factory CLI authenticates with FACTORY_WORKER_API_TOKEN; do not print or expose that token.
+Do not ask for or handle sandbox provider API keys. The factory CLI authenticates with FACTORY_WORKER_API_TOKEN; do not print or expose that token.
 `;
 
-export async function createFactoryBox(factoryId: string) {
-  return Box.create({
-    apiKey: process.env.UPSTASH_BOX_API_KEY,
-    name: `factory-${factoryId.slice(0, 8)}-default`,
-    runtime: "node",
-  });
-}
-
-export async function getBox(boxId: string) {
-  return Box.get(boxId, {
-    apiKey: process.env.UPSTASH_BOX_API_KEY,
-  });
-}
-
-export async function createWorkerBox({
-  factoryApiToken,
-  factoryId,
-  snapshotId,
-  workerId,
-}: {
-  factoryApiToken?: string;
-  factoryId: string;
-  snapshotId: string;
-  workerId: string;
-}) {
-  return Box.fromSnapshot(snapshotId, {
-    apiKey: process.env.UPSTASH_BOX_API_KEY,
-    env: factoryApiToken
-      ? {
-          FACTORY_API_URL: getAppPublicUrl(),
-          FACTORY_WORKER_API_TOKEN: factoryApiToken,
-        }
-      : undefined,
-    name: `factory-${factoryId.slice(0, 8)}-worker-${workerId.slice(0, 8)}`,
-    runtime: "node",
-  });
-}
-
-export async function createDefaultFactorySnapshot({
-  box,
+export async function createDefaultFactoryCheckpoint({
   codexAuthJson,
   factoryId,
+  sandbox,
 }: {
-  box: Box;
   codexAuthJson?: string;
   factoryId: string;
+  sandbox: AppSandbox;
 }) {
   const preparedAt = new Date().toISOString();
   const marker = JSON.stringify({ factoryId, preparedAt });
@@ -88,42 +55,29 @@ export async function createDefaultFactorySnapshot({
     );
   }
 
-  const result = await runBoxCommand(box, commands.join(" && "), 30_000);
+  const result = await runSandboxCommand(
+    sandbox,
+    commands.join(" && "),
+    30_000,
+  );
 
   if (!result.success) {
     throw new Error(
-      `Could not prepare factory snapshot: ${
+      `Could not prepare factory checkpoint: ${
         cleanCommandOutput(result.output) || "No output"
       }`,
     );
   }
 
-  return box.snapshot({ name: `factory-${factoryId.slice(0, 8)}-default` });
+  return createCheckpoint(sandbox, `factory-${factoryId.slice(0, 8)}-default`);
 }
 
-export async function runBoxCommand(
-  box: Box,
-  command: string,
-  timeoutMs?: number,
-): Promise<BoxCommandResult> {
-  const wrapped = createBoxCommand(command, timeoutMs);
-  const run = await box.exec.command(wrapped);
-  const output = String(run.result ?? "");
-  const exitCode = run.exitCode ?? (run.status === "completed" ? 0 : 1);
-
-  return {
-    exitCode,
-    output,
-    success: run.status === "completed" && exitCode === 0,
-  };
-}
-
-export async function ensureLatestCodexOnBox(box: Box) {
-  const result = await runBoxCommand(
-    box,
+export async function ensureLatestCodexOnSandbox(sandbox: AppSandbox) {
+  const result = await runSandboxCommand(
+    sandbox,
     [
       `mkdir -p ${shellQuote(codexBinDir)}`,
-      `npm install -g --prefix ${shellQuote(codexNpmPrefix)} --cache ${shellQuote(`${factoryDir}/npm-cache`)} @openai/codex@latest`,
+      `npm install -g --prefix ${shellQuote(codexNpmPrefix)} --cache ${shellQuote(`${factoryDir}/npm-cache`)} --registry=https://registry.npmjs.org/ @openai/codex@latest`,
       `${createCodexPathExport()} command -v codex && codex --version`,
     ].join(" && "),
     120_000,
@@ -140,13 +94,16 @@ export async function ensureLatestCodexOnBox(box: Box) {
   return cleanCommandOutput(result.output);
 }
 
-export async function ensureCodexCli(box: Box) {
-  await ensureLatestCodexOnBox(box);
+export async function ensureCodexCli(sandbox: AppSandbox) {
+  await ensureLatestCodexOnSandbox(sandbox);
 }
 
-export async function snapshotCodexHome(box: Box, factoryId: string) {
-  const archiveResult = await runBoxCommand(
-    box,
+export async function snapshotCodexHome(
+  sandbox: AppSandbox,
+  factoryId: string,
+) {
+  const archiveResult = await runSandboxCommand(
+    sandbox,
     [
       `mkdir -p ${shellQuote(factoryDir)}`,
       `paths=""`,
@@ -166,12 +123,15 @@ export async function snapshotCodexHome(box: Box, factoryId: string) {
     );
   }
 
-  return box.snapshot({ name: `factory-${factoryId.slice(0, 8)}-codex-home` });
+  return createCheckpoint(
+    sandbox,
+    `factory-${factoryId.slice(0, 8)}-codex-home`,
+  );
 }
 
-export async function restoreCodexHome(box: Box) {
-  const result = await runBoxCommand(
-    box,
+export async function restoreCodexHome(sandbox: AppSandbox) {
+  const result = await runSandboxCommand(
+    sandbox,
     [
       `if test -f ${shellQuote(codexHomeArchivePath)}; then tar -C "$HOME" -xzf ${shellQuote(codexHomeArchivePath)}; elif test -f ${shellQuote(codexAuthArchivePath)}; then tar -C "$HOME" -xzf ${shellQuote(codexAuthArchivePath)}; elif test -d "$HOME/.codex"; then true; else echo "Missing Codex home archive"; exit 1; fi`,
       `test -d "$HOME/.codex"`,
@@ -189,16 +149,15 @@ export async function restoreCodexHome(box: Box) {
 }
 
 export async function streamCodexExec({
-  box,
   imagePaths,
   mcpConfig,
   prompt,
   resume,
+  sandbox,
   secrets,
   sessionId,
   workerId,
 }: {
-  box: Box;
   imagePaths?: string[];
   mcpConfig?: {
     gatewayUrl: string;
@@ -206,11 +165,13 @@ export async function streamCodexExec({
   };
   prompt: string;
   resume: boolean;
+  sandbox: AppSandbox;
   secrets?: Record<string, string>;
   sessionId?: string;
   workerId: string;
 }) {
-  return box.exec.stream(
+  return streamSandboxCommand(
+    sandbox,
     createCodexExecCommand({
       imagePaths,
       mcpConfig,
@@ -224,17 +185,17 @@ export async function streamCodexExec({
 }
 
 export async function waitForWorkerPid({
-  box,
+  sandbox,
   workerId,
 }: {
-  box: Box;
+  sandbox: AppSandbox;
   workerId: string;
 }) {
   const pidPath = getWorkerPidPath(workerId);
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    const result = await runBoxCommand(
-      box,
+    const result = await runSandboxCommand(
+      sandbox,
       `test -s ${shellQuote(pidPath)} && cat ${shellQuote(pidPath)}`,
       2_000,
     );
@@ -248,9 +209,15 @@ export async function waitForWorkerPid({
   return undefined;
 }
 
-export async function killWorkerPid({ box, pid }: { box: Box; pid: number }) {
-  await runBoxCommand(
-    box,
+export async function killWorkerPid({
+  pid,
+  sandbox,
+}: {
+  pid: number;
+  sandbox: AppSandbox;
+}) {
+  await runSandboxCommand(
+    sandbox,
     [
       `kill -TERM -${pid} 2>/dev/null || kill -TERM ${pid} 2>/dev/null || true`,
       "sleep 1",
@@ -260,20 +227,8 @@ export async function killWorkerPid({ box, pid }: { box: Box; pid: number }) {
   );
 }
 
-export function getExecStreamChunkText(chunk: ExecStreamChunk) {
+export function getSandboxStreamChunkText(chunk: SandboxStreamChunk) {
   return chunk.type === "output" ? chunk.data : "";
-}
-
-function createBoxCommand(command: string, timeoutMs?: number) {
-  const timeoutSeconds = timeoutMs
-    ? Math.max(1, Math.ceil(timeoutMs / 1_000))
-    : null;
-  const timeoutPrefix = timeoutSeconds ? `timeout ${timeoutSeconds}s ` : "";
-
-  return [
-    `cd ${shellQuote(boxWorkspace)}`,
-    `${timeoutPrefix}sh -lc ${shellQuote(command)}`,
-  ].join(" && ");
 }
 
 function createCodexExecCommand({
@@ -354,7 +309,7 @@ function createCodexExecCommand({
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
-    `setsid sh -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(boxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
+    `setsid /bin/bash -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(sandboxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
     "pid=$!",
     `echo "$pid" > ${shellQuote(pidPath)}`,
     'wait "$pid"',

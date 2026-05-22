@@ -1,14 +1,15 @@
 import { authenticateFactoryWorkerApiRequest } from "@/lib/factory/worker-api-auth";
 import {
-  getAuthenticatedWorkerBox,
+  getAuthenticatedWorkerSandbox,
   parseWorkerPort,
 } from "@/lib/factory/worker-control";
 import {
   deleteWorkerPort,
   getPublicUrlAuthType,
-  syncWorkerPorts,
+  listWorkerPorts,
   upsertWorkerPort,
 } from "@/lib/factory/worker-ports";
+import { createPreviewUrl } from "@/lib/sandbox/service";
 
 export const runtime = "nodejs";
 
@@ -26,16 +27,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const box = await getAuthenticatedWorkerBox(workerToken);
-    const result = await box.listPublicURLs();
-
-    await syncWorkerPorts(workerToken.workerId, result.publicURLs);
+    await getAuthenticatedWorkerSandbox(workerToken);
+    const ports = await listWorkerPorts(workerToken.workerId);
 
     return Response.json({
-      ports: result.publicURLs.map((publicUrl) => ({
-        authType: getPublicUrlAuthType(publicUrl),
-        port: publicUrl.port,
-        url: publicUrl.url,
+      ports: ports.map((port) => ({
+        authType: port.authType ?? "none",
+        port: port.port,
+        url: port.url,
       })),
     });
   } catch (error) {
@@ -60,8 +59,8 @@ export async function POST(request: Request) {
 
   try {
     const port = parseWorkerPort(body.port);
-    const box = await getAuthenticatedWorkerBox(workerToken);
-    const publicUrl = await box.getPublicURL(port, {
+    const sandbox = await getAuthenticatedWorkerSandbox(workerToken);
+    const publicUrl = await createPreviewUrl(sandbox, port, {
       basicAuth: body.basicAuth === true,
       bearerToken: body.bearerToken === true,
     });
@@ -74,20 +73,17 @@ export async function POST(request: Request) {
     });
 
     return Response.json({
-      password: publicUrl.password,
       port: publicUrl.port,
-      token: publicUrl.token,
       url: publicUrl.url,
-      username: publicUrl.username,
     });
   } catch (error) {
-    await deleteStalePortOnMissingUpstashUrl(workerToken.workerId, error, body);
+    await deleteStalePortOnMissingPreviewUrl(workerToken.workerId, error, body);
 
     return errorResponse(error, "Port could not be exposed.");
   }
 }
 
-async function deleteStalePortOnMissingUpstashUrl(
+async function deleteStalePortOnMissingPreviewUrl(
   workerId: string,
   error: unknown,
   body: ExposePortRequest,

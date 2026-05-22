@@ -11,11 +11,10 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { getAdminDbCore } from "@/lib/admin-db-core";
 import { getMcpCallbackUrl } from "@/lib/app-url";
-import { getBox } from "@/lib/codex/box-auth";
 import {
   deleteWorkerPort,
   getPublicUrlAuthType,
-  syncWorkerPorts,
+  listWorkerPorts,
   upsertWorkerPort,
 } from "@/lib/factory/worker-ports";
 import {
@@ -32,11 +31,16 @@ import {
   updateMcpConnection,
 } from "@/lib/mcp/records";
 import { authenticateMcpWorkerToken } from "@/lib/mcp/run-tokens";
+import {
+  connectSandbox,
+  createPreviewUrl,
+  deletePreviewUrl,
+} from "@/lib/sandbox/service";
 
 const factoryControlTools = [
   {
     description:
-      "Expose a TCP port from this worker's Upstash Box as a temporary public URL. The process must already be listening on the port.",
+      "Expose a TCP port from this worker sandbox as a temporary public URL. The process must already be listening on the port.",
     inputSchema: {
       additionalProperties: false,
       properties: {
@@ -49,7 +53,7 @@ const factoryControlTools = [
           type: "boolean",
         },
         port: {
-          description: "Port number to expose from the worker box.",
+          description: "Port number to expose from the worker sandbox.",
           maximum: 65535,
           minimum: 1,
           type: "integer",
@@ -62,7 +66,7 @@ const factoryControlTools = [
   },
   {
     description:
-      "List temporary public URLs currently exposed for this worker's Upstash Box.",
+      "List temporary public URLs currently exposed for this worker sandbox.",
     inputSchema: {
       additionalProperties: false,
       properties: {},
@@ -72,7 +76,7 @@ const factoryControlTools = [
   },
   {
     description:
-      "Delete a temporary public URL for a port on this worker's Upstash Box.",
+      "Delete a temporary public URL for a port on this worker sandbox.",
     inputSchema: {
       additionalProperties: false,
       properties: {
@@ -248,19 +252,18 @@ async function callFactoryControlTool({
       });
     }
 
-    const box = await getWorkerBox({
+    const sandbox = await getWorkerSandbox({
       factoryId: workerToken.factoryId,
       workerId: workerToken.workerId,
     });
 
     if (name === "factory__list_public_urls") {
-      const result = await box.listPublicURLs();
-      await syncWorkerPorts(workerToken.workerId, result.publicURLs);
+      const publicUrls = await listWorkerPorts(workerToken.workerId);
 
       await createWorkerFactoryControlEvent({
         data: {
           durationMs: Date.now() - startedAt,
-          publicUrlCount: result.publicURLs.length,
+          publicUrlCount: publicUrls.length,
           status: "success",
           toolName: name,
         },
@@ -269,7 +272,7 @@ async function callFactoryControlTool({
       });
 
       return createJsonToolResult({
-        publicUrls: result.publicURLs.map((publicUrl) => ({
+        publicUrls: publicUrls.map((publicUrl) => ({
           port: publicUrl.port,
           url: publicUrl.url,
         })),
@@ -279,7 +282,7 @@ async function callFactoryControlTool({
     const port = getPortArg(args);
 
     if (name === "factory__delete_public_url") {
-      await box.deletePublicURL(port);
+      await deletePreviewUrl(sandbox, port);
       await deleteWorkerPort(workerToken.workerId, port);
       await createWorkerFactoryControlEvent({
         data: {
@@ -301,7 +304,7 @@ async function callFactoryControlTool({
           bearerToken: args.bearerToken === true,
         }
       : {};
-    const publicUrl = await box.getPublicURL(port, options);
+    const publicUrl = await createPreviewUrl(sandbox, port, options);
     await upsertWorkerPort({
       authType: getPublicUrlAuthType(publicUrl),
       port: publicUrl.port,
@@ -312,8 +315,8 @@ async function callFactoryControlTool({
     await createWorkerFactoryControlEvent({
       data: {
         auth: {
-          basicAuth: Boolean(publicUrl.username),
-          bearerToken: Boolean(publicUrl.token),
+          basicAuth: publicUrl.authConfig?.basicAuth === true,
+          bearerToken: publicUrl.authConfig?.bearerToken === true,
         },
         durationMs: Date.now() - startedAt,
         port,
@@ -326,11 +329,8 @@ async function callFactoryControlTool({
     });
 
     return createJsonToolResult({
-      password: publicUrl.password,
       port: publicUrl.port,
-      token: publicUrl.token,
       url: publicUrl.url,
-      username: publicUrl.username,
     });
   } catch (error) {
     const message = getErrorMessage(error);
@@ -436,7 +436,7 @@ async function callGatewayTool({
   }
 }
 
-async function getWorkerBox({
+async function getWorkerSandbox({
   factoryId,
   workerId,
 }: {
@@ -459,10 +459,10 @@ async function getWorkerBox({
   }
 
   if (!worker.sandboxId) {
-    throw new Error("Worker does not have a box yet.");
+    throw new Error("Worker does not have a sandbox yet.");
   }
 
-  return getBox(worker.sandboxId);
+  return connectSandbox(worker.sandboxId);
 }
 
 async function createWorkerFactoryControlEvent({

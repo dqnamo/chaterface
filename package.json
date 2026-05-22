@@ -22,8 +22,8 @@
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/colors": "^3.0.0",
     "@trigger.dev/sdk": "^4.4.6",
-    "@upstash/box": "^0.4.1",
     "clsx": "^2.1.1",
+    "e2b": "^2.21.0",
     "luxon": "^3.7.2",
     "motion": "^12.38.0",
     "next": "16.2.6",
@@ -33,6 +33,7 @@
     "react-dom": "19.2.4",
     "resend": "^6.12.3",
     "streamdown": "^2.5.0",
+    "stripe": "^22.1.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

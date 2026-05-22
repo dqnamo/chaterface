@@ -1,6 +1,6 @@
 "use client";
 
-import { FadersIcon, UsersThreeIcon, WarningIcon } from "@phosphor-icons/react";
+import { CreditCardIcon, FadersIcon, WarningIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
@@ -12,9 +12,9 @@ const settingsSections = [
     label: "General",
   },
   {
-    icon: <UsersThreeIcon aria-hidden="true" size={15} weight="bold" />,
-    id: "supervisors",
-    label: "Supervisors",
+    icon: <CreditCardIcon aria-hidden="true" size={15} weight="bold" />,
+    id: "billing",
+    label: "Billing",
   },
   {
     icon: <WarningIcon aria-hidden="true" size={15} weight="bold" />,

@@ -4,7 +4,7 @@ import {
   unauthorizedResponse,
 } from "@/lib/auth";
 import {
-  getFactoryCapabilityBox,
+  getFactoryCapabilitySandbox,
   listSkillCandidates,
 } from "@/lib/codex/factory-capabilities";
 
@@ -44,8 +44,8 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const factory = await getOwnedFactory<{
-      capabilityBoxId?: string;
-      defaultSanpshotId?: string;
+      capabilitySandboxId?: string;
+      defaultSandboxCheckpointId?: string;
       id: string;
       owner?: { id?: string };
     }>(factoryId, user);
@@ -54,11 +54,11 @@ export async function POST(request: Request, context: RouteContext) {
       return Response.json({ error: "Factory not found" }, { status: 404 });
     }
 
-    const box = await getFactoryCapabilityBox({
+    const sandbox = await getFactoryCapabilitySandbox({
       factory,
       factoryId,
     });
-    const skills = await listSkillCandidates(box, repoUrl);
+    const skills = await listSkillCandidates(sandbox, repoUrl);
 
     return Response.json({ skills });
   } catch (error) {

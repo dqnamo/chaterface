@@ -1,4 +1,10 @@
+import { existsSync } from "node:fs";
+import { loadEnvFile } from "node:process";
 import { defineConfig } from "@trigger.dev/sdk";
+
+if (existsSync(".env.local")) {
+  loadEnvFile(".env.local");
+}
 
 const stampedProjectRef = "__TRIGGER_PROJECT_REF_VALUE__";
 const project =

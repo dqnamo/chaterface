@@ -14,9 +14,26 @@ const _schema = i.schema({
     factories: i.entity({
       status: i.string(),
       name: i.string(),
+      billingPlan: i.string().indexed().optional(),
+      billingUpdatedAt: i.string().indexed().optional(),
       color: i.string().optional(),
+      capabilitySandboxId: i.string().indexed().optional(),
       capabilityBoxId: i.string().indexed().optional(),
+      createdAt: i.string().indexed().optional(),
+      defaultSandboxCheckpointId: i.string().optional(),
       defaultSanpshotId: i.string().optional(),
+      trialEndsAt: i.string().indexed().optional(),
+    }),
+    factoryStripeBillings: i.entity({
+      cancelAtPeriodEnd: i.boolean().optional(),
+      createdAt: i.string().indexed(),
+      currentPeriodEnd: i.string().indexed().optional(),
+      lastWebhookEventId: i.string().unique().indexed().optional(),
+      stripeCustomerId: i.string().indexed().optional(),
+      stripeSubscriptionId: i.string().unique().indexed().optional(),
+      stripeSubscriptionItemId: i.string().indexed().optional(),
+      stripeSubscriptionStatus: i.string().indexed().optional(),
+      updatedAt: i.string().indexed(),
     }),
     supervisors: i.entity({
       acceptedAt: i.string().indexed().optional(),
@@ -156,6 +173,18 @@ const _schema = i.schema({
         on: "factories",
         has: "many",
         label: "agents",
+      },
+    },
+    factoryStripeBilling: {
+      forward: {
+        on: "factoryStripeBillings",
+        has: "one",
+        label: "factory",
+      },
+      reverse: {
+        on: "factories",
+        has: "one",
+        label: "stripeBilling",
       },
     },
     factorySupervisors: {

@@ -141,6 +141,7 @@ function FactoryLayoutContent({
   );
   const isSettingsSection = isFactorySettingsPath(pathname, factoryId);
   const isComputerSection = isFactoryComputerPath(pathname, factoryId);
+  const isSupervisorsSection = isFactorySupervisorsPath(pathname, factoryId);
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -243,19 +244,21 @@ function FactoryLayoutContent({
         <FactoryToolsRail currentPathname={pathname} factoryId={factoryId} />
       </aside>
 
-      <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
-        {isSettingsSection ? (
-          <FactorySettingsSidebar factoryId={factoryId} />
-        ) : isComputerSection ? (
-          <FactoryComputerSidebar factoryId={factoryId} />
-        ) : (
-          <WorkerSidebar
-            currentPathname={pathname}
-            factoryId={factoryId}
-            workers={workers}
-          />
-        )}
-      </aside>
+      {isSupervisorsSection ? null : (
+        <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
+          {isSettingsSection ? (
+            <FactorySettingsSidebar factoryId={factoryId} />
+          ) : isComputerSection ? (
+            <FactoryComputerSidebar factoryId={factoryId} />
+          ) : (
+            <WorkerSidebar
+              currentPathname={pathname}
+              factoryId={factoryId}
+              workers={workers}
+            />
+          )}
+        </aside>
+      )}
 
       <div
         className={cn(
@@ -297,7 +300,7 @@ function FactoryLayoutContent({
               factoryId={factoryId}
               onNavigate={() => setIsSidebarOpen(false)}
             />
-            {isSettingsSection ? (
+            {isSupervisorsSection ? null : isSettingsSection ? (
               <FactorySettingsSidebar
                 className="w-full"
                 factoryId={factoryId}
@@ -337,7 +340,7 @@ function FactoryLayoutContent({
               {factory?.name ?? "Factory"}
             </p>
             <p className="truncate text-grayscale-10 text-xs">
-              Open menu for workers and settings
+              Open menu for factory tools
             </p>
           </div>
         </div>
@@ -358,19 +361,6 @@ function FactoryToolsRail({
   factoryId: string;
   onNavigate?: () => void;
 }) {
-  const [hash, setHash] = useState("");
-
-  useEffect(() => {
-    function syncHash() {
-      setHash(window.location.hash);
-    }
-
-    syncHash();
-    window.addEventListener("hashchange", syncHash);
-
-    return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
-
   const links = [
     {
       href: `/factory/${factoryId}`,
@@ -379,6 +369,12 @@ function FactoryToolsRail({
         currentPathname === `/factory/${factoryId}` ||
         currentPathname.startsWith(`/factory/${factoryId}/workers/`),
       label: "Workers",
+    },
+    {
+      href: `/factory/${factoryId}/supervisors`,
+      icon: <UsersThreeIcon aria-hidden="true" size={18} weight="bold" />,
+      isActive: currentPathname === `/factory/${factoryId}/supervisors`,
+      label: "Supervisors",
     },
     {
       href: `/factory/${factoryId}/mcp`,
@@ -393,18 +389,8 @@ function FactoryToolsRail({
     {
       href: `/factory/${factoryId}/settings`,
       icon: <FadersIcon aria-hidden="true" size={18} weight="bold" />,
-      isActive:
-        currentPathname === `/factory/${factoryId}/settings` &&
-        hash !== "#supervisors",
+      isActive: currentPathname === `/factory/${factoryId}/settings`,
       label: "Settings",
-    },
-    {
-      href: `/factory/${factoryId}/settings#supervisors`,
-      icon: <UsersThreeIcon aria-hidden="true" size={18} weight="bold" />,
-      isActive:
-        currentPathname === `/factory/${factoryId}/settings` &&
-        hash === "#supervisors",
-      label: "Supervisors",
     },
   ];
 
@@ -441,6 +427,10 @@ function isFactoryComputerPath(pathname: string, factoryId: string) {
     `/factory/${factoryId}/skills`,
     `/factory/${factoryId}/mcp`,
   ].includes(pathname);
+}
+
+function isFactorySupervisorsPath(pathname: string, factoryId: string) {
+  return pathname === `/factory/${factoryId}/supervisors`;
 }
 
 function FactoryToolsRailLink({
@@ -541,7 +531,7 @@ function WorkerSidebarSection({
 
   return (
     <section>
-      <h2 className="px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
+      <h2 className="px-2 pb-1  flex flex-row items-center justify-between font-mono font-semibold text-grayscale-10 text-xs uppercase">
         <span>{title}</span>
         <NumberFlow className="ml-2 tabular-nums" value={workers.length} />
       </h2>

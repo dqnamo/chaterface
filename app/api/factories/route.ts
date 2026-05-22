@@ -1,11 +1,10 @@
 import { id } from "@instantdb/admin";
 import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
-import {
-  createDefaultFactorySnapshot,
-  createFactoryBox,
-} from "@/lib/codex/box-auth";
+import { BASIC_BILLING_PLAN, getTrialEndsAt } from "@/lib/billing";
+import { createDefaultFactoryCheckpoint } from "@/lib/codex/sandbox-auth";
 import { encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
+import { createFactorySandbox } from "@/lib/sandbox/service";
 
 export const runtime = "nodejs";
 
@@ -44,6 +43,8 @@ export async function POST(request: Request) {
   const db = getAdminDb();
   const agentId = id();
   const factoryId = id();
+  const now = new Date();
+  const nowIso = now.toISOString();
   const shouldCreateCodexAgent = body.codexAgent?.enabled === true;
   const codexAuthJson =
     shouldCreateCodexAgent && body.codexAgent ? body.codexAgent.authJson : null;
@@ -56,23 +57,34 @@ export async function POST(request: Request) {
   }
 
   try {
-    const box = await createFactoryBox(factoryId);
+    const sandbox = await createFactorySandbox(factoryId);
     const serializedCodexAuthJson = isJsonObject(codexAuthJson)
       ? JSON.stringify(codexAuthJson, null, 2)
       : undefined;
-    const snapshot = await createDefaultFactorySnapshot({
-      box,
+    const checkpoint = await createDefaultFactoryCheckpoint({
       codexAuthJson: serializedCodexAuthJson,
       factoryId,
+      sandbox,
     });
     const factoryTransactions = [
       db.tx.factories[factoryId].update({
-        defaultSanpshotId: snapshot.id,
+        billingPlan: BASIC_BILLING_PLAN,
+        billingUpdatedAt: nowIso,
+        createdAt: nowIso,
+        defaultSandboxCheckpointId: checkpoint.id,
         name,
         status: "ready",
+        trialEndsAt: getTrialEndsAt(now),
       }),
       db.tx.factories[factoryId].link({
         owner: user.id,
+      }),
+      db.tx.factoryStripeBillings[factoryId].update({
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }),
+      db.tx.factoryStripeBillings[factoryId].link({
+        factory: factoryId,
       }),
     ];
     const transactions = shouldCreateCodexAgent
@@ -93,7 +105,7 @@ export async function POST(request: Request) {
     return Response.json({
       agentId: shouldCreateCodexAgent ? agentId : undefined,
       factoryId,
-      snapshotId: snapshot.id,
+      checkpointId: checkpoint.id,
     });
   } catch (error) {
     console.error(error);

@@ -1,20 +1,23 @@
 import "server-only";
 
-import { Box } from "@upstash/box";
 import { getAdminDbCore } from "@/lib/admin-db-core";
 import {
   cleanCommandOutput,
   ensureCodexCli,
-  getBox,
   restoreCodexHome,
-  runBoxCommand,
   shellQuote,
   snapshotCodexHome,
-} from "@/lib/codex/box-auth";
+} from "@/lib/codex/sandbox-auth";
+import {
+  type AppSandbox,
+  connectSandbox,
+  createWorkerSandbox,
+  runSandboxCommand,
+} from "@/lib/sandbox/service";
 
 type FactorySecretRecord = {
-  capabilityBoxId?: string;
-  defaultSanpshotId?: string;
+  capabilitySandboxId?: string;
+  defaultSandboxCheckpointId?: string;
   id: string;
 };
 
@@ -24,64 +27,66 @@ export type SkillCandidate = {
   path: string;
 };
 
-export async function getFactoryCapabilityBox({
+export async function getFactoryCapabilitySandbox({
   factory,
   factoryId,
 }: {
   factory: FactorySecretRecord;
   factoryId: string;
 }) {
-  if (factory.capabilityBoxId) {
-    const box = await getBox(factory.capabilityBoxId);
-    await ensureCodexCli(box);
-    return box;
+  if (factory.capabilitySandboxId) {
+    const sandbox = await connectSandbox(factory.capabilitySandboxId);
+    await ensureCodexCli(sandbox);
+    return sandbox;
   }
 
-  const snapshotId = factory.defaultSanpshotId;
+  const checkpointId = factory.defaultSandboxCheckpointId;
 
-  if (!snapshotId) {
+  if (!checkpointId) {
     throw new Error("Connect Codex before configuring capabilities.");
   }
 
-  const box = await Box.fromSnapshot(snapshotId, {
-    apiKey: process.env.UPSTASH_BOX_API_KEY,
-    baseUrl: process.env.UPSTASH_BOX_BASE_URL,
-    runtime: "node",
-    name: `factory-${factoryId.slice(0, 8)}-capabilities-${Date.now()}`,
+  const sandbox = await createWorkerSandbox({
+    checkpointId,
+    factoryId,
+    workerId: `capabilities-${Date.now()}`,
   });
 
-  await restoreCodexHome(box);
-  await ensureCodexCli(box);
+  await restoreCodexHome(sandbox);
+  await ensureCodexCli(sandbox);
 
   const db = getAdminDbCore();
   await db.transact(
-    db.tx.factories[factory.id].update({ capabilityBoxId: box.id }),
+    db.tx.factories[factory.id].update({ capabilitySandboxId: sandbox.id }),
   );
 
-  return box;
+  return sandbox;
 }
 
 export async function snapshotFactoryCapabilities({
-  box,
+  sandbox,
   factoryId,
 }: {
-  box: Box;
+  sandbox: AppSandbox;
   factoryId: string;
 }) {
-  const snapshot = await snapshotCodexHome(box, factoryId);
+  const checkpoint = await snapshotCodexHome(sandbox, factoryId);
   const db = getAdminDbCore();
 
   await db.transact(
     db.tx.factories[factoryId].update({
-      capabilityBoxId: box.id,
-      defaultSanpshotId: snapshot.id,
+      capabilitySandboxId: sandbox.id,
+      defaultSandboxCheckpointId: checkpoint.id,
     }),
   );
 
-  return snapshot;
+  return checkpoint;
 }
 
-export async function listSkillCandidates(box: Box, repoUrl: string) {
+export async function listSkillCandidates(
+  sandbox: AppSandbox,
+  repoUrl: string,
+) {
   const sourceDir = `/tmp/factory-skills-${Date.now()}`;
   const jsonMarker = "__FACTORY_SKILLS_JSON__";
   const scanner = `
@@ -139,8 +144,8 @@ const candidates = files.sort().map((file) => {
 
 process.stdout.write(marker + JSON.stringify(candidates));
 `;
-  const result = await runBoxCommand(
-    box,
+  const result = await runSandboxCommand(
+    sandbox,
     [
       `rm -rf ${shellQuote(sourceDir)}`,
       `git clone --quiet --depth 1 ${shellQuote(repoUrl)} ${shellQuote(sourceDir)}`,
@@ -176,12 +181,12 @@ process.stdout.write(marker + JSON.stringify(candidates));
 }
 
 export async function installSkills({
-  box,
   repoUrl,
+  sandbox,
   skillPaths,
 }: {
-  box: Box;
   repoUrl: string;
+  sandbox: AppSandbox;
   skillPaths: string[];
 }) {
   const sourceDir = `/tmp/factory-skills-install-${Date.now()}`;
@@ -209,8 +214,8 @@ export async function installSkills({
       `cp -R ${shellQuote(sourceSkillDir)} "$target"`,
     ].join(" && ");
   });
-  const result = await runBoxCommand(
-    box,
+  const result = await runSandboxCommand(
+    sandbox,
     [
       `rm -rf ${shellQuote(sourceDir)}`,
       `git clone --depth 1 ${shellQuote(repoUrl)} ${shellQuote(sourceDir)}`,

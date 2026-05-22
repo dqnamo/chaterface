@@ -1,14 +1,8 @@
 "use client";
 
-import { id } from "@instantdb/react";
-import {
-  TrashIcon,
-  UserPlusIcon,
-  WarningIcon,
-  XIcon,
-} from "@phosphor-icons/react";
+import { CreditCardIcon, TrashIcon, WarningIcon } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import Button from "@/components/public/Button";
 import { cn } from "@/helpers/classname-helper";
@@ -18,27 +12,30 @@ import {
   type FactoryColorValue,
   getFactoryColor,
 } from "@/helpers/factory-colors";
+import {
+  BASIC_SUPERVISOR_LIMIT,
+  getEffectiveBillingPlan,
+  isFactoryTrialing,
+  PRO_BILLING_PLAN,
+} from "@/lib/billing";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { clearLastFactoryId } from "@/lib/factory/last-factory";
 
 type FactoryRecord = {
+  billingPlan?: string;
+  billingUpdatedAt?: string;
   color?: FactoryColorValue;
   id: string;
   name: string;
   owner?: { id?: string };
   supervisors?: SupervisorRecord[];
+  trialEndsAt?: string;
 };
 
 type SupervisorRecord = {
-  acceptedAt?: string;
-  email: string;
   id: string;
-  inviteEmailError?: string;
-  inviteEmailSentAt?: string;
-  invitedAt: string;
   status: string;
-  user?: { id?: string };
 };
 
 export default function FactorySettingsPage() {
@@ -56,45 +53,48 @@ function FactorySettingsPageContent({
 }) {
   const router = useRouter();
   const { isLoading: isAuthLoading, user } = instantDb.useAuth();
-  const userEmail = user?.email ?? undefined;
   const { data, error, isLoading } = instantDb.useQuery(
     user?.id
       ? {
           factories: {
             $: { where: { id: factoryId } },
             owner: {},
-            supervisors: {
-              user: {},
-            },
+            supervisors: {},
           },
         }
       : null,
   );
   const factory = data?.factories?.[0] as FactoryRecord | undefined;
   const currentColor = getFactoryColor(factory?.color);
+  const activeSupervisorCount = (factory?.supervisors ?? []).filter(
+    (supervisor) => supervisor.status !== "removed",
+  ).length;
+  const effectiveBillingPlan = getEffectiveBillingPlan(factory);
+  const isPaidPro = factory?.billingPlan === PRO_BILLING_PLAN;
+  const isTrialing = !isPaidPro && isFactoryTrialing(factory);
+  const isPro = effectiveBillingPlan === PRO_BILLING_PLAN;
   const [selectedColor, setSelectedColor] = useState<FactoryColorValue>(
     DEFAULT_FACTORY_COLOR,
   );
   const [formError, setFormError] = useState<string | null>(null);
-  const [supervisorEmail, setSupervisorEmail] = useState("");
-  const [supervisorError, setSupervisorError] = useState<string | null>(null);
-  const [supervisorNotice, setSupervisorNotice] = useState<string | null>(null);
-  const [isInvitingSupervisor, setIsInvitingSupervisor] = useState(false);
-  const [removingSupervisorId, setRemovingSupervisorId] = useState<
-    string | null
+  const [billingAction, setBillingAction] = useState<
+    "portal" | "upgrade" | null
   >(null);
+  const [billingError, setBillingError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const isOwner = factory?.owner?.id === user?.id;
-  const supervisors = [...(factory?.supervisors ?? [])]
-    .filter((supervisor) => supervisor.status !== "removed")
-    .sort((a, b) => a.email.localeCompare(b.email));
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
       router.replace("/login");
     }
   }, [isAuthLoading, router, user]);
+
+  useEffect(() => {
+    if (window.location.hash === "#supervisors") {
+      router.replace(`/factory/${factoryId}/supervisors`);
+    }
+  }, [factoryId, router]);
 
   useEffect(() => {
     setSelectedColor(currentColor);
@@ -153,102 +153,42 @@ function FactorySettingsPageContent({
     }
   }
 
-  async function inviteSupervisor(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!isOwner) {
-      setSupervisorError("Only the factory owner can invite supervisors.");
+  async function openBillingUrl(action: "portal" | "upgrade") {
+    if (!user?.refresh_token) {
+      setBillingError("You must be signed in to manage billing.");
       return;
     }
 
-    const email = normalizeSupervisorEmail(supervisorEmail);
-
-    if (!isValidEmail(email)) {
-      setSupervisorError("Enter a valid supervisor email.");
-      return;
-    }
-
-    if (userEmail && normalizeSupervisorEmail(userEmail) === email) {
-      setSupervisorError("Factory owners are already supervisors.");
-      return;
-    }
-
-    if (
-      supervisors.some(
-        (supervisor) =>
-          normalizeSupervisorEmail(supervisor.email) === email &&
-          supervisor.status !== "removed",
-      )
-    ) {
-      setSupervisorError("That supervisor has already been invited.");
-      return;
-    }
-
-    setIsInvitingSupervisor(true);
-    setSupervisorError(null);
-    setSupervisorNotice(null);
+    setBillingAction(action);
+    setBillingError(null);
 
     try {
-      const supervisorId = id();
-      const now = new Date().toISOString();
-
-      await instantDb.transact([
-        instantDb.tx.supervisors[supervisorId].update({
-          email,
-          invitedAt: now,
-          invitedByEmail: userEmail,
-          status: "invited",
-          updatedAt: now,
-        }),
-        instantDb.tx.supervisors[supervisorId].link({
-          factory: factoryId,
-        }),
-      ]);
-
-      setSupervisorEmail("");
-      setSupervisorNotice("Supervisor invite created.");
-      router.refresh();
-    } catch (inviteError) {
-      console.error(inviteError);
-      setSupervisorError(
-        inviteError instanceof Error
-          ? inviteError.message
-          : "Supervisor could not be invited.",
+      const response = await fetch(
+        `/api/factories/${factoryId}/billing/${action}`,
+        {
+          headers: {
+            Authorization: `Bearer ${user.refresh_token}`,
+          },
+          method: "POST",
+        },
       );
-    } finally {
-      setIsInvitingSupervisor(false);
-    }
-  }
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+        url?: string;
+      } | null;
 
-  async function removeSupervisor(supervisorId: string) {
-    if (!isOwner) {
-      setSupervisorError("Only the factory owner can remove supervisors.");
-      return;
-    }
+      if (!response.ok || !body?.url) {
+        throw new Error(body?.error ?? "Billing could not be opened.");
+      }
 
-    setRemovingSupervisorId(supervisorId);
-    setSupervisorError(null);
-    setSupervisorNotice(null);
-
-    try {
-      await instantDb.transact(
-        instantDb.tx.supervisors[supervisorId].update({
-          status: "removed",
-          updatedAt: new Date().toISOString(),
-        }),
+      window.location.href = body.url;
+    } catch (openError) {
+      setBillingError(
+        openError instanceof Error
+          ? openError.message
+          : "Billing could not be opened.",
       );
-
-      setSupervisorNotice("Supervisor removed.");
-      router.refresh();
-    } catch (removeError) {
-      console.error(removeError);
-      setSupervisorError(
-        removeError instanceof Error
-          ? removeError.message
-          : "Supervisor could not be removed.",
-      );
-    } finally {
-      setRemovingSupervisorId(null);
+      setBillingAction(null);
     }
   }
 
@@ -349,88 +289,70 @@ function FactorySettingsPageContent({
 
         <section
           className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1"
-          id="supervisors"
+          id="billing"
         >
           <div className="border-grayscale-3 border-b px-3 py-2">
             <h2 className="font-mono font-bold text-[11px] text-grayscale-10 uppercase tracking-wide">
-              Supervisors
+              Billing
             </h2>
           </div>
           <div className="flex flex-col gap-4 px-3 py-3">
-            {isOwner ? (
-              <form
-                className="flex flex-col gap-2 sm:flex-row"
-                onSubmit={inviteSupervisor}
-              >
-                <label className="sr-only" htmlFor="supervisor-email">
-                  Supervisor email
-                </label>
-                <input
-                  className="min-h-9 min-w-0 flex-1 rounded-lg border border-grayscale-4 bg-grayscale-1 px-3 text-grayscale-12 text-sm outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-8"
-                  id="supervisor-email"
-                  onChange={(event) => setSupervisorEmail(event.target.value)}
-                  placeholder="teammate@example.com"
-                  type="email"
-                  value={supervisorEmail}
-                />
-                <Button disabled={isInvitingSupervisor} type="submit">
-                  <UserPlusIcon aria-hidden="true" size={14} weight="bold" />
-                  {isInvitingSupervisor ? "Inviting..." : "Invite"}
-                </Button>
-              </form>
-            ) : (
-              <p className="text-grayscale-10 text-sm">
-                Factory owners manage supervisor access.
-              </p>
-            )}
-
-            {supervisorError ? (
-              <p className="text-red-11 text-sm" role="alert">
-                {supervisorError}
-              </p>
-            ) : null}
-            {supervisorNotice ? (
-              <p className="text-green-11 text-sm" role="status">
-                {supervisorNotice}
-              </p>
-            ) : null}
-
-            <div className="overflow-hidden rounded-lg border border-grayscale-3">
-              {supervisors.length > 0 ? (
-                supervisors.map((supervisor) => (
-                  <div
-                    className="flex min-h-12 items-center justify-between gap-3 border-grayscale-3 border-b px-3 py-2 last:border-b-0"
-                    key={supervisor.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-grayscale-12 text-sm">
-                        {supervisor.email}
-                      </p>
-                      <p className="text-grayscale-10 text-xs">
-                        {supervisor.status === "active"
-                          ? "Active"
-                          : "Invite pending"}
-                      </p>
-                    </div>
-                    {isOwner && supervisor.status !== "removed" ? (
-                      <button
-                        aria-label={`Remove ${supervisor.email}`}
-                        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-10 transition-colors hover:border-red-7 hover:bg-red-2 hover:text-red-11 disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={removingSupervisorId === supervisor.id}
-                        onClick={() => removeSupervisor(supervisor.id)}
-                        title="Remove supervisor"
-                        type="button"
-                      >
-                        <XIcon aria-hidden="true" size={14} weight="bold" />
-                      </button>
-                    ) : null}
-                  </div>
-                ))
-              ) : (
-                <p className="px-3 py-6 text-center text-grayscale-10 text-sm">
-                  No supervisors yet.
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
+                <CreditCardIcon aria-hidden="true" size={16} weight="bold" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-grayscale-12 text-sm">
+                  {isPaidPro ? "Pro" : isTrialing ? "Trial" : "Basic"}
                 </p>
-              )}
+                <p className="text-grayscale-10 text-xs">
+                  {isPro
+                    ? "Unlimited supervisors and unlimited workers."
+                    : `${activeSupervisorCount}/${BASIC_SUPERVISOR_LIMIT} supervisors, unlimited workers.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <BillingStat
+                label="Supervisor seats"
+                value={`Owner + ${activeSupervisorCount}`}
+              />
+              <BillingStat label="Workers" value="Unlimited" />
+            </div>
+
+            {factory.trialEndsAt && isTrialing ? (
+              <p className="text-grayscale-10 text-xs">
+                Trial ends {formatBillingDate(factory.trialEndsAt)}.
+              </p>
+            ) : null}
+
+            {billingError ? (
+              <p className="text-red-11 text-sm" role="alert">
+                {billingError}
+              </p>
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {isPaidPro ? (
+                <Button
+                  disabled={billingAction !== null}
+                  onClick={() => openBillingUrl("portal")}
+                  type="button"
+                  variant="secondary"
+                >
+                  {billingAction === "portal" ? "Opening..." : "Manage billing"}
+                </Button>
+              ) : null}
+              {!isPaidPro ? (
+                <Button
+                  disabled={billingAction !== null}
+                  onClick={() => openBillingUrl("upgrade")}
+                  type="button"
+                >
+                  {billingAction === "upgrade" ? "Opening..." : "Upgrade"}
+                </Button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -484,10 +406,23 @@ function FactorySettingsPageContent({
   );
 }
 
-function normalizeSupervisorEmail(email: string) {
-  return email.trim().toLowerCase();
+function BillingStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-grayscale-3 bg-grayscale-2 px-3 py-2">
+      <p className="font-medium text-grayscale-12 text-sm">{value}</p>
+      <p className="text-grayscale-10 text-xs">{label}</p>
+    </div>
+  );
 }
 
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+function formatBillingDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  }).format(date);
 }

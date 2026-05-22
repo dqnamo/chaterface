@@ -1,23 +1,27 @@
 import { id } from "@instantdb/admin";
 import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
-import { getFactoryMcpGatewayUrl } from "@/lib/app-url";
+import { getAppPublicUrl, getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import {
   cleanCommandOutput,
-  createWorkerBox,
-  ensureLatestCodexOnBox,
-  getBox,
-  getExecStreamChunkText,
+  ensureLatestCodexOnSandbox,
+  getSandboxStreamChunkText,
   killWorkerPid,
-  runBoxCommand,
+  sandboxFactoryDir,
   shellQuote,
   streamCodexExec,
   waitForWorkerPid,
-} from "@/lib/codex/box-auth";
+} from "@/lib/codex/sandbox-auth";
 import { decryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 import { createFactoryWorkerApiToken } from "@/lib/factory/worker-api-auth";
 import { listEnabledMcpCapabilitiesForFactory } from "@/lib/mcp/records";
 import { createMcpWorkerToken } from "@/lib/mcp/run-tokens";
+import {
+  type AppSandbox,
+  connectSandbox,
+  createWorkerSandbox,
+  runSandboxCommand,
+} from "@/lib/sandbox/service";
 
 type RunWorkerPayload = {
   userMessageEventId: string;
@@ -29,7 +33,7 @@ type WorkerRecord = {
   activePid?: number;
   codexSessionId?: string;
   factory?: {
-    defaultSanpshotId?: string;
+    defaultSandboxCheckpointId?: string;
     id: string;
     secrets?: SecretRecord[];
   };
@@ -141,24 +145,24 @@ export const runWorkerTask = task({
         });
       }
 
-      const defaultSnapshotId = worker.factory.defaultSanpshotId;
+      const defaultCheckpointId = worker.factory.defaultSandboxCheckpointId;
       const secrets = getFactorySecrets(worker.factory.secrets ?? []);
       const mcpConfig = await getWorkerMcpConfig({
         factoryId: worker.factory.id,
         workerId: worker.id,
       });
 
-      if (!worker.sandboxId && !defaultSnapshotId) {
+      if (!worker.sandboxId && !defaultCheckpointId) {
         await failWorker(
           payload.workerId,
-          "Factory default snapshot is missing",
+          "Factory default sandbox checkpoint is missing",
         );
         workerAlreadyFailed = true;
-        logTaskStep("error", "Factory default snapshot is missing", {
+        logTaskStep("error", "Factory default sandbox checkpoint is missing", {
           factoryId: worker.factory.id,
           workerId: payload.workerId,
         });
-        throw new Error("Factory default snapshot is missing");
+        throw new Error("Factory default sandbox checkpoint is missing");
       }
 
       setRunMetadata("creating_sandbox", {
@@ -173,15 +177,20 @@ export const runWorkerTask = task({
             factoryId: worker.factory.id,
             workerId: worker.id,
           });
-      const box = worker.sandboxId
-        ? await getBox(worker.sandboxId)
-        : await createWorkerBox({
-            factoryApiToken,
+      const sandbox = worker.sandboxId
+        ? await connectSandbox(worker.sandboxId)
+        : await createWorkerSandbox({
+            checkpointId: defaultCheckpointId ?? "",
+            env: factoryApiToken
+              ? {
+                  FACTORY_API_URL: getAppPublicUrl(),
+                  FACTORY_WORKER_API_TOKEN: factoryApiToken,
+                }
+              : undefined,
             factoryId: worker.factory.id,
-            snapshotId: defaultSnapshotId ?? "",
             workerId: worker.id,
           });
-      const sandboxId = worker.sandboxId ?? box.id;
+      const sandboxId = worker.sandboxId ?? sandbox.id;
       const shouldInterrupt =
         worker.status === "running" && typeof worker.activePid === "number";
 
@@ -198,7 +207,7 @@ export const runWorkerTask = task({
           sandboxId,
           workerId: worker.id,
         });
-        await killWorkerPid({ box, pid: worker.activePid });
+        await killWorkerPid({ pid: worker.activePid, sandbox });
         await appendWorkerEvent(worker.id, {
           createdAt: now,
           data: {
@@ -210,15 +219,15 @@ export const runWorkerTask = task({
         });
       }
 
-      setRunMetadata("setting_up_box", {
+      setRunMetadata("setting_up_sandbox", {
         sandboxId,
         workerId: worker.id,
       });
-      logTaskStep("info", "Installing latest Codex CLI on box", {
+      logTaskStep("info", "Installing latest Codex CLI in sandbox", {
         sandboxId,
         workerId: worker.id,
       });
-      const codexSetupOutput = await ensureLatestCodexOnBox(box);
+      const codexSetupOutput = await ensureLatestCodexOnSandbox(sandbox);
       logTaskStep("info", "Codex CLI setup complete", {
         output: truncateForLog(codexSetupOutput),
         sandboxId,
@@ -226,8 +235,8 @@ export const runWorkerTask = task({
       });
       const imagePaths = await stageWorkerImageAttachments({
         attachments: userMessageEvent?.attachments ?? [],
-        box,
         eventId: payload.userMessageEventId,
+        sandbox,
         workerId: worker.id,
       });
 
@@ -258,16 +267,16 @@ export const runWorkerTask = task({
       });
 
       const stream = await streamCodexExec({
-        box,
         imagePaths,
         mcpConfig,
         prompt,
         resume: Boolean(worker.sandboxId),
+        sandbox,
         secrets,
         sessionId: worker.codexSessionId,
         workerId: worker.id,
       });
-      const pid = await waitForWorkerPid({ box, workerId: worker.id });
+      const pid = await waitForWorkerPid({ sandbox, workerId: worker.id });
 
       if (pid) {
         await db.transact(
@@ -309,7 +318,7 @@ export const runWorkerTask = task({
             continue;
           }
 
-          const chunkText = getExecStreamChunkText(chunk);
+          const chunkText = getSandboxStreamChunkText(chunk);
 
           if (chunkText) {
             outputBytes += chunkText.length;
@@ -456,13 +465,13 @@ async function getUserMessageEvent(eventId: string) {
 
 async function stageWorkerImageAttachments({
   attachments,
-  box,
   eventId,
+  sandbox,
   workerId,
 }: {
   attachments: AttachmentRecord[];
-  box: Awaited<ReturnType<typeof getBox>>;
   eventId: string;
+  sandbox: AppSandbox;
   workerId: string;
 }) {
   const imageAttachments = attachments.filter(isImageAttachment);
@@ -471,7 +480,7 @@ async function stageWorkerImageAttachments({
     return [];
   }
 
-  const attachmentDir = `/workspace/home/.factory/workers/${workerId}/attachments/${eventId}`;
+  const attachmentDir = `${sandboxFactoryDir}/workers/${workerId}/attachments/${eventId}`;
   const stagedAttachments = imageAttachments.map((attachment, index) => ({
     path: `${attachmentDir}/image-${index + 1}${getAttachmentExtension(attachment)}`,
     url: attachment.url,
@@ -498,8 +507,8 @@ main().catch((error) => {
   process.exitCode = 1;
 });
 `.trim();
-  const result = await runBoxCommand(
-    box,
+  const result = await runSandboxCommand(
+    sandbox,
     [
       `mkdir -p ${shellQuote(attachmentDir)}`,
       `node -e ${shellQuote(script)} ${shellQuote(JSON.stringify(stagedAttachments))}`,

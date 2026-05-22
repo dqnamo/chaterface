@@ -4,14 +4,13 @@ import { id } from "@instantdb/admin";
 import { getAdminDbCore } from "@/lib/admin-db-core";
 
 export type PublicUrlRecord = {
-  password?: string;
+  authConfig?: Record<string, unknown>;
   port: number;
-  token?: string;
   url: string;
-  username?: string;
 };
 
 type PortRecord = {
+  authType?: string;
   createdAt: string;
   id: string;
   port: number;
@@ -83,11 +82,11 @@ export async function deleteWorkerPort(workerId: string, port: number) {
 }
 
 export function getPublicUrlAuthType(publicUrl: PublicUrlRecord) {
-  if (publicUrl.token) {
+  if (publicUrl.authConfig?.bearerToken === true) {
     return "bearer_token";
   }
 
-  if (publicUrl.username || publicUrl.password) {
+  if (publicUrl.authConfig?.basicAuth === true) {
     return "basic_auth";
   }
 
@@ -111,7 +110,7 @@ async function getPortByWorkerIdPort(workerIdPort: string) {
   return result.ports[0] as PortRecord | undefined;
 }
 
-async function listWorkerPorts(workerId: string) {
+export async function listWorkerPorts(workerId: string) {
   const db = getAdminDbCore();
   const result = await db.query({
     workers: {

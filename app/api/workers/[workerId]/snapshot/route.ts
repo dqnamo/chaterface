@@ -1,6 +1,6 @@
 import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
-import { getBox } from "@/lib/codex/box-auth";
 import { getAdminDb } from "@/lib/db.server";
+import { connectSandbox, createCheckpoint } from "@/lib/sandbox/service";
 
 export const runtime = "nodejs";
 
@@ -56,25 +56,28 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const box = await getBox(worker.sandboxId);
-    const snapshot = await box.snapshot({
-      name: `factory-${factoryId.slice(0, 8)}-default`,
-    });
+    const sandbox = await connectSandbox(worker.sandboxId);
+    const checkpoint = await createCheckpoint(
+      sandbox,
+      `factory-${factoryId.slice(0, 8)}-default`,
+    );
 
     await db.transact(
       db.tx.factories[factoryId].update({
-        defaultSanpshotId: snapshot.id,
+        defaultSandboxCheckpointId: checkpoint.id,
       }),
     );
 
-    return Response.json({ snapshotId: snapshot.id });
+    return Response.json({ checkpointId: checkpoint.id });
   } catch (error) {
     console.error(error);
 
     return Response.json(
       {
         error:
-          error instanceof Error ? error.message : "Could not create snapshot",
+          error instanceof Error
+            ? error.message
+            : "Could not create sandbox checkpoint",
       },
       { status: 500 },
     );

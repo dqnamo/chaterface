@@ -48,12 +48,19 @@ const rules = {
   },
   supervisors: {
     bind: {
+      basicSupervisorLimitAllowsInvite:
+        "size(data.ref('factory.supervisors.status').filter(status, status != 'removed')) <= 3",
       canAcceptInvite:
         "auth.email == data.email && data.status == 'invited' && newData.status == 'active' && request.modifiedFields.all(field, field in ['acceptedAt', 'status', 'updatedAt'])",
       canCreateInvite:
-        "auth.id in newData.ref('factory.owner.id') && newData.status == 'invited' && newData.email != auth.email",
+        "auth.id in data.ref('factory.owner.id') && data.status == 'invited' && data.email != auth.email && factoryBillingAllowsInvite",
       canRemoveInvite:
         "isOwner && newData.status == 'removed' && request.modifiedFields.all(field, field in ['status', 'updatedAt'])",
+      factoryBillingAllowsInvite:
+        "factoryIsPro || factoryIsTrialing || basicSupervisorLimitAllowsInvite",
+      factoryIsPro: "'pro' in data.ref('factory.billingPlan')",
+      factoryIsTrialing:
+        "data.ref('factory.trialEndsAt').exists(trialEndsAt, timestamp(trialEndsAt) > request.time)",
       isInvitedEmail: "auth.email == data.email",
       isLinkedSupervisor: "auth.id in data.ref('user.id')",
       isOwner: "auth.id in data.ref('factory.owner.id')",
@@ -68,6 +75,14 @@ const rules = {
   agents: {
     allow: {
       view: "auth.id in data.ref('factory.owner.id')",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+  },
+  factoryStripeBillings: {
+    allow: {
+      view: "false",
       create: "false",
       update: "false",
       delete: "false",

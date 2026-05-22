@@ -1,9 +1,10 @@
 import { authenticateFactoryWorkerApiRequest } from "@/lib/factory/worker-api-auth";
 import {
-  getAuthenticatedWorkerBox,
+  getAuthenticatedWorkerSandbox,
   parseWorkerPort,
 } from "@/lib/factory/worker-control";
 import { deleteWorkerPort } from "@/lib/factory/worker-ports";
+import { deletePreviewUrl } from "@/lib/sandbox/service";
 
 export const runtime = "nodejs";
 
@@ -24,9 +25,9 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   try {
     const port = parseWorkerPort(portParam);
-    const box = await getAuthenticatedWorkerBox(workerToken);
+    const sandbox = await getAuthenticatedWorkerSandbox(workerToken);
 
-    await box.deletePublicURL(port);
+    await deletePreviewUrl(sandbox, port);
     await deleteWorkerPort(workerToken.workerId, port);
 
     return Response.json({ deleted: true, port });

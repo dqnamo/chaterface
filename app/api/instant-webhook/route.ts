@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/db.server";
+import { syncFactoryStripeSeatQuantity } from "@/lib/stripe-billing.server";
 import { sendSupervisorInviteEmail } from "@/lib/supervisor-invitations";
 import {
   getWorkerForUserMessage,
@@ -136,6 +137,8 @@ export async function POST(request: Request) {
           factoryId: factory.id,
           supervisorId: supervisor.id,
         });
+
+        await syncFactorySeatsForBilling(factory.id, supervisor.id);
       } catch (error) {
         const message =
           error instanceof Error
@@ -151,6 +154,25 @@ export async function POST(request: Request) {
         throw error;
       }
     }),
+    typedHandlers("supervisors", "update", async (record) => {
+      const supervisor = record.after as SupervisorRecord | null;
+
+      if (!supervisor) {
+        return;
+      }
+
+      const supervisorWithFactory = await getSupervisorWithFactory(
+        db,
+        supervisor.id,
+      );
+      const factoryId = supervisorWithFactory?.factory?.id;
+
+      if (!factoryId) {
+        return;
+      }
+
+      await syncFactorySeatsForBilling(factoryId, supervisor.id);
+    }),
   );
 
   try {
@@ -161,6 +183,21 @@ export async function POST(request: Request) {
       error: serializeError(error),
     });
     return Response.json({ error: getErrorMessage(error) }, { status: 400 });
+  }
+}
+
+async function syncFactorySeatsForBilling(
+  factoryId: string,
+  supervisorId: string,
+) {
+  try {
+    await syncFactoryStripeSeatQuantity(factoryId);
+  } catch (error) {
+    logInstantWebhook("warn", "Stripe seat sync failed", {
+      error: serializeError(error),
+      factoryId,
+      supervisorId,
+    });
   }
 }
 
