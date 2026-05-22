@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CircleNotchIcon,
   FadersIcon,
   FilesIcon,
   GearSixIcon,
@@ -42,6 +43,7 @@ type WorkerRecord = {
 
 type WorkerStatusTone = {
   className: string;
+  isSpinner?: boolean;
   label: string;
 };
 
@@ -379,15 +381,28 @@ function WorkerSidebarLink({
             {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
           </span>
         </span>
-        <span
-          aria-label={statusTone.label}
-          className={cn(
-            "mt-1.5 size-2 shrink-0 rounded-full",
-            statusTone.className,
-          )}
-          role="img"
-          title={statusTone.label}
-        />
+        {statusTone.isSpinner ? (
+          <CircleNotchIcon
+            aria-label={statusTone.label}
+            className={cn(
+              "mt-1 size-3 shrink-0 animate-spin",
+              statusTone.className,
+            )}
+            role="img"
+            title={statusTone.label}
+            weight="bold"
+          />
+        ) : (
+          <span
+            aria-label={statusTone.label}
+            className={cn(
+              "mt-1.5 size-2 shrink-0 rounded-full",
+              statusTone.className,
+            )}
+            role="img"
+            title={statusTone.label}
+          />
+        )}
       </span>
     </Link>
   );
@@ -413,7 +428,8 @@ function getWorkerStatusTone(status: string): WorkerStatusTone {
     case "queued":
     case "running":
       return {
-        className: "bg-orange-9",
+        className: "text-orange-9",
+        isSpinner: true,
         label: "Working",
       };
     default:
