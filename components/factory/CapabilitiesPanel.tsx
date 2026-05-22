@@ -10,6 +10,10 @@ import type {
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 
+type McpServerWithCapabilities = McpServer & {
+  capabilities?: McpCapability[];
+};
+
 export default function CapabilitiesPanel({
   factoryId,
   section = "all",
@@ -41,9 +45,10 @@ function CapabilitiesPanelContent({
           factories: {
             $: { where: { id: factoryId } },
             skills: {},
-            mcpServers: {},
+            mcpServers: {
+              capabilities: {},
+            },
           },
-          factoryMcpCapabilities: {},
         }
       : null,
   );
@@ -56,18 +61,15 @@ function CapabilitiesPanelContent({
     [factory?.skills],
   );
   const mcpServers = useMemo(() => {
-    const capabilities = (data?.factoryMcpCapabilities ??
-      []) as McpCapability[];
-
-    return ([...(factory?.mcpServers ?? [])] as McpServer[])
+    return ([...(factory?.mcpServers ?? [])] as McpServerWithCapabilities[])
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((server) => ({
         ...server,
-        capabilities: capabilities
-          .filter((capability) => capability.mcpServerId === server.id)
-          .sort((a, b) => a.upstreamName.localeCompare(b.upstreamName)),
+        capabilities: [...(server.capabilities ?? [])].sort((a, b) =>
+          a.upstreamName.localeCompare(b.upstreamName),
+        ),
       }));
-  }, [data?.factoryMcpCapabilities, factory?.mcpServers]);
+  }, [factory?.mcpServers]);
   const showSkills = section === "all" || section === "skills";
   const showMcp = section === "all" || section === "mcp";
 

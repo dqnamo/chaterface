@@ -154,9 +154,10 @@ function createGatewayServer(
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const capabilities = await listMcpCapabilitiesByIds(
-      workerToken.capabilityIds,
-    );
+    const capabilities = await listMcpCapabilitiesByIds({
+      capabilityIds: workerToken.capabilityIds,
+      factoryId: workerToken.factoryId,
+    });
 
     return {
       tools: [
@@ -184,6 +185,7 @@ function createGatewayServer(
 
     const capability = await getMcpCapabilityByNamespacedName(
       workerToken.capabilityIds,
+      workerToken.factoryId,
       toolRequest.params.name,
     );
 

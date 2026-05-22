@@ -53,7 +53,7 @@ export default function FactoryMonogram({
         {initials}
       </span>
       {badgeCount > 0 ? (
-        <span className="-top-1.5 -right-1.5 absolute flex min-w-5 items-center justify-center rounded-md border-2 border-grayscale-1 bg-accent-9 px-1 text-center font-mono text-[11px] text-white leading-4">
+        <span className="-top-1.5 -right-1.5 absolute flex min-w-5 items-center justify-center rounded-lg border-2 border-grayscale-1 bg-blue-9 px-1 text-center font-mono text-[11px] text-white leading-4">
           <NumberFlow value={badgeCount} />
         </span>
       ) : null}

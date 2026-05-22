@@ -200,7 +200,13 @@ export async function listMcpCapabilitiesForConnection(mcpServerId: string) {
   return result.factoryMcpCapabilities as McpCapabilityRecord[];
 }
 
-export async function listMcpCapabilitiesByIds(capabilityIds: string[]) {
+export async function listMcpCapabilitiesByIds({
+  capabilityIds,
+  factoryId,
+}: {
+  capabilityIds: string[];
+  factoryId: string;
+}) {
   if (capabilityIds.length === 0) {
     return [];
   }
@@ -211,6 +217,9 @@ export async function listMcpCapabilitiesByIds(capabilityIds: string[]) {
       db.query({
         factoryMcpCapabilities: {
           $: { where: { id: capabilityId } },
+          mcpServer: {
+            factory: {},
+          },
         },
       }),
     ),
@@ -218,8 +227,14 @@ export async function listMcpCapabilitiesByIds(capabilityIds: string[]) {
   const ids = new Set(capabilityIds);
 
   return results
-    .flatMap((result) => result.factoryMcpCapabilities as McpCapabilityRecord[])
-    .filter((capability) => ids.has(capability.id));
+    .flatMap(
+      (result) =>
+        result.factoryMcpCapabilities as (McpCapabilityRecord & {
+          mcpServer?: { factory?: { id?: string } };
+        })[],
+    )
+    .filter((capability) => ids.has(capability.id))
+    .filter((capability) => capability.mcpServer?.factory?.id === factoryId);
 }
 
 export async function listEnabledMcpCapabilitiesForFactory(factoryId: string) {
@@ -258,6 +273,7 @@ export async function listEnabledMcpCapabilitiesForFactory(factoryId: string) {
 
 export async function getMcpCapabilityByNamespacedName(
   capabilityIds: string[],
+  factoryId: string,
   namespacedName: string,
 ) {
   if (capabilityIds.length === 0) {
@@ -268,16 +284,20 @@ export async function getMcpCapabilityByNamespacedName(
   const result = await db.query({
     factoryMcpCapabilities: {
       $: { where: { namespacedName } },
+      mcpServer: {
+        factory: {},
+      },
     },
   });
   const capability = result.factoryMcpCapabilities[0] as
-    | McpCapabilityRecord
+    | (McpCapabilityRecord & { mcpServer?: { factory?: { id?: string } } })
     | undefined;
   const ids = new Set(capabilityIds);
 
   if (
     !capability ||
     !ids.has(capability.id) ||
+    capability.mcpServer?.factory?.id !== factoryId ||
     !capability.enabled ||
     capability.capabilityType !== "tool"
   ) {

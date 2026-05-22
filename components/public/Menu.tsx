@@ -139,7 +139,7 @@ const GroupLabel = ({
 }: React.ComponentProps<typeof BaseMenu.GroupLabel>) => (
   <BaseMenu.GroupLabel
     className={cn(
-      "px-2 pb-1 pt-1.5 font-bold text-grayscale-9 text-tiny uppercase tracking-wide",
+      "px-2 pb-1 pt-1.5 text-grayscale-9 text-xs tracking-wide",
       className,
     )}
     {...props}

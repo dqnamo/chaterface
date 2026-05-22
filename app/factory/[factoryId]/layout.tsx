@@ -10,7 +10,7 @@ import {
   ListIcon,
   PlusIcon,
   SignOutIcon,
-  UserCircleIcon,
+  UserIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { DateTime } from "luxon";
@@ -276,7 +276,7 @@ function FactoryToolsRail({
   const links = [
     {
       href: `/factory/${factoryId}`,
-      icon: <ChatsTeardropIcon aria-hidden="true" size={17} weight="bold" />,
+      icon: <ChatsTeardropIcon aria-hidden="true" size={18} weight="bold" />,
       isActive:
         currentPathname === `/factory/${factoryId}` ||
         currentPathname.startsWith(`/factory/${factoryId}/workers/`),
@@ -284,7 +284,7 @@ function FactoryToolsRail({
     },
     {
       href: `/factory/${factoryId}/mcp`,
-      icon: <DesktopTowerIcon aria-hidden="true" size={17} weight="bold" />,
+      icon: <DesktopTowerIcon aria-hidden="true" size={18} weight="bold" />,
       isActive: [
         `/factory/${factoryId}/secrets`,
         `/factory/${factoryId}/skills`,
@@ -294,7 +294,7 @@ function FactoryToolsRail({
     },
     {
       href: `/factory/${factoryId}/settings`,
-      icon: <FadersIcon aria-hidden="true" size={17} weight="bold" />,
+      icon: <FadersIcon aria-hidden="true" size={18} weight="bold" />,
       isActive: [`/factory/${factoryId}/settings`].includes(currentPathname),
       label: "Settings",
     },
@@ -626,7 +626,11 @@ function UserRailMenu({
     <Menu.Composed
       positionerProps={{ align: "end", side: "right", sideOffset: 8 }}
       popupProps={{ className: "min-w-48" }}
-      trigger={<UserCircleIcon aria-hidden="true" size={22} weight="bold" />}
+      trigger={
+        <div className="size-10 flex items-center justify-center rounded-lg border-grayscale-3 bg-grayscale-1 p-0 text-grayscale-11 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2 dark:bg-grayscale-2 dark:hover:bg-grayscale-3 dark:data-[popup-open]:bg-grayscale-3">
+          <UserIcon aria-hidden="true" size={22} weight="bold" />
+        </div>
+      }
       triggerProps={{
         "aria-label": "Open user menu",
         className:
@@ -640,7 +644,7 @@ function UserRailMenu({
             <Menu.GroupLabel className="normal-case tracking-normal">
               Signed in as
             </Menu.GroupLabel>
-            <div className="max-w-56 truncate px-2 pb-1 text-grayscale-11 text-xs">
+            <div className="max-w-56 truncate px-2 pb-1 text-grayscale-11 text-sm">
               {userEmail}
             </div>
           </Menu.Group>
