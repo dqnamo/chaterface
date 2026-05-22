@@ -9,12 +9,7 @@ import {
   syncWorkerPorts,
   upsertWorkerPort,
 } from "@/lib/factory/worker-ports";
-import {
-  type AppSandbox,
-  createPreviewUrl,
-  listPreviewUrls,
-  runSandboxCommand,
-} from "@/lib/sandbox/service";
+import { createPreviewUrl, listPreviewUrls } from "@/lib/sandbox/service";
 
 export const runtime = "nodejs";
 
@@ -67,7 +62,6 @@ export async function POST(request: Request) {
   try {
     const port = parseWorkerPort(body.port);
     const sandbox = await getAuthenticatedWorkerSandbox(workerToken);
-    await assertSandboxPortIsPreviewable(sandbox, port);
     const publicUrl = await createPreviewUrl(sandbox, port, {
       basicAuth: body.basicAuth === true,
       bearerToken: body.bearerToken === true,
@@ -117,59 +111,5 @@ function errorResponse(error: unknown, fallback: string) {
   return Response.json(
     { error: error instanceof Error ? error.message : fallback },
     { status: 500 },
-  );
-}
-
-async function assertSandboxPortIsPreviewable(
-  sandbox: AppSandbox,
-  port: number,
-) {
-  const socketResult = await runSandboxCommand(
-    sandbox,
-    "if command -v ss >/dev/null 2>&1; then ss -ltnH; elif command -v netstat >/dev/null 2>&1; then netstat -ltn; else echo __NO_SOCKET_TOOL__; fi",
-    5_000,
-  );
-  const listeners = parseListeningAddresses(socketResult.output, port);
-
-  if (listeners.length === 0) {
-    throw new Error(
-      `No service is listening on port ${port}. Start the dev server first and verify it with curl http://127.0.0.1:${port}.`,
-    );
-  }
-
-  if (listeners.every(isLoopbackAddress)) {
-    throw new Error(
-      `Port ${port} is only listening on ${listeners.join(", ")}. Restart the dev server bound to 0.0.0.0, for example: npm run dev -- --host 0.0.0.0`,
-    );
-  }
-}
-
-function parseListeningAddresses(output: string, port: number) {
-  const portSuffix = `:${port}`;
-
-  return output
-    .split(/\r?\n/)
-    .filter((line) => /\bLISTEN\b/i.test(line))
-    .flatMap((line) =>
-      line
-        .trim()
-        .split(/\s+/)
-        .filter(
-          (token) => token.endsWith(portSuffix) || token.endsWith(`.${port}`),
-        )
-        .map((token) =>
-          token
-            .replace(/^\[([^\]]+)\]:(\d+)$/, "$1:$2")
-            .replace(/^\*:/, "0.0.0.0:"),
-        ),
-    );
-}
-
-function isLoopbackAddress(address: string) {
-  return (
-    address.startsWith("127.") ||
-    address.startsWith("localhost:") ||
-    address.startsWith("::1:") ||
-    address.startsWith("[::1]:")
   );
 }
