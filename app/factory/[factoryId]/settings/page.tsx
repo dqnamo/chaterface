@@ -4,6 +4,7 @@ import { TrashIcon, WarningIcon } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
+import FactorySettingsShell from "@/components/factory/FactorySettingsShell";
 import Button from "@/components/public/Button";
 import { cn } from "@/helpers/classname-helper";
 import {
@@ -140,8 +141,8 @@ function FactorySettingsPageContent({
   }
 
   return (
-    <main className="min-h-dvh px-4 py-8">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+    <FactorySettingsShell factoryId={factoryId}>
+      <div className="flex w-full max-w-2xl flex-col gap-6">
         <div className="flex flex-col py-2">
           <h1>Factory settings</h1>
           <p className="text-grayscale-10 text-sm">
@@ -250,6 +251,6 @@ function FactorySettingsPageContent({
           </div>
         </section>
       </div>
-    </main>
+    </FactorySettingsShell>
   );
 }
