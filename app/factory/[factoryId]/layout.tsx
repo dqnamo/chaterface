@@ -11,6 +11,7 @@ import {
   PlusIcon,
   SignOutIcon,
   UserIcon,
+  UsersThreeIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { DateTime } from "luxon";
@@ -44,6 +45,13 @@ type WorkerRecord = {
   status: string;
 };
 
+type SupervisorMembershipRecord = {
+  factory?: FactoryRecord;
+  id: string;
+  status: string;
+  user?: { id?: string };
+};
+
 type WorkerStatusTone = {
   className: string;
   isSpinner?: boolean;
@@ -69,15 +77,29 @@ function FactoryLayoutContent({
   const { factoryId } = useParams<{ factoryId: string }>();
   const pathname = usePathname();
   const { isLoading: isAuthLoading, user } = instantDb.useAuth();
+  const userEmail = user?.email ?? undefined;
+  const userId = user?.id;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { data, isLoading, error } = instantDb.useQuery(
-    user?.id
+    userId
       ? {
           $users: {
-            $: { where: { id: user.id } },
+            $: { where: { id: userId } },
             ownedFactories: {
               workers: {},
             },
+            supervisedMemberships: {
+              factory: {
+                workers: {},
+              },
+            },
+          },
+          supervisors: {
+            $: { where: { email: userEmail ?? "" } },
+            factory: {
+              workers: {},
+            },
+            user: {},
           },
           factories: {
             $: { where: { id: factoryId } },
@@ -87,9 +109,29 @@ function FactoryLayoutContent({
       : null,
   );
   const currentUser = data?.$users?.[0];
-  const factories = [
-    ...((currentUser?.ownedFactories ?? []) as FactoryRecord[]),
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  const ownedFactories = (
+    (currentUser?.ownedFactories ?? []) as FactoryRecord[]
+  ).sort((a, b) => a.name.localeCompare(b.name));
+  const supervisedFactories = (
+    [
+      ...(currentUser?.supervisedMemberships ?? []),
+      ...(data?.supervisors ?? []),
+    ] as SupervisorMembershipRecord[]
+  )
+    .filter(
+      (membership) => membership.status !== "removed" && membership.factory,
+    )
+    .map((membership) => membership.factory as FactoryRecord)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const factoriesById = new Map<string, FactoryRecord>();
+
+  for (const candidate of [...ownedFactories, ...supervisedFactories]) {
+    factoriesById.set(candidate.id, candidate);
+  }
+
+  const factories = [...factoriesById.values()].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
   const factory = factories.find((candidate) => candidate.id === factoryId);
   const factoryWithWorkers = data?.factories?.[0] as
     | FactoryWithWorkersRecord
@@ -105,6 +147,49 @@ function FactoryLayoutContent({
       router.replace("/login");
     }
   }, [isAuthLoading, router, user]);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function claimSupervisorInvites() {
+      const invites = (data?.supervisors ?? []).filter(
+        (membership) => membership.status === "invited" && !membership.user?.id,
+      ) as SupervisorMembershipRecord[];
+
+      if (invites.length === 0) {
+        return;
+      }
+
+      const now = new Date().toISOString();
+
+      await instantDb.transact(
+        invites.flatMap((invite) => [
+          instantDb.tx.supervisors[invite.id].update({
+            acceptedAt: now,
+            status: "active",
+            updatedAt: now,
+          }),
+          instantDb.tx.supervisors[invite.id].link({
+            user: userId,
+          }),
+        ]),
+      );
+
+      if (!isCancelled) {
+        router.refresh();
+      }
+    }
+
+    claimSupervisorInvites().catch(console.error);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [data?.supervisors, instantDb, router, userId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: close sidebar on navigation
   useEffect(() => {
@@ -273,6 +358,19 @@ function FactoryToolsRail({
   factoryId: string;
   onNavigate?: () => void;
 }) {
+  const [hash, setHash] = useState("");
+
+  useEffect(() => {
+    function syncHash() {
+      setHash(window.location.hash);
+    }
+
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+
   const links = [
     {
       href: `/factory/${factoryId}`,
@@ -295,8 +393,18 @@ function FactoryToolsRail({
     {
       href: `/factory/${factoryId}/settings`,
       icon: <FadersIcon aria-hidden="true" size={18} weight="bold" />,
-      isActive: [`/factory/${factoryId}/settings`].includes(currentPathname),
+      isActive:
+        currentPathname === `/factory/${factoryId}/settings` &&
+        hash !== "#supervisors",
       label: "Settings",
+    },
+    {
+      href: `/factory/${factoryId}/settings#supervisors`,
+      icon: <UsersThreeIcon aria-hidden="true" size={18} weight="bold" />,
+      isActive:
+        currentPathname === `/factory/${factoryId}/settings` &&
+        hash === "#supervisors",
+      label: "Supervisors",
     },
   ];
 

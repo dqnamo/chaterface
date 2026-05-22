@@ -11,6 +11,13 @@ type FactoryRecord = {
   name: string;
 };
 
+type SupervisorMembershipRecord = {
+  factory?: FactoryRecord;
+  id: string;
+  status: string;
+  user?: { id?: string };
+};
+
 export default function FactoriesPage() {
   return <FactoriesPageContent instantDb={db} />;
 }
@@ -18,12 +25,22 @@ export default function FactoriesPage() {
 function FactoriesPageContent({ instantDb }: { instantDb: AppDb }) {
   const router = useRouter();
   const { isLoading: isAuthLoading, user } = instantDb.useAuth();
+  const userEmail = user?.email ?? undefined;
+  const userId = user?.id;
   const { data, isLoading, error } = instantDb.useQuery(
-    user?.id
+    userId
       ? {
           $users: {
-            $: { where: { id: user.id } },
+            $: { where: { id: userId } },
             ownedFactories: {},
+            supervisedMemberships: {
+              factory: {},
+            },
+          },
+          supervisors: {
+            $: { where: { email: userEmail ?? "" } },
+            factory: {},
+            user: {},
           },
         }
       : null,
@@ -36,13 +53,76 @@ function FactoriesPageContent({ instantDb }: { instantDb: AppDb }) {
   }, [isAuthLoading, router, user]);
 
   const currentUser = data?.$users?.[0];
-  const factories = useMemo(
-    () =>
-      [...((currentUser?.ownedFactories ?? []) as FactoryRecord[])].sort(
-        (a, b) => a.name.localeCompare(b.name),
-      ),
-    [currentUser?.ownedFactories],
-  );
+  const factories = useMemo(() => {
+    const ownedFactories = (currentUser?.ownedFactories ??
+      []) as FactoryRecord[];
+    const supervisorFactories = (
+      [
+        ...(currentUser?.supervisedMemberships ?? []),
+        ...(data?.supervisors ?? []),
+      ] as SupervisorMembershipRecord[]
+    )
+      .filter(
+        (membership) => membership.status !== "removed" && membership.factory,
+      )
+      .map((membership) => membership.factory as FactoryRecord);
+    const factoriesById = new Map<string, FactoryRecord>();
+
+    for (const factory of [...ownedFactories, ...supervisorFactories]) {
+      factoriesById.set(factory.id, factory);
+    }
+
+    return [...factoriesById.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [
+    currentUser?.ownedFactories,
+    currentUser?.supervisedMemberships,
+    data?.supervisors,
+  ]);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function claimSupervisorInvites() {
+      const invites = (data?.supervisors ?? []).filter(
+        (membership) => membership.status === "invited" && !membership.user?.id,
+      ) as SupervisorMembershipRecord[];
+
+      if (invites.length === 0) {
+        return;
+      }
+
+      const now = new Date().toISOString();
+
+      await instantDb.transact(
+        invites.flatMap((invite) => [
+          instantDb.tx.supervisors[invite.id].update({
+            acceptedAt: now,
+            status: "active",
+            updatedAt: now,
+          }),
+          instantDb.tx.supervisors[invite.id].link({
+            user: userId,
+          }),
+        ]),
+      );
+
+      if (!isCancelled) {
+        router.refresh();
+      }
+    }
+
+    claimSupervisorInvites().catch(console.error);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [data?.supervisors, instantDb, router, userId]);
 
   useEffect(() => {
     if (isAuthLoading || isLoading || !user || error) {

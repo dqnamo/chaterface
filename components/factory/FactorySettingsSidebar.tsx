@@ -1,6 +1,6 @@
 "use client";
 
-import { FadersIcon, WarningIcon } from "@phosphor-icons/react";
+import { FadersIcon, UsersThreeIcon, WarningIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
@@ -10,6 +10,11 @@ const settingsSections = [
     icon: <FadersIcon aria-hidden="true" size={15} weight="bold" />,
     id: "general",
     label: "General",
+  },
+  {
+    icon: <UsersThreeIcon aria-hidden="true" size={15} weight="bold" />,
+    id: "supervisors",
+    label: "Supervisors",
   },
   {
     icon: <WarningIcon aria-hidden="true" size={15} weight="bold" />,
@@ -31,8 +36,12 @@ export default function FactorySettingsSidebar({
 
   useEffect(() => {
     function syncHash() {
+      const sectionId = window.location.hash.replace("#", "");
+
       setActiveSectionId(
-        window.location.hash === "#danger-zone" ? "danger-zone" : "general",
+        settingsSections.some((section) => section.id === sectionId)
+          ? sectionId
+          : "general",
       );
     }
 

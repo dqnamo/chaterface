@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/db.server";
+import { sendSupervisorInviteEmail } from "@/lib/supervisor-invitations";
 import {
   getWorkerForUserMessage,
   triggerWorkerRunTask,
@@ -11,6 +12,20 @@ type EventRecord = {
   id: string;
   source?: string;
   type?: string;
+};
+
+type SupervisorRecord = {
+  email?: string;
+  id: string;
+  invitedByEmail?: string;
+  status?: string;
+};
+
+type SupervisorWithFactory = SupervisorRecord & {
+  factory?: {
+    id?: string;
+    name?: string;
+  };
 };
 
 export async function POST(request: Request) {
@@ -74,6 +89,68 @@ export async function POST(request: Request) {
         workerId,
       });
     }),
+    typedHandlers("supervisors", "create", async (record) => {
+      const supervisor = record.after as SupervisorRecord | null;
+
+      if (!supervisor || supervisor.status !== "invited" || !supervisor.email) {
+        return;
+      }
+
+      const supervisorWithFactory = await getSupervisorWithFactory(
+        db,
+        supervisor.id,
+      );
+      const factory = supervisorWithFactory?.factory;
+
+      if (!factory?.id || !factory.name) {
+        logInstantWebhook("warn", "Supervisor invite has no factory link", {
+          idempotencyKey: record.idempotencyKey,
+          supervisorId: supervisor.id,
+        });
+        return;
+      }
+
+      try {
+        const inviteResult = await sendSupervisorInviteEmail({
+          factoryId: factory.id,
+          factoryName: factory.name,
+          invitedByEmail: supervisor.invitedByEmail,
+          request,
+          supervisorEmail: supervisor.email,
+        });
+        const now = new Date().toISOString();
+        const emailUpdate = {
+          inviteEmailSentAt: now,
+          ...(inviteResult.skipped
+            ? { inviteEmailError: inviteResult.reason }
+            : {}),
+          ...(!inviteResult.skipped && inviteResult.emailId
+            ? { resendEmailId: inviteResult.emailId }
+            : {}),
+        };
+
+        await db.transact(db.tx.supervisors[supervisor.id].update(emailUpdate));
+
+        logInstantWebhook("info", "Supervisor invite email processed", {
+          emailSkipped: inviteResult.skipped,
+          factoryId: factory.id,
+          supervisorId: supervisor.id,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Supervisor invite email could not be sent.";
+
+        await db.transact(
+          db.tx.supervisors[supervisor.id].update({
+            inviteEmailError: message,
+          }),
+        );
+
+        throw error;
+      }
+    }),
   );
 
   try {
@@ -100,6 +177,20 @@ async function findWorkerIdForUserMessage(
   const event = result.events[0] as { worker?: { id?: string } } | undefined;
 
   return event?.worker?.id;
+}
+
+async function getSupervisorWithFactory(
+  db: ReturnType<typeof getAdminDb>,
+  supervisorId: string,
+) {
+  const result = await db.query({
+    supervisors: {
+      $: { where: { id: supervisorId } },
+      factory: {},
+    },
+  });
+
+  return result.supervisors[0] as SupervisorWithFactory | undefined;
 }
 
 function getErrorMessage(error: unknown) {
