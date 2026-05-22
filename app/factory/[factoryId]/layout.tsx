@@ -20,7 +20,6 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
-import FactorySidebarNavLink from "@/components/factory/FactorySidebarNavLink";
 import Button from "@/components/public/Button";
 import { Menu } from "@/components/public/Menu";
 import { cn } from "@/helpers/classname-helper";
@@ -147,6 +146,10 @@ function FactoryLayoutContent({
       </aside>
 
       <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
+        <FactoryToolsRail currentPathname={pathname} factoryId={factoryId} />
+      </aside>
+
+      <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
         <WorkerSidebar
           currentPathname={pathname}
           factoryId={factoryId}
@@ -188,6 +191,12 @@ function FactoryLayoutContent({
                 userEmail={user.email}
               />
             </div>
+            <FactoryToolsRail
+              className="w-full"
+              currentPathname={pathname}
+              factoryId={factoryId}
+              onNavigate={() => setIsSidebarOpen(false)}
+            />
             <WorkerSidebar
               className="w-full"
               currentPathname={pathname}
@@ -224,6 +233,94 @@ function FactoryLayoutContent({
   );
 }
 
+function FactoryToolsRail({
+  className,
+  currentPathname,
+  factoryId,
+  onNavigate,
+}: {
+  className?: string;
+  currentPathname: string;
+  factoryId: string;
+  onNavigate?: () => void;
+}) {
+  const links = [
+    {
+      href: `/factory/${factoryId}/secrets`,
+      icon: <LockKeyIcon aria-hidden="true" size={17} weight="bold" />,
+      label: "Secrets",
+    },
+    {
+      href: `/factory/${factoryId}/skills`,
+      icon: <FilesIcon aria-hidden="true" size={17} weight="bold" />,
+      label: "Skills",
+    },
+    {
+      href: `/factory/${factoryId}/mcp`,
+      icon: <PlugsConnectedIcon aria-hidden="true" size={17} weight="bold" />,
+      label: "MCP",
+    },
+    {
+      href: `/factory/${factoryId}/settings`,
+      icon: <FadersIcon aria-hidden="true" size={17} weight="bold" />,
+      label: "Settings",
+    },
+  ];
+
+  return (
+    <nav
+      aria-label="Factory tools"
+      className={cn(
+        "flex h-full w-14 shrink-0 flex-col items-center gap-1 border-grayscale-3 border-b p-2 md:border-b-0",
+        "max-md:h-auto max-md:w-full max-md:flex-row max-md:justify-between",
+        className,
+      )}
+    >
+      {links.map((link) => (
+        <FactoryToolsRailLink
+          currentPathname={currentPathname}
+          href={link.href}
+          icon={link.icon}
+          key={link.href}
+          label={link.label}
+          onNavigate={onNavigate}
+        />
+      ))}
+    </nav>
+  );
+}
+
+function FactoryToolsRailLink({
+  currentPathname,
+  href,
+  icon,
+  label,
+  onNavigate,
+}: {
+  currentPathname: string;
+  href: string;
+  icon: ReactNode;
+  label: string;
+  onNavigate?: () => void;
+}) {
+  const isActive = currentPathname === href;
+
+  return (
+    <Link
+      aria-label={label}
+      className={cn(
+        "flex size-10 shrink-0 items-center justify-center rounded-lg text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+        isActive && "bg-grayscale-3 text-grayscale-12 hover:bg-grayscale-3",
+      )}
+      href={href}
+      onClick={onNavigate}
+      title={label}
+    >
+      {icon}
+    </Link>
+  );
+}
+
 function WorkerSidebar({
   className,
   currentPathname,
@@ -245,48 +342,6 @@ function WorkerSidebar({
   return (
     <div className={cn("flex h-full min-h-0 w-64 flex-col", className)}>
       <nav className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 flex-col gap-1 border-b border-grayscale-3 p-2">
-          {/* <FactorySidebarNavLink
-            currentPathname={currentPathname}
-            href={`/factory/${factoryId}`}
-            icon={<PlusIcon aria-hidden="true" size={14} weight="bold" />}
-            label="New worker"
-            onNavigate={onNavigate}
-          /> */}
-          <h2 className="px-2 pb-1 mt-2 font-mono font-semibold text-grayscale-10 text-xs uppercase">
-            Factory
-          </h2>
-          <FactorySidebarNavLink
-            currentPathname={currentPathname}
-            href={`/factory/${factoryId}/secrets`}
-            icon={<LockKeyIcon aria-hidden="true" size={15} weight="bold" />}
-            label="Secrets"
-            onNavigate={onNavigate}
-          />
-          <FactorySidebarNavLink
-            currentPathname={currentPathname}
-            href={`/factory/${factoryId}/skills`}
-            icon={<FilesIcon aria-hidden="true" size={15} weight="bold" />}
-            label="Skills"
-            onNavigate={onNavigate}
-          />
-          <FactorySidebarNavLink
-            currentPathname={currentPathname}
-            href={`/factory/${factoryId}/mcp`}
-            icon={
-              <PlugsConnectedIcon aria-hidden="true" size={15} weight="bold" />
-            }
-            label="MCP"
-            onNavigate={onNavigate}
-          />
-          <FactorySidebarNavLink
-            currentPathname={currentPathname}
-            href={`/factory/${factoryId}/settings`}
-            icon={<FadersIcon aria-hidden="true" size={15} weight="bold" />}
-            label="Settings"
-            onNavigate={onNavigate}
-          />
-        </div>
         <div className="p-2 scroll-mask-y scroll-mask-y-from-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           <Button
             href={`/factory/${factoryId}`}
