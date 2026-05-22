@@ -149,10 +149,13 @@ function FactorySettingsPageContent({
           </p>
         </div>
 
-        <section className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1">
+        <section
+          className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1"
+          id="general"
+        >
           <div className="border-grayscale-3 border-b px-3 py-2">
             <h2 className="font-mono font-bold text-[11px] text-grayscale-10 uppercase tracking-wide">
-              Factory color
+              General
             </h2>
           </div>
           <div className="flex flex-col gap-4 px-3 py-3">
@@ -208,7 +211,10 @@ function FactorySettingsPageContent({
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-red-6 bg-red-2">
+        <section
+          className="overflow-hidden rounded-lg border border-red-6 bg-red-2"
+          id="danger-zone"
+        >
           <div className="border-red-6 border-b px-3 py-2">
             <h2 className="font-mono font-bold text-[11px] text-red-11 uppercase tracking-wide">
               Danger zone

@@ -4,6 +4,7 @@ import NumberFlow from "@number-flow/react";
 import {
   ChatsTeardropIcon,
   CircleNotchIcon,
+  DesktopTowerIcon,
   FadersIcon,
   GearSixIcon,
   ListIcon,
@@ -17,6 +18,7 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import FactoryComputerSidebar from "@/components/factory/FactoryComputerSidebar";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import FactorySettingsSidebar from "@/components/factory/FactorySettingsSidebar";
 import Button from "@/components/public/Button";
@@ -124,6 +126,7 @@ function FactoryLayoutContent({
     (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
   );
   const isSettingsSection = isFactorySettingsPath(pathname, factoryId);
+  const isComputerSection = isFactoryComputerPath(pathname, factoryId);
 
   if (!isLoading && !factory) {
     return (
@@ -152,6 +155,8 @@ function FactoryLayoutContent({
       <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
         {isSettingsSection ? (
           <FactorySettingsSidebar factoryId={factoryId} />
+        ) : isComputerSection ? (
+          <FactoryComputerSidebar factoryId={factoryId} />
         ) : (
           <WorkerSidebar
             currentPathname={pathname}
@@ -203,6 +208,12 @@ function FactoryLayoutContent({
             />
             {isSettingsSection ? (
               <FactorySettingsSidebar
+                className="w-full"
+                factoryId={factoryId}
+                onNavigate={() => setIsSidebarOpen(false)}
+              />
+            ) : isComputerSection ? (
+              <FactoryComputerSidebar
                 className="w-full"
                 factoryId={factoryId}
                 onNavigate={() => setIsSidebarOpen(false)}
@@ -266,14 +277,19 @@ function FactoryToolsRail({
       label: "Workers",
     },
     {
-      href: `/factory/${factoryId}/settings`,
-      icon: <FadersIcon aria-hidden="true" size={17} weight="bold" />,
+      href: `/factory/${factoryId}/mcp`,
+      icon: <DesktopTowerIcon aria-hidden="true" size={17} weight="bold" />,
       isActive: [
-        `/factory/${factoryId}/settings`,
         `/factory/${factoryId}/secrets`,
         `/factory/${factoryId}/skills`,
         `/factory/${factoryId}/mcp`,
       ].includes(currentPathname),
+      label: "Computer",
+    },
+    {
+      href: `/factory/${factoryId}/settings`,
+      icon: <FadersIcon aria-hidden="true" size={17} weight="bold" />,
+      isActive: [`/factory/${factoryId}/settings`].includes(currentPathname),
       label: "Settings",
     },
   ];
@@ -302,8 +318,11 @@ function FactoryToolsRail({
 }
 
 function isFactorySettingsPath(pathname: string, factoryId: string) {
+  return pathname === `/factory/${factoryId}/settings`;
+}
+
+function isFactoryComputerPath(pathname: string, factoryId: string) {
   return [
-    `/factory/${factoryId}/settings`,
     `/factory/${factoryId}/secrets`,
     `/factory/${factoryId}/skills`,
     `/factory/${factoryId}/mcp`,

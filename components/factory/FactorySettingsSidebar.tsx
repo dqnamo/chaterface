@@ -1,35 +1,20 @@
 "use client";
 
-import {
-  FadersIcon,
-  FilesIcon,
-  LockKeyIcon,
-  PlugsConnectedIcon,
-} from "@phosphor-icons/react";
+import { FadersIcon, WarningIcon } from "@phosphor-icons/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
 
 const settingsSections = [
   {
     icon: <FadersIcon aria-hidden="true" size={15} weight="bold" />,
-    label: "Settings",
-    path: "settings",
+    id: "general",
+    label: "General",
   },
   {
-    icon: <LockKeyIcon aria-hidden="true" size={15} weight="bold" />,
-    label: "Secrets",
-    path: "secrets",
-  },
-  {
-    icon: <FilesIcon aria-hidden="true" size={15} weight="bold" />,
-    label: "Skills",
-    path: "skills",
-  },
-  {
-    icon: <PlugsConnectedIcon aria-hidden="true" size={15} weight="bold" />,
-    label: "MCP",
-    path: "mcp",
+    icon: <WarningIcon aria-hidden="true" size={15} weight="bold" />,
+    id: "danger-zone",
+    label: "Danger zone",
   },
 ];
 
@@ -42,7 +27,20 @@ export default function FactorySettingsSidebar({
   factoryId: string;
   onNavigate?: () => void;
 }) {
-  const pathname = usePathname();
+  const [activeSectionId, setActiveSectionId] = useState("general");
+
+  useEffect(() => {
+    function syncHash() {
+      setActiveSectionId(
+        window.location.hash === "#danger-zone" ? "danger-zone" : "general",
+      );
+    }
+
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
 
   return (
     <div className={cn("flex h-full min-h-0 w-64 flex-col p-2", className)}>
@@ -51,8 +49,8 @@ export default function FactorySettingsSidebar({
           Settings
         </h2>
         {settingsSections.map((section) => {
-          const href = `/factory/${factoryId}/${section.path}`;
-          const isActive = pathname === href;
+          const href = `/factory/${factoryId}/settings#${section.id}`;
+          const isActive = activeSectionId === section.id;
 
           return (
             <Link
@@ -62,7 +60,7 @@ export default function FactorySettingsSidebar({
                   "bg-grayscale-3 text-grayscale-12 hover:bg-grayscale-3",
               )}
               href={href}
-              key={section.path}
+              key={section.id}
               onClick={onNavigate}
             >
               {section.icon}
