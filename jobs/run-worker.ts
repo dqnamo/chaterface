@@ -1,8 +1,6 @@
 import { id } from "@instantdb/admin";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
-import { getFactoryMcpGatewayUrl } from "@/lib/app-url";
+import { getAppPublicUrl, getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import {
   cleanCommandOutput,
   ensureLatestCodexOnSandbox,
@@ -15,6 +13,10 @@ import {
 } from "@/lib/codex/sandbox-auth";
 import { decryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
+import {
+  createFactoryWorkerApiToken,
+  factoryWorkerTokenHeader,
+} from "@/lib/factory/worker-api-auth";
 import { listEnabledMcpCapabilitiesForFactory } from "@/lib/mcp/records";
 import { createMcpWorkerToken } from "@/lib/mcp/run-tokens";
 import {
@@ -152,6 +154,15 @@ export const runWorkerTask = task({
         factoryId: worker.factory.id,
         workerId: worker.id,
       });
+      const factoryApiToken = await createFactoryWorkerApiToken({
+        factoryId: worker.factory.id,
+        workerId: worker.id,
+      });
+      const workerApiConfig = {
+        apiUrl: getAppPublicUrl(),
+        token: factoryApiToken,
+        tokenHeader: factoryWorkerTokenHeader,
+      };
 
       if (!worker.sandboxId && !defaultCheckpointId) {
         await failWorker(
@@ -176,6 +187,11 @@ export const runWorkerTask = task({
         ? await connectSandbox(worker.sandboxId)
         : await createWorkerSandbox({
             checkpointId: defaultCheckpointId ?? "",
+            env: {
+              FACTORY_API_URL: workerApiConfig.apiUrl,
+              FACTORY_WORKER_API_TOKEN: workerApiConfig.token,
+              FACTORY_WORKER_TOKEN_HEADER: workerApiConfig.tokenHeader,
+            },
             factoryId: worker.factory.id,
             workerId: worker.id,
           });
@@ -252,6 +268,7 @@ export const runWorkerTask = task({
         sandboxId,
         secretsCount: Object.keys(secrets).length,
         mcpEnabled: Boolean(mcpConfig),
+        workerApiEnabled: true,
         workerId: worker.id,
       });
 
@@ -264,6 +281,7 @@ export const runWorkerTask = task({
         secrets,
         sessionId: worker.codexSessionId,
         workerId: worker.id,
+        workerApiConfig,
       });
       const pid = await waitForWorkerPid({ sandbox, workerId: worker.id });
 
@@ -778,85 +796,30 @@ async function getWorkerMcpConfig({
   factoryId: string;
   workerId: string;
 }) {
-  if (!process.env.APP_PUBLIC_URL?.trim()) {
-    throw new Error("APP_PUBLIC_URL is required for worker MCP gateway access");
+  const capabilities = await listEnabledMcpCapabilitiesForFactory(factoryId);
+
+  if (capabilities.length === 0) {
+    return undefined;
   }
 
-  const capabilities = await listEnabledMcpCapabilitiesForFactory(factoryId);
+  if (!process.env.APP_PUBLIC_URL?.trim()) {
+    throw new Error("APP_PUBLIC_URL is required for MCP-enabled workers");
+  }
+
   const gatewayUrl = getFactoryMcpGatewayUrl();
 
   if (!gatewayUrl.startsWith("https://")) {
-    throw new Error(
-      "APP_PUBLIC_URL must be HTTPS for worker MCP gateway access",
-    );
+    throw new Error("APP_PUBLIC_URL must be HTTPS for MCP-enabled workers");
   }
 
-  const token = await createMcpWorkerToken({
-    capabilityIds: capabilities.map((capability) => capability.id),
-    factoryId,
-    workerId,
-  });
-
-  logTaskStep("info", "Preflighting Factory MCP gateway", {
-    capabilityCount: capabilities.length,
-    factoryId,
+  return {
     gatewayUrl,
-    workerId,
-  });
-
-  await verifyFactoryMcpGateway({
-    gatewayUrl,
-    token,
-  });
-
-  return { gatewayUrl, token };
-}
-
-async function verifyFactoryMcpGateway({
-  gatewayUrl,
-  token,
-}: {
-  gatewayUrl: string;
-  token: string;
-}) {
-  const client = new Client(
-    { name: "software-factory-worker-preflight", version: "0.1.0" },
-    { capabilities: {} },
-  );
-  const transport = new StreamableHTTPClientTransport(new URL(gatewayUrl), {
-    requestInit: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  });
-
-  try {
-    await client.connect(transport);
-    const tools = await client.listTools();
-    const toolNames = tools.tools.map((tool) => tool.name);
-
-    logTaskStep("info", "Factory MCP gateway preflight succeeded", {
-      gatewayUrl,
-      toolCount: toolNames.length,
-      toolNames,
-    });
-
-    if (!toolNames.includes("factory__expose_port")) {
-      throw new Error("Factory MCP gateway did not list factory control tools");
-    }
-  } catch (error) {
-    logTaskStep("error", "Factory MCP gateway preflight failed", {
-      error: serializeError(error),
-      gatewayUrl,
-    });
-
-    throw new Error(
-      `Factory MCP gateway preflight failed: ${formatErrorForMessage(error)}`,
-    );
-  } finally {
-    await client.close().catch(() => null);
-  }
+    token: await createMcpWorkerToken({
+      capabilityIds: capabilities.map((capability) => capability.id),
+      factoryId,
+      workerId,
+    }),
+  };
 }
 
 function logTaskStep(
@@ -903,22 +866,6 @@ function serializeError(error: unknown) {
   }
 
   return { message: String(error) };
-}
-
-function formatErrorForMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    try {
-      return JSON.stringify(toJsonValue(error));
-    } catch {
-      return String(error);
-    }
-  }
-
-  return String(error);
 }
 
 function truncateForLog(value: string, maxLength = 2_000) {

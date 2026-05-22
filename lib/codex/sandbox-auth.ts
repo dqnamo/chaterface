@@ -22,10 +22,16 @@ const codexModel = "gpt-5.5";
 const factoryWorkerInstructions = `You are running inside a Software Factory worker sandbox.
 
 You have access to the repository workspace at /home/user/workspace.
-When a local web server or previewable service is useful, start it inside the sandbox and use the factory__expose_port MCP tool. The factory will create a public URL and show it in the worker UI.
-Use factory__list_public_urls to inspect currently exposed ports and factory__delete_public_url to remove a public URL.
-When you need an external MCP server or integration that is not currently available, use the factory__request_mcp_connection MCP tool with the server name, URL, auth type, optional scopes, and reason. The factory owner will complete connection from the worker chat.
-Do not ask for or handle sandbox provider API keys.
+When a local web server or previewable service is useful, start it inside the sandbox and expose it with the worker API:
+curl -sS -X POST "$FACTORY_API_URL/api/worker/ports" -H "Content-Type: application/json" -H "$FACTORY_WORKER_TOKEN_HEADER: $FACTORY_WORKER_API_TOKEN" -d '{"port":5173}'
+The factory will create a public URL and show it in the worker UI. You can pass "basicAuth": true or "bearerToken": true in the JSON body when the preview should require generated auth.
+List exposed ports with:
+curl -sS "$FACTORY_API_URL/api/worker/ports" -H "$FACTORY_WORKER_TOKEN_HEADER: $FACTORY_WORKER_API_TOKEN"
+Delete a public URL with:
+curl -sS -X DELETE "$FACTORY_API_URL/api/worker/ports/5173" -H "$FACTORY_WORKER_TOKEN_HEADER: $FACTORY_WORKER_API_TOKEN"
+When you need an external MCP server or integration that is not currently available, request it with:
+curl -sS -X POST "$FACTORY_API_URL/api/worker/mcp-requests" -H "Content-Type: application/json" -H "$FACTORY_WORKER_TOKEN_HEADER: $FACTORY_WORKER_API_TOKEN" -d '{"name":"GitHub","url":"https://example.com/mcp","authType":"oauth","reason":"Needed for this task"}'
+Do not print or expose FACTORY_WORKER_API_TOKEN, and do not ask for or handle sandbox provider API keys.
 `;
 
 export async function createDefaultFactoryCheckpoint({
@@ -154,6 +160,7 @@ export async function streamCodexExec({
   secrets,
   sessionId,
   workerId,
+  workerApiConfig,
 }: {
   imagePaths?: string[];
   mcpConfig?: {
@@ -166,6 +173,11 @@ export async function streamCodexExec({
   secrets?: Record<string, string>;
   sessionId?: string;
   workerId: string;
+  workerApiConfig?: {
+    apiUrl: string;
+    token: string;
+    tokenHeader: string;
+  };
 }) {
   return streamSandboxCommand(
     sandbox,
@@ -177,6 +189,7 @@ export async function streamCodexExec({
       secrets,
       sessionId,
       workerId,
+      workerApiConfig,
     }),
   );
 }
@@ -236,6 +249,7 @@ function createCodexExecCommand({
   secrets = {},
   sessionId,
   workerId,
+  workerApiConfig,
 }: {
   imagePaths?: string[];
   mcpConfig?: {
@@ -247,6 +261,11 @@ function createCodexExecCommand({
   secrets?: Record<string, string>;
   sessionId?: string;
   workerId: string;
+  workerApiConfig?: {
+    apiUrl: string;
+    token: string;
+    tokenHeader: string;
+  };
 }) {
   const workerDir = `${factoryDir}/workers/${workerId}`;
   const pidPath = getWorkerPidPath(workerId);
@@ -256,6 +275,13 @@ function createCodexExecCommand({
   const secretEnv = createSecretsEnv(secrets);
   const mcpEnv = mcpConfig
     ? `export FACTORY_MCP_WORKER_TOKEN=${shellQuote(mcpConfig.token)}`
+    : "";
+  const workerApiEnv = workerApiConfig
+    ? [
+        `export FACTORY_API_URL=${shellQuote(workerApiConfig.apiUrl)}`,
+        `export FACTORY_WORKER_API_TOKEN=${shellQuote(workerApiConfig.token)}`,
+        `export FACTORY_WORKER_TOKEN_HEADER=${shellQuote(workerApiConfig.tokenHeader)}`,
+      ].join(" && ")
     : "";
   const mcpArgs = mcpConfig
     ? [
@@ -302,7 +328,7 @@ function createCodexExecCommand({
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
-    `setsid /bin/bash -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(sandboxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
+    `setsid /bin/bash -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${workerApiEnv ? `${workerApiEnv} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(sandboxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
     "pid=$!",
     `echo "$pid" > ${shellQuote(pidPath)}`,
     'wait "$pid"',
