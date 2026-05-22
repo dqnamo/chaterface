@@ -1,3 +1,4 @@
+import NumberFlow from "@number-flow/react";
 import type { CSSProperties } from "react";
 import { cn } from "@/helpers/classname-helper";
 import {
@@ -6,10 +7,12 @@ import {
 } from "@/helpers/factory-colors";
 
 export default function FactoryMonogram({
+  badgeCount = 0,
   color,
   name,
   selected,
 }: {
+  badgeCount?: number;
   color?: FactoryColorValue | null | string;
   name: string;
   selected?: boolean;
@@ -25,7 +28,7 @@ export default function FactoryMonogram({
   return (
     <div
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold uppercase transition-opacity",
+        "relative flex size-10 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold uppercase transition-opacity",
         selected === false && "opacity-50 hover:opacity-75",
         selected === true && "opacity-100",
       )}
@@ -37,6 +40,11 @@ export default function FactoryMonogram({
       }}
     >
       {initials}
+      {badgeCount > 0 ? (
+        <span className="-top-1.5 -right-1.5 absolute flex min-w-5 items-center justify-center rounded-full border border-grayscale-1 bg-green-9 px-1 text-center font-mono text-[11px] text-white leading-4 shadow-sm">
+          <NumberFlow value={badgeCount} />
+        </span>
+      ) : null}
     </div>
   );
 }

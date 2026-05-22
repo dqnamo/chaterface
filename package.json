@@ -18,6 +18,7 @@
     "@instantdb/admin": "^1.0.35",
     "@instantdb/react": "^1.0.35",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@number-flow/react": "^0.6.0",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/colors": "^3.0.0",
     "@trigger.dev/sdk": "^4.4.6",

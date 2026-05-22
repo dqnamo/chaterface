@@ -1,5 +1,6 @@
 "use client";
 
+import NumberFlow from "@number-flow/react";
 import {
   CircleNotchIcon,
   FadersIcon,
@@ -32,6 +33,7 @@ type FactoryRecord = {
   id: string;
   name: string;
   status: string;
+  workers?: WorkerRecord[];
 };
 
 type WorkerRecord = {
@@ -72,7 +74,9 @@ function FactoryLayoutContent({
       ? {
           $users: {
             $: { where: { id: user.id } },
-            ownedFactories: {},
+            ownedFactories: {
+              workers: {},
+            },
           },
           factories: {
             $: { where: { id: factoryId } },
@@ -332,7 +336,8 @@ function WorkerSidebarSection({
   return (
     <section>
       <h2 className="px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
-        {title}
+        <span>{title}</span>
+        <NumberFlow className="ml-2 tabular-nums" value={workers.length} />
       </h2>
       <div className="flex flex-col gap-px">
         {workers.map((worker) => (
@@ -389,7 +394,6 @@ function WorkerSidebarLink({
               statusTone.className,
             )}
             role="img"
-            title={statusTone.label}
             weight="bold"
           />
         ) : (
@@ -473,6 +477,7 @@ function SidebarContent({
               onClick={onNavigate}
             >
               <FactoryMonogram
+                badgeCount={getIdleWorkerCount(candidate.workers)}
                 color={candidate.color}
                 name={candidate.name}
                 selected={candidate.id === activeFactoryId}
@@ -488,6 +493,10 @@ function SidebarContent({
       />
     </div>
   );
+}
+
+function getIdleWorkerCount(workers?: WorkerRecord[]) {
+  return (workers ?? []).filter((worker) => worker.status === "idle").length;
 }
 
 function UserRailMenu({
