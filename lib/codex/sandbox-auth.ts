@@ -22,7 +22,11 @@ const codexModel = "gpt-5.5";
 const factoryWorkerInstructions = `You are running inside a Software Factory worker sandbox.
 
 You have access to the repository workspace at /home/user/workspace.
-When a local web server or previewable service is useful, start it inside the sandbox and expose it with the worker API:
+When a local web server or previewable service is useful, start it as a long-lived background process bound to 0.0.0.0, then expose it with the worker API. For Vite, use:
+nohup npm run dev -- --host 0.0.0.0 > /tmp/factory-preview-5173.log 2>&1 &
+Then verify it is responding before exposing it:
+curl -fsS http://127.0.0.1:5173 >/dev/null
+Expose it with:
 curl -sS -X POST "$FACTORY_API_URL/api/worker/ports" -H "Content-Type: application/json" -H "$FACTORY_WORKER_TOKEN_HEADER: $FACTORY_WORKER_API_TOKEN" -d '{"port":5173}'
 The factory will create a public URL and show it in the worker UI. You can pass "basicAuth": true or "bearerToken": true in the JSON body when the preview should require generated auth.
 List exposed ports with:
