@@ -1,6 +1,6 @@
 import { id } from "@instantdb/admin";
 import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
-import { getAppPublicUrl, getFactoryMcpGatewayUrl } from "@/lib/app-url";
+import { getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import {
   cleanCommandOutput,
   ensureLatestCodexOnSandbox,
@@ -13,7 +13,6 @@ import {
 } from "@/lib/codex/sandbox-auth";
 import { decryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
-import { createFactoryWorkerApiToken } from "@/lib/factory/worker-api-auth";
 import { listEnabledMcpCapabilitiesForFactory } from "@/lib/mcp/records";
 import { createMcpWorkerToken } from "@/lib/mcp/run-tokens";
 import {
@@ -171,22 +170,10 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
 
-      const factoryApiToken = worker.sandboxId
-        ? undefined
-        : await createFactoryWorkerApiToken({
-            factoryId: worker.factory.id,
-            workerId: worker.id,
-          });
       const sandbox = worker.sandboxId
         ? await connectSandbox(worker.sandboxId)
         : await createWorkerSandbox({
             checkpointId: defaultCheckpointId ?? "",
-            env: factoryApiToken
-              ? {
-                  FACTORY_API_URL: getAppPublicUrl(),
-                  FACTORY_WORKER_API_TOKEN: factoryApiToken,
-                }
-              : undefined,
             factoryId: worker.factory.id,
             workerId: worker.id,
           });
@@ -790,15 +777,12 @@ async function getWorkerMcpConfig({
   workerId: string;
 }) {
   const capabilities = await listEnabledMcpCapabilitiesForFactory(factoryId);
-
-  if (!process.env.APP_PUBLIC_URL?.trim() && capabilities.length === 0) {
-    return undefined;
-  }
-
   const gatewayUrl = getFactoryMcpGatewayUrl();
 
   if (!gatewayUrl.startsWith("https://")) {
-    throw new Error("APP_PUBLIC_URL must be HTTPS for MCP-enabled workers");
+    throw new Error(
+      "APP_PUBLIC_URL must be HTTPS for worker MCP gateway access",
+    );
   }
 
   return {

@@ -1,5 +1,3 @@
-import { getAppPublicUrl } from "@/lib/app-url";
-import { factoryWorkerTokenHeader } from "@/lib/factory/worker-api-auth";
 import {
   type AppSandbox,
   createCheckpoint,
@@ -16,7 +14,6 @@ export const sandboxWorkspace = "/home/user/workspace";
 export const sandboxFactoryDir = "/home/user/.factoryplane";
 
 const factoryDir = sandboxFactoryDir;
-const factoryBinDir = `${factoryDir}/bin`;
 const codexNpmPrefix = `${factoryDir}/npm-global`;
 const codexBinDir = `${codexNpmPrefix}/bin`;
 const codexAuthArchivePath = `${factoryDir}/codex-auth.tgz`;
@@ -25,10 +22,10 @@ const codexModel = "gpt-5.5";
 const factoryWorkerInstructions = `You are running inside a Software Factory worker sandbox.
 
 You have access to the repository workspace at /home/user/workspace.
-When a local web server or previewable service is useful, start it inside the sandbox and run factory expose <port>. The factory will create a public URL and show it in the worker UI.
-Use factory ports to inspect currently exposed ports and factory delete-port <port> to remove a public URL.
-When you need an external MCP server or integration that is not currently available, run factory request-mcp --name <name> --url <http-mcp-url> --auth <oauth|bearer_token> with optional --scopes and --reason. The factory owner will complete connection from the worker chat.
-Do not ask for or handle sandbox provider API keys. The factory CLI authenticates with FACTORY_WORKER_API_TOKEN; do not print or expose that token.
+When a local web server or previewable service is useful, start it inside the sandbox and use the factory__expose_port MCP tool. The factory will create a public URL and show it in the worker UI.
+Use factory__list_public_urls to inspect currently exposed ports and factory__delete_public_url to remove a public URL.
+When you need an external MCP server or integration that is not currently available, use the factory__request_mcp_connection MCP tool with the server name, URL, auth type, optional scopes, and reason. The factory owner will complete connection from the worker chat.
+Do not ask for or handle sandbox provider API keys.
 `;
 
 export async function createDefaultFactoryCheckpoint({
@@ -257,10 +254,6 @@ function createCodexExecCommand({
   const workerPrompt = `${factoryWorkerInstructions}\n\nUser task:\n${prompt}`;
   const secretsPath = `${factoryDir}/secrets.env`;
   const secretEnv = createSecretsEnv(secrets);
-  const factoryCliPath = `${factoryBinDir}/factory`;
-  const factoryCliScript = createFactoryCliScript(getAppPublicUrl());
-  const factoryCliInstallCommands =
-    createFactoryCliInstallCommands(factoryCliPath);
   const mcpEnv = mcpConfig
     ? `export FACTORY_MCP_WORKER_TOKEN=${shellQuote(mcpConfig.token)}`
     : "";
@@ -304,9 +297,6 @@ function createCodexExecCommand({
 
   return [
     `mkdir -p ${shellQuote(workerDir)}`,
-    `mkdir -p ${shellQuote(factoryBinDir)}`,
-    `printf %s ${shellQuote(factoryCliScript)} > ${shellQuote(factoryCliPath)} && chmod +x ${shellQuote(factoryCliPath)}`,
-    ...factoryCliInstallCommands,
     `rm -f ${shellQuote(pidPath)}`,
     `printf %s ${shellQuote(workerPrompt)} > ${shellQuote(promptPath)}`,
     secretEnv
@@ -319,126 +309,8 @@ function createCodexExecCommand({
   ].join("\n");
 }
 
-function createFactoryCliInstallCommands(factoryCliPath: string) {
-  const pathExport = `export PATH=${factoryBinDir}:$HOME/.local/bin:$PATH`;
-
-  return [
-    `mkdir -p "$HOME/.local/bin"`,
-    `ln -sf ${shellQuote(factoryCliPath)} "$HOME/.local/bin/factory"`,
-    `if test -d /usr/local/bin; then ln -sf ${shellQuote(factoryCliPath)} /usr/local/bin/factory 2>/dev/null || sudo -n ln -sf ${shellQuote(factoryCliPath)} /usr/local/bin/factory 2>/dev/null || true; fi`,
-    ...["$HOME/.bash_profile", "$HOME/.bashrc", "$HOME/.profile"].map(
-      (profilePath) =>
-        `touch ${profilePath} && grep -qxF ${shellQuote(pathExport)} ${profilePath} || printf '\\n%s\\n' ${shellQuote(pathExport)} >> ${profilePath}`,
-    ),
-  ];
-}
-
 function createCodexPathExport() {
-  return `export PATH=${shellQuote(factoryBinDir)}:${shellQuote(codexBinDir)}:$PATH;`;
-}
-
-function createFactoryCliScript(factoryApiBaseUrl: string) {
-  return `#!/usr/bin/env node
-const factoryApiBaseUrl = process.env.FACTORY_API_URL || ${JSON.stringify(factoryApiBaseUrl)};
-const factoryWorkerApiToken = process.env.FACTORY_WORKER_API_TOKEN || "";
-const factoryWorkerTokenHeader = ${JSON.stringify(factoryWorkerTokenHeader)};
-
-function usage() {
-  console.error(\`Usage:
-  factory expose <port> [--bearer-token] [--basic-auth]
-  factory ports
-  factory delete-port <port>
-  factory request-mcp --name <name> --url <url> [--auth oauth|bearer_token] [--scopes <scopes>] [--reason <reason>]\`);
-}
-
-function readOption(args, name) {
-  const index = args.indexOf(name);
-  if (index === -1) return undefined;
-  const value = args[index + 1];
-  if (!value || value.startsWith("--")) {
-    throw new Error(\`\${name} requires a value\`);
-  }
-  return value;
-}
-
-function hasFlag(args, name) {
-  return args.includes(name);
-}
-
-async function request(path, options = {}) {
-  const response = await fetch(\`\${factoryApiBaseUrl}\${path}\`, {
-    ...options,
-    headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(factoryWorkerApiToken ? { [factoryWorkerTokenHeader]: factoryWorkerApiToken } : {}),
-      ...(options.headers || {}),
-    },
-  });
-  const body = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error(body?.error || \`Factory API request failed: \${response.status}\`);
-  }
-
-  return body;
-}
-
-async function main() {
-  const [command, ...args] = process.argv.slice(2);
-
-  if (command === "expose") {
-    const port = Number(args[0]);
-    const result = await request("/api/worker/ports", {
-      method: "POST",
-      body: JSON.stringify({
-        basicAuth: hasFlag(args, "--basic-auth"),
-        bearerToken: hasFlag(args, "--bearer-token"),
-        port,
-      }),
-    });
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
-  if (command === "ports") {
-    const result = await request("/api/worker/ports");
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
-  if (command === "delete-port") {
-    const port = Number(args[0]);
-    const result = await request(\`/api/worker/ports/\${port}\`, {
-      method: "DELETE",
-    });
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
-  if (command === "request-mcp") {
-    const result = await request("/api/worker/mcp-requests", {
-      method: "POST",
-      body: JSON.stringify({
-        authType: readOption(args, "--auth") || "oauth",
-        name: readOption(args, "--name"),
-        reason: readOption(args, "--reason"),
-        scopes: readOption(args, "--scopes"),
-        url: readOption(args, "--url"),
-      }),
-    });
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
-  usage();
-  process.exitCode = 1;
-}
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
-`;
+  return `export PATH=${shellQuote(codexBinDir)}:$PATH;`;
 }
 
 function getWorkerPidPath(workerId: string) {
