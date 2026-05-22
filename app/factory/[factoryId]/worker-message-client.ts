@@ -32,11 +32,6 @@ export async function triggerWorkerRun({
     return null;
   }
 
-  if (worker?.status === "retired") {
-    onError("This worker has been retired.");
-    return null;
-  }
-
   if (!userRefreshToken) {
     onError("You must be signed in to run a worker.");
     return null;
@@ -82,6 +77,7 @@ export async function triggerWorkerRun({
         }),
       ),
       instantDb.tx.workers[workerId].update({
+        retiredAt: null,
         status: nextStatus,
         updatedAt: now,
         ...(isNewWorker
@@ -145,11 +141,6 @@ export async function queueWorkerMessage({
     return false;
   }
 
-  if (worker.status === "retired") {
-    onError("This worker has been retired.");
-    return false;
-  }
-
   if (!userRefreshToken) {
     onError("You must be signed in to queue a message.");
     return false;
@@ -194,6 +185,8 @@ export async function queueWorkerMessage({
         }),
       ),
       instantDb.tx.workers[worker.id].update({
+        retiredAt: null,
+        status: worker.status === "retired" ? "queued" : worker.status,
         updatedAt: now,
       }),
     ]);

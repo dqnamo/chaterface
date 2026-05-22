@@ -2,6 +2,7 @@ import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
 import {
   getWorkerForUserMessage,
   triggerWorkerRunTask,
+  unretireWorkerForRun,
 } from "@/lib/worker-run-trigger";
 
 export const runtime = "nodejs";
@@ -75,15 +76,15 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   if (worker.status === "retired") {
-    logWorkerRunRoute("warn", "Worker run request worker retired", {
+    await unretireWorkerForRun({
+      now: requestedAt,
+      workerId,
+    });
+    logWorkerRunRoute("info", "Worker unretired by run request", {
       userId: user.id,
       userMessageEventId,
       workerId,
     });
-    return Response.json(
-      { error: "This worker has been retired." },
-      { status: 400 },
-    );
   }
 
   if (!worker.events?.some((event) => event.id === userMessageEventId)) {

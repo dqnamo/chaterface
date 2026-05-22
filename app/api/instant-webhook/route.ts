@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/db.server";
 import {
   getWorkerForUserMessage,
   triggerWorkerRunTask,
+  unretireWorkerForRun,
 } from "@/lib/worker-run-trigger";
 
 export const runtime = "nodejs";
@@ -50,15 +51,13 @@ export async function POST(request: Request) {
       }
 
       if (worker.status === "retired") {
-        logInstantWebhook(
-          "warn",
-          "User message event ignored for retired worker",
-          {
-            userMessageEventId: event.id,
-            workerId,
-          },
-        );
-        return;
+        await unretireWorkerForRun({
+          workerId,
+        });
+        logInstantWebhook("info", "Worker unretired by user message", {
+          userMessageEventId: event.id,
+          workerId,
+        });
       }
 
       const handle = await triggerWorkerRunTask({

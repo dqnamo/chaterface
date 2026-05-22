@@ -121,18 +121,24 @@ export const runWorkerTask = task({
       }
 
       if (worker.status === "retired") {
-        setRunMetadata("retired", {
+        await db.transact(
+          db.tx.workers[worker.id].update({
+            activeCommandId: null,
+            activePid: null,
+            retiredAt: null,
+            status: "queued",
+            updatedAt: now,
+          }),
+        );
+        worker.status = "queued";
+        setRunMetadata("unretired", {
           userMessageEventId: payload.userMessageEventId,
           workerId: worker.id,
         });
-        logTaskStep("info", "Worker is retired; skipping run", {
+        logTaskStep("info", "Worker unretired by run task", {
           userMessageEventId: payload.userMessageEventId,
           workerId: worker.id,
         });
-        return {
-          skipped: true,
-          workerId: worker.id,
-        };
       }
 
       const defaultSnapshotId = worker.factory.defaultSanpshotId;

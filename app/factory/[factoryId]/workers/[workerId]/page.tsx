@@ -44,6 +44,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   >("idle");
   const [retireError, setRetireError] = useState<string | null>(null);
   const [isRetiring, setIsRetiring] = useState(false);
+  const [isUnretiring, setIsUnretiring] = useState(false);
   const { data, isLoading, error } = instantDb.useQuery(
     workerId
       ? {
@@ -120,6 +121,43 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
       );
     } finally {
       setIsRetiring(false);
+    }
+  }
+
+  async function onUnretireWorker() {
+    if (!isRetired || isUnretiring) {
+      return;
+    }
+
+    if (!user) {
+      setRetireError("You must be signed in to unretire a worker.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    setIsUnretiring(true);
+    setRetireError(null);
+
+    try {
+      await instantDb.transact(
+        instantDb.tx.workers[selectedWorkerId].update({
+          activeCommandId: null,
+          activePid: null,
+          retiredAt: null,
+          status: "idle",
+          updatedAt: now,
+        }),
+      );
+    } catch (unretireWorkerError) {
+      console.error(unretireWorkerError);
+      setRetireError(
+        unretireWorkerError instanceof Error
+          ? unretireWorkerError.message
+          : "Worker could not be unretired.",
+      );
+    } finally {
+      setIsUnretiring(false);
     }
   }
 
@@ -212,14 +250,25 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
           >
             {baselineButtonLabel}
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={isRetired || isRetiring}
-            onClick={onRetireWorker}
-          >
-            {isRetiring ? "Retiring..." : "Retire worker"}
-          </Button>
+          {isRetired ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isUnretiring}
+              onClick={onUnretireWorker}
+            >
+              {isUnretiring ? "Unretiring..." : "Unretire worker"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isRetiring}
+              onClick={onRetireWorker}
+            >
+              {isRetiring ? "Retiring..." : "Retire worker"}
+            </Button>
+          )}
         </div>
       </header>
       <Dialog.Root

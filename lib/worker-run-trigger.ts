@@ -69,3 +69,23 @@ export async function triggerWorkerRunTask({
     },
   );
 }
+
+export async function unretireWorkerForRun({
+  now = new Date().toISOString(),
+  workerId,
+}: {
+  now?: string;
+  workerId: string;
+}) {
+  const db = getAdminDb();
+
+  await db.transact(
+    db.tx.workers[workerId].update({
+      activeCommandId: null,
+      activePid: null,
+      retiredAt: null,
+      status: "queued",
+      updatedAt: now,
+    }),
+  );
+}

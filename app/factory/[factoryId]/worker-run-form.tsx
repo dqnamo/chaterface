@@ -195,12 +195,12 @@ function WorkerPromptFormContent({
 
   const isRetired = worker.status === "retired";
   const isRunning = worker.status === "running";
-  const isInputDisabled = isRetired || isSending;
+  const isInputDisabled = isSending;
 
   return (
     <WorkerComposer
       attachments={attachments}
-      disabled={isRetired}
+      disabled={isSending}
       endActions={
         isRunning ? (
           <Button
@@ -232,7 +232,7 @@ function WorkerPromptFormContent({
       onSubmit={onSubmit}
       placeholder={
         isRetired
-          ? "This worker has been retired."
+          ? "Send a message to unretire this worker..."
           : "Send a message to the worker..."
       }
       prompt={prompt}
