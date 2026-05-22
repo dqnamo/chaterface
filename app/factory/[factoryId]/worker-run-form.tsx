@@ -92,10 +92,10 @@ function NewWorkerFormContent({
       error={error}
       fileInputRef={fileInputRef}
       isSending={isSending}
-      onAddAttachment={(event) =>
+      onAddAttachment={(files) =>
         addImageAttachments({
           currentAttachments: attachments,
-          event,
+          files,
           onError: setError,
           setAttachments,
         })
@@ -216,10 +216,10 @@ function WorkerPromptFormContent({
       error={error}
       fileInputRef={fileInputRef}
       isSending={isSending}
-      onAddAttachment={(event) =>
+      onAddAttachment={(files) =>
         addImageAttachments({
           currentAttachments: attachments,
-          event,
+          files,
           onError: setError,
           setAttachments,
         })

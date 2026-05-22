@@ -5,14 +5,17 @@ import { ImageSquare, X } from "@phosphor-icons/react";
 import type {
   ChangeEvent,
   Dispatch,
+  DragEvent,
   FormEvent,
   KeyboardEvent,
   ReactNode,
   RefObject,
   SetStateAction,
 } from "react";
+import { useState } from "react";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
+import { cn } from "@/helpers/classname-helper";
 
 export type ImageAttachment = {
   file: File;
@@ -52,7 +55,7 @@ export function WorkerComposer({
   error: string | null;
   fileInputRef: RefObject<HTMLInputElement | null>;
   isSending: boolean;
-  onAddAttachment: (event: ChangeEvent<HTMLInputElement>) => void;
+  onAddAttachment: (files: File[]) => void;
   onRemoveAttachment: (attachmentId: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   placeholder?: string;
@@ -66,13 +69,82 @@ export function WorkerComposer({
   const attachmentDisabled = disabled || isSending;
   const displayedSubmitLabel =
     isSending && attachments.length > 0 ? uploadingLabel : submitLabel;
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+
+  function onAttachmentInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    onAddAttachment(selectedFiles);
+  }
+
+  function onDragEnter(event: DragEvent<HTMLFormElement>) {
+    if (!hasDraggedFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!attachmentDisabled) {
+      setIsDraggingFiles(true);
+    }
+  }
+
+  function onDragOver(event: DragEvent<HTMLFormElement>) {
+    if (!hasDraggedFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = attachmentDisabled ? "none" : "copy";
+
+    if (!attachmentDisabled) {
+      setIsDraggingFiles(true);
+    }
+  }
+
+  function onDragLeave(event: DragEvent<HTMLFormElement>) {
+    if (!hasDraggedFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFiles(false);
+  }
+
+  function onDrop(event: DragEvent<HTMLFormElement>) {
+    if (!hasDraggedFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFiles(false);
+
+    if (!attachmentDisabled) {
+      onAddAttachment(Array.from(event.dataTransfer.files));
+    }
+  }
 
   return (
     <Card
       layer={0}
-      className="mx-auto w-full max-w-2xl bg-white dark:bg-grayscale-2 p-0"
+      className={cn(
+        "mx-auto w-full max-w-2xl bg-white dark:bg-grayscale-2 p-0 transition-colors",
+        isDraggingFiles &&
+          "border-accent-8 bg-accent-2 dark:bg-accent-3 ring-2 ring-accent-5",
+      )}
     >
-      <form onSubmit={onSubmit} className="flex flex-col">
+      <form
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onSubmit={onSubmit}
+        className="flex flex-col"
+      >
         <textarea
           id="worker-task"
           value={prompt}
@@ -100,7 +172,7 @@ export function WorkerComposer({
               className="sr-only"
               disabled={attachmentDisabled}
               multiple
-              onChange={onAddAttachment}
+              onChange={onAttachmentInputChange}
               ref={fileInputRef}
               type="file"
             />
@@ -131,17 +203,16 @@ export function WorkerComposer({
 
 export function addImageAttachments({
   currentAttachments,
-  event,
+  files,
   onError,
   setAttachments,
 }: {
   currentAttachments: ImageAttachment[];
-  event: ChangeEvent<HTMLInputElement>;
+  files: File[];
   onError: (error: string | null) => void;
   setAttachments: Dispatch<SetStateAction<ImageAttachment[]>>;
 }) {
-  const selectedFiles = Array.from(event.target.files ?? []);
-  event.target.value = "";
+  const selectedFiles = files;
 
   if (selectedFiles.length === 0) {
     return;
@@ -177,6 +248,10 @@ export function addImageAttachments({
   if (validAttachments.length > 0) {
     setAttachments((current) => [...current, ...validAttachments]);
   }
+}
+
+function hasDraggedFiles(event: DragEvent<HTMLElement>) {
+  return Array.from(event.dataTransfer.types).includes("Files");
 }
 
 export function removeImageAttachment(
