@@ -60,6 +60,7 @@ const _schema = i.schema({
       activeCommandId: i.string().indexed().optional(),
       activePid: i.number().optional(),
       codexSessionId: i.string().indexed().optional(),
+      codexSessionConfigVersion: i.string().indexed().optional(),
       createdAt: i.string().indexed().optional(),
       name: i.string().indexed().optional(),
       retiredAt: i.string().indexed().optional(),

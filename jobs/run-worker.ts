@@ -31,6 +31,7 @@ type WorkerRecord = {
   activeCommandId?: string;
   activePid?: number;
   codexSessionId?: string;
+  codexSessionConfigVersion?: string;
   factory?: {
     defaultSandboxCheckpointId?: string;
     id: string;
@@ -72,6 +73,8 @@ type JsonValue =
   | { [key: string]: JsonValue };
 
 type LogLevel = "debug" | "error" | "info" | "warn";
+
+const codexSessionConfigVersion = "factory-mcp-gateway-v1";
 
 export const runWorkerTask = task({
   id: "run-worker",
@@ -150,6 +153,11 @@ export const runWorkerTask = task({
         factoryId: worker.factory.id,
         workerId: worker.id,
       });
+      const shouldResumeCodexSession = Boolean(
+        worker.sandboxId &&
+          worker.codexSessionId &&
+          worker.codexSessionConfigVersion === codexSessionConfigVersion,
+      );
 
       if (!worker.sandboxId && !defaultCheckpointId) {
         await failWorker(
@@ -165,6 +173,8 @@ export const runWorkerTask = task({
       }
 
       setRunMetadata("creating_sandbox", {
+        codexSessionConfigVersion: worker.codexSessionConfigVersion,
+        resumeCodexSession: shouldResumeCodexSession,
         factoryId: worker.factory.id,
         resume: Boolean(worker.sandboxId),
         workerId: worker.id,
@@ -182,6 +192,8 @@ export const runWorkerTask = task({
         worker.status === "running" && typeof worker.activePid === "number";
 
       logTaskStep("info", "Sandbox ready", {
+        codexSessionConfigVersion: worker.codexSessionConfigVersion,
+        resumeCodexSession: shouldResumeCodexSession,
         resume: Boolean(worker.sandboxId),
         sandboxId,
         shouldInterrupt,
@@ -247,9 +259,11 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
       logTaskStep("info", "Worker marked running; starting Codex stream", {
+        codexSessionConfigVersion,
         sandboxId,
         secretsCount: Object.keys(secrets).length,
         mcpEnabled: Boolean(mcpConfig),
+        resumeCodexSession: shouldResumeCodexSession,
         workerId: worker.id,
       });
 
@@ -257,10 +271,10 @@ export const runWorkerTask = task({
         imagePaths,
         mcpConfig,
         prompt,
-        resume: Boolean(worker.sandboxId),
+        resume: shouldResumeCodexSession,
         sandbox,
         secrets,
-        sessionId: worker.codexSessionId,
+        sessionId: shouldResumeCodexSession ? worker.codexSessionId : undefined,
         workerId: worker.id,
       });
       const pid = await waitForWorkerPid({ sandbox, workerId: worker.id });
@@ -330,7 +344,7 @@ export const runWorkerTask = task({
               preview: truncateForLog(line),
               workerId: worker.id,
             });
-            await persistCodexLine(worker.id, line);
+            await persistCodexLine(worker.id, line, codexSessionConfigVersion);
           }
         }
 
@@ -341,7 +355,7 @@ export const runWorkerTask = task({
             preview: truncateForLog(buffer),
             workerId: worker.id,
           });
-          await persistCodexLine(worker.id, buffer);
+          await persistCodexLine(worker.id, buffer, codexSessionConfigVersion);
         }
       } catch (error) {
         logTaskStep("error", "Codex stream failed", {
@@ -529,7 +543,11 @@ function getAttachmentExtension(attachment: AttachmentRecord) {
   return match ? `.${match[1].toLowerCase()}` : ".png";
 }
 
-async function persistCodexLine(workerId: string, line: string) {
+async function persistCodexLine(
+  workerId: string,
+  line: string,
+  sessionConfigVersion: string,
+) {
   const trimmedLine = line.trim();
 
   if (!trimmedLine) {
@@ -558,6 +576,7 @@ async function persistCodexLine(workerId: string, line: string) {
     await db.transact(
       db.tx.workers[workerId].update({
         codexSessionId: sessionId,
+        codexSessionConfigVersion: sessionConfigVersion,
         updatedAt: new Date().toISOString(),
       }),
     );
