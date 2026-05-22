@@ -1,6 +1,6 @@
 import "server-only";
 
-import { e2bSandboxProvider } from "@/lib/sandbox/providers/e2b";
+import { upstashBoxProvider } from "@/lib/sandbox/providers/upstash-box";
 
 export type SandboxCommandResult = {
   exitCode: number;
@@ -31,7 +31,7 @@ export type SandboxPreviewAuthOptions = {
 
 export type AppSandbox = {
   id: string;
-  provider: "e2b";
+  provider: "upstash-box";
   raw: unknown;
 };
 
@@ -66,7 +66,7 @@ export type SandboxProvider = {
   ): Promise<AsyncIterable<SandboxStreamChunk>>;
 };
 
-const provider = e2bSandboxProvider;
+const provider = upstashBoxProvider;
 
 export function connectSandbox(sandboxId: string) {
   return provider.connectSandbox(sandboxId);

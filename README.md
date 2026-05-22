@@ -16,8 +16,7 @@ Open [http://localhost:3000](http://localhost:3000).
 Copy the variables from `.env.example` into `.env.local` and fill them in:
 
 - `NEXT_PUBLIC_INSTANT_APP_ID` from InstantDB
-- `E2B_API_KEY` from E2B
-- `E2B_SANDBOX_TEMPLATE`, optional E2B template alias/ID for factory and worker sandboxes
+- `UPSTASH_BOX_API_KEY` from Upstash Box
 - `TRIGGER_SECRET_KEY` from Trigger.dev
 - `APP_PUBLIC_URL`, the public HTTPS origin used for callbacks and webhooks
 - `STRIPE_SECRET_KEY` from Stripe
@@ -26,9 +25,8 @@ Copy the variables from `.env.example` into `.env.local` and fill them in:
 - `NEXT_PUBLIC_POSTHOG_TOKEN` from PostHog
 - `NEXT_PUBLIC_POSTHOG_HOST` from PostHog, defaults to `https://us.i.posthog.com`
 
-For larger E2B workers, build a custom E2B template with the desired
-`cpuCount` and `memoryMB`, then set `E2B_SANDBOX_TEMPLATE` to that template
-alias or ID before creating new factory checkpoints.
+Factory and worker sandboxes run on Upstash Box. Boxes auto-pause when idle and
+resume when the app reconnects or creates a public URL.
 
 ## Trigger.dev
 

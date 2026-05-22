@@ -6,12 +6,13 @@ import {
 import {
   deleteWorkerPort,
   getPublicUrlAuthType,
-  listWorkerPorts,
+  syncWorkerPorts,
   upsertWorkerPort,
 } from "@/lib/factory/worker-ports";
 import {
   type AppSandbox,
   createPreviewUrl,
+  listPreviewUrls,
   runSandboxCommand,
 } from "@/lib/sandbox/service";
 
@@ -31,12 +32,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    await getAuthenticatedWorkerSandbox(workerToken);
-    const ports = await listWorkerPorts(workerToken.workerId);
+    const sandbox = await getAuthenticatedWorkerSandbox(workerToken);
+    const ports = await listPreviewUrls(sandbox);
+
+    await syncWorkerPorts(workerToken.workerId, ports);
 
     return Response.json({
       ports: ports.map((port) => ({
-        authType: port.authType ?? "none",
+        authType: getPublicUrlAuthType(port),
         port: port.port,
         url: port.url,
       })),
@@ -77,7 +80,13 @@ export async function POST(request: Request) {
       workerId: workerToken.workerId,
     });
 
+    const origin = new URL(publicUrl.url).origin;
+
     return Response.json({
+      allowedOriginsHint: `If the app enforces host or origin checks, add ${origin} to its allowed hosts/origins configuration.`,
+      authConfig: publicUrl.authConfig,
+      message: `Save this URL and share it with the user: ${publicUrl.url}`,
+      origin,
       port: publicUrl.port,
       url: publicUrl.url,
     });

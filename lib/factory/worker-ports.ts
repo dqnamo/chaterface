@@ -5,8 +5,11 @@ import { getAdminDbCore } from "@/lib/admin-db-core";
 
 export type PublicUrlRecord = {
   authConfig?: Record<string, unknown>;
+  password?: string;
   port: number;
+  token?: string;
   url: string;
+  username?: string;
 };
 
 type PortRecord = {
@@ -24,10 +27,18 @@ export async function syncWorkerPorts(
 ) {
   const livePorts = new Set(publicUrls.map((publicUrl) => publicUrl.port));
   const existingPorts = await listWorkerPorts(workerId);
+  const existingAuthTypes = new Map(
+    existingPorts.map((port) => [port.port, port.authType]),
+  );
 
   for (const publicUrl of publicUrls) {
+    const authType = getPublicUrlAuthType(publicUrl);
+
     await upsertWorkerPort({
-      authType: getPublicUrlAuthType(publicUrl),
+      authType:
+        authType === "none"
+          ? (existingAuthTypes.get(publicUrl.port) ?? authType)
+          : authType,
       port: publicUrl.port,
       url: publicUrl.url,
       workerId,
@@ -82,11 +93,16 @@ export async function deleteWorkerPort(workerId: string, port: number) {
 }
 
 export function getPublicUrlAuthType(publicUrl: PublicUrlRecord) {
-  if (publicUrl.authConfig?.bearerToken === true) {
+  if (publicUrl.token || publicUrl.authConfig?.token) {
     return "bearer_token";
   }
 
-  if (publicUrl.authConfig?.basicAuth === true) {
+  if (
+    publicUrl.username ||
+    publicUrl.password ||
+    publicUrl.authConfig?.username ||
+    publicUrl.authConfig?.password
+  ) {
     return "basic_auth";
   }
 

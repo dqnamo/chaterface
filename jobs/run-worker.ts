@@ -183,24 +183,28 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
 
-      const sandbox = worker.sandboxId
-        ? await connectSandbox(worker.sandboxId)
-        : await createWorkerSandbox({
-            checkpointId: defaultCheckpointId ?? "",
-            env: {
-              FACTORY_API_URL: workerApiConfig.apiUrl,
-              FACTORY_WORKER_API_TOKEN: workerApiConfig.token,
-              FACTORY_WORKER_TOKEN_HEADER: workerApiConfig.tokenHeader,
-            },
-            factoryId: worker.factory.id,
-            workerId: worker.id,
-          });
-      const sandboxId = worker.sandboxId ?? sandbox.id;
+      const sandboxEnv = {
+        FACTORY_API_URL: workerApiConfig.apiUrl,
+        FACTORY_WORKER_API_TOKEN: workerApiConfig.token,
+        FACTORY_WORKER_TOKEN_HEADER: workerApiConfig.tokenHeader,
+      };
+      const { resumeCodexSession, sandbox, sandboxRecreated } =
+        await getOrCreateWorkerSandbox({
+          defaultCheckpointId,
+          env: sandboxEnv,
+          factoryId: worker.factory.id,
+          sandboxId: worker.sandboxId,
+          workerId: worker.id,
+        });
+      const sandboxId = sandbox.id;
       const shouldInterrupt =
-        worker.status === "running" && typeof worker.activePid === "number";
+        resumeCodexSession &&
+        worker.status === "running" &&
+        typeof worker.activePid === "number";
 
       logTaskStep("info", "Sandbox ready", {
-        resume: Boolean(worker.sandboxId),
+        resume: resumeCodexSession,
+        sandboxRecreated,
         sandboxId,
         shouldInterrupt,
         workerId: worker.id,
@@ -254,6 +258,8 @@ export const runWorkerTask = task({
       await db.transact(
         db.tx.workers[worker.id].update({
           activeCommandId: payload.userMessageEventId,
+          activePid: null,
+          codexSessionId: resumeCodexSession ? worker.codexSessionId : null,
           sandboxId,
           status: "running",
           updatedAt: now,
@@ -276,10 +282,10 @@ export const runWorkerTask = task({
         imagePaths,
         mcpConfig,
         prompt,
-        resume: Boolean(worker.sandboxId),
+        resume: resumeCodexSession,
         sandbox,
         secrets,
-        sessionId: worker.codexSessionId,
+        sessionId: resumeCodexSession ? worker.codexSessionId : undefined,
         workerId: worker.id,
         workerApiConfig,
       });
@@ -468,6 +474,72 @@ async function getUserMessageEvent(eventId: string) {
   });
 
   return result.events[0] as EventRecord | undefined;
+}
+
+async function getOrCreateWorkerSandbox({
+  defaultCheckpointId,
+  env,
+  factoryId,
+  sandboxId,
+  workerId,
+}: {
+  defaultCheckpointId?: string;
+  env: Record<string, string>;
+  factoryId: string;
+  sandboxId?: string;
+  workerId: string;
+}) {
+  if (sandboxId) {
+    try {
+      const sandbox = await connectSandbox(sandboxId);
+
+      return {
+        resumeCodexSession: true,
+        sandbox,
+        sandboxRecreated: false,
+      };
+    } catch (error) {
+      if (!isMissingSandboxError(error)) {
+        throw error;
+      }
+
+      logTaskStep("warn", "Worker sandbox was missing; creating replacement", {
+        error: serializeError(error),
+        sandboxId,
+        workerId,
+      });
+    }
+  }
+
+  if (!defaultCheckpointId) {
+    throw new Error("Factory default sandbox checkpoint is missing");
+  }
+
+  const sandbox = await createWorkerSandbox({
+    checkpointId: defaultCheckpointId,
+    env,
+    factoryId,
+    workerId,
+  });
+
+  return {
+    resumeCodexSession: false,
+    sandbox,
+    sandboxRecreated: Boolean(sandboxId),
+  };
+}
+
+function isMissingSandboxError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.name === "SandboxNotFoundError" ||
+    /box .*not found/i.test(error.message) ||
+    /sandbox .*not found/i.test(error.message) ||
+    /paused sandbox .*not found/i.test(error.message)
+  );
 }
 
 async function stageWorkerImageAttachments({
