@@ -259,7 +259,8 @@ function createCodexExecCommand({
   const secretEnv = createSecretsEnv(secrets);
   const factoryCliPath = `${factoryBinDir}/factory`;
   const factoryCliScript = createFactoryCliScript(getAppPublicUrl());
-  const factoryCliInstallCommands = createFactoryCliInstallCommands(factoryCliPath);
+  const factoryCliInstallCommands =
+    createFactoryCliInstallCommands(factoryCliPath);
   const mcpEnv = mcpConfig
     ? `export FACTORY_MCP_WORKER_TOKEN=${shellQuote(mcpConfig.token)}`
     : "";
