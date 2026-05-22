@@ -6,7 +6,7 @@
     "dev": "next dev",
     "trigger:dev": "npx trigger.dev@latest dev",
     "trigger:deploy": "npx trigger.dev@latest deploy",
-    "build": "next build",
+    "build": "VERCEL_PREVIEW_COMMENTS_ENABLED=0 next build",
     "start": "next start",
     "lint": "biome lint .",
     "format": "biome format --write .",
