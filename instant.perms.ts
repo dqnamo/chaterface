@@ -128,6 +128,17 @@ const rules = {
       delete: "false",
     },
   },
+  factoryGithubSettings: {
+    allow: {
+      view: "auth.id in data.ref('factory.owner.id')",
+      create: "false",
+      update: "false",
+      delete: "false",
+    },
+    fields: {
+      tokenEncrypted: "false",
+    },
+  },
   factoryMcpServers: {
     allow: {
       view: "auth.id in data.ref('factory.owner.id')",

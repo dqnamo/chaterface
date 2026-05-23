@@ -4,11 +4,20 @@ import {
   ArrowLeftIcon,
   CheckIcon,
   CpuIcon,
+  GithubLogoIcon,
   PlusIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useId, useState } from "react";
+import {
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+  useEffect,
+  useId,
+  useState,
+} from "react";
 import Button from "@/components/public/Button";
 import Input from "@/components/public/Input";
 import { cn } from "@/helpers/classname-helper";
@@ -16,7 +25,13 @@ import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { saveLastFactoryId } from "@/lib/factory/last-factory";
 
-type WizardStep = "factory" | "agent";
+type WizardStep = "factory" | "github" | "agent";
+
+type GithubRepositoryRow = {
+  id: string;
+  path: string;
+  url: string;
+};
 
 export default function NewFactoryPage() {
   return <NewFactoryWizard instantDb={db} />;
@@ -27,11 +42,20 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
   const { isLoading: isAuthLoading, user } = instantDb.useAuth();
   const [step, setStep] = useState<WizardStep>("factory");
   const [name, setName] = useState("");
+  const [gitName, setGitName] = useState("");
+  const [gitEmail, setGitEmail] = useState("");
+  const [githubToken, setGithubToken] = useState("");
+  const [githubRepositories, setGithubRepositories] = useState<
+    GithubRepositoryRow[]
+  >([]);
   const [addCodexAgent, setAddCodexAgent] = useState(true);
   const [codexAuthJsonText, setCodexAuthJsonText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const nameId = useId();
+  const gitNameId = useId();
+  const gitEmailId = useId();
+  const githubTokenId = useId();
   const authJsonId = useId();
 
   useEffect(() => {
@@ -40,7 +64,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
     }
   }, [isAuthLoading, router, user]);
 
-  function goToAgentStep(event: FormEvent<HTMLFormElement>) {
+  function goToGithubStep(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!name.trim()) {
@@ -48,6 +72,12 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
       return;
     }
 
+    setError(null);
+    setStep("github");
+  }
+
+  function goToAgentStep(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError(null);
     setStep("agent");
   }
@@ -91,6 +121,15 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
           codexAgent: {
             authJson: parsedCodexAuthJson.authJson,
             enabled: addCodexAgent,
+          },
+          github: {
+            gitEmail,
+            gitName,
+            repositories: githubRepositories.map((repository) => ({
+              path: repository.path,
+              url: repository.url,
+            })),
+            token: githubToken,
           },
           name: trimmedName,
         }),
@@ -154,7 +193,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
         {step === "factory" ? (
           <form
             className="rounded-lg border border-grayscale-3 bg-grayscale-1"
-            onSubmit={goToAgentStep}
+            onSubmit={goToGithubStep}
           >
             <div className="border-grayscale-3 border-b px-4 py-3">
               <h2 className="font-semibold text-sm">Factory details</h2>
@@ -177,6 +216,159 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
 
               <div className="flex justify-end">
                 <Button type="submit">Continue</Button>
+              </div>
+            </div>
+          </form>
+        ) : step === "github" ? (
+          <form
+            className="rounded-lg border border-grayscale-3 bg-grayscale-1"
+            onSubmit={goToAgentStep}
+          >
+            <div className="border-grayscale-3 border-b px-4 py-3">
+              <h2 className="font-semibold text-sm">GitHub setup</h2>
+            </div>
+            <div className="flex flex-col gap-4 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1.5" htmlFor={gitNameId}>
+                  <span className="font-medium text-sm">Git name</span>
+                  <Input
+                    id={gitNameId}
+                    value={gitName}
+                    onChange={(event) => setGitName(event.target.value)}
+                    placeholder="Ada Lovelace"
+                    autoComplete="name"
+                    disabled={isSaving}
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5" htmlFor={gitEmailId}>
+                  <span className="font-medium text-sm">Git email</span>
+                  <Input
+                    id={gitEmailId}
+                    value={gitEmail}
+                    onChange={(event) => setGitEmail(event.target.value)}
+                    placeholder="ada@example.com"
+                    autoComplete="email"
+                    disabled={isSaving}
+                  />
+                </label>
+              </div>
+
+              <label className="flex flex-col gap-1.5" htmlFor={githubTokenId}>
+                <span className="font-medium text-sm">GitHub token</span>
+                <Input
+                  id={githubTokenId}
+                  value={githubToken}
+                  onChange={(event) => setGithubToken(event.target.value)}
+                  placeholder="ghp_..."
+                  type="password"
+                  autoComplete="off"
+                  disabled={isSaving}
+                />
+                <span className="text-grayscale-10 text-xs">
+                  Used for HTTPS clones and saved in the factory computer.
+                </span>
+              </label>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-medium text-sm">Repositories</h3>
+                    <p className="text-grayscale-10 text-xs">
+                      Clone paths can be relative to /workspace/home.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      setGithubRepositories((current) => [
+                        ...current,
+                        { id: createRowId(), path: "", url: "" },
+                      ])
+                    }
+                    disabled={isSaving}
+                  >
+                    <PlusIcon size={14} weight="bold" aria-hidden="true" />
+                    Add repo
+                  </Button>
+                </div>
+
+                {githubRepositories.length === 0 ? (
+                  <div className="rounded-lg border border-grayscale-3 bg-grayscale-2 px-3 py-4 text-center text-grayscale-10 text-sm">
+                    No repositories configured.
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {githubRepositories.map((repository) => (
+                      <div
+                        key={repository.id}
+                        className="grid gap-2 rounded-lg border border-grayscale-3 bg-grayscale-2 p-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]"
+                      >
+                        <Input
+                          value={repository.url}
+                          onChange={(event) =>
+                            updateGithubRepository(
+                              setGithubRepositories,
+                              repository.id,
+                              "url",
+                              event.target.value,
+                            )
+                          }
+                          placeholder="https://github.com/org/repo.git"
+                          disabled={isSaving}
+                        />
+                        <Input
+                          value={repository.path}
+                          onChange={(event) =>
+                            updateGithubRepository(
+                              setGithubRepositories,
+                              repository.id,
+                              "path",
+                              event.target.value,
+                            )
+                          }
+                          placeholder="code/repo"
+                          disabled={isSaving}
+                        />
+                        <button
+                          type="button"
+                          className="flex size-9 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-10 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12"
+                          aria-label="Remove repository"
+                          onClick={() =>
+                            setGithubRepositories((current) =>
+                              current.filter(
+                                (candidate) => candidate.id !== repository.id,
+                              ),
+                            )
+                          }
+                          disabled={isSaving}
+                        >
+                          <TrashIcon
+                            size={15}
+                            weight="bold"
+                            aria-hidden="true"
+                          />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {error ? <ErrorNotice>{error}</ErrorNotice> : null}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setStep("factory")}
+                  disabled={isSaving}
+                >
+                  Back
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                  Continue
+                </Button>
               </div>
             </div>
           </form>
@@ -257,7 +449,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setStep("factory")}
+                  onClick={() => setStep("github")}
                   disabled={isSaving}
                 >
                   Back
@@ -278,11 +470,12 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
 function StepRail({ activeStep }: { activeStep: WizardStep }) {
   const steps = [
     { icon: CheckIcon, id: "factory", label: "Factory" },
+    { icon: GithubLogoIcon, id: "github", label: "GitHub" },
     { icon: CpuIcon, id: "agent", label: "Agent" },
   ] as const;
 
   return (
-    <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-3 gap-px">
+    <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-3 gap-px">
       {steps.map((step) => {
         const Icon = step.icon;
         const isActive = activeStep === step.id;
@@ -305,6 +498,25 @@ function StepRail({ activeStep }: { activeStep: WizardStep }) {
         );
       })}
     </div>
+  );
+}
+
+function updateGithubRepository(
+  setGithubRepositories: Dispatch<SetStateAction<GithubRepositoryRow[]>>,
+  id: string,
+  field: "path" | "url",
+  value: string,
+) {
+  setGithubRepositories((current) =>
+    current.map((repository) =>
+      repository.id === id ? { ...repository, [field]: value } : repository,
+    ),
+  );
+}
+
+function createRowId() {
+  return (
+    globalThis.crypto?.randomUUID?.() ?? String(Date.now() + Math.random())
   );
 }
 

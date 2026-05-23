@@ -84,6 +84,18 @@ const _schema = i.schema({
       skillPath: i.string().optional(),
       status: i.string().indexed(),
     }),
+    factoryGithubSettings: i.entity({
+      appliedAt: i.string().indexed().optional(),
+      createdAt: i.string().indexed(),
+      gitEmail: i.string().optional(),
+      gitName: i.string().optional(),
+      hasToken: i.boolean().optional(),
+      lastError: i.string().optional(),
+      repositories: i.json().optional(),
+      status: i.string().indexed(),
+      tokenEncrypted: i.string().optional(),
+      updatedAt: i.string().indexed(),
+    }),
     factoryMcpServers: i.entity({
       authStatus: i.string().indexed().optional(),
       authType: i.string().indexed().optional(),
@@ -246,6 +258,18 @@ const _schema = i.schema({
         on: "factories",
         has: "many",
         label: "skills",
+      },
+    },
+    factoryGithubSettings: {
+      forward: {
+        on: "factoryGithubSettings",
+        has: "one",
+        label: "factory",
+      },
+      reverse: {
+        on: "factories",
+        has: "one",
+        label: "githubSettings",
       },
     },
     factoryMcpServers: {

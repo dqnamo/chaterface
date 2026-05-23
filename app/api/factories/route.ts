@@ -1,9 +1,11 @@
 import { id } from "@instantdb/admin";
 import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
 import { BASIC_BILLING_PLAN, getTrialEndsAt } from "@/lib/billing";
+import { applyGithubSetup } from "@/lib/codex/github-setup";
 import { createDefaultFactoryCheckpoint } from "@/lib/codex/sandbox-auth";
 import { encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
+import { parseGithubSettingsInput } from "@/lib/factory/github-settings";
 import { createFactorySandbox } from "@/lib/sandbox/service";
 
 export const runtime = "nodejs";
@@ -13,6 +15,7 @@ type CreateFactoryRequest = {
     authJson?: unknown;
     enabled?: boolean;
   };
+  github?: unknown;
   name?: string;
 };
 
@@ -56,8 +59,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const githubSettings = parseGithubSettingsInput(body.github);
+
+  if ("error" in githubSettings) {
+    return Response.json({ error: githubSettings.error }, { status: 400 });
+  }
+
   try {
     const sandbox = await createFactorySandbox(factoryId);
+    await applyGithubSetup(sandbox, githubSettings);
     const serializedCodexAuthJson = isJsonObject(codexAuthJson)
       ? JSON.stringify(codexAuthJson, null, 2)
       : undefined;
@@ -84,6 +94,22 @@ export async function POST(request: Request) {
         updatedAt: nowIso,
       }),
       db.tx.factoryStripeBillings[factoryId].link({
+        factory: factoryId,
+      }),
+      db.tx.factoryGithubSettings[factoryId].update({
+        appliedAt: nowIso,
+        createdAt: nowIso,
+        gitEmail: githubSettings.gitEmail,
+        gitName: githubSettings.gitName,
+        hasToken: Boolean(githubSettings.token),
+        repositories: githubSettings.repositories,
+        status: "applied",
+        ...(githubSettings.token
+          ? { tokenEncrypted: encryptSecretValue(githubSettings.token) }
+          : {}),
+        updatedAt: nowIso,
+      }),
+      db.tx.factoryGithubSettings[factoryId].link({
         factory: factoryId,
       }),
     ];

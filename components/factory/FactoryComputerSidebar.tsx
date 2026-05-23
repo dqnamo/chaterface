@@ -2,13 +2,13 @@
 
 import {
   FilesIcon,
-  LockKeyIcon,
+  GithubLogoIcon,
   PlugsConnectedIcon,
 } from "@phosphor-icons/react";
+import { TextboxIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/helpers/classname-helper";
-import { TextboxIcon } from "@phosphor-icons/react/dist/ssr";
 
 const computerSections = [
   {
@@ -25,6 +25,11 @@ const computerSections = [
     icon: <TextboxIcon aria-hidden="true" size={15} weight="bold" />,
     label: "Secrets",
     path: "secrets",
+  },
+  {
+    icon: <GithubLogoIcon aria-hidden="true" size={15} weight="bold" />,
+    label: "GitHub",
+    path: "github",
   },
 ];
 

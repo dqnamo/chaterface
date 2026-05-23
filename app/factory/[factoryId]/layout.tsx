@@ -387,6 +387,7 @@ function FactoryToolsRail({
       href: `/factory/${factoryId}/mcp`,
       icon: <DesktopTowerIcon aria-hidden="true" size={18} weight="bold" />,
       isActive: [
+        `/factory/${factoryId}/github`,
         `/factory/${factoryId}/secrets`,
         `/factory/${factoryId}/skills`,
         `/factory/${factoryId}/mcp`,
@@ -432,6 +433,7 @@ function isFactorySettingsPath(pathname: string, factoryId: string) {
 
 function isFactoryComputerPath(pathname: string, factoryId: string) {
   return [
+    `/factory/${factoryId}/github`,
     `/factory/${factoryId}/secrets`,
     `/factory/${factoryId}/skills`,
     `/factory/${factoryId}/mcp`,
