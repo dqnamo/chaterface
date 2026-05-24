@@ -7,6 +7,7 @@ import {
   addImageAttachments,
   cleanupAttachments,
   type ImageAttachment,
+  type QueuedComposerMessage,
   removeImageAttachment,
   WorkerComposer,
   type WorkerComposerPresenceControls,
@@ -71,6 +72,7 @@ function NewWorkerFormContent({
       factoryId,
       instantDb,
       prompt: trimmedPrompt,
+      userEmail: user.email,
       userId: user.id,
       userRefreshToken: user.refresh_token,
       workerId,
@@ -118,11 +120,13 @@ function NewWorkerFormContent({
 export function WorkerPromptForm({
   factoryId,
   presence,
+  queuedMessages,
   topSection,
   worker,
 }: {
   factoryId?: string;
   presence?: WorkerComposerPresenceControls;
+  queuedMessages?: QueuedComposerMessage[];
   topSection?: ReactNode;
   worker: WorkerRecord;
 }) {
@@ -131,6 +135,7 @@ export function WorkerPromptForm({
       factoryId={factoryId}
       instantDb={db}
       presence={presence}
+      queuedMessages={queuedMessages}
       topSection={topSection}
       worker={worker}
     />
@@ -141,12 +146,14 @@ function WorkerPromptFormContent({
   factoryId,
   instantDb,
   presence,
+  queuedMessages,
   topSection,
   worker,
 }: {
   factoryId?: string;
   instantDb: AppDb;
   presence?: WorkerComposerPresenceControls;
+  queuedMessages?: QueuedComposerMessage[];
   topSection?: ReactNode;
   worker: WorkerRecord;
 }) {
@@ -166,6 +173,7 @@ function WorkerPromptFormContent({
       factoryId,
       instantDb,
       prompt,
+      userEmail: user?.email,
       userId: user?.id,
       userRefreshToken: user?.refresh_token,
       worker,
@@ -190,6 +198,7 @@ function WorkerPromptFormContent({
       factoryId,
       instantDb,
       prompt,
+      userEmail: user?.email,
       userId: user?.id,
       userRefreshToken: user?.refresh_token,
       worker,
@@ -250,6 +259,7 @@ function WorkerPromptFormContent({
       }
       presence={presence}
       prompt={prompt}
+      queuedMessages={queuedMessages}
       setPrompt={setPrompt}
       submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}
       topSection={topSection}

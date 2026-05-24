@@ -3,6 +3,7 @@
 import { faker } from "@faker-js/faker";
 import { id } from "@instantdb/react";
 import type { ImageAttachment } from "@/components/factory/WorkerComposer";
+import { createSupervisorMessageSender } from "@/helpers/user-identity";
 import type { AppDb } from "@/lib/db.client";
 import type { WorkerRecord } from "./worker-run-form";
 
@@ -12,6 +13,7 @@ export async function triggerWorkerRun({
   instantDb,
   onError,
   prompt,
+  userEmail,
   userId,
   userRefreshToken,
   worker,
@@ -22,6 +24,7 @@ export async function triggerWorkerRun({
   instantDb: AppDb;
   onError: (error: string | null) => void;
   prompt: string;
+  userEmail?: null | string;
   userId?: string;
   userRefreshToken?: string;
   worker?: WorkerRecord;
@@ -64,6 +67,7 @@ export async function triggerWorkerRun({
         createdAt: now,
         data: {
           prompt,
+          supervisor: createSupervisorMessageSender({ userEmail, userId }),
         },
         source: "factory",
         type: "user_message",
@@ -121,6 +125,7 @@ export async function queueWorkerMessage({
   instantDb,
   onError,
   prompt,
+  userEmail,
   userId,
   userRefreshToken,
   worker,
@@ -130,6 +135,7 @@ export async function queueWorkerMessage({
   instantDb: AppDb;
   onError: (error: string | null) => void;
   prompt: string;
+  userEmail?: null | string;
   userId?: string;
   userRefreshToken?: string;
   worker: WorkerRecord;
@@ -172,6 +178,7 @@ export async function queueWorkerMessage({
         data: {
           prompt: trimmedPrompt,
           queuedAt: now,
+          supervisor: createSupervisorMessageSender({ userEmail, userId }),
         },
         source: "factory",
         type: "queued_user_message",

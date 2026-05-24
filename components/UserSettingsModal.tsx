@@ -13,6 +13,7 @@ import {
   USER_AVATAR_COLOR_OPTIONS,
   type UserAvatarColorValue,
 } from "@/helpers/user-avatar-colors";
+import { getUserDisplayName } from "@/helpers/user-identity";
 import type { AppDb } from "@/lib/db.client";
 
 type UserRecord = {
@@ -78,7 +79,7 @@ export default function UserSettingsModal({
       setAvatarError(
         saveError instanceof Error
           ? saveError.message
-          : "User avatar could not be saved.",
+          : "Presence color could not be saved.",
       );
     }
   }
@@ -144,15 +145,18 @@ export default function UserSettingsModal({
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <p className="font-medium text-grayscale-12 text-sm">
-                          User avatar
+                          Presence color
                         </p>
                         <p className="text-grayscale-10 text-xs">
-                          Used for your account in the rail.
+                          Used for cursors and live presence accents.
                         </p>
                       </div>
                       <UserAvatar
-                        color={selectedAvatarColor}
-                        name={currentUser?.email ?? user.email ?? user.id}
+                        name={getUserDisplayName({
+                          email: currentUser?.email ?? user.email,
+                          id: user.id,
+                        })}
+                        seed={user.id}
                       />
                     </div>
 
@@ -162,7 +166,7 @@ export default function UserSettingsModal({
 
                         return (
                           <button
-                            aria-label={`Use ${option.label} user avatar color`}
+                            aria-label={`Use ${option.label} presence color`}
                             aria-pressed={isSelected}
                             className={cn(
                               "group relative flex size-5 aspect-square cursor-pointer items-center justify-center border-grayscale-6 bg-grayscale-2 transition-colors hover:border-grayscale-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-9 focus-visible:outline-offset-2",

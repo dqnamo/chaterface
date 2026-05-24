@@ -1,4 +1,5 @@
 import type { InstaQLEntity } from "@instantdb/react";
+import type { UserIdentity } from "@/helpers/user-identity";
 import type schema from "@/instant.schema";
 
 export type EventRecord = InstaQLEntity<typeof schema, "events">;
@@ -27,6 +28,32 @@ export function getUserPrompt(data: unknown) {
   }
 
   return String(data.prompt ?? "");
+}
+
+export function getEventSender(data: unknown): UserIdentity | null {
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  const sender = getSenderRecord(data.supervisor) ?? getSenderRecord(data.user);
+
+  if (sender) {
+    return sender;
+  }
+
+  const email = getOptionalString(data.userEmail);
+  const id = getOptionalString(data.userId);
+  const name = getOptionalString(data.userName);
+
+  if (!email && !id && !name) {
+    return null;
+  }
+
+  return {
+    email,
+    id,
+    name,
+  };
 }
 
 export function getEventAttachments(event: EventRecord) {
@@ -120,6 +147,10 @@ export function getEventFeedItems(events: EventRecord[]) {
   }
 
   for (const event of events) {
+    if (event.type === "queued_user_message") {
+      continue;
+    }
+
     if (isCodexJsonEvent(event)) {
       codexJsonEvents.push(event);
       continue;
@@ -299,4 +330,32 @@ function isEventAttachment(value: unknown): value is EventAttachment {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function getSenderRecord(value: unknown): UserIdentity | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const avatarSeed = getOptionalString(value.avatarSeed);
+  const email = getOptionalString(value.email);
+  const id = getOptionalString(value.id);
+  const name = getOptionalString(value.name);
+
+  if (!avatarSeed && !email && !id && !name) {
+    return null;
+  }
+
+  return {
+    avatarSeed,
+    email,
+    id,
+    name,
+  };
+}
+
+function getOptionalString(value: unknown) {
+  const trimmedValue = typeof value === "string" ? value.trim() : "";
+
+  return trimmedValue || undefined;
 }

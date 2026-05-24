@@ -13,7 +13,7 @@ import type {
   RefObject,
   SetStateAction,
 } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
 import { cn } from "@/helpers/classname-helper";
@@ -30,6 +30,12 @@ export type WorkerComposerPresenceControls = {
   onPromptFocus?: (event: FocusEvent<HTMLTextAreaElement>) => void;
   onPromptKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   status?: ReactNode;
+};
+
+export type QueuedComposerMessage = {
+  attachmentCount?: number;
+  id: string;
+  message: string;
 };
 
 const maxImageAttachments = 5;
@@ -54,6 +60,7 @@ export function WorkerComposer({
   placeholder = "Send a message to the worker...",
   presence,
   prompt,
+  queuedMessages = [],
   setPrompt,
   startActions,
   submitLabel,
@@ -72,6 +79,7 @@ export function WorkerComposer({
   placeholder?: string;
   presence?: WorkerComposerPresenceControls;
   prompt: string;
+  queuedMessages?: QueuedComposerMessage[];
   setPrompt: Dispatch<SetStateAction<string>>;
   startActions?: ReactNode;
   submitLabel: string;
@@ -83,6 +91,7 @@ export function WorkerComposer({
   const displayedSubmitLabel =
     isSending && attachments.length > 0 ? uploadingLabel : submitLabel;
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function onAttachmentInputChange(event: ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -146,6 +155,15 @@ export function WorkerComposer({
     submitTextareaOnEnter(event);
   }
 
+  function onQueuedMessageClick(message: string) {
+    setPrompt(message);
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(message.length, message.length);
+    });
+  }
+
   return (
     <Card
       layer={0}
@@ -166,8 +184,14 @@ export function WorkerComposer({
         {topSection ? (
           <div className="border-grayscale-3 border-b">{topSection}</div>
         ) : null}
+        <QueuedMessageBadges
+          disabled={disabled}
+          messages={queuedMessages}
+          onSelect={onQueuedMessageClick}
+        />
         <textarea
           id="worker-task"
+          ref={textareaRef}
           value={prompt}
           className="resize-none p-3 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10"
           disabled={disabled}
@@ -227,6 +251,50 @@ export function WorkerComposer({
         </div>
       </form>
     </Card>
+  );
+}
+
+function QueuedMessageBadges({
+  disabled,
+  messages,
+  onSelect,
+}: {
+  disabled?: boolean;
+  messages: QueuedComposerMessage[];
+  onSelect: (message: string) => void;
+}) {
+  if (messages.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="flex flex-wrap gap-2 border-grayscale-3 border-b px-3 py-2">
+      {messages.map((message) => (
+        <li className="min-w-0 max-w-full" key={message.id}>
+          <button
+            aria-label={`Use queued message: ${message.message}`}
+            className="flex max-w-full items-center gap-1.5 rounded-full border border-grayscale-3 bg-grayscale-1 px-2.5 py-1 text-left text-xs text-grayscale-11 transition hover:border-grayscale-5 hover:bg-grayscale-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-grayscale-3 dark:hover:bg-grayscale-4"
+            disabled={disabled}
+            onClick={() => onSelect(message.message)}
+            title={message.message}
+            type="button"
+          >
+            <span className="shrink-0 font-medium text-grayscale-10">
+              Queued
+            </span>
+            <span className="min-w-0 max-w-64 truncate text-grayscale-12 sm:max-w-96">
+              {message.message}
+            </span>
+            {message.attachmentCount ? (
+              <span className="shrink-0 rounded-full bg-grayscale-3 px-1.5 py-0.5 text-grayscale-10 dark:bg-grayscale-4">
+                {message.attachmentCount}{" "}
+                {message.attachmentCount === 1 ? "image" : "images"}
+              </span>
+            ) : null}
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

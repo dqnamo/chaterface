@@ -4,6 +4,10 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { EventFeed, type EventRecord } from "@/components/Event";
+import {
+  getEventAttachments,
+  getUserPrompt,
+} from "@/components/events/event-utils";
 import { WorkerChatPresenceFrame } from "@/components/factory/presence";
 import WorkerStatusIndicator from "@/components/factory/WorkerStatusIndicator";
 import Button from "@/components/public/Button";
@@ -92,6 +96,28 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   const events = [...(worker.events ?? [])].sort((a, b) =>
     (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
   );
+  const feedEvents = events.filter(
+    (event) => event.type !== "queued_user_message",
+  );
+  const queuedMessages = events.flatMap((event) => {
+    if (event.type !== "queued_user_message") {
+      return [];
+    }
+
+    const message = getUserPrompt(event.data)?.trim();
+
+    if (!message) {
+      return [];
+    }
+
+    return [
+      {
+        attachmentCount: getEventAttachments(event).length,
+        id: event.id,
+        message,
+      },
+    ];
+  });
   const currentUser = data?.$users?.[0] as UserRecord | undefined;
   const workerTitle = worker.name ?? `Worker ${worker.id.slice(0, 8)}`;
   const selectedWorkerId = worker.id;
@@ -330,9 +356,9 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
 
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
-              {events.length > 0 ? (
+              {feedEvents.length > 0 ? (
                 <EventFeed
-                  events={events}
+                  events={feedEvents}
                   factoryId={factoryId}
                   userRefreshToken={user.refresh_token}
                 />
@@ -346,6 +372,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
             <WorkerPromptForm
               factoryId={factoryId}
               presence={presence}
+              queuedMessages={queuedMessages}
               topSection={composerHeader}
               worker={worker}
             />

@@ -42,15 +42,25 @@ export type McpServer = {
 export function Field({
   children,
   hint,
+  htmlFor,
   label,
 }: {
   children: ReactNode;
   hint?: string;
+  htmlFor?: string;
   label: string;
 }) {
+  const labelClassName = "font-medium text-grayscale-11 text-xs";
+
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="font-medium text-grayscale-11 text-xs">{label}</span>
+      {htmlFor ? (
+        <label className={labelClassName} htmlFor={htmlFor}>
+          {label}
+        </label>
+      ) : (
+        <span className={labelClassName}>{label}</span>
+      )}
       {children}
       {hint ? <span className="text-grayscale-10 text-xs">{hint}</span> : null}
     </div>
@@ -68,7 +78,7 @@ export function Notice({
 }) {
   const toneClass =
     tone === "error"
-      ? "border-grayscale-5 bg-grayscale-2 text-grayscale-12"
+      ? "border-red-5 bg-red-2 text-red-11"
       : tone === "accent"
         ? "border-accent-5 bg-accent-2 text-accent-11"
         : "border-grayscale-4 bg-grayscale-2 text-grayscale-11";

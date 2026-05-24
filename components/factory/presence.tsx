@@ -10,6 +10,7 @@ import {
   getUserAvatarColor,
   type UserAvatarColorValue,
 } from "@/helpers/user-avatar-colors";
+import { getUserDisplayName } from "@/helpers/user-identity";
 import type { AppDb } from "@/lib/db.client";
 
 export type SupervisorPresenceIdentity = {
@@ -215,7 +216,8 @@ export function WorkerSupervisorPresenceStack({
           className="rounded-[5px] ring-2 ring-white dark:ring-grayscale-2"
           color={supervisor.avatarColor}
           key={supervisor.peerId}
-          name={supervisor.email ?? supervisor.name}
+          name={getPresenceDisplayName(supervisor)}
+          seed={supervisor.supervisorId}
           size={18}
         />
       ))}
@@ -336,10 +338,10 @@ function getPresenceDisplayName({
   }
 
   if (email) {
-    return email.split("@")[0] || email;
+    return getUserDisplayName({ email });
   }
 
-  return "Supervisor";
+  return getUserDisplayName({ name });
 }
 
 function getPresenceColor(color: unknown) {

@@ -32,6 +32,7 @@ export class PersistentFactoryMcpOAuthProvider implements OAuthClientProvider {
       grant_types: ["authorization_code", "refresh_token"],
       redirect_uris: [this.callbackUrl],
       response_types: ["code"],
+      scope: this.connection.scopes || undefined,
       token_endpoint_auth_method: "none",
     };
   }

@@ -1,43 +1,40 @@
 "use client";
 
-import { Facehash } from "facehash";
+import Image from "next/image";
 import { cn } from "@/helpers/classname-helper";
-import {
-  getUserAvatarColor,
-  type UserAvatarColorValue,
-} from "@/helpers/user-avatar-colors";
+import type { UserAvatarColorValue } from "@/helpers/user-avatar-colors";
+import { getDiceBearGlassAvatarUrl } from "@/helpers/user-identity";
 
 export default function UserAvatar({
   className,
-  color,
   name,
   selected = true,
+  seed,
   size = 40,
 }: {
   className?: string;
   color?: UserAvatarColorValue | null | string;
   name: string;
+  seed?: string;
   selected?: boolean;
   size?: number;
 }) {
-  const avatarColor = getUserAvatarColor(color);
+  const src = getDiceBearGlassAvatarUrl({ name, avatarSeed: seed }, size);
 
   return (
-    <Facehash
+    <Image
+      alt=""
       aria-hidden="true"
       className={cn(
-        "shrink-0 rounded-lg border border-transparent font-semibold text-white uppercase transition-opacity",
+        "shrink-0 rounded-lg border border-grayscale-3 bg-grayscale-2 object-cover transition-opacity dark:border-grayscale-4",
         selected === false && "opacity-50 group-hover:opacity-75",
         className,
       )}
-      colors={[`var(--${avatarColor}-9)`]}
-      interactive={false}
-      intensity3d="none"
-      name={name}
-      showInitial
-      size={size}
-      style={{ color: "white" }}
-      variant="solid"
+      draggable={false}
+      height={size}
+      unoptimized
+      src={src}
+      width={size}
     />
   );
 }

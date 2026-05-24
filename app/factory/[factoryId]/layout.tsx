@@ -37,6 +37,7 @@ import UserSettingsModal from "@/components/UserSettingsModal";
 import { cn } from "@/helpers/classname-helper";
 import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { UserAvatarColorValue } from "@/helpers/user-avatar-colors";
+import { getUserDisplayName } from "@/helpers/user-identity";
 import { getWorkerStatusTone } from "@/helpers/worker-status";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
@@ -249,6 +250,7 @@ function FactoryLayoutContent({
           instantDb={instantDb}
           userAvatarColor={currentUser?.avatarColor}
           userEmail={user.email}
+          userId={user.id}
         />
       </aside>
 
@@ -306,6 +308,7 @@ function FactoryLayoutContent({
             orientation="horizontal"
             userAvatarColor={currentUser?.avatarColor}
             userEmail={user.email}
+            userId={user.id}
           />
         </div>
       </aside>
@@ -360,6 +363,7 @@ function FactoryLayoutContent({
               orientation="horizontal"
               userAvatarColor={currentUser?.avatarColor}
               userEmail={user.email}
+              userId={user.id}
             />
           </div>
         </aside>
@@ -835,6 +839,7 @@ function SidebarContent({
   showUserMenu = true,
   userAvatarColor,
   userEmail,
+  userId,
 }: {
   activeFactoryId: string;
   factories: FactoryRecord[];
@@ -844,6 +849,7 @@ function SidebarContent({
   showUserMenu?: boolean;
   userAvatarColor?: UserAvatarColorValue | null | string;
   userEmail?: null | string;
+  userId?: null | string;
 }) {
   const isHorizontal = orientation === "horizontal";
 
@@ -904,6 +910,7 @@ function SidebarContent({
           orientation={orientation}
           userAvatarColor={userAvatarColor}
           userEmail={userEmail}
+          userId={userId}
         />
       ) : null}
     </div>
@@ -920,12 +927,14 @@ function UserRailMenu({
   orientation = "vertical",
   userAvatarColor,
   userEmail,
+  userId,
 }: {
   instantDb: AppDb;
   onNavigate?: () => void;
   orientation?: "horizontal" | "vertical";
   userAvatarColor?: UserAvatarColorValue | null | string;
   userEmail?: null | string;
+  userId?: null | string;
 }) {
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -957,7 +966,8 @@ function UserRailMenu({
           <div className="flex size-10 items-center justify-center">
             <UserAvatar
               color={userAvatarColor}
-              name={userEmail ?? "User"}
+              name={getUserDisplayName({ email: userEmail, id: userId })}
+              seed={userId ?? userEmail ?? undefined}
               size={40}
             />
           </div>

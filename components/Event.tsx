@@ -10,10 +10,17 @@ import {
   getDiagnosticMessage,
   getEventAttachments,
   getEventFeedItems,
+  getEventSender,
   getMcpConnectionRequest,
   getUserPrompt,
 } from "@/components/events/event-utils";
 import { McpConnectionRequestEvent } from "@/components/events/McpConnectionRequestEvent";
+import UserAvatar from "@/components/UserAvatar";
+import {
+  getUserAvatarSeed,
+  getUserDisplayName,
+  type UserIdentity,
+} from "@/helpers/user-identity";
 
 export type { EventRecord } from "@/components/events/event-utils";
 
@@ -31,6 +38,7 @@ type EventFeedProps = {
 
 type MessageEventProps = {
   attachments?: EventAttachment[];
+  author?: UserIdentity | null;
   label: string;
   message: string;
 };
@@ -74,20 +82,13 @@ export default function Event({
   if (event.type === "user_message") {
     const message = getUserPrompt(event.data);
     const attachments = getEventAttachments(event);
-
-    return message ? (
-      <MessageEvent attachments={attachments} label="You" message={message} />
-    ) : null;
-  }
-
-  if (event.type === "queued_user_message") {
-    const message = getUserPrompt(event.data);
-    const attachments = getEventAttachments(event);
+    const author = getEventSender(event.data);
 
     return message ? (
       <MessageEvent
         attachments={attachments}
-        label="Queued"
+        author={author ?? { name: "Supervisor" }}
+        label="Supervisor"
         message={message}
       />
     ) : null;
@@ -112,9 +113,13 @@ export default function Event({
 
 export function MessageEvent({
   attachments = [],
+  author,
   label,
   message,
 }: MessageEventProps) {
+  const authorName = author ? getUserDisplayName(author) : null;
+  const authorSeed = author ? getUserAvatarSeed(author) : undefined;
+
   return (
     <li>
       <motion.div
@@ -123,9 +128,23 @@ export function MessageEvent({
         initial={{ opacity: 0, y: 8 }}
         transition={{ duration: 0.1, ease: "easeOut" }}
       >
-        <p className="font-mono text-grayscale-10 text-xs font-medium uppercase">
-          {label}
-        </p>
+        {authorName ? (
+          <div className="flex min-w-0 items-center gap-2">
+            <UserAvatar
+              className="rounded-md"
+              name={authorName}
+              seed={authorSeed}
+              size={22}
+            />
+            <p className="min-w-0 truncate font-medium text-grayscale-11 text-xs">
+              {authorName}
+            </p>
+          </div>
+        ) : (
+          <p className="font-mono text-grayscale-10 text-xs font-medium uppercase">
+            {label}
+          </p>
+        )}
         <Streamdown
           className="text-sm text-grayscale-12 [overflow-wrap:anywhere]"
           mode="static"
