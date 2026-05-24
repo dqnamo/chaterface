@@ -2,13 +2,14 @@ import "server-only";
 
 import Stripe from "stripe";
 import { getAppPublicUrl } from "@/lib/app-url";
-import { BASIC_BILLING_PLAN, PRO_BILLING_PLAN } from "@/lib/billing";
+import {
+  BASIC_BILLING_PLAN,
+  type FactorySeatFields,
+  getFactorySeatCount,
+  isPaidStripeStatus,
+  PRO_BILLING_PLAN,
+} from "@/lib/billing";
 import { getAdminDb } from "@/lib/db.server";
-
-type FactoryForSeats = {
-  owner?: { id?: string };
-  supervisors?: { status?: string }[];
-};
 
 let stripeClient: Stripe | null = null;
 
@@ -96,7 +97,7 @@ export async function syncFactoryStripeSeatQuantity(factoryId: string) {
   });
   const billing = result.factoryStripeBillings[0] as
     | (StripeBillingRecord & {
-        factory?: FactoryForSeats;
+        factory?: FactorySeatFields;
       })
     | undefined;
 
@@ -213,24 +214,12 @@ export async function updateFactoryBillingFromSubscriptionEvent({
   return true;
 }
 
-function getFactorySeatCount(factory: FactoryForSeats | undefined) {
-  const supervisorCount = (factory?.supervisors ?? []).filter(
-    (supervisor) => supervisor.status !== "removed",
-  ).length;
-
-  return 1 + supervisorCount;
-}
-
 function getStripeObjectId(value: StripeSubscription["customer"]) {
   if (typeof value === "string") {
     return value;
   }
 
   return value?.id;
-}
-
-function isPaidStripeStatus(status?: string) {
-  return status === "active" || status === "trialing";
 }
 
 function getStripe() {

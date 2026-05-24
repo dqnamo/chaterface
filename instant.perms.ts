@@ -57,7 +57,7 @@ const rules = {
       basicSupervisorLimitAllowsInvite:
         "size(data.ref('factory.supervisors.status').filter(status, status != 'removed')) <= 3",
       canAcceptInvite:
-        "auth.email == data.email && data.status == 'invited' && newData.status == 'active' && request.modifiedFields.all(field, field in ['acceptedAt', 'status', 'updatedAt'])",
+        "auth.email == data.email && data.status == 'invited' && newData.status == 'active' && request.modifiedFields.all(field, field in ['acceptedAt', 'status', 'updatedAt', 'user'])",
       canCreateInvite:
         "auth.id in data.ref('factory.owner.id') && data.status == 'invited' && data.email != auth.email && factoryBillingAllowsInvite",
       canRemoveInvite:
@@ -112,11 +112,20 @@ const rules = {
     bind: {
       isFactoryMember:
         "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
+      onlyCreatesClientWorker:
+        "request.modifiedFields.all(field, field in ['createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt']) && data.status == 'queued' && data.retiredAt == null",
+      onlyQueuesClientWorker:
+        "request.modifiedFields.all(field, field in ['retiredAt', 'status', 'updatedAt']) && newData.retiredAt == null && newData.status in ['queued', 'running']",
+      onlyRetiresClientWorker:
+        "request.modifiedFields.all(field, field in ['activeCommandId', 'activePid', 'retiredAt', 'status', 'updatedAt']) && newData.activeCommandId == null && newData.activePid == null && newData.status == 'retired' && newData.retiredAt != null",
+      onlyUnretiresClientWorker:
+        "request.modifiedFields.all(field, field in ['activeCommandId', 'activePid', 'retiredAt', 'status', 'updatedAt']) && data.status == 'retired' && newData.activeCommandId == null && newData.activePid == null && newData.retiredAt == null && newData.status == 'idle'",
     },
     allow: {
       view: "isFactoryMember",
-      create: "isFactoryMember",
-      update: "isFactoryMember",
+      create: "isFactoryMember && onlyCreatesClientWorker",
+      update:
+        "isFactoryMember && (onlyQueuesClientWorker || onlyRetiresClientWorker || onlyUnretiresClientWorker)",
       delete: "false",
     },
   },
@@ -183,10 +192,12 @@ const rules = {
     bind: {
       isFactoryMember:
         "auth.id in data.ref('worker.factory.owner.id') || auth.id in data.ref('worker.factory.supervisors.user.id')",
+      onlyCreatesClientMessageEvent:
+        "request.modifiedFields.all(field, field in ['attachments', 'createdAt', 'data', 'source', 'type', 'worker']) && data.source == 'factory' && data.type in ['user_message', 'queued_user_message']",
     },
     allow: {
       view: "isFactoryMember",
-      create: "isFactoryMember",
+      create: "isFactoryMember && onlyCreatesClientMessageEvent",
       update: "false",
       delete: "false",
     },

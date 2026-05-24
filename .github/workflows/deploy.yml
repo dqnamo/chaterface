@@ -19,8 +19,11 @@ jobs:
     env:
       INSTANT_APP_ID: ${{ secrets.INSTANT_APP_ID }}
       INSTANT_APP_ADMIN_TOKEN: ${{ secrets.INSTANT_APP_ADMIN_TOKEN }}
+      NEXT_PUBLIC_INSTANT_APP_ID: ${{ secrets.NEXT_PUBLIC_INSTANT_APP_ID || secrets.INSTANT_APP_ID }}
       TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
       TRIGGER_PROJECT_REF: ${{ secrets.TRIGGER_PROJECT_REF }}
+      APP_PUBLIC_URL: ${{ vars.APP_PUBLIC_URL || secrets.APP_PUBLIC_URL || 'https://factoryplane.com' }}
+      VERCEL_PREVIEW_COMMENTS_ENABLED: "0"
 
     steps:
       - name: Checkout
@@ -42,10 +45,32 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
-        run: pnpm exec tsc --noEmit --pretty false
+        run: pnpm typecheck
 
       - name: Check formatting and lint
-        run: pnpm exec biome check .
+        run: pnpm check
+
+      - name: Run unit and integration tests
+        run: pnpm test:unit
+
+      - name: Build Next.js application
+        run: pnpm build
+
+      - name: Smoke test production server
+        run: |
+          pnpm start --hostname 127.0.0.1 --port 3000 > /tmp/factoryplane-next.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          cat /tmp/factoryplane-next.log
+          exit 1
 
       - name: Push Instant schema
         run: pnpm dlx instant-cli@latest --token "$INSTANT_APP_ADMIN_TOKEN" push schema --app "$INSTANT_APP_ID" --yes
@@ -76,3 +101,48 @@ jobs:
 
       - name: Deploy Trigger.dev
         run: pnpm dlx trigger.dev@latest deploy --env prod --skip-update-check
+
+  e2e:
+    name: Playwright production flows
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ vars.PLAYWRIGHT_E2E_ENABLED == 'true' }}
+
+    env:
+      E2E_BASE_URL: ${{ vars.E2E_BASE_URL || vars.APP_PUBLIC_URL || secrets.APP_PUBLIC_URL }}
+      E2E_FACTORY_ID: ${{ vars.E2E_FACTORY_ID }}
+      E2E_AUTH_STORAGE_STATE: e2e-auth-state.json
+      E2E_AUTH_STORAGE_STATE_JSON: ${{ secrets.E2E_AUTH_STORAGE_STATE_JSON }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Write authenticated browser state
+        run: |
+          if [ -z "$E2E_AUTH_STORAGE_STATE_JSON" ]; then
+            echo "Missing E2E_AUTH_STORAGE_STATE_JSON secret"
+            exit 1
+          fi
+          printf '%s' "$E2E_AUTH_STORAGE_STATE_JSON" > "$E2E_AUTH_STORAGE_STATE"
+
+      - name: Run Playwright flows
+        run: pnpm test:e2e

@@ -38,15 +38,33 @@ npm run trigger:dev
 npm run trigger:deploy
 ```
 
+## Tests
+
+```bash
+pnpm test:unit
+pnpm test:e2e
+```
+
+Unit tests use Node's built-in test runner. Playwright production flows require
+an authenticated storage state file in `E2E_AUTH_STORAGE_STATE`; set
+`E2E_FACTORY_ID` to exercise existing-factory flows.
+
 ## GitHub Deploys
 
 Pushes to `main` run `.github/workflows/deploy.yml`, which typechecks, runs
-Biome, pushes the Instant schema and permissions, then deploys Trigger.dev.
+Biome, runs unit tests, builds and smoke-tests the Next app, pushes the Instant
+schema and permissions, then deploys Trigger.dev.
+
+Set `PLAYWRIGHT_E2E_ENABLED=true` as a repository variable to run the Playwright
+production-flow job. Configure `E2E_BASE_URL`, `E2E_FACTORY_ID`, and the
+`E2E_AUTH_STORAGE_STATE_JSON` secret for that job.
 
 Configure these repository secrets:
 
 - `INSTANT_APP_ID`
+- `NEXT_PUBLIC_INSTANT_APP_ID`, optional when it matches `INSTANT_APP_ID`
 - `INSTANT_APP_ADMIN_TOKEN`
+- `APP_PUBLIC_URL`, or set it as a repository variable
 - `TRIGGER_PROJECT_REF`, the Trigger.dev project ref used by `trigger.config.ts`
 - `TRIGGER_ACCESS_TOKEN`, a Trigger.dev personal access token from
   https://cloud.trigger.dev/account/tokens

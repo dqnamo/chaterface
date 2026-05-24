@@ -7,6 +7,7 @@ import {
   updateFactoryBillingFromSubscriptionEvent,
   verifyStripeWebhookEvent,
 } from "@/lib/stripe-billing.server";
+import { getCheckoutSessionBillingContext } from "@/lib/stripe-webhook-events";
 
 export const runtime = "nodejs";
 
@@ -69,26 +70,27 @@ async function handleCheckoutSessionCompleted(
   eventId: string,
   session: StripeCheckoutSession,
 ) {
-  const factoryId = session.client_reference_id?.trim();
-  const subscriptionId =
-    typeof session.subscription === "string"
-      ? session.subscription.trim()
-      : session.subscription?.id;
+  const billingContext = getCheckoutSessionBillingContext(session);
 
-  if (!factoryId || !subscriptionId) {
+  if (!billingContext) {
     console.warn("[stripe-webhook] Checkout session missing billing context", {
       checkoutSessionId: session.id,
-      factoryId,
-      subscriptionId,
+      factoryId: session.client_reference_id,
+      subscriptionId:
+        typeof session.subscription === "string"
+          ? session.subscription
+          : session.subscription?.id,
     });
     return;
   }
 
-  const subscription = await retrieveStripeSubscription(subscriptionId);
+  const subscription = await retrieveStripeSubscription(
+    billingContext.subscriptionId,
+  );
 
   await updateFactoryBillingFromStripeSubscription({
     eventId,
-    factoryId,
+    factoryId: billingContext.factoryId,
     subscription,
   });
 }

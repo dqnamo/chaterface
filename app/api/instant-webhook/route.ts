@@ -1,4 +1,8 @@
 import { getAdminDb } from "@/lib/db.server";
+import {
+  shouldProcessSupervisorInvite,
+  shouldTriggerWorkerRunForEvent,
+} from "@/lib/instant-webhook-events";
 import { syncFactoryStripeSeatQuantity } from "@/lib/stripe-billing.server";
 import { sendSupervisorInviteEmail } from "@/lib/supervisor-invitations";
 import {
@@ -37,11 +41,7 @@ export async function POST(request: Request) {
     typedHandlers("events", "create", async (record) => {
       const event = record.after as EventRecord | null;
 
-      if (
-        !event ||
-        event.source !== "factory" ||
-        event.type !== "user_message"
-      ) {
+      if (!shouldTriggerWorkerRunForEvent(event)) {
         return;
       }
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     typedHandlers("supervisors", "create", async (record) => {
       const supervisor = record.after as SupervisorRecord | null;
 
-      if (!supervisor || supervisor.status !== "invited" || !supervisor.email) {
+      if (!shouldProcessSupervisorInvite(supervisor)) {
         return;
       }
 

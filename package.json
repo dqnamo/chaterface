@@ -10,7 +10,11 @@
     "start": "next start",
     "lint": "biome lint .",
     "format": "biome format --write .",
-    "check": "biome check ."
+    "check": "biome check .",
+    "typecheck": "tsc --noEmit --pretty false",
+    "test": "pnpm test:unit",
+    "test:unit": "find tests/unit tests/integration -name '*.test.ts' -print0 | xargs -0 node --experimental-strip-types --test",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -39,6 +43,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

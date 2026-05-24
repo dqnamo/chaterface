@@ -10,6 +10,11 @@ export type FactoryBillingFields = {
   trialEndsAt?: string;
 };
 
+export type FactorySeatFields = {
+  owner?: { id?: string };
+  supervisors?: { status?: string }[];
+};
+
 export function getTrialEndsAt(createdAt: Date) {
   const trialEndsAt = new Date(createdAt);
 
@@ -43,4 +48,16 @@ export function isFactoryTrialing(
   const trialEndsAt = Date.parse(factory.trialEndsAt);
 
   return Number.isFinite(trialEndsAt) && trialEndsAt > now.getTime();
+}
+
+export function getFactorySeatCount(factory: FactorySeatFields | undefined) {
+  const supervisorCount = (factory?.supervisors ?? []).filter(
+    (supervisor) => supervisor.status !== "removed",
+  ).length;
+
+  return 1 + supervisorCount;
+}
+
+export function isPaidStripeStatus(status?: string) {
+  return status === "active" || status === "trialing";
 }

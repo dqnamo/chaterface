@@ -1,5 +1,7 @@
 import { getAdminDb } from "@/lib/db.server";
 
+export { canAccessFactory } from "@/lib/auth-access";
+
 export type CurrentUser = {
   email?: string;
   id: string;
@@ -52,29 +54,4 @@ export async function getOwnedFactory<
   }
 
   return factory;
-}
-
-export function canAccessFactory(
-  factory:
-    | {
-        owner?: { id?: string };
-        supervisors?: { status?: string; user?: { id?: string } }[];
-      }
-    | undefined,
-  user: CurrentUser,
-) {
-  if (!factory) {
-    return false;
-  }
-
-  if (factory.owner?.id === user.id) {
-    return true;
-  }
-
-  return Boolean(
-    factory.supervisors?.some(
-      (supervisor) =>
-        supervisor.status === "active" && supervisor.user?.id === user.id,
-    ),
-  );
 }

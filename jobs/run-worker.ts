@@ -25,6 +25,13 @@ import {
   createWorkerSandbox,
   runSandboxCommand,
 } from "@/lib/sandbox/service";
+import {
+  findCodexSessionId,
+  getFinalWorkerStatus,
+  getNextQueuedEvent,
+  isMissingSandboxError,
+  shouldFinalizeWorker,
+} from "@/lib/worker-run-lifecycle";
 
 type RunWorkerPayload = {
   userMessageEventId: string;
@@ -529,19 +536,6 @@ async function getOrCreateWorkerSandbox({
   };
 }
 
-function isMissingSandboxError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return (
-    error.name === "SandboxNotFoundError" ||
-    /box .*not found/i.test(error.message) ||
-    /sandbox .*not found/i.test(error.message) ||
-    /paused sandbox .*not found/i.test(error.message)
-  );
-}
-
 async function stageWorkerImageAttachments({
   attachments,
   eventId,
@@ -707,11 +701,7 @@ async function finalizeWorker({
   const db = getAdminDb();
   const currentWorker = await getWorker(workerId);
 
-  if (currentWorker?.activeCommandId !== userMessageEventId) {
-    return;
-  }
-
-  if (currentWorker.status === "retired") {
+  if (!shouldFinalizeWorker(currentWorker, userMessageEventId)) {
     return;
   }
 
@@ -719,7 +709,7 @@ async function finalizeWorker({
     db.tx.workers[workerId].update({
       activeCommandId: null,
       activePid: null,
-      status: exitCode === 0 ? "idle" : "failed",
+      status: getFinalWorkerStatus(exitCode),
       updatedAt: new Date().toISOString(),
     }),
   );
@@ -812,35 +802,7 @@ async function getNextQueuedUserMessageEvent(workerId: string) {
   });
   const worker = result.workers[0] as { events?: EventRecord[] } | undefined;
 
-  return [...(worker?.events ?? [])].sort((a, b) =>
-    (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
-  )[0];
-}
-
-function findCodexSessionId(value: unknown): string | undefined {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-
-  for (const [key, nestedValue] of Object.entries(value)) {
-    if (
-      typeof nestedValue === "string" &&
-      /(?:session|conversation).*id/i.test(key) &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        nestedValue,
-      )
-    ) {
-      return nestedValue;
-    }
-
-    const nestedSessionId = findCodexSessionId(nestedValue);
-
-    if (nestedSessionId) {
-      return nestedSessionId;
-    }
-  }
-
-  return undefined;
+  return getNextQueuedEvent(worker?.events ?? []);
 }
 
 function getFactorySecrets(secrets: SecretRecord[]) {
