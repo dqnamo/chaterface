@@ -78,7 +78,6 @@ const STEP_DEFINITIONS: readonly StepDefinition[] = [
     icon: CpuIcon,
     id: "agent",
     label: "Agent",
-    optional: true,
     title: "Add your first agent",
   },
 ] as const;
@@ -98,7 +97,6 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
   const [githubRepositories, setGithubRepositories] = useState<
     GithubRepositoryRow[]
   >([]);
-  const [addCodexAgent, setAddCodexAgent] = useState(true);
   const [codexAuthJsonText, setCodexAuthJsonText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -182,10 +180,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
       return;
     }
 
-    const parsedCodexAuthJson = parseCodexAuthJson({
-      enabled: addCodexAgent,
-      value: codexAuthJsonText,
-    });
+    const parsedCodexAuthJson = parseCodexAuthJson(codexAuthJsonText);
 
     if ("error" in parsedCodexAuthJson) {
       setError(parsedCodexAuthJson.error);
@@ -203,7 +198,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
         body: JSON.stringify({
           codexAgent: {
             authJson: parsedCodexAuthJson.authJson,
-            enabled: addCodexAgent,
+            enabled: true,
           },
           github: {
             gitEmail,
@@ -325,7 +320,6 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
 
           {step === "agent" ? (
             <AgentStep
-              addCodexAgent={addCodexAgent}
               codexAuthJsonText={codexAuthJsonText}
               error={error}
               factoryName={trimmedName || "Untitled factory"}
@@ -336,7 +330,6 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
               isSaving={isSaving}
               onBack={() => advanceToStep("github")}
               onSubmit={createFactory}
-              setAddCodexAgent={setAddCodexAgent}
               setCodexAuthJsonText={setCodexAuthJsonText}
             />
           ) : null}
@@ -820,7 +813,6 @@ function RepositoryRow({
 }
 
 function AgentStep({
-  addCodexAgent,
   codexAuthJsonText,
   error,
   factoryName,
@@ -831,10 +823,8 @@ function AgentStep({
   isSaving,
   onBack,
   onSubmit,
-  setAddCodexAgent,
   setCodexAuthJsonText,
 }: {
-  addCodexAgent: boolean;
   codexAuthJsonText: string;
   error: string | null;
   factoryName: string;
@@ -845,11 +835,9 @@ function AgentStep({
   isSaving: boolean;
   onBack: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  setAddCodexAgent: Dispatch<SetStateAction<boolean>>;
   setCodexAuthJsonText: Dispatch<SetStateAction<string>>;
 }) {
   const authJsonId = useId();
-  const toggleId = useId();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
     "idle",
   );
@@ -888,138 +876,81 @@ function AgentStep({
         <SummaryCard>
           <SummaryRow label="Factory" value={factoryName} />
           <SummaryRow label="GitHub" value={githubSummary} />
-          <SummaryRow
-            label="Codex agent"
-            value={addCodexAgent ? "Will be added" : "Not now"}
-          />
+          <SummaryRow label="Codex agent" value="Will be added" />
         </SummaryCard>
 
-        <FieldGroup title="Codex agent">
-          <label
-            htmlFor={toggleId}
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-              addCodexAgent
-                ? "border-accent-7 bg-accent-2"
-                : "border-grayscale-3 bg-grayscale-2 hover:border-grayscale-5 dark:bg-grayscale-3/40",
-            )}
-          >
-            <span className="relative mt-0.5 flex h-5 w-9 shrink-0 items-center">
-              <input
-                id={toggleId}
-                type="checkbox"
-                className="peer sr-only"
-                checked={addCodexAgent}
-                onChange={(event) => setAddCodexAgent(event.target.checked)}
-                disabled={isSaving}
-              />
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "absolute inset-0 rounded-full border transition-colors",
-                  addCodexAgent
-                    ? "border-accent-9 bg-accent-9"
-                    : "border-grayscale-5 bg-grayscale-4",
-                )}
-              />
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform",
-                  addCodexAgent ? "translate-x-4" : "translate-x-0",
-                )}
-              />
-            </span>
-            <span className="flex min-w-0 flex-col gap-1">
-              <span className="font-medium text-grayscale-12 text-sm">
-                Add a Codex agent now
-              </span>
-              <span className="text-grayscale-11 text-sm">
-                Paste{" "}
-                <code className="rounded bg-grayscale-3 px-1 py-0.5 font-mono text-xs">
-                  auth.json
-                </code>{" "}
-                from{" "}
-                <code className="rounded bg-grayscale-3 px-1 py-0.5 font-mono text-xs">
-                  ~/.codex
-                </code>{" "}
-                so the agent can sign into Codex from this factory's sandboxes.
-              </span>
-            </span>
-          </label>
-
-          {addCodexAgent ? (
-            <div className="mt-3 flex flex-col gap-3">
-              <div className="rounded-lg border border-grayscale-3 bg-grayscale-2 p-3 dark:bg-grayscale-3/40">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-grayscale-12 text-sm">
-                      Copy from this machine
-                    </p>
-                    <p className="text-grayscale-10 text-xs">
-                      Runs locally and copies your existing Codex auth into the
-                      clipboard.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={copyCommand}
-                    disabled={isSaving}
-                    className="flex shrink-0 items-center gap-1.5 rounded-md border border-grayscale-4 bg-grayscale-1 px-2 py-1 font-medium text-grayscale-11 text-xs transition-colors hover:border-grayscale-6 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-grayscale-2"
-                  >
-                    {copyState === "copied" ? (
-                      <>
-                        <CheckIcon size={12} weight="bold" aria-hidden="true" />
-                        Copied
-                      </>
-                    ) : copyState === "error" ? (
-                      <>
-                        <WarningCircleIcon
-                          size={12}
-                          weight="bold"
-                          aria-hidden="true"
-                        />
-                        Try again
-                      </>
-                    ) : (
-                      <>
-                        <CopyIcon size={12} weight="bold" aria-hidden="true" />
-                        Copy
-                      </>
-                    )}
-                  </button>
+        <FieldGroup
+          description={
+            "Paste auth.json from ~/.codex so the agent can sign into Codex from this factory's sandboxes."
+          }
+          title="Codex auth"
+        >
+          <div className="flex flex-col gap-3">
+            <div className="rounded-lg border border-grayscale-3 bg-grayscale-2 p-3 dark:bg-grayscale-3/40">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-grayscale-12 text-sm">
+                    Copy from this machine
+                  </p>
+                  <p className="text-grayscale-10 text-xs">
+                    Runs locally and copies your existing Codex auth into the
+                    clipboard.
+                  </p>
                 </div>
-                <code className="mt-2 block overflow-x-auto rounded-md bg-grayscale-1 px-3 py-2 font-mono text-grayscale-11 text-xs">
-                  pbcopy &lt; ~/.codex/auth.json
-                </code>
-              </div>
-
-              <label className="flex flex-col gap-1.5" htmlFor={authJsonId}>
-                <span className="font-medium text-grayscale-12 text-sm">
-                  Codex auth JSON
-                </span>
-                <textarea
-                  id={authJsonId}
-                  value={codexAuthJsonText}
-                  onChange={(event) => setCodexAuthJsonText(event.target.value)}
-                  placeholder='{"tokens":{}}'
-                  autoComplete="off"
+                <button
+                  type="button"
+                  onClick={copyCommand}
                   disabled={isSaving}
-                  spellCheck={false}
-                  className="min-h-48 w-full resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 font-mono text-grayscale-12 text-xs outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
-                />
-                <span className="text-grayscale-10 text-xs">
-                  Saved encrypted on the agent and installed into worker
-                  sandboxes created with that agent.
-                </span>
-              </label>
+                  className="flex shrink-0 items-center gap-1.5 rounded-md border border-grayscale-4 bg-grayscale-1 px-2 py-1 font-medium text-grayscale-11 text-xs transition-colors hover:border-grayscale-6 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-grayscale-2"
+                >
+                  {copyState === "copied" ? (
+                    <>
+                      <CheckIcon size={12} weight="bold" aria-hidden="true" />
+                      Copied
+                    </>
+                  ) : copyState === "error" ? (
+                    <>
+                      <WarningCircleIcon
+                        size={12}
+                        weight="bold"
+                        aria-hidden="true"
+                      />
+                      Try again
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon size={12} weight="bold" aria-hidden="true" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <code className="mt-2 block overflow-x-auto rounded-md bg-grayscale-1 px-3 py-2 font-mono text-grayscale-11 text-xs">
+                pbcopy &lt; ~/.codex/auth.json
+              </code>
             </div>
-          ) : (
-            <p className="mt-3 rounded-lg border border-grayscale-3 border-dashed bg-grayscale-2 px-3 py-2 text-grayscale-11 text-xs dark:bg-grayscale-3/40">
-              Skipping for now. You can connect an agent any time from the
-              factory's agents settings.
-            </p>
-          )}
+
+            <label className="flex flex-col gap-1.5" htmlFor={authJsonId}>
+              <span className="font-medium text-grayscale-12 text-sm">
+                Codex auth JSON
+              </span>
+              <textarea
+                id={authJsonId}
+                value={codexAuthJsonText}
+                onChange={(event) => setCodexAuthJsonText(event.target.value)}
+                placeholder='{"tokens":{}}'
+                autoComplete="off"
+                disabled={isSaving}
+                spellCheck={false}
+                required
+                className="min-h-48 w-full resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 font-mono text-grayscale-12 text-xs outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
+              />
+              <span className="text-grayscale-10 text-xs">
+                Saved encrypted on the agent and copied as a file into the
+                default snapshot.
+              </span>
+            </label>
+          </div>
         </FieldGroup>
       </div>
       <StepFooter>
@@ -1191,17 +1122,9 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function parseCodexAuthJson({
-  enabled,
-  value,
-}: {
-  enabled: boolean;
-  value: string;
-}): { authJson?: Record<string, unknown> } | { error: string } {
-  if (!enabled) {
-    return {};
-  }
-
+function parseCodexAuthJson(
+  value: string,
+): { authJson: Record<string, unknown> } | { error: string } {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
