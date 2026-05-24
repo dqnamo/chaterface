@@ -17,15 +17,18 @@ type McpServerWithCapabilities = McpServer & {
 export default function CapabilitiesPanel({
   factoryId,
   section = "all",
+  variant = "default",
 }: {
   factoryId: string;
   section?: "all" | "mcp" | "skills";
+  variant?: "computer" | "default";
 }) {
   return (
     <CapabilitiesPanelContent
       factoryId={factoryId}
       instantDb={db}
       section={section}
+      variant={variant}
     />
   );
 }
@@ -34,10 +37,12 @@ function CapabilitiesPanelContent({
   factoryId,
   instantDb,
   section,
+  variant,
 }: {
   factoryId: string;
   instantDb: AppDb;
   section: "all" | "mcp" | "skills";
+  variant: "computer" | "default";
 }) {
   const { data } = instantDb.useQuery(
     factoryId
@@ -95,6 +100,7 @@ function CapabilitiesPanelContent({
           <SkillsPanel
             factoryId={factoryId}
             instantDb={instantDb}
+            variant={section === "all" ? "default" : variant}
             skills={skills}
           />
         ) : null}
@@ -102,6 +108,7 @@ function CapabilitiesPanelContent({
           <McpServersPanel
             factoryId={factoryId}
             instantDb={instantDb}
+            variant={section === "all" ? "default" : variant}
             servers={mcpServers}
           />
         ) : null}

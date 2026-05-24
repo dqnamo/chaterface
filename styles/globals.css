@@ -68,6 +68,15 @@
   --scroll-mask-fade-from-b: --value(percentage);
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   position: relative;
 }

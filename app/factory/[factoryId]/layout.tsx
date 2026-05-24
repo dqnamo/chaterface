@@ -2,7 +2,9 @@
 
 import NumberFlow from "@number-flow/react";
 import {
+  CaretDownIcon,
   ChatsTeardropIcon,
+  CheckIcon,
   CircleNotchIcon,
   DesktopTowerIcon,
   FadersIcon,
@@ -17,10 +19,17 @@ import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import FactoryComputerSidebar from "@/components/factory/FactoryComputerSidebar";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import FactorySettingsSidebar from "@/components/factory/FactorySettingsSidebar";
+import {
+  type FactorySupervisorPresence,
+  type SupervisorPresenceIdentity,
+  useFactorySupervisorPresence,
+  WorkerSupervisorPresenceStack,
+} from "@/components/factory/presence";
+import Logo from "@/components/Logo";
 import Button from "@/components/public/Button";
 import { Menu } from "@/components/public/Menu";
 import UserAvatar from "@/components/UserAvatar";
@@ -63,10 +72,6 @@ type UserRecord = {
   supervisedMemberships?: SupervisorMembershipRecord[];
 };
 
-type FactoryWithWorkersRecord = FactoryRecord & {
-  workers?: WorkerRecord[];
-};
-
 export default function FactoryLayout({ children }: { children: ReactNode }) {
   return <FactoryLayoutContent instantDb={db}>{children}</FactoryLayoutContent>;
 }
@@ -106,43 +111,44 @@ function FactoryLayoutContent({
             },
             user: {},
           },
-          factories: {
-            $: { where: { id: factoryId } },
-            workers: {},
-          },
         }
       : null,
   );
   const currentUser = data?.$users?.[0] as UserRecord | undefined;
-  const ownedFactories = (
-    (currentUser?.ownedFactories ?? []) as FactoryRecord[]
-  ).sort((a, b) => a.name.localeCompare(b.name));
-  const supervisedFactories = (
-    [
-      ...(currentUser?.supervisedMemberships ?? []),
-      ...(data?.supervisors ?? []),
-    ] as SupervisorMembershipRecord[]
-  )
-    .filter(
-      (membership) => membership.status !== "removed" && membership.factory,
+  const factories = useMemo(() => {
+    const ownedFactories = (currentUser?.ownedFactories ??
+      []) as FactoryRecord[];
+    const supervisedFactories = (
+      [
+        ...(currentUser?.supervisedMemberships ?? []),
+        ...(data?.supervisors ?? []),
+      ] as SupervisorMembershipRecord[]
     )
-    .map((membership) => membership.factory as FactoryRecord)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const factoriesById = new Map<string, FactoryRecord>();
+      .filter(
+        (membership) => membership.status !== "removed" && membership.factory,
+      )
+      .map((membership) => membership.factory as FactoryRecord);
+    const factoriesById = new Map<string, FactoryRecord>();
 
-  for (const candidate of [...ownedFactories, ...supervisedFactories]) {
-    factoriesById.set(candidate.id, candidate);
-  }
+    for (const candidate of [...ownedFactories, ...supervisedFactories]) {
+      factoriesById.set(candidate.id, candidate);
+    }
 
-  const factories = [...factoriesById.values()].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+    return [...factoriesById.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [
+    currentUser?.ownedFactories,
+    currentUser?.supervisedMemberships,
+    data?.supervisors,
+  ]);
   const factory = factories.find((candidate) => candidate.id === factoryId);
-  const factoryWithWorkers = data?.factories?.[0] as
-    | FactoryWithWorkersRecord
-    | undefined;
-  const workers = [...(factoryWithWorkers?.workers ?? [])].sort((a, b) =>
-    (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
+  const workers = useMemo(
+    () =>
+      [...(factory?.workers ?? [])].sort((a, b) =>
+        (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
+      ),
+    [factory?.workers],
   );
   const isSettingsSection = isFactorySettingsPath(pathname, factoryId);
   const isComputerSection = isFactoryComputerPath(pathname, factoryId);
@@ -236,7 +242,7 @@ function FactoryLayoutContent({
 
   return (
     <div className="flex min-h-dvh w-full flex-row bg-grayscale-1 text-grayscale-12">
-      <aside className="hidden border-grayscale-3 dark:border-grayscale-3 border-r p-2 md:sticky md:top-0 md:flex md:h-dvh md:flex-col">
+      <aside className="hidden border-grayscale-3 dark:border-grayscale-3 border-r p-2 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
         <SidebarContent
           activeFactoryId={factoryId}
           factories={factories}
@@ -246,12 +252,12 @@ function FactoryLayoutContent({
         />
       </aside>
 
-      <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
+      <aside className="hidden border-grayscale-3 border-r lg:sticky lg:top-0 lg:block lg:h-dvh">
         <FactoryToolsRail currentPathname={pathname} factoryId={factoryId} />
       </aside>
 
       {isSupervisorsSection ? null : (
-        <aside className="hidden border-grayscale-3 border-r md:sticky md:top-0 md:block md:h-dvh">
+        <aside className="hidden border-grayscale-3 border-r lg:sticky lg:top-0 lg:block lg:h-dvh">
           {isSettingsSection ? (
             <FactorySettingsSidebar factoryId={factoryId} />
           ) : isComputerSection ? (
@@ -260,11 +266,49 @@ function FactoryLayoutContent({
             <WorkerSidebar
               currentPathname={pathname}
               factoryId={factoryId}
+              instantDb={instantDb}
+              supervisorIdentity={{
+                avatarColor: currentUser?.avatarColor,
+                email: user.email,
+                id: user.id,
+              }}
               workers={workers}
             />
           )}
         </aside>
       )}
+
+      <aside className="sticky top-0 hidden h-dvh w-80 shrink-0 flex-col border-grayscale-3 border-r bg-grayscale-1 md:flex lg:hidden">
+        <div className="flex items-center border-grayscale-3 border-b px-4 py-3">
+          <FactorySwitcherMenu
+            activeFactoryId={factoryId}
+            currentFactory={factory}
+            factories={factories}
+            variant="wide"
+          />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <CompactFactorySidebarBody
+            currentPathname={pathname}
+            factoryId={factoryId}
+            instantDb={instantDb}
+            supervisorIdentity={{
+              avatarColor: currentUser?.avatarColor,
+              email: user.email,
+              id: user.id,
+            }}
+            workers={workers}
+          />
+        </div>
+        <div className="flex items-center border-grayscale-3 border-t px-4 py-3">
+          <UserRailMenu
+            instantDb={instantDb}
+            orientation="horizontal"
+            userAvatarColor={currentUser?.avatarColor}
+            userEmail={user.email}
+          />
+        </div>
+      </aside>
 
       <div
         className={cn(
@@ -278,12 +322,17 @@ function FactoryLayoutContent({
           aria-label="Close sidebar"
           onClick={() => setIsSidebarOpen(false)}
         />
-        <aside className="absolute inset-y-0 left-0 flex w-[min(22rem,92vw)] flex-col border-grayscale-3 border-r bg-grayscale-1 shadow-2xl">
-          <div className="flex min-h-14 items-center justify-between border-grayscale-3 border-b px-4 pt-[env(safe-area-inset-top)]">
-            <span className="font-semibold text-sm">Factory</span>
+        <aside className="absolute inset-y-0 left-0 flex w-[min(24rem,94vw)] flex-col border-grayscale-3 border-r bg-grayscale-1 shadow-2xl">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+            <FactorySwitcherMenu
+              activeFactoryId={factoryId}
+              currentFactory={factory}
+              factories={factories}
+              variant="wide"
+            />
             <button
               type="button"
-              className="flex size-9 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-11 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12"
+              className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-11 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12"
               aria-label="Close sidebar"
               onClick={() => setIsSidebarOpen(false)}
             >
@@ -291,49 +340,33 @@ function FactoryLayoutContent({
             </button>
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="border-grayscale-3 border-b p-2">
-              <SidebarContent
-                activeFactoryId={factoryId}
-                factories={factories}
-                instantDb={instantDb}
-                onNavigate={() => setIsSidebarOpen(false)}
-                userAvatarColor={currentUser?.avatarColor}
-                userEmail={user.email}
-              />
-            </div>
-            <FactoryToolsRail
-              className="w-full"
+            <CompactFactorySidebarBody
               currentPathname={pathname}
               factoryId={factoryId}
+              instantDb={instantDb}
               onNavigate={() => setIsSidebarOpen(false)}
+              supervisorIdentity={{
+                avatarColor: currentUser?.avatarColor,
+                email: user.email,
+                id: user.id,
+              }}
+              workers={workers}
             />
-            {isSupervisorsSection ? null : isSettingsSection ? (
-              <FactorySettingsSidebar
-                className="w-full"
-                factoryId={factoryId}
-                onNavigate={() => setIsSidebarOpen(false)}
-              />
-            ) : isComputerSection ? (
-              <FactoryComputerSidebar
-                className="w-full"
-                factoryId={factoryId}
-                onNavigate={() => setIsSidebarOpen(false)}
-              />
-            ) : (
-              <WorkerSidebar
-                className="w-full"
-                currentPathname={pathname}
-                factoryId={factoryId}
-                onNavigate={() => setIsSidebarOpen(false)}
-                workers={workers}
-              />
-            )}
+          </div>
+          <div className="flex items-center border-grayscale-3 border-t px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+            <UserRailMenu
+              instantDb={instantDb}
+              onNavigate={() => setIsSidebarOpen(false)}
+              orientation="horizontal"
+              userAvatarColor={currentUser?.avatarColor}
+              userEmail={user.email}
+            />
           </div>
         </aside>
       </div>
 
       <main className="min-w-0 flex-1 pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0">
-        <div className="fixed inset-x-0 top-0 z-30 flex min-h-14 items-center gap-3 border-grayscale-3 border-b bg-grayscale-1/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur md:hidden">
+        <div className="fixed inset-x-0 top-0 z-30 grid min-h-14 grid-cols-[auto_1fr_auto] items-center gap-3 border-grayscale-3 border-b bg-grayscale-1/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur md:hidden">
           <button
             type="button"
             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
@@ -342,18 +375,160 @@ function FactoryLayoutContent({
           >
             <ListIcon size={18} weight="bold" aria-hidden="true" />
           </button>
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-sm">
-              {factory?.name ?? "Factory"}
-            </p>
-            <p className="truncate text-grayscale-10 text-xs">
-              Open menu for factory tools
-            </p>
-          </div>
+          <Logo className="size-8 justify-self-center" />
+          <span aria-hidden="true" className="size-9" />
         </div>
+        {isSettingsSection ? (
+          <FactorySettingsSidebar
+            className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 border-grayscale-3 border-b bg-grayscale-1/95 backdrop-blur md:hidden"
+            factoryId={factoryId}
+          />
+        ) : isComputerSection ? (
+          <FactoryComputerSidebar
+            className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 border-grayscale-3 border-b bg-grayscale-1/95 backdrop-blur md:hidden"
+            factoryId={factoryId}
+          />
+        ) : null}
         {children}
       </main>
     </div>
+  );
+}
+
+function CompactFactorySidebarBody({
+  currentPathname,
+  factoryId,
+  instantDb,
+  onNavigate,
+  supervisorIdentity,
+  workers,
+}: {
+  currentPathname: string;
+  factoryId: string;
+  instantDb: AppDb;
+  onNavigate?: () => void;
+  supervisorIdentity: SupervisorPresenceIdentity;
+  workers: WorkerRecord[];
+}) {
+  return (
+    <>
+      <FactoryToolsRail
+        className="w-full"
+        currentPathname={currentPathname}
+        factoryId={factoryId}
+        onNavigate={onNavigate}
+        showWorkersLink={false}
+        variant="list"
+      />
+      <WorkerSidebar
+        className="w-full"
+        currentPathname={currentPathname}
+        factoryId={factoryId}
+        instantDb={instantDb}
+        onNavigate={onNavigate}
+        supervisorIdentity={supervisorIdentity}
+        workers={workers}
+      />
+    </>
+  );
+}
+
+function FactorySwitcherMenu({
+  activeFactoryId,
+  currentFactory,
+  factories,
+  variant = "compact",
+}: {
+  activeFactoryId: string;
+  currentFactory?: FactoryRecord;
+  factories: FactoryRecord[];
+  variant?: "compact" | "wide";
+}) {
+  const router = useRouter();
+  const isWide = variant === "wide";
+
+  function navigateToFactory(nextFactoryId: string) {
+    router.push(`/factory/${nextFactoryId}`);
+  }
+
+  function createFactory() {
+    router.push("/factories/new");
+  }
+
+  return (
+    <Menu.Composed
+      positionerProps={{ align: "end", side: "bottom", sideOffset: 8 }}
+      popupProps={{ className: "min-w-64" }}
+      trigger={
+        <>
+          {currentFactory ? (
+            <FactoryMonogram
+              badgeCount={getIdleWorkerCount(currentFactory.workers)}
+              color={currentFactory.color}
+              name={currentFactory.name}
+            />
+          ) : (
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-grayscale-3 font-semibold text-grayscale-11 text-sm">
+              FA
+            </span>
+          )}
+          {isWide ? (
+            <span className="min-w-0 flex-1 truncate text-left font-medium">
+              {currentFactory?.name ?? "Factory"}
+            </span>
+          ) : null}
+          <CaretDownIcon aria-hidden="true" size={13} weight="bold" />
+        </>
+      }
+      triggerProps={{
+        "aria-label": "Switch factory",
+        className: cn(
+          "h-10 border-grayscale-3 bg-grayscale-1 text-grayscale-11 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2 dark:bg-grayscale-2 dark:hover:bg-grayscale-3 dark:data-[popup-open]:bg-grayscale-3",
+          isWide
+            ? "w-full justify-start gap-2 p-0 pr-2"
+            : "justify-center gap-1 p-0 pr-1",
+        ),
+        title: currentFactory?.name ?? "Switch factory",
+      }}
+    >
+      <Menu.Group>
+        <Menu.GroupLabel>Factories</Menu.GroupLabel>
+        {factories.map((candidate) => {
+          const isActive = candidate.id === activeFactoryId;
+
+          return (
+            <Menu.Item
+              className="min-h-11"
+              key={candidate.id}
+              onClick={() => navigateToFactory(candidate.id)}
+            >
+              <FactoryMonogram
+                badgeCount={getIdleWorkerCount(candidate.workers)}
+                color={candidate.color}
+                name={candidate.name}
+                selected={!isActive ? false : undefined}
+              />
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {candidate.name}
+              </span>
+              {isActive ? (
+                <CheckIcon
+                  aria-hidden="true"
+                  className="text-accent-11"
+                  size={15}
+                  weight="bold"
+                />
+              ) : null}
+            </Menu.Item>
+          );
+        })}
+      </Menu.Group>
+      <Menu.Separator />
+      <Menu.Item onClick={createFactory}>
+        <PlusIcon aria-hidden="true" size={14} weight="bold" />
+        Create factory
+      </Menu.Item>
+    </Menu.Composed>
   );
 }
 
@@ -362,11 +537,15 @@ function FactoryToolsRail({
   currentPathname,
   factoryId,
   onNavigate,
+  showWorkersLink = true,
+  variant = "rail",
 }: {
   className?: string;
   currentPathname: string;
   factoryId: string;
   onNavigate?: () => void;
+  showWorkersLink?: boolean;
+  variant?: "list" | "rail";
 }) {
   const links = [
     {
@@ -392,13 +571,13 @@ function FactoryToolsRail({
         `/factory/${factoryId}/skills`,
         `/factory/${factoryId}/mcp`,
       ].includes(currentPathname),
-      label: "Computer",
+      label: "Computer settings",
     },
     {
       href: `/factory/${factoryId}/settings/general`,
       icon: <FadersIcon aria-hidden="true" size={18} weight="bold" />,
       isActive: isFactorySettingsPath(currentPathname, factoryId),
-      label: "Settings",
+      label: "Factory settings",
     },
   ];
 
@@ -406,21 +585,25 @@ function FactoryToolsRail({
     <nav
       aria-label="Factory tools"
       className={cn(
-        "flex h-full w-14 shrink-0 flex-col items-center gap-1 border-grayscale-3 border-b p-2 md:border-b-0",
-        "max-md:h-auto max-md:w-full max-md:flex-row max-md:justify-between",
+        variant === "list"
+          ? "flex w-full shrink-0 flex-col gap-1 border-grayscale-3 border-b p-2"
+          : "flex h-full w-14 shrink-0 flex-col items-center gap-1 border-grayscale-3 border-b p-2 lg:border-b-0",
         className,
       )}
     >
-      {links.map((link) => (
-        <FactoryToolsRailLink
-          href={link.href}
-          icon={link.icon}
-          isActive={link.isActive}
-          key={link.href}
-          label={link.label}
-          onNavigate={onNavigate}
-        />
-      ))}
+      {links
+        .filter((link) => showWorkersLink || link.label !== "Workers")
+        .map((link) => (
+          <FactoryToolsRailLink
+            href={link.href}
+            icon={link.icon}
+            isActive={link.isActive}
+            key={link.href}
+            label={link.label}
+            onNavigate={onNavigate}
+            variant={variant}
+          />
+        ))}
     </nav>
   );
 }
@@ -450,18 +633,22 @@ function FactoryToolsRailLink({
   isActive,
   label,
   onNavigate,
+  variant = "rail",
 }: {
   href: string;
   icon: ReactNode;
   isActive: boolean;
   label: string;
   onNavigate?: () => void;
+  variant?: "list" | "rail";
 }) {
   return (
     <Link
       aria-label={label}
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-lg text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+        variant === "list"
+          ? "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
+          : "flex size-10 shrink-0 items-center justify-center rounded-lg text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
         isActive && "bg-grayscale-3 text-grayscale-12 hover:bg-grayscale-3",
       )}
       href={href}
@@ -469,6 +656,7 @@ function FactoryToolsRailLink({
       title={label}
     >
       {icon}
+      {variant === "list" ? <span className="font-medium">{label}</span> : null}
     </Link>
   );
 }
@@ -477,19 +665,29 @@ function WorkerSidebar({
   className,
   currentPathname,
   factoryId,
+  instantDb,
   onNavigate,
+  supervisorIdentity,
   workers,
 }: {
   className?: string;
   currentPathname: string;
   factoryId: string;
+  instantDb: AppDb;
   onNavigate?: () => void;
+  supervisorIdentity: SupervisorPresenceIdentity;
   workers: WorkerRecord[];
 }) {
   const activeWorkers = workers.filter((worker) => worker.status !== "retired");
   const retiredWorkers = workers.filter(
     (worker) => worker.status === "retired",
   );
+  const { supervisorsByWorkerId } = useFactorySupervisorPresence({
+    factoryId,
+    identity: supervisorIdentity,
+    instantDb,
+    pathname: currentPathname,
+  });
 
   return (
     <div className={cn("flex h-full min-h-0 w-64 flex-col", className)}>
@@ -508,6 +706,7 @@ function WorkerSidebar({
             currentPathname={currentPathname}
             factoryId={factoryId}
             onNavigate={onNavigate}
+            supervisorsByWorkerId={supervisorsByWorkerId}
             title="Active workers"
             workers={activeWorkers}
           />
@@ -515,6 +714,7 @@ function WorkerSidebar({
             currentPathname={currentPathname}
             factoryId={factoryId}
             onNavigate={onNavigate}
+            supervisorsByWorkerId={supervisorsByWorkerId}
             title="Retired workers"
             workers={retiredWorkers}
           />
@@ -528,12 +728,14 @@ function WorkerSidebarSection({
   currentPathname,
   factoryId,
   onNavigate,
+  supervisorsByWorkerId,
   title,
   workers,
 }: {
   currentPathname: string;
   factoryId: string;
   onNavigate?: () => void;
+  supervisorsByWorkerId: Record<string, FactorySupervisorPresence[]>;
   title: string;
   workers: WorkerRecord[];
 }) {
@@ -542,8 +744,8 @@ function WorkerSidebarSection({
   }
 
   return (
-    <section>
-      <h2 className="px-2 pb-1  flex flex-row items-center justify-between font-mono font-semibold text-grayscale-10 text-xs uppercase">
+    <section className="min-w-0">
+      <h2 className="flex flex-row items-center justify-between px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
         <span>{title}</span>
         <NumberFlow className="ml-2 tabular-nums" value={workers.length} />
       </h2>
@@ -554,6 +756,7 @@ function WorkerSidebarSection({
             factoryId={factoryId}
             key={worker.id}
             onNavigate={onNavigate}
+            supervisors={supervisorsByWorkerId[worker.id] ?? []}
             worker={worker}
           />
         ))}
@@ -566,11 +769,13 @@ function WorkerSidebarLink({
   currentPathname,
   factoryId,
   onNavigate,
+  supervisors,
   worker,
 }: {
   currentPathname: string;
   factoryId: string;
   onNavigate?: () => void;
+  supervisors: FactorySupervisorPresence[];
   worker: WorkerRecord;
 }) {
   const href = `/factory/${factoryId}/workers/${worker.id}`;
@@ -594,6 +799,7 @@ function WorkerSidebarLink({
             {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
           </span>
         </span>
+        <WorkerSupervisorPresenceStack supervisors={supervisors} />
         {statusTone.isSpinner ? (
           <CircleNotchIcon
             aria-label={statusTone.label}
@@ -625,6 +831,8 @@ function SidebarContent({
   factories,
   instantDb,
   onNavigate,
+  orientation = "vertical",
+  showUserMenu = true,
   userAvatarColor,
   userEmail,
 }: {
@@ -632,16 +840,40 @@ function SidebarContent({
   factories: FactoryRecord[];
   instantDb: AppDb;
   onNavigate?: () => void;
+  orientation?: "horizontal" | "vertical";
+  showUserMenu?: boolean;
   userAvatarColor?: UserAvatarColorValue | null | string;
   userEmail?: null | string;
 }) {
+  const isHorizontal = orientation === "horizontal";
+
   return (
-    <div className="flex h-full flex-col justify-between gap-4">
-      <nav>
-        <ul className="flex flex-col gap-2">
+    <div
+      className={cn(
+        "flex gap-4",
+        isHorizontal
+          ? "h-auto min-w-0 flex-row items-center"
+          : "h-full flex-col justify-between",
+      )}
+    >
+      <nav
+        className={cn(
+          isHorizontal &&
+            "scrollbar-none min-w-0 flex-1 overflow-x-auto overscroll-x-contain",
+        )}
+      >
+        <ul
+          className={cn(
+            "flex gap-2",
+            isHorizontal ? "min-w-max flex-row items-center pr-1" : "flex-col",
+          )}
+        >
           <Link
             aria-label="Create factory"
-            className="flex aspect-square w-full items-center justify-center rounded-lg border border-b-2 border-grayscale-3 bg-white text-grayscale-11 transition-colors hover:border-grayscale-4 hover:bg-grayscale-2 dark:border-grayscale-4 dark:bg-grayscale-3 dark:hover:border-grayscale-5 dark:hover:bg-grayscale-4"
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-lg border border-b-2 border-grayscale-3 bg-white text-grayscale-11 transition-colors hover:border-grayscale-4 hover:bg-grayscale-2 dark:border-grayscale-4 dark:bg-grayscale-3 dark:hover:border-grayscale-5 dark:hover:bg-grayscale-4",
+              isHorizontal ? "size-10" : "aspect-square w-full",
+            )}
             href="/factories/new"
             onClick={onNavigate}
             title="Create factory"
@@ -650,6 +882,7 @@ function SidebarContent({
           </Link>
           {factories.map((candidate) => (
             <Link
+              className="shrink-0"
               href={`/factory/${candidate.id}`}
               key={candidate.id}
               onClick={onNavigate}
@@ -664,12 +897,15 @@ function SidebarContent({
           ))}
         </ul>
       </nav>
-      <UserRailMenu
-        instantDb={instantDb}
-        onNavigate={onNavigate}
-        userAvatarColor={userAvatarColor}
-        userEmail={userEmail}
-      />
+      {showUserMenu ? (
+        <UserRailMenu
+          instantDb={instantDb}
+          onNavigate={onNavigate}
+          orientation={orientation}
+          userAvatarColor={userAvatarColor}
+          userEmail={userEmail}
+        />
+      ) : null}
     </div>
   );
 }
@@ -681,11 +917,13 @@ function getIdleWorkerCount(workers?: WorkerRecord[]) {
 function UserRailMenu({
   instantDb,
   onNavigate,
+  orientation = "vertical",
   userAvatarColor,
   userEmail,
 }: {
   instantDb: AppDb;
   onNavigate?: () => void;
+  orientation?: "horizontal" | "vertical";
   userAvatarColor?: UserAvatarColorValue | null | string;
   userEmail?: null | string;
 }) {
@@ -709,7 +947,11 @@ function UserRailMenu({
   return (
     <>
       <Menu.Composed
-        positionerProps={{ align: "end", side: "right", sideOffset: 8 }}
+        positionerProps={{
+          align: "end",
+          side: orientation === "horizontal" ? "bottom" : "right",
+          sideOffset: 8,
+        }}
         popupProps={{ className: "min-w-48" }}
         trigger={
           <div className="flex size-10 items-center justify-center">

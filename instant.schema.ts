@@ -40,10 +40,11 @@ const _schema = i.schema({
       acceptedAt: i.string().indexed().optional(),
       email: i.string().indexed(),
       inviteEmailError: i.string().optional(),
+      inviteEmailId: i.string().optional(),
       inviteEmailSentAt: i.string().indexed().optional(),
+      inviteEmailStatus: i.string().optional(),
       invitedAt: i.string().indexed(),
       invitedByEmail: i.string().optional(),
-      cloudflareEmailStatus: i.string().optional(),
       status: i.string().indexed(),
       updatedAt: i.string().indexed(),
     }),
@@ -331,6 +332,28 @@ const _schema = i.schema({
         has: "many",
         label: "ports",
       },
+    },
+  },
+  rooms: {
+    factoryPresence: {
+      presence: i.entity({
+        avatarColor: i.string().optional(),
+        email: i.string().optional(),
+        name: i.string(),
+        supervisorId: i.string(),
+        workerId: i.string().optional(),
+      }),
+    },
+    workerChat: {
+      presence: i.entity({
+        avatarColor: i.string().optional(),
+        chatInput: i.boolean().optional(),
+        cursor: i.json().optional(),
+        email: i.string().optional(),
+        focusedComposer: i.boolean().optional(),
+        name: i.string(),
+        supervisorId: i.string(),
+      }),
     },
   },
 });

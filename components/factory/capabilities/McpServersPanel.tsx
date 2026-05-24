@@ -20,6 +20,7 @@ import {
   type McpServer,
   Notice,
 } from "@/components/factory/capabilities/shared";
+import { FactorySectionCard } from "@/components/factory/FactorySectionLayout";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
 import Input from "@/components/public/Input";
@@ -29,10 +30,12 @@ export function McpServersPanel({
   factoryId,
   instantDb,
   servers,
+  variant = "default",
 }: {
   factoryId: string;
   instantDb: AppDb;
   servers: (McpServer & { capabilities: McpCapability[] })[];
+  variant?: "computer" | "default";
 }) {
   const { user } = instantDb.useAuth();
   const [authType, setAuthType] = useState<McpAuthType>("oauth");
@@ -256,15 +259,16 @@ export function McpServersPanel({
     }
   }
 
-  return (
-    <Card className="p-4">
-      <div className="mb-4 flex items-center gap-2">
-        <Plug size={16} weight="bold" aria-hidden="true" />
-        <h3 className="text-[11px] font-mono font-bold uppercase tracking-wide text-grayscale-10">
-          MCP Servers
-        </h3>
-      </div>
-
+  const content = (
+    <>
+      {variant === "default" ? (
+        <div className="mb-4 flex items-center gap-2">
+          <Plug size={16} weight="bold" aria-hidden="true" />
+          <h3 className="text-[11px] font-mono font-bold uppercase tracking-wide text-grayscale-10">
+            MCP Servers
+          </h3>
+        </div>
+      ) : null}
       <form className="flex flex-col gap-3" onSubmit={handleStart}>
         <Field label="Name">
           <Input
@@ -366,8 +370,14 @@ export function McpServersPanel({
         onToggleConnection={toggleServer}
         rotationTokens={rotationTokens}
       />
-    </Card>
+    </>
   );
+
+  if (variant === "computer") {
+    return <FactorySectionCard>{content}</FactorySectionCard>;
+  }
+
+  return <Card className="p-4">{content}</Card>;
 }
 
 function McpConnectionList({

@@ -9,6 +9,7 @@ import {
   type ImageAttachment,
   removeImageAttachment,
   WorkerComposer,
+  type WorkerComposerPresenceControls,
 } from "@/components/factory/WorkerComposer";
 import Button from "@/components/public/Button";
 import type { AppDb } from "@/lib/db.client";
@@ -116,10 +117,12 @@ function NewWorkerFormContent({
 
 export function WorkerPromptForm({
   factoryId,
+  presence,
   topSection,
   worker,
 }: {
   factoryId?: string;
+  presence?: WorkerComposerPresenceControls;
   topSection?: ReactNode;
   worker: WorkerRecord;
 }) {
@@ -127,6 +130,7 @@ export function WorkerPromptForm({
     <WorkerPromptFormContent
       factoryId={factoryId}
       instantDb={db}
+      presence={presence}
       topSection={topSection}
       worker={worker}
     />
@@ -136,11 +140,13 @@ export function WorkerPromptForm({
 function WorkerPromptFormContent({
   factoryId,
   instantDb,
+  presence,
   topSection,
   worker,
 }: {
   factoryId?: string;
   instantDb: AppDb;
+  presence?: WorkerComposerPresenceControls;
   topSection?: ReactNode;
   worker: WorkerRecord;
 }) {
@@ -169,6 +175,7 @@ function WorkerPromptFormContent({
     setIsSending(false);
 
     if (workerId) {
+      presence?.onAfterSend?.();
       cleanupAttachments(attachments);
       setAttachments([]);
       setPrompt("");
@@ -192,6 +199,7 @@ function WorkerPromptFormContent({
     setIsSending(false);
 
     if (queued) {
+      presence?.onAfterSend?.();
       cleanupAttachments(attachments);
       setAttachments([]);
       setPrompt("");
@@ -240,6 +248,7 @@ function WorkerPromptFormContent({
           ? "Send a message to unretire this worker..."
           : "Send a message to the worker..."
       }
+      presence={presence}
       prompt={prompt}
       setPrompt={setPrompt}
       submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}

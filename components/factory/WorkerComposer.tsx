@@ -6,6 +6,7 @@ import type {
   ChangeEvent,
   Dispatch,
   DragEvent,
+  FocusEvent,
   FormEvent,
   KeyboardEvent,
   ReactNode,
@@ -21,6 +22,14 @@ export type ImageAttachment = {
   file: File;
   id: string;
   previewUrl: string;
+};
+
+export type WorkerComposerPresenceControls = {
+  onAfterSend?: () => void;
+  onPromptBlur?: (event: FocusEvent<HTMLTextAreaElement>) => void;
+  onPromptFocus?: (event: FocusEvent<HTMLTextAreaElement>) => void;
+  onPromptKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  status?: ReactNode;
 };
 
 const maxImageAttachments = 5;
@@ -43,6 +52,7 @@ export function WorkerComposer({
   onRemoveAttachment,
   onSubmit,
   placeholder = "Send a message to the worker...",
+  presence,
   prompt,
   setPrompt,
   startActions,
@@ -60,6 +70,7 @@ export function WorkerComposer({
   onRemoveAttachment: (attachmentId: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   placeholder?: string;
+  presence?: WorkerComposerPresenceControls;
   prompt: string;
   setPrompt: Dispatch<SetStateAction<string>>;
   startActions?: ReactNode;
@@ -130,6 +141,11 @@ export function WorkerComposer({
     }
   }
 
+  function onTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    presence?.onPromptKeyDown?.(event);
+    submitTextareaOnEnter(event);
+  }
+
   return (
     <Card
       layer={0}
@@ -157,7 +173,9 @@ export function WorkerComposer({
           disabled={disabled}
           placeholder={placeholder}
           onChange={(event) => setPrompt(event.target.value)}
-          onKeyDown={submitTextareaOnEnter}
+          onBlur={presence?.onPromptBlur}
+          onFocus={presence?.onPromptFocus}
+          onKeyDown={onTextareaKeyDown}
           rows={4}
         />
         <ImageAttachmentPreviews
@@ -165,6 +183,11 @@ export function WorkerComposer({
           disabled={attachmentDisabled}
           onRemove={onRemoveAttachment}
         />
+        {presence?.status ? (
+          <div className="border-grayscale-3 border-t px-3 py-1.5">
+            {presence.status}
+          </div>
+        ) : null}
         {error ? (
           <p className="border-grayscale-3 border-t px-3 py-2 text-red-11 text-sm">
             {error}

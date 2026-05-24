@@ -4,8 +4,10 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { EventFeed, type EventRecord } from "@/components/Event";
+import { WorkerChatPresenceFrame } from "@/components/factory/presence";
 import WorkerStatusIndicator from "@/components/factory/WorkerStatusIndicator";
 import Button from "@/components/public/Button";
+import type { UserAvatarColorValue } from "@/helpers/user-avatar-colors";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { WorkerPromptForm, type WorkerRecord } from "../../worker-run-form";
@@ -25,6 +27,12 @@ type PortRecord = {
   port: number;
   updatedAt: string;
   url: string;
+};
+
+type UserRecord = {
+  avatarColor?: UserAvatarColorValue;
+  email?: string;
+  id: string;
 };
 
 export default function WorkerPage() {
@@ -56,6 +64,9 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
             factory: {},
             ports: {},
           },
+          $users: {
+            $: { where: { id: user?.id ?? "" } },
+          },
         }
       : null,
   );
@@ -74,9 +85,14 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
     return <p>Worker not found.</p>;
   }
 
+  if (!user) {
+    return <p>Loading session...</p>;
+  }
+
   const events = [...(worker.events ?? [])].sort((a, b) =>
     (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
   );
+  const currentUser = data?.$users?.[0] as UserRecord | undefined;
   const workerTitle = worker.name ?? `Worker ${worker.id.slice(0, 8)}`;
   const selectedWorkerId = worker.id;
   const isRetired = worker.status === "retired";
@@ -265,64 +281,77 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   );
 
   return (
-    <div className="flex h-dvh w-full flex-col">
-      <Dialog.Root
-        open={baselineDialogOpen}
-        onOpenChange={(nextOpen) => setBaselineDialogOpen(nextOpen)}
-      >
-        <Dialog.Portal>
-          <Dialog.Backdrop className="fixed inset-0 z-100 bg-grayscale-12/20 backdrop-blur-sm" />
-          <Dialog.Popup className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-100 w-[calc(100vw-2rem)] max-w-md rounded-lg border border-grayscale-3 bg-white p-4 shadow-xl outline-none">
-            <Dialog.Title className="font-semibold text-base text-grayscale-12">
-              Update factory baseline?
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-grayscale-11 text-sm">
-              New workers will start from this worker's current files. Existing
-              workers will not change.
-            </Dialog.Description>
-            {baselineError ? (
-              <p className="mt-3 text-red-500 text-sm">{baselineError}</p>
-            ) : null}
-            <div className="mt-5 flex justify-end gap-2">
-              <Dialog.Close
-                className="flex cursor-pointer flex-row gap-1.5 rounded-lg border border-b-2 border-grayscale-3 bg-white px-2 py-1 font-medium text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:border-grayscale-4"
-                disabled={isUpdatingBaseline}
-              >
-                Cancel
-              </Dialog.Close>
-              <Button
-                type="button"
-                disabled={isUpdatingBaseline}
-                onClick={onSetFactoryBaseline}
-              >
-                {isUpdatingBaseline ? "Updating..." : "Update baseline"}
-              </Button>
+    <WorkerChatPresenceFrame
+      identity={{
+        avatarColor: currentUser?.avatarColor,
+        email: user.email,
+        id: user.id,
+      }}
+      instantDb={instantDb}
+      workerId={worker.id}
+    >
+      {(presence) => (
+        <div className="flex h-dvh w-full flex-col">
+          <Dialog.Root
+            open={baselineDialogOpen}
+            onOpenChange={(nextOpen) => setBaselineDialogOpen(nextOpen)}
+          >
+            <Dialog.Portal>
+              <Dialog.Backdrop className="fixed inset-0 z-100 bg-grayscale-12/20 backdrop-blur-sm" />
+              <Dialog.Popup className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-100 w-[calc(100vw-2rem)] max-w-md rounded-lg border border-grayscale-3 bg-white p-4 shadow-xl outline-none">
+                <Dialog.Title className="font-semibold text-base text-grayscale-12">
+                  Update factory baseline?
+                </Dialog.Title>
+                <Dialog.Description className="mt-2 text-grayscale-11 text-sm">
+                  New workers will start from this worker's current files.
+                  Existing workers will not change.
+                </Dialog.Description>
+                {baselineError ? (
+                  <p className="mt-3 text-red-500 text-sm">{baselineError}</p>
+                ) : null}
+                <div className="mt-5 flex justify-end gap-2">
+                  <Dialog.Close
+                    className="flex cursor-pointer flex-row gap-1.5 rounded-lg border border-b-2 border-grayscale-3 bg-white px-2 py-1 font-medium text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:border-grayscale-4"
+                    disabled={isUpdatingBaseline}
+                  >
+                    Cancel
+                  </Dialog.Close>
+                  <Button
+                    type="button"
+                    disabled={isUpdatingBaseline}
+                    onClick={onSetFactoryBaseline}
+                  >
+                    {isUpdatingBaseline ? "Updating..." : "Update baseline"}
+                  </Button>
+                </div>
+              </Dialog.Popup>
+            </Dialog.Portal>
+          </Dialog.Root>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
+              {events.length > 0 ? (
+                <EventFeed
+                  events={events}
+                  factoryId={factoryId}
+                  userRefreshToken={user.refresh_token}
+                />
+              ) : (
+                <p>No events yet.</p>
+              )}
             </div>
-          </Dialog.Popup>
-        </Dialog.Portal>
-      </Dialog.Root>
+          </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
-          {events.length > 0 ? (
-            <EventFeed
-              events={events}
+          <div className="w-full mt-auto mb-4">
+            <WorkerPromptForm
               factoryId={factoryId}
-              userRefreshToken={user?.refresh_token}
+              presence={presence}
+              topSection={composerHeader}
+              worker={worker}
             />
-          ) : (
-            <p>No events yet.</p>
-          )}
+          </div>
         </div>
-      </div>
-
-      <div className="w-full mt-auto mb-4">
-        <WorkerPromptForm
-          factoryId={factoryId}
-          topSection={composerHeader}
-          worker={worker}
-        />
-      </div>
-    </div>
+      )}
+    </WorkerChatPresenceFrame>
   );
 }

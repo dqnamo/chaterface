@@ -9,8 +9,11 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
+import {
+  FactorySectionCard,
+  FactorySectionPageShell,
+} from "@/components/factory/FactorySectionLayout";
 import Button from "@/components/public/Button";
-import Card from "@/components/public/Card";
 import Input from "@/components/public/Input";
 import { cn } from "@/helpers/classname-helper";
 import {
@@ -56,6 +59,31 @@ export type FactorySettingsSection =
   | "billing"
   | "agents"
   | "danger-zone";
+
+const settingsSectionCopy = {
+  agents: {
+    description: "View the coding agents connected to this factory.",
+    title: "Agents",
+  },
+  billing: {
+    description: "Manage this factory's plan and seats.",
+    title: "Billing",
+  },
+  "danger-zone": {
+    description: "Delete this factory and manage destructive actions.",
+    title: "Danger zone",
+  },
+  general: {
+    description: "Configure this factory workspace.",
+    title: "General",
+  },
+} satisfies Record<
+  FactorySettingsSection,
+  {
+    description: string;
+    title: string;
+  }
+>;
 
 export default function FactorySettingsSectionPage({
   section,
@@ -283,6 +311,7 @@ function FactorySettingsPageContent({
       setBillingAction(null);
     }
   }
+  const copy = settingsSectionCopy[section];
 
   if (isAuthLoading || !user || isLoading) {
     return (
@@ -308,223 +337,197 @@ function FactorySettingsPageContent({
   }
 
   return (
-    <div className="min-h-dvh px-4 py-8">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <div className="flex flex-col py-2">
-          <h1>Factory settings</h1>
-          <p className="text-grayscale-10 text-sm">
-            Configure this factory workspace.
-          </p>
-        </div>
+    <FactorySectionPageShell title={copy.title} description={copy.description}>
+      {section === "general" ? (
+        <FactorySectionCard>
+          <div className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5" htmlFor={factoryNameId}>
+              <span className="font-medium text-grayscale-12 text-sm">
+                Factory name
+              </span>
+              <Input
+                id={factoryNameId}
+                autoComplete="off"
+                className="w-full bg-grayscale-2"
+                onChange={(event) => {
+                  setFactoryName(event.target.value);
+                  setNameStatus("idle");
+                  setNameError(null);
+                }}
+                placeholder="Factory name"
+                value={factoryName}
+              />
+              <span className="min-h-4 text-xs">
+                {nameError ? (
+                  <span className="text-red-11">{nameError}</span>
+                ) : nameStatus === "saving" ? (
+                  <span className="text-grayscale-10">Saving...</span>
+                ) : nameStatus === "saved" ? (
+                  <span className="text-grayscale-10">Saved.</span>
+                ) : null}
+              </span>
+            </label>
 
-        {section === "general" ? (
-          <section className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1">
-            <div className="border-grayscale-3 border-b px-3 py-2">
-              <h2 className="font-mono font-bold text-[11px] text-grayscale-10 uppercase tracking-wide">
-                General
-              </h2>
-            </div>
-            <div className="flex flex-col gap-4 px-3 py-3">
-              <label className="flex flex-col gap-1.5" htmlFor={factoryNameId}>
-                <span className="font-medium text-grayscale-12 text-sm">
-                  Factory name
-                </span>
-                <Input
-                  id={factoryNameId}
-                  autoComplete="off"
-                  className="w-full bg-grayscale-2"
-                  onChange={(event) => {
-                    setFactoryName(event.target.value);
-                    setNameStatus("idle");
-                    setNameError(null);
-                  }}
-                  placeholder="Factory name"
-                  value={factoryName}
-                />
-                <span className="min-h-4 text-xs">
-                  {nameError ? (
-                    <span className="text-red-11">{nameError}</span>
-                  ) : nameStatus === "saving" ? (
-                    <span className="text-grayscale-10">Saving...</span>
-                  ) : nameStatus === "saved" ? (
-                    <span className="text-grayscale-10">Saved.</span>
-                  ) : null}
-                </span>
-              </label>
-
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="font-medium text-grayscale-12 text-sm">
-                    Monogram
-                  </p>
-                  <p className="text-grayscale-10 text-xs">
-                    Used for this factory in the rail.
-                  </p>
-                </div>
-                <FactoryMonogram color={selectedColor} name={factory.name} />
-              </div>
-
-              <div className="flex flex-row flex-wrap items-center gap-2">
-                {FACTORY_COLOR_OPTIONS.map((option) => {
-                  const isSelected = selectedColor === option.id;
-
-                  return (
-                    <button
-                      aria-label={`Use ${option.label} factory color`}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        "group relative flex size-5 aspect-square items-center justify-center border-grayscale-6 bg-grayscale-2 transition-colors hover:border-grayscale-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-9 focus-visible:outline-offset-2",
-                      )}
-                      key={option.id}
-                      onClick={() => saveColor(option.id)}
-                      title={option.label}
-                      type="button"
-                    >
-                      <span
-                        className="relative size-5 aspect-square rounded-md transition-transform group-hover:scale-110"
-                        style={{ backgroundColor: `var(--${option.id}-9)` }}
-                      />
-                      {isSelected ? (
-                        <span
-                          aria-hidden="true"
-                          className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 size-2 rounded-xs"
-                          style={{ backgroundColor: `var(--${option.id}-5)` }}
-                        />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {formError ? (
-                <p className="text-red-11 text-sm" role="alert">
-                  {formError}
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium text-grayscale-12 text-sm">
+                  Monogram
                 </p>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        {section === "agents" ? (
-          <FactoryAgentsPanel agents={agents} isLoading={isLoading} />
-        ) : null}
-
-        {section === "billing" ? (
-          <section className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1">
-            <div className="border-grayscale-3 border-b px-3 py-2">
-              <h2 className="font-mono font-bold text-[11px] text-grayscale-10 uppercase tracking-wide">
-                Billing
-              </h2>
-            </div>
-            <div className="flex flex-col gap-4 px-3 py-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
-                  <CreditCardIcon aria-hidden="true" size={16} weight="bold" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-grayscale-12 text-sm">
-                    {isPaidPro ? "Pro" : isTrialing ? "Trial" : "Basic"}
-                  </p>
-                  <p className="text-grayscale-10 text-xs">
-                    {isPro
-                      ? "Unlimited supervisors and unlimited workers."
-                      : `${activeSupervisorCount}/${BASIC_SUPERVISOR_LIMIT} supervisors, unlimited workers.`}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <BillingStat
-                  label="Supervisor seats"
-                  value={`Owner + ${activeSupervisorCount}`}
-                />
-                <BillingStat label="Workers" value="Unlimited" />
-              </div>
-
-              {factory.trialEndsAt && isTrialing ? (
                 <p className="text-grayscale-10 text-xs">
-                  Trial ends {formatBillingDate(factory.trialEndsAt)}.
+                  Used for this factory in the rail.
                 </p>
-              ) : null}
+              </div>
+              <FactoryMonogram color={selectedColor} name={factory.name} />
+            </div>
 
-              {billingError ? (
-                <p className="text-red-11 text-sm" role="alert">
-                  {billingError}
-                </p>
-              ) : null}
+            <div className="flex flex-row flex-wrap items-center gap-2">
+              {FACTORY_COLOR_OPTIONS.map((option) => {
+                const isSelected = selectedColor === option.id;
 
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                {isPaidPro ? (
-                  <Button
-                    disabled={billingAction !== null}
-                    onClick={() => openBillingUrl("portal")}
-                    type="button"
-                    variant="secondary"
-                  >
-                    {billingAction === "portal"
-                      ? "Opening..."
-                      : "Manage billing"}
-                  </Button>
-                ) : null}
-                {!isPaidPro ? (
-                  <Button
-                    disabled={billingAction !== null}
-                    onClick={() => openBillingUrl("upgrade")}
+                return (
+                  <button
+                    aria-label={`Use ${option.label} factory color`}
+                    aria-pressed={isSelected}
+                    className={cn(
+                      "group relative flex size-5 aspect-square items-center justify-center border-grayscale-6 bg-grayscale-2 transition-colors hover:border-grayscale-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-9 focus-visible:outline-offset-2",
+                    )}
+                    key={option.id}
+                    onClick={() => saveColor(option.id)}
+                    title={option.label}
                     type="button"
                   >
-                    {billingAction === "upgrade" ? "Opening..." : "Upgrade"}
-                  </Button>
-                ) : null}
-              </div>
+                    <span
+                      className="relative size-5 aspect-square rounded-md transition-transform group-hover:scale-110"
+                      style={{ backgroundColor: `var(--${option.id}-9)` }}
+                    />
+                    {isSelected ? (
+                      <span
+                        aria-hidden="true"
+                        className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 size-2 rounded-xs"
+                        style={{ backgroundColor: `var(--${option.id}-5)` }}
+                      />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
-          </section>
-        ) : null}
 
-        {section === "danger-zone" ? (
-          <section className="overflow-hidden rounded-lg border border-red-6 bg-red-2">
-            <div className="border-red-6 border-b px-3 py-2">
-              <h2 className="font-mono font-bold text-[11px] text-red-11 uppercase tracking-wide">
-                Danger zone
-              </h2>
-            </div>
-            <div className="flex flex-col gap-4 px-3 py-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-red-6 bg-red-3 text-red-11">
-                  <WarningIcon aria-hidden="true" size={16} weight="bold" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-red-12 text-sm">
-                    Delete factory
-                  </p>
-                  <p className="text-red-11 text-xs">
-                    Permanently removes this factory. Downstream cleanup should
-                    run from the factory delete event.
-                  </p>
-                </div>
+            {formError ? (
+              <p className="text-red-11 text-sm" role="alert">
+                {formError}
+              </p>
+            ) : null}
+          </div>
+        </FactorySectionCard>
+      ) : null}
+
+      {section === "agents" ? (
+        <FactoryAgentsPanel agents={agents} isLoading={isLoading} />
+      ) : null}
+
+      {section === "billing" ? (
+        <FactorySectionCard>
+          <div className="flex flex-col gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
+                <CreditCardIcon aria-hidden="true" size={16} weight="bold" />
               </div>
-
-              {deleteError ? (
-                <p className="text-red-11 text-sm" role="alert">
-                  {deleteError}
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-grayscale-12 text-sm">
+                  {isPaidPro ? "Pro" : isTrialing ? "Trial" : "Basic"}
                 </p>
-              ) : null}
+                <p className="text-grayscale-10 text-xs">
+                  {isPro
+                    ? "Unlimited supervisors and unlimited workers."
+                    : `${activeSupervisorCount}/${BASIC_SUPERVISOR_LIMIT} supervisors, unlimited workers.`}
+                </p>
+              </div>
+            </div>
 
-              <div className="flex justify-end">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <BillingStat
+                label="Supervisor seats"
+                value={`Owner + ${activeSupervisorCount}`}
+              />
+              <BillingStat label="Workers" value="Unlimited" />
+            </div>
+
+            {factory.trialEndsAt && isTrialing ? (
+              <p className="text-grayscale-10 text-xs">
+                Trial ends {formatBillingDate(factory.trialEndsAt)}.
+              </p>
+            ) : null}
+
+            {billingError ? (
+              <p className="text-red-11 text-sm" role="alert">
+                {billingError}
+              </p>
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {isPaidPro ? (
                 <Button
-                  className="border-red-8 bg-red-9 text-white hover:border-red-9 hover:bg-red-10 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isDeleting}
-                  onClick={deleteFactory}
+                  disabled={billingAction !== null}
+                  onClick={() => openBillingUrl("portal")}
+                  type="button"
+                  variant="secondary"
+                >
+                  {billingAction === "portal" ? "Opening..." : "Manage billing"}
+                </Button>
+              ) : null}
+              {!isPaidPro ? (
+                <Button
+                  disabled={billingAction !== null}
+                  onClick={() => openBillingUrl("upgrade")}
                   type="button"
                 >
-                  <TrashIcon aria-hidden="true" size={14} weight="bold" />
-                  {isDeleting ? "Deleting..." : "Delete factory"}
+                  {billingAction === "upgrade" ? "Opening..." : "Upgrade"}
                 </Button>
+              ) : null}
+            </div>
+          </div>
+        </FactorySectionCard>
+      ) : null}
+
+      {section === "danger-zone" ? (
+        <FactorySectionCard innerClassName="border-red-6 bg-red-2 dark:bg-red-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-red-6 bg-red-3 text-red-11">
+                <WarningIcon aria-hidden="true" size={16} weight="bold" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium text-red-12 text-sm">
+                  Delete factory
+                </p>
+                <p className="text-red-11 text-xs">
+                  Permanently removes this factory. Downstream cleanup should
+                  run from the factory delete event.
+                </p>
               </div>
             </div>
-          </section>
-        ) : null}
-      </div>
-    </div>
+
+            {deleteError ? (
+              <p className="text-red-11 text-sm" role="alert">
+                {deleteError}
+              </p>
+            ) : null}
+
+            <div className="flex justify-end">
+              <Button
+                className="border-red-8 bg-red-9 text-white hover:border-red-9 hover:bg-red-10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isDeleting}
+                onClick={deleteFactory}
+                type="button"
+              >
+                <TrashIcon aria-hidden="true" size={14} weight="bold" />
+                {isDeleting ? "Deleting..." : "Delete factory"}
+              </Button>
+            </div>
+          </div>
+        </FactorySectionCard>
+      ) : null}
+    </FactorySectionPageShell>
   );
 }
 
@@ -536,51 +539,46 @@ function FactoryAgentsPanel({
   isLoading: boolean;
 }) {
   return (
-    <Card layer={0} className="w-full max-w-2xl gap-4 rounded-[16px] p-1.5">
-      <Card
-        layer={1}
-        className="small-shadow w-full max-w-2xl gap-4 rounded-[13px] bg-grayscale-1 p-2 dark:bg-grayscale-2"
-      >
-        <div className="flex flex-col gap-1">
-          {isLoading ? (
-            <p className="text-grayscale-10 text-sm">Loading agents...</p>
-          ) : agents.length > 0 ? (
-            agents.map((agent) => (
-              <div
-                className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 px-3"
-                key={agent.id}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
-                    <CpuIcon aria-hidden="true" size={16} weight="bold" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-grayscale-12 text-sm">
-                      {formatAgentType(agent.type)}
-                    </p>
-                    <p className="truncate font-mono text-grayscale-10 text-xs">
-                      {agent.id}
-                    </p>
-                  </div>
+    <FactorySectionCard>
+      <div className="flex flex-col gap-1">
+        {isLoading ? (
+          <p className="text-grayscale-10 text-sm">Loading agents...</p>
+        ) : agents.length > 0 ? (
+          agents.map((agent) => (
+            <div
+              className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 px-3"
+              key={agent.id}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
+                  <CpuIcon aria-hidden="true" size={16} weight="bold" />
                 </div>
-                <span className="shrink-0 rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
-                  Connected
-                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-grayscale-12 text-sm">
+                    {formatAgentType(agent.type)}
+                  </p>
+                  <p className="truncate font-mono text-grayscale-10 text-xs">
+                    {agent.id}
+                  </p>
+                </div>
               </div>
-            ))
-          ) : (
-            <div className="flex flex-col items-center justify-center p-16">
-              <p className="font-medium text-grayscale-11 text-sm">
-                No agents connected yet.
-              </p>
-              <p className="max-w-sm text-balance text-center text-grayscale-10 text-xs">
-                Add an agent when creating a factory to connect it here.
-              </p>
+              <span className="shrink-0 rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
+                Connected
+              </span>
             </div>
-          )}
-        </div>
-      </Card>
-    </Card>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center p-16">
+            <p className="font-medium text-grayscale-11 text-sm">
+              No agents connected yet.
+            </p>
+            <p className="max-w-sm text-balance text-center text-grayscale-10 text-xs">
+              Add an agent when creating a factory to connect it here.
+            </p>
+          </div>
+        )}
+      </div>
+    </FactorySectionCard>
   );
 }
 

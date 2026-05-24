@@ -1,9 +1,9 @@
 "use client";
 
-import { Plug, PuzzlePiece } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import CapabilitiesPanel from "@/components/factory/CapabilitiesPanel";
+import { FactorySectionPageShell } from "@/components/factory/FactorySectionLayout";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 
@@ -13,13 +13,11 @@ const sectionCopy = {
   mcp: {
     description:
       "Connect MCP servers and control the tools available to workers.",
-    icon: Plug,
-    loading: "Loading MCP servers...",
-    title: "MCP",
+    loading: "Loading integrations...",
+    title: "Integrations",
   },
   skills: {
     description: "Install skills that new workers should receive by default.",
-    icon: PuzzlePiece,
     loading: "Loading skills...",
     title: "Skills",
   },
@@ -27,7 +25,6 @@ const sectionCopy = {
   CapabilitySection,
   {
     description: string;
-    icon: typeof Plug;
     loading: string;
     title: string;
   }
@@ -40,12 +37,10 @@ export default function FactoryCapabilitySectionPage({
 }) {
   const { factoryId } = useParams<{ factoryId: string }>();
   const copy = sectionCopy[section];
-  const Icon = copy.icon;
 
   return (
     <FactoryCapabilitySectionPageContent
       factoryId={factoryId}
-      Icon={Icon}
       copy={copy}
       instantDb={db}
       section={section}
@@ -56,13 +51,11 @@ export default function FactoryCapabilitySectionPage({
 function FactoryCapabilitySectionPageContent({
   copy,
   factoryId,
-  Icon,
   instantDb,
   section,
 }: {
   copy: (typeof sectionCopy)[CapabilitySection];
   factoryId: string;
-  Icon: typeof Plug;
   instantDb: AppDb;
   section: CapabilitySection;
 }) {
@@ -105,27 +98,13 @@ function FactoryCapabilitySectionPageContent({
   }
 
   return (
-    <div className="px-4 py-5 sm:p-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <header className="flex flex-col gap-3 border-b border-grayscale-3 pb-6">
-          <div className="flex min-w-0 flex-col gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg border border-grayscale-4 bg-grayscale-2 text-accent-11">
-              <Icon size={20} weight="bold" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-md font-mono font-bold uppercase text-grayscale-12">
-                {copy.title}
-              </h1>
-              <p className="mt-1 text-sm text-grayscale-11">
-                {copy.description}
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <CapabilitiesPanel factoryId={factoryId} section={section} />
-      </div>
-    </div>
+    <FactorySectionPageShell title={copy.title} description={copy.description}>
+      <CapabilitiesPanel
+        factoryId={factoryId}
+        section={section}
+        variant="computer"
+      />
+    </FactorySectionPageShell>
   );
 }
 

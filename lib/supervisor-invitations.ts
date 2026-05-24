@@ -1,21 +1,10 @@
+import { type ErrorResponse, Resend } from "resend";
 import { getAppPublicUrl } from "@/lib/app-url";
 
-const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-const cloudflareEmailApiToken = process.env.CLOUDFLARE_EMAIL_API_TOKEN;
-const cloudflareEmailFrom = process.env.CLOUDFLARE_EMAIL_FROM;
-const cloudflareEmailFromName =
-  process.env.CLOUDFLARE_EMAIL_FROM_NAME ?? "Factoryplane";
-
-type CloudflareEmailSendResponse = {
-  errors?: { code?: number; message?: string }[];
-  messages?: { code?: number; message?: string }[];
-  result?: {
-    delivered?: string[];
-    permanent_bounces?: string[];
-    queued?: string[];
-  } | null;
-  success?: boolean;
-};
+const resendApiKey = process.env.RESEND_API_KEY;
+const resendEmailFrom = process.env.RESEND_EMAIL_FROM;
+const resendEmailFromName =
+  process.env.RESEND_EMAIL_FROM_NAME ?? "Factoryplane";
 
 export function normalizeSupervisorEmail(email: string) {
   return email.trim().toLowerCase();
@@ -34,24 +23,17 @@ export async function sendSupervisorInviteEmail({
   request?: Request;
   supervisorEmail: string;
 }) {
-  if (!cloudflareAccountId) {
+  if (!resendApiKey) {
     return {
       skipped: true,
-      reason: "CLOUDFLARE_ACCOUNT_ID is not configured",
+      reason: "RESEND_API_KEY is not configured",
     } as const;
   }
 
-  if (!cloudflareEmailApiToken) {
+  if (!resendEmailFrom) {
     return {
       skipped: true,
-      reason: "CLOUDFLARE_EMAIL_API_TOKEN is not configured",
-    } as const;
-  }
-
-  if (!cloudflareEmailFrom) {
-    return {
-      skipped: true,
-      reason: "CLOUDFLARE_EMAIL_FROM is not configured",
+      reason: "RESEND_EMAIL_FROM is not configured",
     } as const;
   }
 
@@ -59,81 +41,50 @@ export async function sendSupervisorInviteEmail({
   const inviter = invitedByEmail
     ? `${invitedByEmail} invited you`
     : "You were invited";
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/email/sending/send`,
-    {
-      body: JSON.stringify({
-        from: { address: cloudflareEmailFrom, name: cloudflareEmailFromName },
-        html: [
-          `<p>${escapeHtml(inviter)} to supervise <strong>${escapeHtml(
-            factoryName,
-          )}</strong> on Factoryplane.</p>`,
-          `<p>Sign in with this email address to accept the invite:</p>`,
-          `<p><a href="${escapeHtml(factoryUrl)}">Open ${escapeHtml(
-            factoryName,
-          )}</a></p>`,
-        ].join(""),
-        subject: `You were invited to supervise ${factoryName}`,
-        text: [
-          `${inviter} to supervise ${factoryName} on Factoryplane.`,
-          "",
-          "Sign in with this email address to accept the invite:",
-          factoryUrl,
-        ].join("\n"),
-        to: supervisorEmail,
-      }),
-      headers: {
-        Authorization: `Bearer ${cloudflareEmailApiToken}`,
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    },
-  );
+  const resend = new Resend(resendApiKey);
+  const { data, error } = await resend.emails.send({
+    from: formatFromAddress(resendEmailFrom, resendEmailFromName),
+    html: [
+      `<p>${escapeHtml(inviter)} to supervise <strong>${escapeHtml(
+        factoryName,
+      )}</strong> on Factoryplane.</p>`,
+      `<p>Sign in with this email address to accept the invite:</p>`,
+      `<p><a href="${escapeHtml(factoryUrl)}">Open ${escapeHtml(
+        factoryName,
+      )}</a></p>`,
+    ].join(""),
+    subject: `You were invited to supervise ${factoryName}`,
+    text: [
+      `${inviter} to supervise ${factoryName} on Factoryplane.`,
+      "",
+      "Sign in with this email address to accept the invite:",
+      factoryUrl,
+    ].join("\n"),
+    to: supervisorEmail,
+  });
 
-  const body = (await response
-    .json()
-    .catch(() => null)) as CloudflareEmailSendResponse | null;
-
-  if (!response.ok || !body?.success) {
-    throw new Error(getCloudflareEmailErrorMessage(body, response.status));
+  if (error) {
+    throw new Error(getResendEmailErrorMessage(error));
   }
 
   return {
-    status: getCloudflareEmailStatus(body.result),
+    id: data.id,
+    status: "sent",
     skipped: false,
   } as const;
 }
 
-function getCloudflareEmailErrorMessage(
-  body: CloudflareEmailSendResponse | null,
-  status: number,
-) {
-  const errorMessage = body?.errors
-    ?.map((error) => error.message)
-    .filter(Boolean)
-    .join(", ");
-
-  return errorMessage
-    ? `Cloudflare Email Service error: ${errorMessage}`
-    : `Cloudflare Email Service request failed with status ${status}`;
+function getResendEmailErrorMessage(error: ErrorResponse) {
+  return error.statusCode
+    ? `Resend email error (${error.statusCode} ${error.name}): ${error.message}`
+    : `Resend email error (${error.name}): ${error.message}`;
 }
 
-function getCloudflareEmailStatus(
-  result: CloudflareEmailSendResponse["result"],
-) {
-  if (result?.permanent_bounces?.length) {
-    return "permanent_bounce";
-  }
+function formatFromAddress(address: string, name: string) {
+  const safeAddress = address.trim().replaceAll(/[\r\n]/g, "");
+  const safeName = name.trim().replaceAll(/[\r\n]/g, " ");
 
-  if (result?.queued?.length) {
-    return "queued";
-  }
-
-  if (result?.delivered?.length) {
-    return "delivered";
-  }
-
-  return "sent";
+  return safeName ? `${safeName} <${safeAddress}>` : safeAddress;
 }
 
 function escapeHtml(value: string) {

@@ -19,6 +19,7 @@ Copy the variables from `.env.example` into `.env.local` and fill them in:
 - `UPSTASH_BOX_API_KEY` from Upstash Box
 - `TRIGGER_SECRET_KEY` from Trigger.dev
 - `APP_PUBLIC_URL`, the public HTTPS origin used for callbacks and webhooks
+- `RESEND_API_KEY` and `RESEND_EMAIL_FROM` for supervisor invite emails
 - `STRIPE_SECRET_KEY` from Stripe
 - `STRIPE_WEBHOOK_SECRET` from the Stripe webhook endpoint
 - `STRIPE_PRO_PAYMENT_LINK_URL` for the Pro subscription Payment Link

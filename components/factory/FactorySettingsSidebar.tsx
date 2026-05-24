@@ -45,9 +45,17 @@ export default function FactorySettingsSidebar({
   const pathname = usePathname();
 
   return (
-    <div className={cn("flex h-full min-h-0 w-64 flex-col p-2", className)}>
-      <nav aria-label="Factory settings" className="flex flex-col gap-1">
-        <h2 className="mt-2 px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
+    <div
+      className={cn(
+        "flex h-full min-h-0 w-64 flex-col p-2 max-md:h-auto max-md:w-full max-md:flex-none",
+        className,
+      )}
+    >
+      <nav
+        aria-label="Factory settings"
+        className="flex flex-col gap-1 max-md:scrollbar-none max-md:min-w-0 max-md:flex-row max-md:items-center max-md:gap-2 max-md:overflow-x-auto max-md:overscroll-x-contain"
+      >
+        <h2 className="mt-2 px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase max-md:sr-only">
           Factory Settings
         </h2>
         {settingsSections.map((section) => {
@@ -57,7 +65,7 @@ export default function FactorySettingsSidebar({
           return (
             <Link
               className={cn(
-                "flex py-1 items-center gap-2 rounded-md px-2 text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+                "flex items-center gap-2 rounded-md px-2 py-1 text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:text-grayscale-12 max-md:shrink-0",
                 isActive &&
                   "bg-grayscale-3 text-grayscale-12 hover:bg-grayscale-3",
               )}

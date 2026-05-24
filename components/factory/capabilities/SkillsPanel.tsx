@@ -11,6 +11,7 @@ import {
   Notice,
   type SkillCandidate,
 } from "@/components/factory/capabilities/shared";
+import { FactorySectionCard } from "@/components/factory/FactorySectionLayout";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
 import Input from "@/components/public/Input";
@@ -30,10 +31,12 @@ export function SkillsPanel({
   factoryId,
   instantDb,
   skills,
+  variant = "default",
 }: {
   factoryId: string;
   instantDb: AppDb;
   skills: SkillRecord[];
+  variant?: "computer" | "default";
 }) {
   const { user } = instantDb.useAuth();
   const [repoUrl, setRepoUrl] = useState("");
@@ -172,15 +175,16 @@ export function SkillsPanel({
     });
   }
 
-  return (
-    <Card className="p-4">
-      <div className="mb-4 flex items-center gap-2">
-        <PuzzlePiece size={16} weight="bold" aria-hidden="true" />
-        <h3 className="text-[11px] font-mono font-bold uppercase tracking-wide text-grayscale-10">
-          Skills
-        </h3>
-      </div>
-
+  const content = (
+    <>
+      {variant === "default" ? (
+        <div className="mb-4 flex items-center gap-2">
+          <PuzzlePiece size={16} weight="bold" aria-hidden="true" />
+          <h3 className="text-[11px] font-mono font-bold uppercase tracking-wide text-grayscale-10">
+            Skills
+          </h3>
+        </div>
+      ) : null}
       <form className="flex flex-col gap-3" onSubmit={handleList}>
         <Field label="Skills repo URL">
           <Input
@@ -257,6 +261,12 @@ export function SkillsPanel({
           error: skill.lastError,
         }))}
       />
-    </Card>
+    </>
   );
+
+  if (variant === "computer") {
+    return <FactorySectionCard>{content}</FactorySectionCard>;
+  }
+
+  return <Card className="p-4">{content}</Card>;
 }

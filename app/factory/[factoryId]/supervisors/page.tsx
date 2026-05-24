@@ -4,7 +4,12 @@ import { id } from "@instantdb/react";
 import { UserPlusIcon, XIcon } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
+import {
+  FactorySectionCard,
+  FactorySectionPageShell,
+} from "@/components/factory/FactorySectionLayout";
 import Button from "@/components/public/Button";
+import Input from "@/components/public/Input";
 import {
   BASIC_SUPERVISOR_LIMIT,
   getEffectiveBillingPlan,
@@ -255,117 +260,108 @@ function FactorySupervisorsPageContent({
   }
 
   return (
-    <main className="min-h-dvh px-4 py-8">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <div className="flex flex-col py-2">
-          <h1>Supervisors</h1>
-          <p className="text-grayscale-10 text-sm">
-            Manage who can access and operate this factory.
-          </p>
-        </div>
-
-        <section className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1">
-          <div className="border-grayscale-3 border-b px-3 py-2">
-            <h2 className="font-mono font-bold text-[11px] text-grayscale-10 uppercase tracking-wide">
-              Access
-            </h2>
-          </div>
-          <div className="flex flex-col gap-4 px-3 py-3">
-            {isOwner ? (
-              <form
-                className="flex flex-col gap-2 sm:flex-row"
-                onSubmit={inviteSupervisor}
-              >
-                <label className="sr-only" htmlFor="supervisor-email">
-                  Supervisor email
-                </label>
-                <input
-                  className="min-h-9 min-w-0 flex-1 rounded-lg border border-grayscale-4 bg-grayscale-1 px-3 text-grayscale-12 text-sm outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-8"
-                  id="supervisor-email"
-                  onChange={(event) => setSupervisorEmail(event.target.value)}
-                  placeholder="teammate@example.com"
-                  type="email"
-                  value={supervisorEmail}
-                />
-                {supervisorLimitReached ? (
-                  <Button
-                    disabled={isOpeningUpgrade}
-                    onClick={openUpgrade}
-                    type="button"
-                  >
-                    {isOpeningUpgrade ? "Opening..." : "Upgrade"}
-                  </Button>
-                ) : (
-                  <Button disabled={isInvitingSupervisor} type="submit">
-                    <UserPlusIcon aria-hidden="true" size={14} weight="bold" />
-                    {isInvitingSupervisor ? "Inviting..." : "Invite"}
-                  </Button>
-                )}
-              </form>
-            ) : (
-              <p className="text-grayscale-10 text-sm">
-                Factory owners manage supervisor access.
-              </p>
-            )}
-
-            {supervisorError ? (
-              <p className="text-red-11 text-sm" role="alert">
-                {supervisorError}
-              </p>
-            ) : null}
-            {supervisorNotice ? (
-              <p className="text-green-11 text-sm" role="status">
-                {supervisorNotice}
-              </p>
-            ) : null}
-            {!isPro ? (
-              <p className="text-grayscale-10 text-xs">
-                Basic includes {BASIC_SUPERVISOR_LIMIT} supervisors. Workers are
-                unlimited.
-              </p>
-            ) : null}
-
-            <div className="overflow-hidden rounded-lg border border-grayscale-3">
-              {supervisors.length > 0 ? (
-                supervisors.map((supervisor) => (
-                  <div
-                    className="flex min-h-12 items-center justify-between gap-3 border-grayscale-3 border-b px-3 py-2 last:border-b-0"
-                    key={supervisor.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-grayscale-12 text-sm">
-                        {supervisor.email}
-                      </p>
-                      <p className="text-grayscale-10 text-xs">
-                        {supervisor.status === "active"
-                          ? "Active"
-                          : "Invite pending"}
-                      </p>
-                    </div>
-                    {isOwner && supervisor.status !== "removed" ? (
-                      <button
-                        aria-label={`Remove ${supervisor.email}`}
-                        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-10 transition-colors hover:border-red-7 hover:bg-red-2 hover:text-red-11 disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={removingSupervisorId === supervisor.id}
-                        onClick={() => removeSupervisor(supervisor.id)}
-                        title="Remove supervisor"
-                        type="button"
-                      >
-                        <XIcon aria-hidden="true" size={14} weight="bold" />
-                      </button>
-                    ) : null}
-                  </div>
-                ))
+    <FactorySectionPageShell
+      title="Supervisors"
+      description="Manage who can access and operate this factory."
+    >
+      <FactorySectionCard>
+        <div className="flex flex-col gap-4">
+          {isOwner ? (
+            <form
+              className="flex flex-col gap-2 sm:flex-row"
+              onSubmit={inviteSupervisor}
+            >
+              <label className="sr-only" htmlFor="supervisor-email">
+                Supervisor email
+              </label>
+              <Input
+                className="min-h-9 min-w-0 flex-1 bg-grayscale-2"
+                id="supervisor-email"
+                onChange={(event) => setSupervisorEmail(event.target.value)}
+                placeholder="teammate@example.com"
+                type="email"
+                value={supervisorEmail}
+              />
+              {supervisorLimitReached ? (
+                <Button
+                  disabled={isOpeningUpgrade}
+                  onClick={openUpgrade}
+                  type="button"
+                >
+                  {isOpeningUpgrade ? "Opening..." : "Upgrade"}
+                </Button>
               ) : (
-                <p className="px-3 py-6 text-center text-grayscale-10 text-sm">
+                <Button disabled={isInvitingSupervisor} type="submit">
+                  <UserPlusIcon aria-hidden="true" size={14} weight="bold" />
+                  {isInvitingSupervisor ? "Inviting..." : "Invite"}
+                </Button>
+              )}
+            </form>
+          ) : (
+            <p className="text-grayscale-10 text-sm">
+              Factory owners manage supervisor access.
+            </p>
+          )}
+
+          {supervisorError ? (
+            <p className="text-red-11 text-sm" role="alert">
+              {supervisorError}
+            </p>
+          ) : null}
+          {supervisorNotice ? (
+            <p className="text-green-11 text-sm" role="status">
+              {supervisorNotice}
+            </p>
+          ) : null}
+          {!isPro ? (
+            <p className="text-grayscale-10 text-xs">
+              Basic includes {BASIC_SUPERVISOR_LIMIT} supervisors. Workers are
+              unlimited.
+            </p>
+          ) : null}
+
+          <div className="flex flex-col gap-1">
+            {supervisors.length > 0 ? (
+              supervisors.map((supervisor) => (
+                <div
+                  className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 px-3 py-2"
+                  key={supervisor.id}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-grayscale-12 text-sm">
+                      {supervisor.email}
+                    </p>
+                    <p className="text-grayscale-10 text-xs">
+                      {supervisor.status === "active"
+                        ? "Active"
+                        : "Invite pending"}
+                    </p>
+                  </div>
+                  {isOwner && supervisor.status !== "removed" ? (
+                    <button
+                      aria-label={`Remove ${supervisor.email}`}
+                      className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-10 transition-colors hover:border-red-7 hover:bg-red-2 hover:text-red-11 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={removingSupervisorId === supervisor.id}
+                      onClick={() => removeSupervisor(supervisor.id)}
+                      title="Remove supervisor"
+                      type="button"
+                    >
+                      <XIcon aria-hidden="true" size={14} weight="bold" />
+                    </button>
+                  ) : null}
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center p-16">
+                <p className="font-medium text-grayscale-11 text-sm">
                   No supervisors yet.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </section>
-      </div>
-    </main>
+        </div>
+      </FactorySectionCard>
+    </FactorySectionPageShell>
   );
 }
 

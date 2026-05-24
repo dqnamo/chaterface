@@ -18,11 +18,6 @@ export default function Home() {
       <div className="relative mx-auto max-w-4xl flex w-full flex-col border-x border-grayscale-3 p-4 pt-[4.5rem] dark:border-grayscale-2 md:p-8 lg:p-16">
         <div className="flex flex-col gap-px p-2">
           <Logo />
-          <div className="mt-3 flex flex-row items-center gap-1">
-            <h1 className="text-xl font-medium text-grayscale-12">
-              FactoryPlane
-            </h1>
-          </div>
           <p className="max-w-md text-balance text-sm leading-6 text-grayscale-11">
             Open source, collaborative software factory running in the cloud
             using your existing coding agents.
