@@ -90,9 +90,9 @@ export async function sendSupervisorInviteEmail({
     },
   );
 
-  const body = (await response.json().catch(() => null)) as
-    | CloudflareEmailSendResponse
-    | null;
+  const body = (await response
+    .json()
+    .catch(() => null)) as CloudflareEmailSendResponse | null;
 
   if (!response.ok || !body?.success) {
     throw new Error(getCloudflareEmailErrorMessage(body, response.status));

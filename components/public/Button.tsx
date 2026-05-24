@@ -26,9 +26,11 @@ export default function Button(props: ButtonProps) {
       "bg-white hover:bg-grayscale-2 hover:border-grayscale-4 dark:hover:bg-grayscale-4 dark:hover:border-grayscale-5 dark:bg-grayscale-3 border-grayscale-3 dark:border-grayscale-4 rounded-lg",
   };
 
-  const shortcutClasses = "text-xs uppercase -mr-0.5 ml-auto px-1.5 py-px rounded font-mono font-semibold";
+  const shortcutClasses =
+    "text-xs uppercase -mr-0.5 ml-auto px-1.5 py-px rounded font-mono font-semibold";
   const shortcutVariantClasses = {
-    primary: "bg-grayscale-11/50 text-grayscale-4 dark:bg-grayscale-9/50 dark:text-grayscale-11",
+    primary:
+      "bg-grayscale-11/50 text-grayscale-4 dark:bg-grayscale-9/50 dark:text-grayscale-11",
     secondary: "bg-grayscale-2 dark:bg-grayscale-4",
   };
 
@@ -45,9 +47,14 @@ export default function Button(props: ButtonProps) {
 
     return (
       <a className={classes} {...anchorProps}>
-        
         {children}
-        {shortcut && <span className={cn(shortcutClasses, shortcutVariantClasses[variant])}>{shortcut}</span>}
+        {shortcut && (
+          <span
+            className={cn(shortcutClasses, shortcutVariantClasses[variant])}
+          >
+            {shortcut}
+          </span>
+        )}
       </a>
     );
   }
@@ -63,7 +70,11 @@ export default function Button(props: ButtonProps) {
   return (
     <button className={classes} {...buttonProps}>
       {children}
-      {shortcut && <span className={cn(shortcutClasses, shortcutVariantClasses[variant])}>{shortcut}</span>}
+      {shortcut && (
+        <span className={cn(shortcutClasses, shortcutVariantClasses[variant])}>
+          {shortcut}
+        </span>
+      )}
     </button>
   );
 }

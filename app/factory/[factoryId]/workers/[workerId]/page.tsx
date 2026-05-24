@@ -1,7 +1,6 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowSquareOut } from "@phosphor-icons/react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { EventFeed, type EventRecord } from "@/components/Event";
@@ -78,7 +77,6 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   const events = [...(worker.events ?? [])].sort((a, b) =>
     (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
   );
-  const ports = [...(worker.ports ?? [])].sort((a, b) => a.port - b.port);
   const workerTitle = worker.name ?? `Worker ${worker.id.slice(0, 8)}`;
   const selectedWorkerId = worker.id;
   const isRetired = worker.status === "retired";
@@ -219,8 +217,9 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
           </h1>
           <WorkerStatusIndicator showLabel status={worker.status} />
         </div>
-        
-        
+        {retireError ? (
+          <p className="mt-1 text-red-500 text-xs">{retireError}</p>
+        ) : null}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
         <Button
@@ -281,6 +280,9 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
               New workers will start from this worker's current files. Existing
               workers will not change.
             </Dialog.Description>
+            {baselineError ? (
+              <p className="mt-3 text-red-500 text-sm">{baselineError}</p>
+            ) : null}
             <div className="mt-5 flex justify-end gap-2">
               <Dialog.Close
                 className="flex cursor-pointer flex-row gap-1.5 rounded-lg border border-b-2 border-grayscale-3 bg-white px-2 py-1 font-medium text-grayscale-11 text-sm transition-colors hover:bg-grayscale-2 hover:border-grayscale-4"
