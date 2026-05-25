@@ -47,11 +47,9 @@ Do not print or expose FACTORY_WORKER_API_TOKEN, and do not ask for or handle sa
 `;
 
 export async function createDefaultFactoryCheckpoint({
-  codexAuthJson,
   factoryId,
   sandbox,
 }: {
-  codexAuthJson?: string;
   factoryId: string;
   sandbox: AppSandbox;
 }) {
@@ -61,14 +59,6 @@ export async function createDefaultFactoryCheckpoint({
     `mkdir -p ${shellQuote(factoryDir)}`,
     `printf %s ${shellQuote(marker)} > ${shellQuote(`${factoryDir}/factory.json`)}`,
   ];
-
-  if (codexAuthJson) {
-    commands.push(
-      'mkdir -p "$HOME/.codex"',
-      `printf %s ${shellQuote(codexAuthJson)} > "$HOME/.codex/auth.json"`,
-      'chmod 600 "$HOME/.codex/auth.json"',
-    );
-  }
 
   const result = await runSandboxCommand(
     sandbox,
@@ -85,6 +75,32 @@ export async function createDefaultFactoryCheckpoint({
   }
 
   return createCheckpoint(sandbox, `factory-${factoryId.slice(0, 8)}-default`);
+}
+
+export async function installCodexAuthOnSandbox({
+  codexAuthJson,
+  sandbox,
+}: {
+  codexAuthJson: string;
+  sandbox: AppSandbox;
+}) {
+  const result = await runSandboxCommand(
+    sandbox,
+    [
+      'mkdir -p "$HOME/.codex"',
+      `printf %s ${shellQuote(codexAuthJson)} > "$HOME/.codex/auth.json"`,
+      'chmod 600 "$HOME/.codex/auth.json"',
+    ].join(" && "),
+    30_000,
+  );
+
+  if (!result.success) {
+    throw new Error(
+      `Could not install Codex auth: ${
+        cleanCommandOutput(result.output) || "No output"
+      }`,
+    );
+  }
 }
 
 export async function ensureLatestCodexOnSandbox(sandbox: AppSandbox) {

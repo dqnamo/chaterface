@@ -13,6 +13,7 @@ import {
   FactorySectionCard,
   FactorySectionPageShell,
 } from "@/components/factory/FactorySectionLayout";
+import { WorkerRunOptions } from "@/components/factory/WorkerRunOptions";
 import Button from "@/components/public/Button";
 import Input from "@/components/public/Input";
 import { cn } from "@/helpers/classname-helper";
@@ -28,6 +29,14 @@ import {
   isFactoryTrialing,
   PRO_BILLING_PLAN,
 } from "@/lib/billing";
+import {
+  normalizeWorkerModel,
+  normalizeWorkerReasoningLevel,
+  normalizeWorkerSpeed,
+  type WorkerModel,
+  type WorkerReasoningLevel,
+  type WorkerSpeed,
+} from "@/lib/codex/worker-options";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { clearLastFactoryId } from "@/lib/factory/last-factory";
@@ -50,6 +59,11 @@ type SupervisorRecord = {
 };
 
 type AgentRecord = {
+  codexModel?: string;
+  codexReasoningLevel?: string;
+  codexSpeed?: string;
+  gitEmail?: string;
+  gitName?: string;
   id: string;
   type?: string;
 };
@@ -422,7 +436,11 @@ function FactorySettingsPageContent({
       ) : null}
 
       {section === "agents" ? (
-        <FactoryAgentsPanel agents={agents} isLoading={isLoading} />
+        <FactoryAgentsPanel
+          agents={agents}
+          instantDb={instantDb}
+          isLoading={isLoading}
+        />
       ) : null}
 
       {section === "billing" ? (
@@ -533,9 +551,11 @@ function FactorySettingsPageContent({
 
 function FactoryAgentsPanel({
   agents,
+  instantDb,
   isLoading,
 }: {
   agents: AgentRecord[];
+  instantDb: AppDb;
   isLoading: boolean;
 }) {
   return (
@@ -546,25 +566,31 @@ function FactoryAgentsPanel({
         ) : agents.length > 0 ? (
           agents.map((agent) => (
             <div
-              className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 px-3"
+              className="flex flex-col gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 p-3"
               key={agent.id}
             >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
-                  <CpuIcon aria-hidden="true" size={16} weight="bold" />
+              <div className="flex min-h-10 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
+                    <CpuIcon aria-hidden="true" size={16} weight="bold" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-grayscale-12 text-sm">
+                      {formatAgentType(agent.type)}
+                    </p>
+                    <p className="truncate font-mono text-grayscale-10 text-xs">
+                      {agent.id}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-grayscale-12 text-sm">
-                    {formatAgentType(agent.type)}
-                  </p>
-                  <p className="truncate font-mono text-grayscale-10 text-xs">
-                    {agent.id}
-                  </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <AgentDefaultOptions agent={agent} instantDb={instantDb} />
+                  <span className="rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
+                    Connected
+                  </span>
                 </div>
               </div>
-              <span className="shrink-0 rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
-                Connected
-              </span>
+              <AgentIdentityOptions agent={agent} instantDb={instantDb} />
             </div>
           ))
         ) : (
@@ -579,6 +605,139 @@ function FactoryAgentsPanel({
         )}
       </div>
     </FactorySectionCard>
+  );
+}
+
+function AgentIdentityOptions({
+  agent,
+  instantDb,
+}: {
+  agent: AgentRecord;
+  instantDb: AppDb;
+}) {
+  const gitNameId = useId();
+  const gitEmailId = useId();
+  const [gitName, setGitName] = useState(agent.gitName ?? "");
+  const [gitEmail, setGitEmail] = useState(agent.gitEmail ?? "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setGitName(agent.gitName ?? "");
+    setGitEmail(agent.gitEmail ?? "");
+  }, [agent.gitEmail, agent.gitName]);
+
+  const trimmedGitName = gitName.trim();
+  const trimmedGitEmail = gitEmail.trim();
+  const hasChanges =
+    trimmedGitName !== (agent.gitName ?? "") ||
+    trimmedGitEmail !== (agent.gitEmail ?? "");
+
+  async function saveIdentity() {
+    setIsSaving(true);
+
+    try {
+      await instantDb.transact(
+        instantDb.tx.agents[agent.id].update({
+          gitEmail: trimmedGitEmail,
+          gitName: trimmedGitName,
+        }),
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-2 border-grayscale-3 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+      <label className="flex min-w-0 flex-col gap-1.5" htmlFor={gitNameId}>
+        <span className="font-medium text-grayscale-12 text-xs">Git name</span>
+        <Input
+          className="h-9 bg-grayscale-1 dark:bg-grayscale-1"
+          disabled={isSaving}
+          id={gitNameId}
+          onChange={(event) => setGitName(event.target.value)}
+          placeholder="Factory default"
+          value={gitName}
+        />
+      </label>
+      <label className="flex min-w-0 flex-col gap-1.5" htmlFor={gitEmailId}>
+        <span className="font-medium text-grayscale-12 text-xs">Git email</span>
+        <Input
+          autoComplete="email"
+          className="h-9 bg-grayscale-1 dark:bg-grayscale-1"
+          disabled={isSaving}
+          id={gitEmailId}
+          onChange={(event) => setGitEmail(event.target.value)}
+          placeholder="Factory default"
+          value={gitEmail}
+        />
+      </label>
+      <Button
+        className="h-9 justify-center"
+        disabled={isSaving || !hasChanges}
+        onClick={saveIdentity}
+        type="button"
+        variant="secondary"
+      >
+        {isSaving ? "Saving..." : "Save identity"}
+      </Button>
+    </div>
+  );
+}
+
+function AgentDefaultOptions({
+  agent,
+  instantDb,
+}: {
+  agent: AgentRecord;
+  instantDb: AppDb;
+}) {
+  const model = normalizeWorkerModel(agent.codexModel);
+  const reasoningLevel = normalizeWorkerReasoningLevel(
+    agent.codexReasoningLevel,
+  );
+  const speed = normalizeWorkerSpeed({
+    model,
+    speed: agent.codexSpeed,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function updateDefaults(updates: {
+    codexModel?: WorkerModel;
+    codexReasoningLevel?: WorkerReasoningLevel;
+    codexSpeed?: WorkerSpeed;
+  }) {
+    setIsSaving(true);
+
+    try {
+      await instantDb.transact(instantDb.tx.agents[agent.id].update(updates));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <WorkerRunOptions
+      disabled={isSaving}
+      model={model}
+      reasoningLevel={reasoningLevel}
+      setModel={(nextModel) =>
+        updateDefaults({
+          codexModel: nextModel,
+        })
+      }
+      setReasoningLevel={(nextReasoningLevel) =>
+        updateDefaults({
+          codexReasoningLevel: nextReasoningLevel,
+        })
+      }
+      setSpeed={(nextSpeed) =>
+        updateDefaults({
+          codexSpeed: nextSpeed,
+        })
+      }
+      speed={speed}
+    />
   );
 }
 

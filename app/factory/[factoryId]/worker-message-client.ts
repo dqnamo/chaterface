@@ -27,6 +27,7 @@ export async function triggerWorkerRun({
   workerModel,
   workerReasoningLevel,
   worker,
+  workerAgentId,
   workerSpeed,
   workerId: preGeneratedWorkerId,
 }: {
@@ -41,6 +42,7 @@ export async function triggerWorkerRun({
   workerModel?: WorkerModel;
   workerReasoningLevel?: WorkerReasoningLevel;
   worker?: WorkerRecord;
+  workerAgentId?: null | string;
   workerSpeed?: WorkerSpeed;
   workerId?: string;
 }) {
@@ -74,6 +76,11 @@ export async function triggerWorkerRun({
   });
 
   onError(null);
+
+  if (isNewWorker && !workerAgentId) {
+    onError("Select an agent before sending this task to a worker.");
+    return null;
+  }
 
   try {
     const attachmentFileIds = await uploadImageAttachments({
@@ -128,6 +135,14 @@ export async function triggerWorkerRun({
           factory: factoryId,
         }),
       );
+
+      if (workerAgentId) {
+        transactions.push(
+          instantDb.tx.workers[workerId].link({
+            agent: workerAgentId,
+          }),
+        );
+      }
     }
 
     await instantDb.transact(transactions);

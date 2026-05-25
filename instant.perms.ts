@@ -79,11 +79,27 @@ const rules = {
     },
   },
   agents: {
+    bind: {
+      codexModelIsSupported:
+        "!('codexModel' in request.modifiedFields) || newData.codexModel in ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex-spark']",
+      codexReasoningLevelIsSupported:
+        "!('codexReasoningLevel' in request.modifiedFields) || newData.codexReasoningLevel in ['low', 'medium', 'high', 'xhigh']",
+      codexSpeedIsSupported:
+        "!('codexSpeed' in request.modifiedFields) || newData.codexSpeed in ['standard', 'fast']",
+      isFactoryMember:
+        "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
+      isOwner: "auth.id in data.ref('factory.owner.id')",
+      onlyUpdatesAgentSettings:
+        "request.modifiedFields.all(field, field in ['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName']) && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
+    },
     allow: {
-      view: "auth.id in data.ref('factory.owner.id')",
+      view: "isFactoryMember",
       create: "false",
-      update: "false",
+      update: "isOwner && onlyUpdatesAgentSettings",
       delete: "false",
+    },
+    fields: {
+      authEncrypted: "false",
     },
   },
   factoryStripeBillings: {
@@ -119,7 +135,7 @@ const rules = {
       isFactoryMember:
         "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
       onlyCreatesClientWorker:
-        "request.modifiedFields.all(field, field in ['codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt']) && data.status == 'queued' && data.retiredAt == null && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
+        "request.modifiedFields.all(field, field in ['agent', 'codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt']) && data.status == 'queued' && data.retiredAt == null && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
       onlyQueuesClientWorker:
         "request.modifiedFields.all(field, field in ['codexModel', 'codexReasoningLevel', 'codexSpeed', 'retiredAt', 'status', 'updatedAt']) && newData.retiredAt == null && newData.status in ['queued', 'running'] && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
       onlyRetiresClientWorker:

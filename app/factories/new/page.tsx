@@ -1009,8 +1009,8 @@ function AgentStep({
                   className="min-h-48 w-full resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 font-mono text-grayscale-12 text-xs outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
                 />
                 <span className="text-grayscale-10 text-xs">
-                  Saved encrypted on the agent and copied as a file into the
-                  default snapshot.
+                  Saved encrypted on the agent and installed into worker
+                  sandboxes created with that agent.
                 </span>
               </label>
             </div>

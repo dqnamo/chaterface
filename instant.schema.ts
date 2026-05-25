@@ -51,6 +51,11 @@ const _schema = i.schema({
     agents: i.entity({
       type: i.string(),
       authEncrypted: i.string(),
+      codexModel: i.string().indexed().optional(),
+      codexReasoningLevel: i.string().indexed().optional(),
+      codexSpeed: i.string().indexed().optional(),
+      gitEmail: i.string().indexed().optional(),
+      gitName: i.string().indexed().optional(),
     }),
     secrets: i.entity({
       createdAt: i.string().indexed(),
@@ -248,6 +253,18 @@ const _schema = i.schema({
       },
       reverse: {
         on: "factories",
+        has: "many",
+        label: "workers",
+      },
+    },
+    workerAgents: {
+      forward: {
+        on: "workers",
+        has: "one",
+        label: "agent",
+      },
+      reverse: {
+        on: "agents",
         has: "many",
         label: "workers",
       },

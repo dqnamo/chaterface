@@ -53,10 +53,10 @@ export function WorkerRunOptions({
         disabled={disabled}
         type="button"
       >
-        <Lightning size={16} weight="bold" aria-hidden="true" />
-        <span className="font-semibold text-grayscale-12">
-          {getCompactModelLabel(model)}
-        </span>
+        {speed === "fast" ? (
+          <Lightning size={16} weight="fill" aria-hidden="true" />
+        ) : null}
+        <span className="font-semibold text-grayscale-12">{modelLabel}</span>
         <span>{reasoningLabel}</span>
         <span className="sr-only">worker settings</span>
         <CaretDown size={14} weight="bold" aria-hidden="true" />
@@ -158,8 +158,4 @@ function getWorkerOptionLabel<TValue extends string>(
   value: TValue,
 ) {
   return options.find((option) => option.value === value)?.label ?? value;
-}
-
-function getCompactModelLabel(model: WorkerModel) {
-  return model.replace(/^gpt-/, "").replace(/-codex-spark$/, " Spark");
 }

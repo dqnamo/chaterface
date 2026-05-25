@@ -68,11 +68,7 @@ export async function POST(request: Request) {
   try {
     const sandbox = await createFactorySandbox(factoryId);
     await applyGithubSetup(sandbox, githubSettings);
-    const serializedCodexAuthJson = isJsonObject(codexAuthJson)
-      ? JSON.stringify(codexAuthJson, null, 2)
-      : undefined;
     const checkpoint = await createDefaultFactoryCheckpoint({
-      codexAuthJson: serializedCodexAuthJson,
       factoryId,
       sandbox,
     });
@@ -118,6 +114,15 @@ export async function POST(request: Request) {
           ...factoryTransactions,
           db.tx.agents[agentId].update({
             authEncrypted: encryptSecretValue(codexAuthJson),
+            codexModel: "gpt-5.5",
+            codexReasoningLevel: "medium",
+            codexSpeed: "standard",
+            ...(githubSettings.gitEmail
+              ? { gitEmail: githubSettings.gitEmail }
+              : {}),
+            ...(githubSettings.gitName
+              ? { gitName: githubSettings.gitName }
+              : {}),
             type: "codex",
           }),
           db.tx.agents[agentId].link({

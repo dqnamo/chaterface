@@ -71,6 +71,7 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
       ? {
           workers: {
             $: { where: { id: workerId } },
+            agent: {},
             factory: {},
             ports: {},
           },
