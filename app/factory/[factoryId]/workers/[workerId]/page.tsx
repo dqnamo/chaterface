@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EventFeed, type EventRecord } from "@/components/Event";
 import {
   getEventAttachments,
@@ -17,7 +17,6 @@ import { db } from "@/lib/db.client";
 import { WorkerPromptForm, type WorkerRecord } from "../../worker-run-form";
 
 type WorkerPageRecord = WorkerRecord & {
-  events?: EventRecord[];
   factory?: {
     id: string;
   };
@@ -39,6 +38,8 @@ type UserRecord = {
   id: string;
 };
 
+const eventPageSize = 75;
+
 export default function WorkerPage() {
   return <WorkerPageContent instantDb={db} />;
 }
@@ -57,14 +58,19 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
   const [retireError, setRetireError] = useState<string | null>(null);
   const [isRetiring, setIsRetiring] = useState(false);
   const [isUnretiring, setIsUnretiring] = useState(false);
+  const [isLoadingOlderEvents, setIsLoadingOlderEvents] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const isNearChatBottomRef = useRef(true);
+  const hasScrolledToInitialBottomRef = useRef(false);
+  const pendingScrollRestoreRef = useRef<{
+    scrollHeight: number;
+    scrollTop: number;
+  } | null>(null);
   const { data, isLoading, error } = instantDb.useQuery(
     workerId
       ? {
           workers: {
             $: { where: { id: workerId } },
-            events: {
-              attachments: {},
-            },
             factory: {},
             ports: {},
           },
@@ -74,6 +80,126 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
         }
       : null,
   );
+  const {
+    data: eventData,
+    isLoading: isLoadingEvents,
+    error: eventsError,
+    canLoadNextPage,
+    loadNextPage,
+  } = instantDb.useInfiniteQuery({
+    events: {
+      $: {
+        limit: eventPageSize,
+        order: {
+          createdAt: "desc",
+        },
+        where: {
+          "worker.id": workerId,
+        },
+      },
+      attachments: {},
+    },
+  });
+  const events = useMemo(
+    () =>
+      ([...((eventData?.events ?? []) as EventRecord[])] as EventRecord[])
+        .reverse()
+        .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? "")),
+    [eventData?.events],
+  );
+  const oldestEventId = events[0]?.id ?? null;
+  const latestEventId = events.at(-1)?.id ?? null;
+
+  const updateNearChatBottom = useCallback(() => {
+    const scrollElement = chatScrollRef.current;
+
+    if (!scrollElement) {
+      isNearChatBottomRef.current = true;
+      return;
+    }
+
+    isNearChatBottomRef.current =
+      scrollElement.scrollHeight -
+        scrollElement.scrollTop -
+        scrollElement.clientHeight <
+      120;
+  }, []);
+
+  const scrollChatToBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      requestAnimationFrame(() => {
+        const scrollElement = chatScrollRef.current;
+
+        if (!scrollElement) {
+          return;
+        }
+
+        scrollElement.scrollTo({
+          behavior,
+          top: scrollElement.scrollHeight,
+        });
+        updateNearChatBottom();
+      });
+    },
+    [updateNearChatBottom],
+  );
+
+  const loadOlderEvents = useCallback(() => {
+    const scrollElement = chatScrollRef.current;
+
+    if (!canLoadNextPage || isLoadingOlderEvents || !scrollElement) {
+      return;
+    }
+
+    pendingScrollRestoreRef.current = {
+      scrollHeight: scrollElement.scrollHeight,
+      scrollTop: scrollElement.scrollTop,
+    };
+    setIsLoadingOlderEvents(true);
+
+    Promise.resolve(loadNextPage()).finally(() => {
+      setIsLoadingOlderEvents(false);
+    });
+  }, [canLoadNextPage, isLoadingOlderEvents, loadNextPage]);
+
+  const onChatScroll = useCallback(() => {
+    const scrollElement = chatScrollRef.current;
+
+    updateNearChatBottom();
+
+    if (scrollElement && scrollElement.scrollTop <= 160) {
+      loadOlderEvents();
+    }
+  }, [loadOlderEvents, updateNearChatBottom]);
+
+  useLayoutEffect(() => {
+    const scrollRestore = pendingScrollRestoreRef.current;
+    const scrollElement = chatScrollRef.current;
+
+    if (!scrollRestore || !scrollElement || !oldestEventId) {
+      return;
+    }
+
+    const heightDelta = scrollElement.scrollHeight - scrollRestore.scrollHeight;
+    scrollElement.scrollTop = scrollRestore.scrollTop + heightDelta;
+    pendingScrollRestoreRef.current = null;
+  }, [oldestEventId]);
+
+  useLayoutEffect(() => {
+    if (isLoadingEvents || events.length === 0 || !latestEventId) {
+      return;
+    }
+
+    if (!hasScrolledToInitialBottomRef.current) {
+      scrollChatToBottom();
+      hasScrolledToInitialBottomRef.current = true;
+      return;
+    }
+
+    if (isNearChatBottomRef.current) {
+      scrollChatToBottom();
+    }
+  }, [events.length, isLoadingEvents, latestEventId, scrollChatToBottom]);
 
   if (isLoading) {
     return <p>Loading worker...</p>;
@@ -93,9 +219,6 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
     return <p>Loading session...</p>;
   }
 
-  const events = [...(worker.events ?? [])].sort((a, b) =>
-    (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
-  );
   const feedEvents = events.filter(
     (event) => event.type !== "queued_user_message",
   );
@@ -354,9 +477,32 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
             </Dialog.Portal>
           </Dialog.Root>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+            onScroll={onChatScroll}
+            ref={chatScrollRef}
+          >
             <div className="max-w-2xl mx-auto w-full px-3 pt-4 pb-20">
-              {feedEvents.length > 0 ? (
+              {canLoadNextPage ? (
+                <div className="mb-4 flex justify-center">
+                  <Button
+                    className="text-xs"
+                    disabled={isLoadingOlderEvents}
+                    onClick={loadOlderEvents}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {isLoadingOlderEvents
+                      ? "Loading earlier..."
+                      : "Load earlier"}
+                  </Button>
+                </div>
+              ) : null}
+              {eventsError ? (
+                <p className="text-red-500 text-sm">{eventsError.message}</p>
+              ) : isLoadingEvents ? (
+                <p>Loading events...</p>
+              ) : feedEvents.length > 0 ? (
                 <EventFeed
                   events={feedEvents}
                   factoryId={factoryId}
@@ -371,7 +517,14 @@ function WorkerPageContent({ instantDb }: { instantDb: AppDb }) {
           <div className="w-full mt-auto mb-4">
             <WorkerPromptForm
               factoryId={factoryId}
-              presence={presence}
+              presence={{
+                ...presence,
+                onAfterSend: () => {
+                  presence.onAfterSend?.();
+                  isNearChatBottomRef.current = true;
+                  scrollChatToBottom("smooth");
+                },
+              }}
               queuedMessages={queuedMessages}
               topSection={composerHeader}
               worker={worker}
