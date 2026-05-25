@@ -88,14 +88,13 @@ const rules = {
         "!('codexSpeed' in request.modifiedFields) || newData.codexSpeed in ['standard', 'fast']",
       isFactoryMember:
         "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
-      isOwner: "auth.id in data.ref('factory.owner.id')",
       onlyUpdatesAgentSettings:
         "request.modifiedFields.all(field, field in ['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName', 'name']) && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
     },
     allow: {
       view: "isFactoryMember",
       create: "false",
-      update: "isOwner && onlyUpdatesAgentSettings",
+      update: "isFactoryMember && onlyUpdatesAgentSettings",
       delete: "false",
     },
     fields: {
@@ -112,13 +111,14 @@ const rules = {
   },
   secrets: {
     bind: {
-      isOwner: "auth.id in data.ref('factory.owner.id')",
+      isFactoryMember:
+        "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
     },
     allow: {
-      view: "isOwner",
+      view: "isFactoryMember",
       create: "false",
       update: "false",
-      delete: "isOwner",
+      delete: "isFactoryMember",
     },
     fields: {
       valueEncrypted: "false",
@@ -152,16 +152,24 @@ const rules = {
     },
   },
   factorySkills: {
+    bind: {
+      isFactoryMember:
+        "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
+    },
     allow: {
-      view: "auth.id in data.ref('factory.owner.id')",
+      view: "isFactoryMember",
       create: "false",
       update: "false",
       delete: "false",
     },
   },
   factoryGithubSettings: {
+    bind: {
+      isFactoryMember:
+        "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
+    },
     allow: {
-      view: "auth.id in data.ref('factory.owner.id')",
+      view: "isFactoryMember",
       create: "false",
       update: "false",
       delete: "false",
@@ -171,16 +179,24 @@ const rules = {
     },
   },
   factoryMcpServers: {
+    bind: {
+      isFactoryMember:
+        "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
+    },
     allow: {
-      view: "auth.id in data.ref('factory.owner.id')",
+      view: "isFactoryMember",
       create: "false",
       update: "false",
       delete: "false",
     },
   },
   factoryMcpCapabilities: {
+    bind: {
+      isFactoryMember:
+        "auth.id in data.ref('mcpServer.factory.owner.id') || auth.id in data.ref('mcpServer.factory.supervisors.user.id')",
+    },
     allow: {
-      view: "auth.id in data.ref('mcpServer.factory.owner.id')",
+      view: "isFactoryMember",
       create: "false",
       update: "false",
       delete: "false",

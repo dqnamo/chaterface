@@ -1,8 +1,9 @@
 import { id } from "@instantdb/admin";
 import { getAdminDb } from "@/lib/admin-db";
 import {
+  type FactoryAccessRecord,
+  getAccessibleFactory,
   getCurrentUserForApiRequest,
-  getOwnedFactory,
   unauthorizedResponse,
 } from "@/lib/auth";
 import {
@@ -23,6 +24,12 @@ type RouteContext = {
   params: Promise<{
     factoryId: string;
   }>;
+};
+
+type CapabilityFactoryRecord = FactoryAccessRecord & {
+  capabilitySandboxId?: string;
+  defaultSandboxCheckpointId?: string;
+  id: string;
 };
 
 export async function POST(request: Request, context: RouteContext) {
@@ -57,12 +64,10 @@ export async function POST(request: Request, context: RouteContext) {
   let canRecordFailure = false;
 
   try {
-    const factory = await getOwnedFactory<{
-      capabilitySandboxId?: string;
-      defaultSandboxCheckpointId?: string;
-      id: string;
-      owner?: { id?: string };
-    }>(factoryId, user);
+    const factory = await getAccessibleFactory<CapabilityFactoryRecord>(
+      factoryId,
+      user,
+    );
 
     if (!factory) {
       return Response.json({ error: "Factory not found" }, { status: 404 });

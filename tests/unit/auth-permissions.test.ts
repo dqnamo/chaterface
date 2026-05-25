@@ -70,14 +70,38 @@ test("supervisor invite acceptance can link the signed-in user", () => {
   );
 });
 
-test("agent permissions allow owners to update supported settings only", () => {
+test("agent permissions allow factory members to update supported settings only", () => {
   assert.match(
     permissionsSource,
     /agents:[\s\S]*?onlyUpdatesAgentSettings:[\s\S]*?\['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName', 'name'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
   );
   assert.match(
     permissionsSource,
-    /agents:[\s\S]*?update:\s+"isOwner && onlyUpdatesAgentSettings"/,
+    /agents:[\s\S]*?update:\s+"isFactoryMember && onlyUpdatesAgentSettings"/,
+  );
+});
+
+test("permissions let factory members read and act on capability records", () => {
+  assert.match(permissionsSource, /agents:[\s\S]*?view:\s+"isFactoryMember"/);
+  assert.match(
+    permissionsSource,
+    /secrets:[\s\S]*?view:\s+"isFactoryMember"[\s\S]*?delete:\s+"isFactoryMember"/,
+  );
+  assert.match(
+    permissionsSource,
+    /factorySkills:[\s\S]*?view:\s+"isFactoryMember"/,
+  );
+  assert.match(
+    permissionsSource,
+    /factoryGithubSettings:[\s\S]*?view:\s+"isFactoryMember"/,
+  );
+  assert.match(
+    permissionsSource,
+    /factoryMcpServers:[\s\S]*?view:\s+"isFactoryMember"/,
+  );
+  assert.match(
+    permissionsSource,
+    /factoryMcpCapabilities:[\s\S]*?view:\s+"isFactoryMember"/,
   );
 });
 

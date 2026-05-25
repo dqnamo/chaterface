@@ -1,7 +1,7 @@
 import { getMcpCallbackUrl } from "@/lib/app-url";
 import {
+  getAccessibleFactory,
   getCurrentUserForApiRequest,
-  getOwnedFactory,
   unauthorizedResponse,
 } from "@/lib/auth";
 import {
@@ -76,7 +76,7 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const factory = await getOwnedFactory(factoryId, user);
+    const factory = await getAccessibleFactory(factoryId, user);
 
     if (!factory) {
       return Response.json({ error: "Factory not found" }, { status: 404 });

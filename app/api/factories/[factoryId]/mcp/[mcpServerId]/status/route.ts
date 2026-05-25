@@ -1,6 +1,6 @@
 import {
+  getAccessibleFactory,
   getCurrentUserForApiRequest,
-  getOwnedFactory,
   unauthorizedResponse,
 } from "@/lib/auth";
 import { getMcpConnection } from "@/lib/mcp/records";
@@ -22,7 +22,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const { factoryId, mcpServerId } = await context.params;
-  const factory = await getOwnedFactory(factoryId, user);
+  const factory = await getAccessibleFactory(factoryId, user);
 
   if (!factory) {
     return Response.json({ error: "Factory not found" }, { status: 404 });

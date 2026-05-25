@@ -1,6 +1,8 @@
+import { canAccessFactory, type FactoryAccessRecord } from "@/lib/auth-access";
 import { getAdminDb } from "@/lib/db.server";
 
-export { canAccessFactory } from "@/lib/auth-access";
+export type { FactoryAccessRecord };
+export { canAccessFactory };
 
 export type CurrentUser = {
   email?: string;
@@ -50,6 +52,29 @@ export async function getOwnedFactory<
   const factory = result.factories[0] as TFactory | undefined;
 
   if (!factory || factory.owner?.id !== user.id) {
+    return undefined;
+  }
+
+  return factory;
+}
+
+export async function getAccessibleFactory<
+  TFactory extends FactoryAccessRecord,
+>(factoryId: string, user: CurrentUser, include: Record<string, unknown> = {}) {
+  const db = getAdminDb();
+  const result = await db.query({
+    factories: {
+      $: { where: { id: factoryId } },
+      ...include,
+      owner: {},
+      supervisors: {
+        user: {},
+      },
+    },
+  });
+  const factory = result.factories[0] as TFactory | undefined;
+
+  if (!canAccessFactory(factory, user)) {
     return undefined;
   }
 

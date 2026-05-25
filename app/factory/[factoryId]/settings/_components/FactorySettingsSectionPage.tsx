@@ -63,6 +63,7 @@ type FactoryRecord = {
 type SupervisorRecord = {
   id: string;
   status: string;
+  user?: { id?: string };
 };
 
 type AgentRecord = {
@@ -84,7 +85,7 @@ export type FactorySettingsSection =
 
 const settingsSectionCopy = {
   agents: {
-    description: "View the coding agents connected to this factory.",
+    description: "Add and view the coding agents connected to this factory.",
     title: "Agents",
   },
   billing: {
@@ -141,7 +142,9 @@ function FactorySettingsPageContent({
             $: { where: { id: factoryId } },
             agents: {},
             owner: {},
-            supervisors: {},
+            supervisors: {
+              user: {},
+            },
           },
         }
       : null,
@@ -158,7 +161,14 @@ function FactorySettingsPageContent({
   const activeSupervisorCount = (factory?.supervisors ?? []).filter(
     (supervisor) => supervisor.status !== "removed",
   ).length;
-  const canManageAgents = factory?.owner?.id === user?.id;
+  const isOwner = Boolean(user?.id) && factory?.owner?.id === user?.id;
+  const isActiveSupervisor =
+    Boolean(user?.id) &&
+    (factory?.supervisors ?? []).some(
+      (supervisor) =>
+        supervisor.status === "active" && supervisor.user?.id === user?.id,
+    );
+  const canManageAgents = isOwner || isActiveSupervisor;
   const effectiveBillingPlan = getEffectiveBillingPlan(factory);
   const isPaidPro = factory?.billingPlan === PRO_BILLING_PLAN;
   const isTrialing = !isPaidPro && isFactoryTrialing(factory);
@@ -580,7 +590,7 @@ function FactoryAgentsPanel({
           <AddAgentForm factoryId={factoryId} instantDb={instantDb} />
         ) : (
           <p className="rounded-lg border border-grayscale-3 bg-grayscale-2 px-3 py-2 text-grayscale-10 text-sm">
-            Only factory owners can manage agents.
+            Only factory owners and supervisors can manage agents.
           </p>
         )}
 
