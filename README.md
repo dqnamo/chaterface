@@ -99,3 +99,8 @@ link checkouts and subscription changes update FactoryPlane billing state.
 
 Client-side analytics are initialized in `instrumentation-client.ts`. Leave
 `NEXT_PUBLIC_POSTHOG_TOKEN` empty to disable PostHog locally.
+
+## License
+
+FactoryPlane is licensed under the Apache License, Version 2.0. See
+[LICENSE](LICENSE) for details.
