@@ -1,4 +1,5 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
+import { CaretRight } from "@phosphor-icons/react";
 import { cn } from "@/helpers/classname-helper";
 
 type MenuComposedProps = Omit<
@@ -44,11 +45,9 @@ const Backdrop = ({
 
 const Positioner = ({
   className,
-  sideOffset = 6,
   ...props
 }: React.ComponentProps<typeof BaseMenu.Positioner>) => (
   <BaseMenu.Positioner
-    sideOffset={sideOffset}
     className={cn("z-50 outline-none", className)}
     {...props}
   />
@@ -211,13 +210,26 @@ const SubmenuRoot = (
 ) => <BaseMenu.SubmenuRoot {...props} />;
 
 const SubmenuTrigger = ({
+  children,
   className,
   ...props
 }: React.ComponentProps<typeof BaseMenu.SubmenuTrigger>) => (
   <BaseMenu.SubmenuTrigger
-    className={cn(itemClasses, "after:ml-auto after:content-['>']", className)}
+    className={cn(
+      itemClasses,
+      "grid grid-cols-[minmax(0,1fr)_auto_auto]",
+      className,
+    )}
     {...props}
-  />
+  >
+    {children}
+    <CaretRight
+      aria-hidden="true"
+      className="text-grayscale-8"
+      size={12}
+      weight="bold"
+    />
+  </BaseMenu.SubmenuTrigger>
 );
 
 const Composed = ({

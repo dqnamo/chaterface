@@ -46,59 +46,56 @@ export function WorkerRunOptions({
   }
 
   return (
-    <Menu.Composed
-      modal={false}
-      popupProps={{ className: "w-64" }}
-      positionerProps={{ sideOffset: 8 }}
-      showArrow={false}
-      trigger={
-        <>
-          <Lightning size={16} weight="bold" aria-hidden="true" />
-          <span className="font-semibold text-grayscale-12">
-            {getCompactModelLabel(model)}
-          </span>
-          <span>{reasoningLabel}</span>
-          <span className="sr-only">worker settings</span>
-          <CaretDown size={14} weight="bold" aria-hidden="true" />
-        </>
-      }
-      triggerProps={{
-        "aria-label": `Worker settings: ${modelLabel}, ${reasoningLabel}, ${speedLabel}`,
-        className:
-          "h-9 text-grayscale-10 disabled:cursor-not-allowed disabled:opacity-60",
-        disabled,
-        type: "button",
-      }}
-    >
-      <WorkerRunOptionsSubmenu
-        label="Model"
-        selectedLabel={modelLabel}
-        value={model}
-        onValueChange={(value) => onModelChange(value as WorkerModel)}
-        options={workerModelOptions}
-      />
-      <WorkerRunOptionsSubmenu
-        label="Reasoning"
-        selectedLabel={reasoningLabel}
-        value={reasoningLevel}
-        onValueChange={(value) =>
-          setReasoningLevel(value as WorkerReasoningLevel)
-        }
-        options={workerReasoningLevelOptions}
-      />
-      <WorkerRunOptionsSubmenu
-        getDisabled={(value) =>
-          value === "fast" && !isFastAvailable
-            ? "Fast mode is available for GPT-5.5 and GPT-5.4."
-            : undefined
-        }
-        label="Speed"
-        selectedLabel={speedLabel}
-        value={speed}
-        onValueChange={(value) => setSpeed(value as WorkerSpeed)}
-        options={workerSpeedOptions}
-      />
-    </Menu.Composed>
+    <Menu.Root modal={false}>
+      <Menu.Trigger
+        aria-label={`Worker settings: ${modelLabel}, ${reasoningLabel}, ${speedLabel}`}
+        className="h-9 text-grayscale-10 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled}
+        type="button"
+      >
+        <Lightning size={16} weight="bold" aria-hidden="true" />
+        <span className="font-semibold text-grayscale-12">
+          {getCompactModelLabel(model)}
+        </span>
+        <span>{reasoningLabel}</span>
+        <span className="sr-only">worker settings</span>
+        <CaretDown size={14} weight="bold" aria-hidden="true" />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner sideOffset={8}>
+          <Menu.Popup className="w-64">
+            <WorkerRunOptionsSubmenu
+              label="Model"
+              selectedLabel={modelLabel}
+              value={model}
+              onValueChange={(value) => onModelChange(value as WorkerModel)}
+              options={workerModelOptions}
+            />
+            <WorkerRunOptionsSubmenu
+              label="Reasoning"
+              selectedLabel={reasoningLabel}
+              value={reasoningLevel}
+              onValueChange={(value) =>
+                setReasoningLevel(value as WorkerReasoningLevel)
+              }
+              options={workerReasoningLevelOptions}
+            />
+            <WorkerRunOptionsSubmenu
+              getDisabled={(value) =>
+                value === "fast" && !isFastAvailable
+                  ? "Fast mode is available for GPT-5.5 and GPT-5.4."
+                  : undefined
+              }
+              label="Speed"
+              selectedLabel={speedLabel}
+              value={speed}
+              onValueChange={(value) => setSpeed(value as WorkerSpeed)}
+              options={workerSpeedOptions}
+            />
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -121,32 +118,34 @@ function WorkerRunOptionsSubmenu<TValue extends string>({
     <Menu.SubmenuRoot>
       <Menu.SubmenuTrigger>
         <span>{label}</span>
-        <span className="ml-auto mr-4 text-grayscale-9 text-xs">
+        <span className="min-w-0 max-w-32 truncate text-right text-grayscale-9 text-xs">
           {selectedLabel}
         </span>
       </Menu.SubmenuTrigger>
       <Menu.Portal>
-        <Menu.Positioner sideOffset={8}>
+        <Menu.Positioner
+          align="start"
+          collisionAvoidance={{ fallbackAxisSide: "none" }}
+          side="inline-end"
+        >
           <Menu.Popup className="w-48">
-            <Menu.Viewport>
-              <Menu.RadioGroup value={value} onValueChange={onValueChange}>
-                {options.map((option) => {
-                  const disabledReason = getDisabled?.(option.value);
+            <Menu.RadioGroup value={value} onValueChange={onValueChange}>
+              {options.map((option) => {
+                const disabledReason = getDisabled?.(option.value);
 
-                  return (
-                    <Menu.RadioItem
-                      disabled={Boolean(disabledReason)}
-                      key={option.value}
-                      title={disabledReason}
-                      value={option.value}
-                    >
-                      <Menu.RadioItemIndicator />
-                      <span>{option.label}</span>
-                    </Menu.RadioItem>
-                  );
-                })}
-              </Menu.RadioGroup>
-            </Menu.Viewport>
+                return (
+                  <Menu.RadioItem
+                    disabled={Boolean(disabledReason)}
+                    key={option.value}
+                    title={disabledReason}
+                    value={option.value}
+                  >
+                    <Menu.RadioItemIndicator />
+                    <span>{option.label}</span>
+                  </Menu.RadioItem>
+                );
+              })}
+            </Menu.RadioGroup>
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>
