@@ -57,6 +57,7 @@ type WorkerAgentRecord = {
   codexReasoningLevel?: string;
   codexSpeed?: string;
   id: string;
+  name?: string;
   type?: string;
 };
 
@@ -566,6 +567,12 @@ function applyAgentDefaults({
 }
 
 function getAgentLabel(agent: WorkerAgentRecord) {
+  const name = agent.name?.trim();
+
+  if (name) {
+    return name;
+  }
+
   const typeLabel = agent.type
     ? `${agent.type.charAt(0).toUpperCase()}${agent.type.slice(1)}`
     : "Agent";

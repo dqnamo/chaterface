@@ -73,7 +73,7 @@ test("supervisor invite acceptance can link the signed-in user", () => {
 test("agent permissions allow owners to update supported settings only", () => {
   assert.match(
     permissionsSource,
-    /agents:[\s\S]*?onlyUpdatesAgentSettings:[\s\S]*?\['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
+    /agents:[\s\S]*?onlyUpdatesAgentSettings:[\s\S]*?\['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName', 'name'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
   );
   assert.match(
     permissionsSource,

@@ -123,6 +123,7 @@ export async function POST(request: Request) {
             ...(githubSettings.gitName
               ? { gitName: githubSettings.gitName }
               : {}),
+            name: "Codex",
             type: "codex",
           }),
           db.tx.agents[agentId].link({
