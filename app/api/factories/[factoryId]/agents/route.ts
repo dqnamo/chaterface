@@ -1,7 +1,8 @@
 import { id } from "@instantdb/admin";
 import {
+  type FactoryAccessRecord,
+  getAccessibleFactory,
   getCurrentUserForApiRequest,
-  getOwnedFactory,
   unauthorizedResponse,
 } from "@/lib/auth";
 import { encryptSecretValue } from "@/lib/crypto.server";
@@ -20,10 +21,6 @@ type RouteContext = {
 type CreateAgentRequest = {
   authJson?: unknown;
   name?: unknown;
-};
-
-type FactoryWithOwner = {
-  owner?: { id?: string };
 };
 
 export async function POST(request: Request, context: RouteContext) {
@@ -62,14 +59,17 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { factoryId } = await context.params;
-  const factory = await getOwnedFactory<FactoryWithOwner>(factoryId, user);
+  const db = getAdminDb();
+  const factory = await getAccessibleFactory<FactoryAccessRecord>(
+    factoryId,
+    user,
+  );
 
   if (!factory) {
     return Response.json({ error: "Factory not found" }, { status: 404 });
   }
 
   const agentId = id();
-  const db = getAdminDb();
 
   await db.transact([
     db.tx.agents[agentId].update({

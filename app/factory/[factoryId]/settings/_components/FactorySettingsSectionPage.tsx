@@ -63,6 +63,7 @@ type FactoryRecord = {
 type SupervisorRecord = {
   id: string;
   status: string;
+  user?: { id?: string };
 };
 
 type AgentRecord = {
@@ -84,7 +85,7 @@ export type FactorySettingsSection =
 
 const settingsSectionCopy = {
   agents: {
-    description: "View the coding agents connected to this factory.",
+    description: "Add and view the coding agents connected to this factory.",
     title: "Agents",
   },
   billing: {
@@ -141,7 +142,9 @@ function FactorySettingsPageContent({
             $: { where: { id: factoryId } },
             agents: {},
             owner: {},
-            supervisors: {},
+            supervisors: {
+              user: {},
+            },
           },
         }
       : null,
@@ -158,6 +161,14 @@ function FactorySettingsPageContent({
   const activeSupervisorCount = (factory?.supervisors ?? []).filter(
     (supervisor) => supervisor.status !== "removed",
   ).length;
+  const isOwner = Boolean(user?.id) && factory?.owner?.id === user?.id;
+  const isActiveSupervisor =
+    Boolean(user?.id) &&
+    (factory?.supervisors ?? []).some(
+      (supervisor) =>
+        supervisor.status === "active" && supervisor.user?.id === user?.id,
+    );
+  const canManageAgents = isOwner || isActiveSupervisor;
   const effectiveBillingPlan = getEffectiveBillingPlan(factory);
   const isPaidPro = factory?.billingPlan === PRO_BILLING_PLAN;
   const isTrialing = !isPaidPro && isFactoryTrialing(factory);
@@ -446,6 +457,7 @@ function FactorySettingsPageContent({
       {section === "agents" ? (
         <FactoryAgentsPanel
           agents={agents}
+          canManageAgents={canManageAgents}
           factoryId={factoryId}
           instantDb={instantDb}
           isLoading={isLoading}
@@ -560,11 +572,13 @@ function FactorySettingsPageContent({
 
 function FactoryAgentsPanel({
   agents,
+  canManageAgents,
   factoryId,
   instantDb,
   isLoading,
 }: {
   agents: AgentRecord[];
+  canManageAgents: boolean;
   factoryId: string;
   instantDb: AppDb;
   isLoading: boolean;
@@ -572,7 +586,13 @@ function FactoryAgentsPanel({
   return (
     <FactorySectionCard>
       <div className="flex flex-col gap-4">
-        <AddAgentForm factoryId={factoryId} instantDb={instantDb} />
+        {canManageAgents ? (
+          <AddAgentForm factoryId={factoryId} instantDb={instantDb} />
+        ) : (
+          <p className="rounded-lg border border-grayscale-3 bg-grayscale-2 px-3 py-2 text-grayscale-10 text-sm">
+            Only factory owners and supervisors can manage agents.
+          </p>
+        )}
 
         {isLoading ? (
           <p className="text-grayscale-10 text-sm">Loading agents...</p>
@@ -598,13 +618,21 @@ function FactoryAgentsPanel({
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <AgentDefaultOptions agent={agent} instantDb={instantDb} />
+                    <AgentDefaultOptions
+                      agent={agent}
+                      disabled={!canManageAgents}
+                      instantDb={instantDb}
+                    />
                     <span className="rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
                       Connected
                     </span>
                   </div>
                 </div>
-                <AgentIdentityOptions agent={agent} instantDb={instantDb} />
+                <AgentIdentityOptions
+                  agent={agent}
+                  disabled={!canManageAgents}
+                  instantDb={instantDb}
+                />
               </div>
             ))}
           </div>
@@ -753,9 +781,11 @@ function AddAgentForm({
 
 function AgentIdentityOptions({
   agent,
+  disabled,
   instantDb,
 }: {
   agent: AgentRecord;
+  disabled?: boolean;
   instantDb: AppDb;
 }) {
   const nameId = useId();
@@ -804,7 +834,7 @@ function AgentIdentityOptions({
         </span>
         <Input
           className="h-9 bg-grayscale-1 dark:bg-grayscale-1"
-          disabled={isSaving}
+          disabled={disabled || isSaving}
           id={nameId}
           maxLength={80}
           onChange={(event) => setName(event.target.value)}
@@ -816,7 +846,7 @@ function AgentIdentityOptions({
         <span className="font-medium text-grayscale-12 text-xs">Git name</span>
         <Input
           className="h-9 bg-grayscale-1 dark:bg-grayscale-1"
-          disabled={isSaving}
+          disabled={disabled || isSaving}
           id={gitNameId}
           onChange={(event) => setGitName(event.target.value)}
           placeholder="Factory default"
@@ -828,7 +858,7 @@ function AgentIdentityOptions({
         <Input
           autoComplete="email"
           className="h-9 bg-grayscale-1 dark:bg-grayscale-1"
-          disabled={isSaving}
+          disabled={disabled || isSaving}
           id={gitEmailId}
           onChange={(event) => setGitEmail(event.target.value)}
           placeholder="Factory default"
@@ -837,7 +867,7 @@ function AgentIdentityOptions({
       </label>
       <Button
         className="h-9 justify-center"
-        disabled={isSaving || !hasChanges}
+        disabled={disabled || isSaving || !hasChanges}
         onClick={saveIdentity}
         type="button"
         variant="secondary"
@@ -850,9 +880,11 @@ function AgentIdentityOptions({
 
 function AgentDefaultOptions({
   agent,
+  disabled,
   instantDb,
 }: {
   agent: AgentRecord;
+  disabled?: boolean;
   instantDb: AppDb;
 }) {
   const model = normalizeWorkerModel(agent.codexModel);
@@ -881,7 +913,7 @@ function AgentDefaultOptions({
 
   return (
     <WorkerRunOptions
-      disabled={isSaving}
+      disabled={disabled || isSaving}
       model={model}
       reasoningLevel={reasoningLevel}
       setModel={(nextModel) =>

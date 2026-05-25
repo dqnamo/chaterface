@@ -1,6 +1,7 @@
 import {
+  type FactoryAccessRecord,
+  getAccessibleFactory,
   getCurrentUserForApiRequest,
-  getOwnedFactory,
   unauthorizedResponse,
 } from "@/lib/auth";
 import {
@@ -28,12 +29,11 @@ type GithubSettingsRecord = {
   tokenEncrypted?: string;
 };
 
-type FactoryWithGithubSettings = {
+type FactoryWithGithubSettings = FactoryAccessRecord & {
   capabilitySandboxId?: string;
   defaultSandboxCheckpointId?: string;
   githubSettings?: GithubSettingsRecord;
   id: string;
-  owner?: { id?: string };
 };
 
 export async function POST(request: Request, context: RouteContext) {
@@ -59,7 +59,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { factoryId } = await context.params;
   const db = getAdminDb();
-  const factory = await getOwnedFactory<FactoryWithGithubSettings>(
+  const factory = await getAccessibleFactory<FactoryWithGithubSettings>(
     factoryId,
     user,
     {

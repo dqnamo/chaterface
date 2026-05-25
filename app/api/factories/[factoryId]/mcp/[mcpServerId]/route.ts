@@ -1,6 +1,6 @@
 import {
+  getAccessibleFactory,
   getCurrentUserForApiRequest,
-  getOwnedFactory,
   unauthorizedResponse,
 } from "@/lib/auth";
 import {
@@ -31,7 +31,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { factoryId, mcpServerId } = await context.params;
-  const factory = await getOwnedFactory(factoryId, user);
+  const factory = await getAccessibleFactory(factoryId, user);
 
   if (!factory) {
     return Response.json({ error: "Factory not found" }, { status: 404 });
@@ -69,7 +69,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   const { factoryId, mcpServerId } = await context.params;
-  const factory = await getOwnedFactory(factoryId, user);
+  const factory = await getAccessibleFactory(factoryId, user);
 
   if (!factory) {
     return Response.json({ error: "Factory not found" }, { status: 404 });

@@ -1,7 +1,7 @@
 import { getAdminDbCore } from "@/lib/admin-db-core";
 import {
+  getAccessibleFactory,
   getCurrentUserForApiRequest,
-  getOwnedFactory,
   unauthorizedResponse,
 } from "@/lib/auth";
 import { getMcpConnectionById, updateMcpCapability } from "@/lib/mcp/records";
@@ -27,7 +27,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { capabilityId, factoryId } = await context.params;
-  const factory = await getOwnedFactory(factoryId, user);
+  const factory = await getAccessibleFactory(factoryId, user);
 
   if (!factory) {
     return Response.json({ error: "Factory not found" }, { status: 404 });
