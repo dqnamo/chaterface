@@ -11,6 +11,11 @@ import {
   streamCodexExec,
   waitForWorkerPid,
 } from "@/lib/codex/sandbox-auth";
+import {
+  normalizeWorkerModel,
+  normalizeWorkerReasoningLevel,
+  normalizeWorkerSpeed,
+} from "@/lib/codex/worker-options";
 import { decryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 import {
@@ -42,6 +47,9 @@ type WorkerRecord = {
   activeCommandId?: string;
   activePid?: number;
   codexSessionId?: string;
+  codexModel?: string;
+  codexReasoningLevel?: string;
+  codexSpeed?: string;
   factory?: {
     defaultSandboxCheckpointId?: string;
     id: string;
@@ -278,6 +286,14 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
       logTaskStep("info", "Worker marked running; starting Codex stream", {
+        codexModel: normalizeWorkerModel(worker.codexModel),
+        codexReasoningLevel: normalizeWorkerReasoningLevel(
+          worker.codexReasoningLevel,
+        ),
+        codexSpeed: normalizeWorkerSpeed({
+          model: worker.codexModel,
+          speed: worker.codexSpeed,
+        }),
         sandboxId,
         secretsCount: Object.keys(secrets).length,
         mcpEnabled: Boolean(mcpConfig),
@@ -288,11 +304,14 @@ export const runWorkerTask = task({
       const stream = await streamCodexExec({
         imagePaths,
         mcpConfig,
+        model: worker.codexModel,
         prompt,
+        reasoningLevel: worker.codexReasoningLevel,
         resume: resumeCodexSession,
         sandbox,
         secrets,
         sessionId: resumeCodexSession ? worker.codexSessionId : undefined,
+        speed: worker.codexSpeed,
         workerId: worker.id,
         workerApiConfig,
       });

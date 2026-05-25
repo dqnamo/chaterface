@@ -4,6 +4,14 @@ import { faker } from "@faker-js/faker";
 import { id } from "@instantdb/react";
 import type { ImageAttachment } from "@/components/factory/WorkerComposer";
 import { createSupervisorMessageSender } from "@/helpers/user-identity";
+import {
+  normalizeWorkerModel,
+  normalizeWorkerReasoningLevel,
+  normalizeWorkerSpeed,
+  type WorkerModel,
+  type WorkerReasoningLevel,
+  type WorkerSpeed,
+} from "@/lib/codex/worker-options";
 import type { AppDb } from "@/lib/db.client";
 import type { WorkerRecord } from "./worker-run-form";
 
@@ -16,7 +24,10 @@ export async function triggerWorkerRun({
   userEmail,
   userId,
   userRefreshToken,
+  workerModel,
+  workerReasoningLevel,
   worker,
+  workerSpeed,
   workerId: preGeneratedWorkerId,
 }: {
   attachments?: ImageAttachment[];
@@ -27,7 +38,10 @@ export async function triggerWorkerRun({
   userEmail?: null | string;
   userId?: string;
   userRefreshToken?: string;
+  workerModel?: WorkerModel;
+  workerReasoningLevel?: WorkerReasoningLevel;
   worker?: WorkerRecord;
+  workerSpeed?: WorkerSpeed;
   workerId?: string;
 }) {
   if (!prompt.trim()) {
@@ -50,6 +64,14 @@ export async function triggerWorkerRun({
   const eventId = id();
   const isNewWorker = !worker;
   const nextStatus = worker?.status === "running" ? "running" : "queued";
+  const codexModel = normalizeWorkerModel(workerModel ?? worker?.codexModel);
+  const codexReasoningLevel = normalizeWorkerReasoningLevel(
+    workerReasoningLevel ?? worker?.codexReasoningLevel,
+  );
+  const codexSpeed = normalizeWorkerSpeed({
+    model: codexModel,
+    speed: workerSpeed ?? worker?.codexSpeed,
+  });
 
   onError(null);
 
@@ -81,6 +103,9 @@ export async function triggerWorkerRun({
         }),
       ),
       instantDb.tx.workers[workerId].update({
+        codexModel,
+        codexReasoningLevel,
+        codexSpeed,
         retiredAt: null,
         status: nextStatus,
         updatedAt: now,
@@ -129,6 +154,9 @@ export async function queueWorkerMessage({
   userId,
   userRefreshToken,
   worker,
+  workerModel,
+  workerReasoningLevel,
+  workerSpeed,
 }: {
   attachments?: ImageAttachment[];
   factoryId?: string;
@@ -139,6 +167,9 @@ export async function queueWorkerMessage({
   userId?: string;
   userRefreshToken?: string;
   worker: WorkerRecord;
+  workerModel?: WorkerModel;
+  workerReasoningLevel?: WorkerReasoningLevel;
+  workerSpeed?: WorkerSpeed;
 }) {
   const trimmedPrompt = prompt.trim();
 
@@ -159,6 +190,14 @@ export async function queueWorkerMessage({
 
   const now = new Date().toISOString();
   const eventId = id();
+  const codexModel = normalizeWorkerModel(workerModel ?? worker.codexModel);
+  const codexReasoningLevel = normalizeWorkerReasoningLevel(
+    workerReasoningLevel ?? worker.codexReasoningLevel,
+  );
+  const codexSpeed = normalizeWorkerSpeed({
+    model: codexModel,
+    speed: workerSpeed ?? worker.codexSpeed,
+  });
 
   onError(null);
 
@@ -192,6 +231,9 @@ export async function queueWorkerMessage({
         }),
       ),
       instantDb.tx.workers[worker.id].update({
+        codexModel,
+        codexReasoningLevel,
+        codexSpeed,
         retiredAt: null,
         status: worker.status === "retired" ? "queued" : worker.status,
         updatedAt: now,

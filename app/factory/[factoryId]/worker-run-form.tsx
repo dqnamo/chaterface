@@ -12,7 +12,19 @@ import {
   WorkerComposer,
   type WorkerComposerPresenceControls,
 } from "@/components/factory/WorkerComposer";
+import { WorkerRunOptions } from "@/components/factory/WorkerRunOptions";
 import Button from "@/components/public/Button";
+import {
+  defaultWorkerModel,
+  defaultWorkerReasoningLevel,
+  defaultWorkerSpeed,
+  normalizeWorkerModel,
+  normalizeWorkerReasoningLevel,
+  normalizeWorkerSpeed,
+  type WorkerModel,
+  type WorkerReasoningLevel,
+  type WorkerSpeed,
+} from "@/lib/codex/worker-options";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { queueWorkerMessage, triggerWorkerRun } from "./worker-message-client";
@@ -20,6 +32,9 @@ import { queueWorkerMessage, triggerWorkerRun } from "./worker-message-client";
 export type WorkerRecord = {
   activePid?: number;
   codexSessionId?: string;
+  codexModel?: string;
+  codexReasoningLevel?: string;
+  codexSpeed?: string;
   createdAt?: string;
   id: string;
   name?: string;
@@ -43,6 +58,12 @@ function NewWorkerFormContent({
   const { user } = instantDb.useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [workerModel, setWorkerModel] =
+    useState<WorkerModel>(defaultWorkerModel);
+  const [workerReasoningLevel, setWorkerReasoningLevel] =
+    useState<WorkerReasoningLevel>(defaultWorkerReasoningLevel);
+  const [workerSpeed, setWorkerSpeed] =
+    useState<WorkerSpeed>(defaultWorkerSpeed);
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -75,6 +96,9 @@ function NewWorkerFormContent({
       userEmail: user.email,
       userId: user.id,
       userRefreshToken: user.refresh_token,
+      workerModel,
+      workerReasoningLevel,
+      workerSpeed,
       workerId,
       onError: setError,
     });
@@ -111,6 +135,17 @@ function NewWorkerFormContent({
       onSubmit={onSubmit}
       prompt={prompt}
       setPrompt={setPrompt}
+      startActions={
+        <WorkerRunOptions
+          disabled={isSending}
+          model={workerModel}
+          setModel={setWorkerModel}
+          reasoningLevel={workerReasoningLevel}
+          setReasoningLevel={setWorkerReasoningLevel}
+          setSpeed={setWorkerSpeed}
+          speed={workerSpeed}
+        />
+      }
       submitLabel={isSending ? "Sending..." : "Send"}
       uploadingLabel="Uploading..."
     />
@@ -160,6 +195,19 @@ function WorkerPromptFormContent({
   const { user } = instantDb.useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [workerModel, setWorkerModel] = useState<WorkerModel>(
+    normalizeWorkerModel(worker.codexModel),
+  );
+  const [workerReasoningLevel, setWorkerReasoningLevel] =
+    useState<WorkerReasoningLevel>(
+      normalizeWorkerReasoningLevel(worker.codexReasoningLevel),
+    );
+  const [workerSpeed, setWorkerSpeed] = useState<WorkerSpeed>(
+    normalizeWorkerSpeed({
+      model: worker.codexModel,
+      speed: worker.codexSpeed,
+    }),
+  );
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -177,6 +225,9 @@ function WorkerPromptFormContent({
       userId: user?.id,
       userRefreshToken: user?.refresh_token,
       worker,
+      workerModel,
+      workerReasoningLevel,
+      workerSpeed,
       onError: setError,
     });
 
@@ -202,6 +253,9 @@ function WorkerPromptFormContent({
       userId: user?.id,
       userRefreshToken: user?.refresh_token,
       worker,
+      workerModel,
+      workerReasoningLevel,
+      workerSpeed,
       onError: setError,
     });
 
@@ -261,6 +315,17 @@ function WorkerPromptFormContent({
       prompt={prompt}
       queuedMessages={queuedMessages}
       setPrompt={setPrompt}
+      startActions={
+        <WorkerRunOptions
+          disabled={isInputDisabled}
+          model={workerModel}
+          setModel={setWorkerModel}
+          reasoningLevel={workerReasoningLevel}
+          setReasoningLevel={setWorkerReasoningLevel}
+          setSpeed={setWorkerSpeed}
+          speed={workerSpeed}
+        />
+      }
       submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}
       topSection={topSection}
       uploadingLabel="Uploading..."
