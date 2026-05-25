@@ -71,8 +71,6 @@ type AgentRecord = {
   id: string;
 };
 
-type AgentCodexCredential = { accessToken: string } | { authJson: string };
-
 type SecretRecord = {
   name?: string;
   valueEncrypted?: string;
@@ -229,9 +227,6 @@ export const runWorkerTask = task({
         resumeCodexSession &&
         worker.status === "running" &&
         typeof worker.activePid === "number";
-      const codexCredential = worker.agent?.authEncrypted
-        ? getAgentCodexCredential(worker.agent)
-        : undefined;
 
       logTaskStep("info", "Sandbox ready", {
         resume: resumeCodexSession,
@@ -241,17 +236,13 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
 
-      if (
-        !resumeCodexSession &&
-        codexCredential &&
-        "authJson" in codexCredential
-      ) {
+      if (!resumeCodexSession && worker.agent?.authEncrypted) {
         await installCodexAuthOnSandbox({
-          codexAuthJson: codexCredential.authJson,
+          codexAuthJson: getAgentCodexAuthJson(worker.agent),
           sandbox,
         });
-        logTaskStep("info", "Legacy agent Codex auth installed in sandbox", {
-          agentId: worker.agent?.id,
+        logTaskStep("info", "Agent Codex auth installed in worker sandbox", {
+          agentId: worker.agent.id,
           sandboxId,
           workerId: worker.id,
         });
@@ -344,10 +335,6 @@ export const runWorkerTask = task({
       });
 
       const stream = await streamCodexExec({
-        codexAccessToken:
-          codexCredential && "accessToken" in codexCredential
-            ? codexCredential.accessToken
-            : undefined,
         imagePaths,
         mcpConfig,
         model: worker.codexModel,
@@ -538,18 +525,14 @@ async function getWorker(workerId: string) {
   return result.workers[0] as WorkerRecord | undefined;
 }
 
-function getAgentCodexCredential(agent: AgentRecord): AgentCodexCredential {
-  const credential = decryptSecretValue<unknown>(agent.authEncrypted);
+function getAgentCodexAuthJson(agent: AgentRecord) {
+  const authJson = decryptSecretValue<unknown>(agent.authEncrypted);
 
-  if (typeof credential === "string" && credential.trim()) {
-    return { accessToken: credential.trim() };
+  if (!isJsonObject(authJson)) {
+    throw new Error("Worker agent Codex auth is missing or invalid");
   }
 
-  if (isJsonObject(credential)) {
-    return { authJson: JSON.stringify(credential, null, 2) };
-  }
-
-  throw new Error("Worker agent Codex credential is missing or invalid");
+  return JSON.stringify(authJson, null, 2);
 }
 
 function getWorkerGitIdentity(worker: WorkerRecord) {

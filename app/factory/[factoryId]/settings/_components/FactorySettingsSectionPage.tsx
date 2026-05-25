@@ -633,12 +633,6 @@ function FactoryAgentsPanel({
                   disabled={!canManageAgents}
                   instantDb={instantDb}
                 />
-                <AgentAccessTokenForm
-                  agent={agent}
-                  disabled={!canManageAgents}
-                  factoryId={factoryId}
-                  instantDb={instantDb}
-                />
               </div>
             ))}
           </div>
@@ -666,9 +660,9 @@ function AddAgentForm({
 }) {
   const { user } = instantDb.useAuth();
   const nameId = useId();
-  const accessTokenId = useId();
+  const authJsonId = useId();
   const [name, setName] = useState("");
-  const [accessToken, setAccessToken] = useState("");
+  const [authJsonText, setAuthJsonText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -687,10 +681,17 @@ function AddAgentForm({
       return;
     }
 
-    const trimmedAccessToken = accessToken.trim();
+    let authJson: unknown;
 
-    if (!trimmedAccessToken) {
-      setError("Codex access token is required.");
+    try {
+      authJson = JSON.parse(authJsonText);
+    } catch {
+      setError("Codex auth JSON must be valid JSON.");
+      return;
+    }
+
+    if (!isJsonObject(authJson)) {
+      setError("Codex auth JSON must be a JSON object.");
       return;
     }
 
@@ -700,7 +701,7 @@ function AddAgentForm({
     try {
       const response = await fetch(`/api/factories/${factoryId}/agents`, {
         body: JSON.stringify({
-          accessToken: trimmedAccessToken,
+          authJson,
           name: trimmedName,
         }),
         headers: {
@@ -719,7 +720,7 @@ function AddAgentForm({
       }
 
       setName("");
-      setAccessToken("");
+      setAuthJsonText("");
     } finally {
       setIsSaving(false);
     }
@@ -745,22 +746,19 @@ function AddAgentForm({
             value={name}
           />
         </label>
-        <label
-          className="flex min-w-0 flex-col gap-1.5"
-          htmlFor={accessTokenId}
-        >
+        <label className="flex min-w-0 flex-col gap-1.5" htmlFor={authJsonId}>
           <span className="font-medium text-grayscale-12 text-xs">
-            Codex access token
+            Codex auth JSON
           </span>
           <textarea
             autoComplete="off"
             className="min-h-24 resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 px-3 py-2 font-mono text-grayscale-12 text-xs outline-none placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
             disabled={isSaving}
-            id={accessTokenId}
-            onChange={(event) => setAccessToken(event.target.value)}
-            placeholder="codex_access_token..."
+            id={authJsonId}
+            onChange={(event) => setAuthJsonText(event.target.value)}
+            placeholder='{"tokens":{}}'
             spellCheck={false}
-            value={accessToken}
+            value={authJsonText}
           />
         </label>
         <Button
@@ -880,126 +878,6 @@ function AgentIdentityOptions({
   );
 }
 
-function AgentAccessTokenForm({
-  agent,
-  disabled,
-  factoryId,
-  instantDb,
-}: {
-  agent: AgentRecord;
-  disabled?: boolean;
-  factoryId: string;
-  instantDb: AppDb;
-}) {
-  const { user } = instantDb.useAuth();
-  const accessTokenId = useId();
-  const [accessToken, setAccessToken] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
-
-  const trimmedAccessToken = accessToken.trim();
-
-  async function updateAccessToken(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!trimmedAccessToken) {
-      setError("Codex access token is required.");
-      return;
-    }
-
-    if (!user?.refresh_token) {
-      setError("You must be signed in to update this agent.");
-      return;
-    }
-
-    setError(null);
-    setStatus("saving");
-
-    try {
-      const response = await fetch(
-        `/api/factories/${factoryId}/agents/${agent.id}`,
-        {
-          body: JSON.stringify({
-            accessToken: trimmedAccessToken,
-          }),
-          headers: {
-            authorization: `Bearer ${user.refresh_token}`,
-            "content-type": "application/json",
-          },
-          method: "PATCH",
-        },
-      );
-      const result = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
-
-      if (!response.ok) {
-        setError(result.error ?? "Access token could not be updated.");
-        setStatus("idle");
-        return;
-      }
-
-      setAccessToken("");
-      setStatus("saved");
-      window.setTimeout(() => setStatus("idle"), 2000);
-    } catch (updateError) {
-      console.error(updateError);
-      setError("Access token could not be updated.");
-      setStatus("idle");
-    }
-  }
-
-  return (
-    <form
-      className="grid gap-2 border-grayscale-3 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-      onSubmit={updateAccessToken}
-    >
-      <label className="flex min-w-0 flex-col gap-1.5" htmlFor={accessTokenId}>
-        <span className="font-medium text-grayscale-12 text-xs">
-          Codex access token
-        </span>
-        <textarea
-          autoComplete="off"
-          className="min-h-20 resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 px-3 py-2 font-mono text-grayscale-12 text-xs outline-none placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
-          disabled={disabled || status === "saving"}
-          id={accessTokenId}
-          onChange={(event) => {
-            setAccessToken(event.target.value);
-            setError(null);
-            if (status === "saved") {
-              setStatus("idle");
-            }
-          }}
-          placeholder="Paste a new Codex access token"
-          spellCheck={false}
-          value={accessToken}
-        />
-        {error ? (
-          <span className="text-red-11 text-xs" role="alert">
-            {error}
-          </span>
-        ) : (
-          <span className="text-grayscale-10 text-xs">
-            Replaces the encrypted credential used for future runs.
-          </span>
-        )}
-      </label>
-      <Button
-        className="h-9 justify-center"
-        disabled={disabled || status === "saving" || !trimmedAccessToken}
-        type="submit"
-        variant="secondary"
-      >
-        {status === "saving"
-          ? "Updating..."
-          : status === "saved"
-            ? "Updated"
-            : "Update token"}
-      </Button>
-    </form>
-  );
-}
-
 function AgentDefaultOptions({
   agent,
   disabled,
@@ -1077,6 +955,10 @@ function formatAgentType(type?: string) {
 
 function getAgentDisplayName(agent: AgentRecord) {
   return agent.name?.trim() || formatAgentType(agent.type);
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function formatBillingDate(value: string) {

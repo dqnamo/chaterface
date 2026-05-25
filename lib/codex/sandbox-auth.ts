@@ -180,7 +180,6 @@ export async function restoreCodexHome(sandbox: AppSandbox) {
 }
 
 export async function streamCodexExec({
-  codexAccessToken,
   imagePaths,
   mcpConfig,
   model = defaultWorkerModel,
@@ -194,7 +193,6 @@ export async function streamCodexExec({
   workerId,
   workerApiConfig,
 }: {
-  codexAccessToken?: string;
   imagePaths?: string[];
   mcpConfig?: {
     gatewayUrl: string;
@@ -218,7 +216,6 @@ export async function streamCodexExec({
   return streamSandboxCommand(
     sandbox,
     createCodexExecCommand({
-      codexAccessToken,
       imagePaths,
       mcpConfig,
       model,
@@ -282,7 +279,6 @@ export function getSandboxStreamChunkText(chunk: SandboxStreamChunk) {
 }
 
 function createCodexExecCommand({
-  codexAccessToken,
   imagePaths = [],
   mcpConfig,
   model,
@@ -295,7 +291,6 @@ function createCodexExecCommand({
   workerId,
   workerApiConfig,
 }: {
-  codexAccessToken?: string;
   imagePaths?: string[];
   mcpConfig?: {
     gatewayUrl: string;
@@ -324,9 +319,6 @@ function createCodexExecCommand({
   const codexReasoningLevel = normalizeWorkerReasoningLevel(reasoningLevel);
   const codexSpeed = normalizeWorkerSpeed({ model: codexModel, speed });
   const secretEnv = createSecretsEnv(secrets);
-  const codexAccessTokenEnv = codexAccessToken
-    ? `export CODEX_ACCESS_TOKEN=${shellQuote(codexAccessToken)}`
-    : "";
   const mcpEnv = mcpConfig
     ? `export FACTORY_MCP_WORKER_TOKEN=${shellQuote(mcpConfig.token)}`
     : "";
@@ -388,7 +380,7 @@ function createCodexExecCommand({
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
-    `setsid /bin/bash -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${codexAccessTokenEnv ? `${codexAccessTokenEnv} && ` : ""}${workerApiEnv ? `${workerApiEnv} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(sandboxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
+    `setsid /bin/bash -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${workerApiEnv ? `${workerApiEnv} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(sandboxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
     "pid=$!",
     `echo "$pid" > ${shellQuote(pidPath)}`,
     'wait "$pid"',

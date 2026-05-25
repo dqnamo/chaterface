@@ -19,7 +19,7 @@ type RouteContext = {
 };
 
 type CreateAgentRequest = {
-  accessToken?: unknown;
+  authJson?: unknown;
   name?: unknown;
 };
 
@@ -51,11 +51,9 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const accessToken = parseCodexAccessToken(body.accessToken);
-
-  if (!accessToken) {
+  if (!isJsonObject(body.authJson)) {
     return Response.json(
-      { error: "Codex access token is required" },
+      { error: "Codex auth JSON file is required" },
       { status: 400 },
     );
   }
@@ -75,7 +73,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   await db.transact([
     db.tx.agents[agentId].update({
-      authEncrypted: encryptSecretValue(accessToken),
+      authEncrypted: encryptSecretValue(body.authJson),
       codexModel: "gpt-5.5",
       codexReasoningLevel: "medium",
       codexSpeed: "standard",
@@ -99,6 +97,6 @@ export async function POST(request: Request, context: RouteContext) {
   });
 }
 
-function parseCodexAccessToken(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
