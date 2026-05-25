@@ -71,15 +71,17 @@ export default function Home() {
         <div className="flex flex-col gap-px p-2">
           <div className="flex flex-row items-center gap-2">
             <Logo className="size-9 rounded-md" />
-            <p className="text-md font-medium leading-6 text-grayscale-12">FactoryPlane</p>
+            <p className="text-md font-medium leading-6 text-grayscale-12">
+              FactoryPlane
+            </p>
           </div>
           <p className="max-w-lg text-balance text-lg font-medium leading-6 text-grayscale-12 mt-8">
             Open source, collaborative software factory running in the cloud
             using your existing coding agents.
           </p>
           <p className="max-w-lg text-balance text-sm leading-6 text-grayscale-11 mt-1">
-            Spin up workers in the cloud, invite supervisors, and steer the
-            work together — all from one place.
+            Spin up workers in the cloud, invite supervisors, and steer the work
+            together — all from one place.
           </p>
           <div className="mt-4 flex flex-row flex-wrap items-center gap-2">
             <Button className="text-xs" href="/login" variant="primary">
