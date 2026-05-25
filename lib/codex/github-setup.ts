@@ -44,18 +44,31 @@ export async function applyGithubSetup(
   }
 }
 
-function createGithubSetupCommands(setup: GithubSetup) {
-  const commands: string[] = [];
+export async function applyGitIdentity(
+  sandbox: AppSandbox,
+  setup: Pick<GithubSetup, "gitEmail" | "gitName">,
+) {
+  const commands = createGitIdentityCommands(setup);
 
-  if (setup.gitName) {
-    commands.push(`git config --global user.name ${shellQuote(setup.gitName)}`);
+  if (commands.length === 0) {
+    return;
   }
 
-  if (setup.gitEmail) {
-    commands.push(
-      `git config --global user.email ${shellQuote(setup.gitEmail)}`,
+  const result = await runSandboxCommand(
+    sandbox,
+    ["set -e", ...commands].join("\n"),
+    30_000,
+  );
+
+  if (!result.success) {
+    throw new Error(
+      `Git identity setup failed: ${cleanCommandOutput(result.output) || "No output"}`,
     );
   }
+}
+
+function createGithubSetupCommands(setup: GithubSetup) {
+  const commands = createGitIdentityCommands(setup);
 
   if (setup.token) {
     const credential = `https://x-access-token:${setup.token}@github.com`;
@@ -69,6 +82,24 @@ function createGithubSetupCommands(setup: GithubSetup) {
 
   for (const repository of setup.repositories) {
     commands.push(createCloneCommand(repository));
+  }
+
+  return commands;
+}
+
+function createGitIdentityCommands(
+  setup: Pick<GithubSetup, "gitEmail" | "gitName">,
+) {
+  const commands: string[] = [];
+
+  if (setup.gitName) {
+    commands.push(`git config --global user.name ${shellQuote(setup.gitName)}`);
+  }
+
+  if (setup.gitEmail) {
+    commands.push(
+      `git config --global user.email ${shellQuote(setup.gitEmail)}`,
+    );
   }
 
   return commands;
