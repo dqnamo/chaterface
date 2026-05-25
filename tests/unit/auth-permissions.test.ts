@@ -71,11 +71,11 @@ test("supervisor invite acceptance can link the signed-in user", () => {
 test("worker permissions keep server-owned runtime fields out of client writes", () => {
   assert.match(
     permissionsSource,
-    /onlyCreatesClientWorker:[\s\S]*?\['createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt'\]/,
+    /onlyCreatesClientWorker:[\s\S]*?\['codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
   );
   assert.match(
     permissionsSource,
-    /onlyQueuesClientWorker:[\s\S]*?\['retiredAt', 'status', 'updatedAt'\]/,
+    /onlyQueuesClientWorker:[\s\S]*?\['codexModel', 'codexReasoningLevel', 'codexSpeed', 'retiredAt', 'status', 'updatedAt'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
   );
   assert.match(
     permissionsSource,

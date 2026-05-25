@@ -13,6 +13,21 @@ import {
   type WorkerComposerPresenceControls,
 } from "@/components/factory/WorkerComposer";
 import Button from "@/components/public/Button";
+import {
+  defaultWorkerModel,
+  defaultWorkerReasoningLevel,
+  defaultWorkerSpeed,
+  isFastSupportedWorkerModel,
+  normalizeWorkerModel,
+  normalizeWorkerReasoningLevel,
+  normalizeWorkerSpeed,
+  type WorkerModel,
+  type WorkerReasoningLevel,
+  type WorkerSpeed,
+  workerModelOptions,
+  workerReasoningLevelOptions,
+  workerSpeedOptions,
+} from "@/lib/codex/worker-options";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
 import { queueWorkerMessage, triggerWorkerRun } from "./worker-message-client";
@@ -20,6 +35,9 @@ import { queueWorkerMessage, triggerWorkerRun } from "./worker-message-client";
 export type WorkerRecord = {
   activePid?: number;
   codexSessionId?: string;
+  codexModel?: string;
+  codexReasoningLevel?: string;
+  codexSpeed?: string;
   createdAt?: string;
   id: string;
   name?: string;
@@ -43,6 +61,12 @@ function NewWorkerFormContent({
   const { user } = instantDb.useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [workerModel, setWorkerModel] =
+    useState<WorkerModel>(defaultWorkerModel);
+  const [workerReasoningLevel, setWorkerReasoningLevel] =
+    useState<WorkerReasoningLevel>(defaultWorkerReasoningLevel);
+  const [workerSpeed, setWorkerSpeed] =
+    useState<WorkerSpeed>(defaultWorkerSpeed);
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -75,6 +99,9 @@ function NewWorkerFormContent({
       userEmail: user.email,
       userId: user.id,
       userRefreshToken: user.refresh_token,
+      workerModel,
+      workerReasoningLevel,
+      workerSpeed,
       workerId,
       onError: setError,
     });
@@ -111,6 +138,17 @@ function NewWorkerFormContent({
       onSubmit={onSubmit}
       prompt={prompt}
       setPrompt={setPrompt}
+      startActions={
+        <WorkerRunOptions
+          disabled={isSending}
+          model={workerModel}
+          setModel={setWorkerModel}
+          reasoningLevel={workerReasoningLevel}
+          setReasoningLevel={setWorkerReasoningLevel}
+          setSpeed={setWorkerSpeed}
+          speed={workerSpeed}
+        />
+      }
       submitLabel={isSending ? "Sending..." : "Send"}
       uploadingLabel="Uploading..."
     />
@@ -160,6 +198,19 @@ function WorkerPromptFormContent({
   const { user } = instantDb.useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [workerModel, setWorkerModel] = useState<WorkerModel>(
+    normalizeWorkerModel(worker.codexModel),
+  );
+  const [workerReasoningLevel, setWorkerReasoningLevel] =
+    useState<WorkerReasoningLevel>(
+      normalizeWorkerReasoningLevel(worker.codexReasoningLevel),
+    );
+  const [workerSpeed, setWorkerSpeed] = useState<WorkerSpeed>(
+    normalizeWorkerSpeed({
+      model: worker.codexModel,
+      speed: worker.codexSpeed,
+    }),
+  );
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -177,6 +228,9 @@ function WorkerPromptFormContent({
       userId: user?.id,
       userRefreshToken: user?.refresh_token,
       worker,
+      workerModel,
+      workerReasoningLevel,
+      workerSpeed,
       onError: setError,
     });
 
@@ -202,6 +256,9 @@ function WorkerPromptFormContent({
       userId: user?.id,
       userRefreshToken: user?.refresh_token,
       worker,
+      workerModel,
+      workerReasoningLevel,
+      workerSpeed,
       onError: setError,
     });
 
@@ -261,9 +318,104 @@ function WorkerPromptFormContent({
       prompt={prompt}
       queuedMessages={queuedMessages}
       setPrompt={setPrompt}
+      startActions={
+        <WorkerRunOptions
+          disabled={isInputDisabled}
+          model={workerModel}
+          setModel={setWorkerModel}
+          reasoningLevel={workerReasoningLevel}
+          setReasoningLevel={setWorkerReasoningLevel}
+          setSpeed={setWorkerSpeed}
+          speed={workerSpeed}
+        />
+      }
       submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}
       topSection={topSection}
       uploadingLabel="Uploading..."
     />
+  );
+}
+
+function WorkerRunOptions({
+  disabled,
+  model,
+  reasoningLevel,
+  setModel,
+  setReasoningLevel,
+  setSpeed,
+  speed,
+}: {
+  disabled?: boolean;
+  model: WorkerModel;
+  reasoningLevel: WorkerReasoningLevel;
+  setModel: (model: WorkerModel) => void;
+  setReasoningLevel: (reasoningLevel: WorkerReasoningLevel) => void;
+  setSpeed: (speed: WorkerSpeed) => void;
+  speed: WorkerSpeed;
+}) {
+  const isFastAvailable = isFastSupportedWorkerModel(model);
+
+  function onModelChange(nextModel: WorkerModel) {
+    setModel(nextModel);
+
+    if (!isFastSupportedWorkerModel(nextModel)) {
+      setSpeed("standard");
+    }
+  }
+
+  return (
+    <div className="flex flex-row flex-wrap items-center gap-2">
+      <label className="flex items-center gap-1.5 text-grayscale-11 text-xs">
+        <span className="font-medium">Model</span>
+        <select
+          className="h-9 rounded-lg border border-grayscale-3 bg-grayscale-1 px-2 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10 dark:bg-grayscale-3"
+          disabled={disabled}
+          onChange={(event) => onModelChange(event.target.value as WorkerModel)}
+          value={model}
+        >
+          {workerModelOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-1.5 text-grayscale-11 text-xs">
+        <span className="font-medium">Thinking</span>
+        <select
+          className="h-9 rounded-lg border border-grayscale-3 bg-grayscale-1 px-2 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10 dark:bg-grayscale-3"
+          disabled={disabled}
+          onChange={(event) =>
+            setReasoningLevel(event.target.value as WorkerReasoningLevel)
+          }
+          value={reasoningLevel}
+        >
+          {workerReasoningLevelOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-1.5 text-grayscale-11 text-xs">
+        <span className="font-medium">Speed</span>
+        <select
+          className="h-9 rounded-lg border border-grayscale-3 bg-grayscale-1 px-2 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10 dark:bg-grayscale-3"
+          disabled={disabled}
+          onChange={(event) => setSpeed(event.target.value as WorkerSpeed)}
+          value={speed}
+        >
+          {workerSpeedOptions.map((option) => (
+            <option
+              disabled={option.value === "fast" && !isFastAvailable}
+              key={option.value}
+              value={option.value}
+            >
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
   );
 }

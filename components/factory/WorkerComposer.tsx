@@ -217,8 +217,8 @@ export function WorkerComposer({
             {error}
           </p>
         ) : null}
-        <div className="flex flex-row items-center justify-between gap-2 border-grayscale-3 border-t p-2">
-          <div className="flex flex-row items-center gap-2">
+        <div className="flex flex-row flex-wrap items-center justify-between gap-2 border-grayscale-3 border-t p-2">
+          <div className="flex min-w-0 flex-row flex-wrap items-center gap-2">
             <input
               accept="image/png,image/jpeg,image/webp,image/gif"
               className="sr-only"
@@ -242,7 +242,7 @@ export function WorkerComposer({
             </Button>
             {startActions}
           </div>
-          <div className="ml-auto flex flex-row items-center gap-2">
+          <div className="ml-auto flex flex-row flex-wrap items-center justify-end gap-2">
             {endActions}
             <Button type="submit" disabled={isSubmitDisabled}>
               {displayedSubmitLabel}

@@ -6,6 +6,16 @@ import {
   type SandboxStreamChunk,
   streamSandboxCommand,
 } from "@/lib/sandbox/service";
+import {
+  defaultWorkerModel,
+  defaultWorkerReasoningLevel,
+  defaultWorkerSpeed,
+  normalizeWorkerModel,
+  normalizeWorkerReasoningLevel,
+  normalizeWorkerSpeed,
+  type WorkerReasoningLevel,
+  type WorkerSpeed,
+} from "./worker-options";
 
 export type { SandboxCommandResult };
 
@@ -18,7 +28,6 @@ const codexNpmPrefix = `${factoryDir}/npm-global`;
 const codexBinDir = `${codexNpmPrefix}/bin`;
 const codexAuthArchivePath = `${factoryDir}/codex-auth.tgz`;
 const codexHomeArchivePath = `${factoryDir}/codex-home.tgz`;
-const codexModel = "gpt-5.5";
 const factoryWorkerInstructions = `You are running inside a Software Factory worker sandbox.
 
 You have access to the repository workspace at /workspace/home.
@@ -157,11 +166,14 @@ export async function restoreCodexHome(sandbox: AppSandbox) {
 export async function streamCodexExec({
   imagePaths,
   mcpConfig,
+  model = defaultWorkerModel,
   prompt,
+  reasoningLevel = defaultWorkerReasoningLevel,
   resume,
   sandbox,
   secrets,
   sessionId,
+  speed = defaultWorkerSpeed,
   workerId,
   workerApiConfig,
 }: {
@@ -170,11 +182,14 @@ export async function streamCodexExec({
     gatewayUrl: string;
     token: string;
   };
+  model?: string;
   prompt: string;
+  reasoningLevel?: string;
   resume: boolean;
   sandbox: AppSandbox;
   secrets?: Record<string, string>;
   sessionId?: string;
+  speed?: string;
   workerId: string;
   workerApiConfig?: {
     apiUrl: string;
@@ -187,10 +202,13 @@ export async function streamCodexExec({
     createCodexExecCommand({
       imagePaths,
       mcpConfig,
+      model,
       prompt,
+      reasoningLevel,
       resume,
       secrets,
       sessionId,
+      speed,
       workerId,
       workerApiConfig,
     }),
@@ -247,10 +265,13 @@ export function getSandboxStreamChunkText(chunk: SandboxStreamChunk) {
 function createCodexExecCommand({
   imagePaths = [],
   mcpConfig,
+  model,
   prompt,
+  reasoningLevel,
   resume,
   secrets = {},
   sessionId,
+  speed,
   workerId,
   workerApiConfig,
 }: {
@@ -259,10 +280,13 @@ function createCodexExecCommand({
     gatewayUrl: string;
     token: string;
   };
+  model?: string;
   prompt: string;
+  reasoningLevel?: string;
   resume: boolean;
   secrets?: Record<string, string>;
   sessionId?: string;
+  speed?: string;
   workerId: string;
   workerApiConfig?: {
     apiUrl: string;
@@ -275,6 +299,9 @@ function createCodexExecCommand({
   const promptPath = `${workerDir}/prompt.txt`;
   const workerPrompt = `${factoryWorkerInstructions}\n\nUser task:\n${prompt}`;
   const secretsPath = `${factoryDir}/secrets.env`;
+  const codexModel = normalizeWorkerModel(model);
+  const codexReasoningLevel = normalizeWorkerReasoningLevel(reasoningLevel);
+  const codexSpeed = normalizeWorkerSpeed({ model: codexModel, speed });
   const secretEnv = createSecretsEnv(secrets);
   const mcpEnv = mcpConfig
     ? `export FACTORY_MCP_WORKER_TOKEN=${shellQuote(mcpConfig.token)}`
@@ -299,12 +326,16 @@ function createCodexExecCommand({
   const imageArgs = imagePaths
     .map((imagePath) => `--image ${shellQuote(imagePath)}`)
     .join(" ");
+  const speedArgs = createCodexSpeedArgs(codexSpeed);
+  const reasoningLevelArgs = createCodexReasoningLevelArgs(codexReasoningLevel);
   const codexCommand = resume
     ? [
         "codex exec resume",
         sessionId ? shellQuote(sessionId) : "--last",
         "--model",
         shellQuote(codexModel),
+        reasoningLevelArgs,
+        speedArgs,
         imageArgs,
         mcpArgs,
         "--dangerously-bypass-approvals-and-sandbox",
@@ -316,6 +347,8 @@ function createCodexExecCommand({
         "codex exec",
         "--model",
         shellQuote(codexModel),
+        reasoningLevelArgs,
+        speedArgs,
         imageArgs,
         mcpArgs,
         "--dangerously-bypass-approvals-and-sandbox",
@@ -344,6 +377,30 @@ function createCodexPathExport() {
 
 function getWorkerPidPath(workerId: string) {
   return `${factoryDir}/workers/${workerId}/codex.pid`;
+}
+
+function createCodexSpeedArgs(speed: WorkerSpeed) {
+  if (speed !== "fast") {
+    return [
+      "-c",
+      shellQuote("service_tier=null"),
+      "-c",
+      shellQuote("features.fast_mode=false"),
+    ].join(" ");
+  }
+
+  return [
+    "-c",
+    shellQuote('service_tier="fast"'),
+    "-c",
+    shellQuote("features.fast_mode=true"),
+  ].join(" ");
+}
+
+function createCodexReasoningLevelArgs(reasoningLevel: WorkerReasoningLevel) {
+  return ["-c", shellQuote(`model_reasoning_effort="${reasoningLevel}"`)].join(
+    " ",
+  );
 }
 
 export function cleanCommandOutput(output: string) {
