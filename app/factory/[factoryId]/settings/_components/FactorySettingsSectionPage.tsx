@@ -7,7 +7,14 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import {
   FactorySectionCard,
@@ -65,6 +72,7 @@ type AgentRecord = {
   gitEmail?: string;
   gitName?: string;
   id: string;
+  name?: string;
   type?: string;
 };
 
@@ -142,7 +150,7 @@ function FactorySettingsPageContent({
   const agents = useMemo(
     () =>
       [...(factory?.agents ?? [])].sort((first, second) =>
-        (first.type ?? "").localeCompare(second.type ?? ""),
+        getAgentDisplayName(first).localeCompare(getAgentDisplayName(second)),
       ),
     [factory?.agents],
   );
@@ -438,6 +446,7 @@ function FactorySettingsPageContent({
       {section === "agents" ? (
         <FactoryAgentsPanel
           agents={agents}
+          factoryId={factoryId}
           instantDb={instantDb}
           isLoading={isLoading}
         />
@@ -551,60 +560,194 @@ function FactorySettingsPageContent({
 
 function FactoryAgentsPanel({
   agents,
+  factoryId,
   instantDb,
   isLoading,
 }: {
   agents: AgentRecord[];
+  factoryId: string;
   instantDb: AppDb;
   isLoading: boolean;
 }) {
   return (
     <FactorySectionCard>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-4">
+        <AddAgentForm factoryId={factoryId} instantDb={instantDb} />
+
         {isLoading ? (
           <p className="text-grayscale-10 text-sm">Loading agents...</p>
         ) : agents.length > 0 ? (
-          agents.map((agent) => (
-            <div
-              className="flex flex-col gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 p-3"
-              key={agent.id}
-            >
-              <div className="flex min-h-10 items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
-                    <CpuIcon aria-hidden="true" size={16} weight="bold" />
+          <div className="flex flex-col gap-1">
+            {agents.map((agent) => (
+              <div
+                className="flex flex-col gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 p-3"
+                key={agent.id}
+              >
+                <div className="flex min-h-10 items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
+                      <CpuIcon aria-hidden="true" size={16} weight="bold" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-grayscale-12 text-sm">
+                        {getAgentDisplayName(agent)}
+                      </p>
+                      <p className="truncate font-mono text-grayscale-10 text-xs">
+                        {formatAgentType(agent.type)} · {agent.id}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-grayscale-12 text-sm">
-                      {formatAgentType(agent.type)}
-                    </p>
-                    <p className="truncate font-mono text-grayscale-10 text-xs">
-                      {agent.id}
-                    </p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <AgentDefaultOptions agent={agent} instantDb={instantDb} />
+                    <span className="rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
+                      Connected
+                    </span>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <AgentDefaultOptions agent={agent} instantDb={instantDb} />
-                  <span className="rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
-                    Connected
-                  </span>
-                </div>
+                <AgentIdentityOptions agent={agent} instantDb={instantDb} />
               </div>
-              <AgentIdentityOptions agent={agent} instantDb={instantDb} />
-            </div>
-          ))
+            ))}
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center p-16">
             <p className="font-medium text-grayscale-11 text-sm">
               No agents connected yet.
             </p>
             <p className="max-w-sm text-balance text-center text-grayscale-10 text-xs">
-              Add an agent when creating a factory to connect it here.
+              Add an agent to connect it here.
             </p>
           </div>
         )}
       </div>
     </FactorySectionCard>
+  );
+}
+
+function AddAgentForm({
+  factoryId,
+  instantDb,
+}: {
+  factoryId: string;
+  instantDb: AppDb;
+}) {
+  const { user } = instantDb.useAuth();
+  const nameId = useId();
+  const authJsonId = useId();
+  const [name, setName] = useState("");
+  const [authJsonText, setAuthJsonText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      setError("Agent name is required.");
+      return;
+    }
+
+    if (!user?.refresh_token) {
+      setError("You must be signed in to add an agent.");
+      return;
+    }
+
+    let authJson: unknown;
+
+    try {
+      authJson = JSON.parse(authJsonText);
+    } catch {
+      setError("Codex auth JSON must be valid JSON.");
+      return;
+    }
+
+    if (!isJsonObject(authJson)) {
+      setError("Codex auth JSON must be a JSON object.");
+      return;
+    }
+
+    setError(null);
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(`/api/factories/${factoryId}/agents`, {
+        body: JSON.stringify({
+          authJson,
+          name: trimmedName,
+        }),
+        headers: {
+          authorization: `Bearer ${user.refresh_token}`,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setError(result.error ?? "Agent could not be added.");
+        return;
+      }
+
+      setName("");
+      setAuthJsonText("");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <form
+      className="grid gap-3 rounded-lg border border-grayscale-3 border-dashed bg-grayscale-2/60 p-3"
+      onSubmit={onSubmit}
+    >
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto] sm:items-end">
+        <label className="flex min-w-0 flex-col gap-1.5" htmlFor={nameId}>
+          <span className="font-medium text-grayscale-12 text-xs">
+            Agent name
+          </span>
+          <Input
+            className="h-9 bg-grayscale-1 dark:bg-grayscale-1"
+            disabled={isSaving}
+            id={nameId}
+            maxLength={80}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Research"
+            value={name}
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1.5" htmlFor={authJsonId}>
+          <span className="font-medium text-grayscale-12 text-xs">
+            Codex auth JSON
+          </span>
+          <textarea
+            autoComplete="off"
+            className="min-h-24 resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 px-3 py-2 font-mono text-grayscale-12 text-xs outline-none placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
+            disabled={isSaving}
+            id={authJsonId}
+            onChange={(event) => setAuthJsonText(event.target.value)}
+            placeholder='{"tokens":{}}'
+            spellCheck={false}
+            value={authJsonText}
+          />
+        </label>
+        <Button
+          className="h-9 justify-center"
+          disabled={isSaving}
+          type="submit"
+        >
+          <CpuIcon aria-hidden="true" size={14} weight="bold" />
+          {isSaving ? "Adding..." : "Add agent"}
+        </Button>
+      </div>
+      {error ? (
+        <p className="text-red-11 text-sm" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </form>
   );
 }
 
@@ -615,20 +758,25 @@ function AgentIdentityOptions({
   agent: AgentRecord;
   instantDb: AppDb;
 }) {
+  const nameId = useId();
   const gitNameId = useId();
   const gitEmailId = useId();
+  const [name, setName] = useState(agent.name ?? "");
   const [gitName, setGitName] = useState(agent.gitName ?? "");
   const [gitEmail, setGitEmail] = useState(agent.gitEmail ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    setName(agent.name ?? "");
     setGitName(agent.gitName ?? "");
     setGitEmail(agent.gitEmail ?? "");
-  }, [agent.gitEmail, agent.gitName]);
+  }, [agent.gitEmail, agent.gitName, agent.name]);
 
+  const trimmedName = name.trim();
   const trimmedGitName = gitName.trim();
   const trimmedGitEmail = gitEmail.trim();
   const hasChanges =
+    trimmedName !== (agent.name ?? "") ||
     trimmedGitName !== (agent.gitName ?? "") ||
     trimmedGitEmail !== (agent.gitEmail ?? "");
 
@@ -640,6 +788,7 @@ function AgentIdentityOptions({
         instantDb.tx.agents[agent.id].update({
           gitEmail: trimmedGitEmail,
           gitName: trimmedGitName,
+          name: trimmedName,
         }),
       );
     } finally {
@@ -648,7 +797,21 @@ function AgentIdentityOptions({
   }
 
   return (
-    <div className="grid gap-2 border-grayscale-3 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+    <div className="grid gap-2 border-grayscale-3 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+      <label className="flex min-w-0 flex-col gap-1.5" htmlFor={nameId}>
+        <span className="font-medium text-grayscale-12 text-xs">
+          Agent name
+        </span>
+        <Input
+          className="h-9 bg-grayscale-1 dark:bg-grayscale-1"
+          disabled={isSaving}
+          id={nameId}
+          maxLength={80}
+          onChange={(event) => setName(event.target.value)}
+          placeholder={formatAgentType(agent.type)}
+          value={name}
+        />
+      </label>
       <label className="flex min-w-0 flex-col gap-1.5" htmlFor={gitNameId}>
         <span className="font-medium text-grayscale-12 text-xs">Git name</span>
         <Input
@@ -679,7 +842,7 @@ function AgentIdentityOptions({
         type="button"
         variant="secondary"
       >
-        {isSaving ? "Saving..." : "Save identity"}
+        {isSaving ? "Saving..." : "Save details"}
       </Button>
     </div>
   );
@@ -756,6 +919,14 @@ function formatAgentType(type?: string) {
   }
 
   return `${type.charAt(0).toUpperCase()}${type.slice(1)} agent`;
+}
+
+function getAgentDisplayName(agent: AgentRecord) {
+  return agent.name?.trim() || formatAgentType(agent.type);
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function formatBillingDate(value: string) {

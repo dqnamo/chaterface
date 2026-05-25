@@ -90,7 +90,7 @@ const rules = {
         "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
       isOwner: "auth.id in data.ref('factory.owner.id')",
       onlyUpdatesAgentSettings:
-        "request.modifiedFields.all(field, field in ['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName']) && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
+        "request.modifiedFields.all(field, field in ['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName', 'name']) && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
     },
     allow: {
       view: "isFactoryMember",

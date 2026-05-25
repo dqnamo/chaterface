@@ -56,6 +56,7 @@ const _schema = i.schema({
       codexSpeed: i.string().indexed().optional(),
       gitEmail: i.string().indexed().optional(),
       gitName: i.string().indexed().optional(),
+      name: i.string().indexed().optional(),
     }),
     secrets: i.entity({
       createdAt: i.string().indexed(),
