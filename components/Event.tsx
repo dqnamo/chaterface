@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Streamdown } from "streamdown";
+import { type LinkSafetyConfig, Streamdown } from "streamdown";
 import { CodexJsonEventGroup } from "@/components/events/CodexJsonEventGroup";
 import {
   type EventAttachment,
@@ -23,6 +23,10 @@ import {
 } from "@/helpers/user-identity";
 
 export type { EventRecord } from "@/components/events/event-utils";
+
+const disabledLinkSafety = {
+  enabled: false,
+} satisfies LinkSafetyConfig;
 
 type EventProps = {
   event: EventRecord;
@@ -147,6 +151,7 @@ export function MessageEvent({
         )}
         <Streamdown
           className="text-sm text-grayscale-12 [overflow-wrap:anywhere]"
+          linkSafety={disabledLinkSafety}
           mode="static"
         >
           {message}
