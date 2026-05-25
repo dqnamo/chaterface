@@ -1,5 +1,7 @@
 "use client";
 
+import { CaretDown, Lightning } from "@phosphor-icons/react";
+import { Menu } from "@/components/public/Menu";
 import {
   isFastSupportedWorkerModel,
   type WorkerModel,
@@ -28,6 +30,12 @@ export function WorkerRunOptions({
   speed: WorkerSpeed;
 }) {
   const isFastAvailable = isFastSupportedWorkerModel(model);
+  const modelLabel = getWorkerOptionLabel(workerModelOptions, model);
+  const reasoningLabel = getWorkerOptionLabel(
+    workerReasoningLevelOptions,
+    reasoningLevel,
+  );
+  const speedLabel = getWorkerOptionLabel(workerSpeedOptions, speed);
 
   function onModelChange(nextModel: WorkerModel) {
     setModel(nextModel);
@@ -38,58 +46,121 @@ export function WorkerRunOptions({
   }
 
   return (
-    <div className="flex flex-row flex-wrap items-center gap-2">
-      <label className="flex items-center gap-1.5 text-grayscale-11 text-xs">
-        <span className="font-medium">Model</span>
-        <select
-          className="h-9 rounded-lg border border-grayscale-3 bg-grayscale-1 px-2 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10 dark:bg-grayscale-3"
-          disabled={disabled}
-          onChange={(event) => onModelChange(event.target.value as WorkerModel)}
-          value={model}
-        >
-          {workerModelOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex items-center gap-1.5 text-grayscale-11 text-xs">
-        <span className="font-medium">Thinking</span>
-        <select
-          className="h-9 rounded-lg border border-grayscale-3 bg-grayscale-1 px-2 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10 dark:bg-grayscale-3"
-          disabled={disabled}
-          onChange={(event) =>
-            setReasoningLevel(event.target.value as WorkerReasoningLevel)
-          }
-          value={reasoningLevel}
-        >
-          {workerReasoningLevelOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex items-center gap-1.5 text-grayscale-11 text-xs">
-        <span className="font-medium">Speed</span>
-        <select
-          className="h-9 rounded-lg border border-grayscale-3 bg-grayscale-1 px-2 text-grayscale-12 text-sm outline-none focus:border-accent-9 disabled:cursor-not-allowed disabled:text-grayscale-10 dark:bg-grayscale-3"
-          disabled={disabled}
-          onChange={(event) => setSpeed(event.target.value as WorkerSpeed)}
-          value={speed}
-        >
-          {workerSpeedOptions.map((option) => (
-            <option
-              disabled={option.value === "fast" && !isFastAvailable}
-              key={option.value}
-              value={option.value}
-            >
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+    <Menu.Composed
+      modal={false}
+      popupProps={{ className: "w-64" }}
+      positionerProps={{ sideOffset: 8 }}
+      showArrow={false}
+      trigger={
+        <>
+          <Lightning size={16} weight="bold" aria-hidden="true" />
+          <span className="font-semibold text-grayscale-12">
+            {getCompactModelLabel(model)}
+          </span>
+          <span>{reasoningLabel}</span>
+          <span className="sr-only">worker settings</span>
+          <CaretDown size={14} weight="bold" aria-hidden="true" />
+        </>
+      }
+      triggerProps={{
+        "aria-label": `Worker settings: ${modelLabel}, ${reasoningLabel}, ${speedLabel}`,
+        className:
+          "h-9 text-grayscale-10 disabled:cursor-not-allowed disabled:opacity-60",
+        disabled,
+        type: "button",
+      }}
+    >
+      <WorkerRunOptionsSubmenu
+        label="Model"
+        selectedLabel={modelLabel}
+        value={model}
+        onValueChange={(value) => onModelChange(value as WorkerModel)}
+        options={workerModelOptions}
+      />
+      <WorkerRunOptionsSubmenu
+        label="Reasoning"
+        selectedLabel={reasoningLabel}
+        value={reasoningLevel}
+        onValueChange={(value) =>
+          setReasoningLevel(value as WorkerReasoningLevel)
+        }
+        options={workerReasoningLevelOptions}
+      />
+      <WorkerRunOptionsSubmenu
+        getDisabled={(value) =>
+          value === "fast" && !isFastAvailable
+            ? "Fast mode is available for GPT-5.5 and GPT-5.4."
+            : undefined
+        }
+        label="Speed"
+        selectedLabel={speedLabel}
+        value={speed}
+        onValueChange={(value) => setSpeed(value as WorkerSpeed)}
+        options={workerSpeedOptions}
+      />
+    </Menu.Composed>
   );
+}
+
+function WorkerRunOptionsSubmenu<TValue extends string>({
+  getDisabled,
+  label,
+  onValueChange,
+  options,
+  selectedLabel,
+  value,
+}: {
+  getDisabled?: (value: TValue) => string | undefined;
+  label: string;
+  onValueChange: (value: TValue) => void;
+  options: readonly { label: string; value: TValue }[];
+  selectedLabel: string;
+  value: TValue;
+}) {
+  return (
+    <Menu.SubmenuRoot>
+      <Menu.SubmenuTrigger>
+        <span>{label}</span>
+        <span className="ml-auto mr-4 text-grayscale-9 text-xs">
+          {selectedLabel}
+        </span>
+      </Menu.SubmenuTrigger>
+      <Menu.Portal>
+        <Menu.Positioner sideOffset={8}>
+          <Menu.Popup className="w-48">
+            <Menu.Viewport>
+              <Menu.RadioGroup value={value} onValueChange={onValueChange}>
+                {options.map((option) => {
+                  const disabledReason = getDisabled?.(option.value);
+
+                  return (
+                    <Menu.RadioItem
+                      disabled={Boolean(disabledReason)}
+                      key={option.value}
+                      title={disabledReason}
+                      value={option.value}
+                    >
+                      <Menu.RadioItemIndicator />
+                      <span>{option.label}</span>
+                    </Menu.RadioItem>
+                  );
+                })}
+              </Menu.RadioGroup>
+            </Menu.Viewport>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.SubmenuRoot>
+  );
+}
+
+function getWorkerOptionLabel<TValue extends string>(
+  options: readonly { label: string; value: TValue }[],
+  value: TValue,
+) {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
+function getCompactModelLabel(model: WorkerModel) {
+  return model.replace(/^gpt-/, "").replace(/-codex-spark$/, " Spark");
 }

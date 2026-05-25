@@ -17,7 +17,7 @@ export const workerReasoningLevelOptions = [
   { label: "Low", value: "low" },
   { label: "Medium", value: "medium" },
   { label: "High", value: "high" },
-  { label: "X High", value: "xhigh" },
+  { label: "Extra High", value: "xhigh" },
 ] as const;
 
 export type WorkerModel = (typeof workerModelOptions)[number]["value"];
