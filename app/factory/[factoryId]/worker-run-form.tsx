@@ -1,8 +1,15 @@
 "use client";
 
 import { id } from "@instantdb/react";
+import { Cpu } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   addImageAttachments,
   cleanupAttachments,
@@ -14,6 +21,7 @@ import {
 } from "@/components/factory/WorkerComposer";
 import { WorkerRunOptions } from "@/components/factory/WorkerRunOptions";
 import Button from "@/components/public/Button";
+import { Menu } from "@/components/public/Menu";
 import {
   defaultWorkerModel,
   defaultWorkerReasoningLevel,
@@ -31,6 +39,7 @@ import { queueWorkerMessage, triggerWorkerRun } from "./worker-message-client";
 
 export type WorkerRecord = {
   activePid?: number;
+  agent?: WorkerAgentRecord;
   codexSessionId?: string;
   codexModel?: string;
   codexReasoningLevel?: string;
@@ -41,6 +50,14 @@ export type WorkerRecord = {
   retiredAt?: string;
   status: string;
   updatedAt?: string;
+};
+
+type WorkerAgentRecord = {
+  codexModel?: string;
+  codexReasoningLevel?: string;
+  codexSpeed?: string;
+  id: string;
+  type?: string;
 };
 
 export function NewWorkerForm({ factoryId }: { factoryId: string }) {
@@ -58,6 +75,8 @@ function NewWorkerFormContent({
   const { user } = instantDb.useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const agents = useFactoryAgents({ factoryId, instantDb });
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [workerModel, setWorkerModel] =
     useState<WorkerModel>(defaultWorkerModel);
   const [workerReasoningLevel, setWorkerReasoningLevel] =
@@ -67,6 +86,15 @@ function NewWorkerFormContent({
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+
+  useDefaultSelectedAgent({
+    agents,
+    selectedAgentId,
+    setSelectedAgentId,
+    setWorkerModel,
+    setWorkerReasoningLevel,
+    setWorkerSpeed,
+  });
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,6 +108,11 @@ function NewWorkerFormContent({
 
     if (!user?.refresh_token) {
       setError("You must be signed in to run a worker.");
+      return;
+    }
+
+    if (!selectedAgentId) {
+      setError("Select an agent before sending this task to a worker.");
       return;
     }
 
@@ -99,6 +132,7 @@ function NewWorkerFormContent({
       workerModel,
       workerReasoningLevel,
       workerSpeed,
+      workerAgentId: selectedAgentId,
       workerId,
       onError: setError,
     });
@@ -136,15 +170,26 @@ function NewWorkerFormContent({
       prompt={prompt}
       setPrompt={setPrompt}
       startActions={
-        <WorkerRunOptions
-          disabled={isSending}
-          model={workerModel}
-          setModel={setWorkerModel}
-          reasoningLevel={workerReasoningLevel}
-          setReasoningLevel={setWorkerReasoningLevel}
-          setSpeed={setWorkerSpeed}
-          speed={workerSpeed}
-        />
+        <>
+          <WorkerAgentSelector
+            agents={agents}
+            disabled={isSending}
+            selectedAgentId={selectedAgentId}
+            setSelectedAgentId={setSelectedAgentId}
+            setWorkerModel={setWorkerModel}
+            setWorkerReasoningLevel={setWorkerReasoningLevel}
+            setWorkerSpeed={setWorkerSpeed}
+          />
+          <WorkerRunOptions
+            disabled={isSending}
+            model={workerModel}
+            setModel={setWorkerModel}
+            reasoningLevel={workerReasoningLevel}
+            setReasoningLevel={setWorkerReasoningLevel}
+            setSpeed={setWorkerSpeed}
+            speed={workerSpeed}
+          />
+        </>
       }
       submitLabel={isSending ? "Sending..." : "Send"}
       uploadingLabel="Uploading..."
@@ -195,6 +240,8 @@ function WorkerPromptFormContent({
   const { user } = instantDb.useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const agents = useFactoryAgents({ factoryId, instantDb });
+  const selectedAgentId = worker.agent?.id ?? null;
   const [workerModel, setWorkerModel] = useState<WorkerModel>(
     normalizeWorkerModel(worker.codexModel),
   );
@@ -316,19 +363,212 @@ function WorkerPromptFormContent({
       queuedMessages={queuedMessages}
       setPrompt={setPrompt}
       startActions={
-        <WorkerRunOptions
-          disabled={isInputDisabled}
-          model={workerModel}
-          setModel={setWorkerModel}
-          reasoningLevel={workerReasoningLevel}
-          setReasoningLevel={setWorkerReasoningLevel}
-          setSpeed={setWorkerSpeed}
-          speed={workerSpeed}
-        />
+        <>
+          <WorkerAgentSelector
+            agents={agents}
+            disabled
+            selectedAgent={worker.agent}
+            selectedAgentId={selectedAgentId}
+            setWorkerModel={setWorkerModel}
+            setWorkerReasoningLevel={setWorkerReasoningLevel}
+            setWorkerSpeed={setWorkerSpeed}
+          />
+          <WorkerRunOptions
+            disabled={isInputDisabled}
+            model={workerModel}
+            setModel={setWorkerModel}
+            reasoningLevel={workerReasoningLevel}
+            setReasoningLevel={setWorkerReasoningLevel}
+            setSpeed={setWorkerSpeed}
+            speed={workerSpeed}
+          />
+        </>
       }
       submitLabel={isSending ? "Sending..." : isRunning ? "Send now" : "Send"}
       topSection={topSection}
       uploadingLabel="Uploading..."
     />
   );
+}
+
+function useFactoryAgents({
+  factoryId,
+  instantDb,
+}: {
+  factoryId?: string;
+  instantDb: AppDb;
+}) {
+  const { data } = instantDb.useQuery(
+    factoryId
+      ? {
+          factories: {
+            $: { where: { id: factoryId } },
+            agents: {},
+          },
+        }
+      : null,
+  );
+  const agents = (data?.factories?.[0]?.agents ?? []) as WorkerAgentRecord[];
+
+  return [...agents].sort((first, second) =>
+    getAgentLabel(first).localeCompare(getAgentLabel(second)),
+  );
+}
+
+function useDefaultSelectedAgent({
+  agents,
+  selectedAgentId,
+  setSelectedAgentId,
+  setWorkerModel,
+  setWorkerReasoningLevel,
+  setWorkerSpeed,
+}: {
+  agents: WorkerAgentRecord[];
+  selectedAgentId: null | string;
+  setSelectedAgentId: (agentId: null | string) => void;
+  setWorkerModel: (model: WorkerModel) => void;
+  setWorkerReasoningLevel: (reasoningLevel: WorkerReasoningLevel) => void;
+  setWorkerSpeed: (speed: WorkerSpeed) => void;
+}) {
+  useEffect(() => {
+    if (agents.length === 0) {
+      setSelectedAgentId(null);
+      return;
+    }
+
+    if (
+      selectedAgentId &&
+      agents.some((agent) => agent.id === selectedAgentId)
+    ) {
+      return;
+    }
+
+    const agent = agents[0];
+
+    setSelectedAgentId(agent.id);
+    applyAgentDefaults({
+      agent,
+      setWorkerModel,
+      setWorkerReasoningLevel,
+      setWorkerSpeed,
+    });
+  }, [
+    agents,
+    selectedAgentId,
+    setSelectedAgentId,
+    setWorkerModel,
+    setWorkerReasoningLevel,
+    setWorkerSpeed,
+  ]);
+}
+
+function WorkerAgentSelector({
+  agents,
+  disabled,
+  selectedAgent: selectedAgentFallback,
+  selectedAgentId,
+  setSelectedAgentId,
+  setWorkerModel,
+  setWorkerReasoningLevel,
+  setWorkerSpeed,
+}: {
+  agents: WorkerAgentRecord[];
+  disabled?: boolean;
+  selectedAgent?: WorkerAgentRecord;
+  selectedAgentId: null | string;
+  setSelectedAgentId?: (agentId: null | string) => void;
+  setWorkerModel: (model: WorkerModel) => void;
+  setWorkerReasoningLevel: (reasoningLevel: WorkerReasoningLevel) => void;
+  setWorkerSpeed: (speed: WorkerSpeed) => void;
+}) {
+  const selectedAgent =
+    agents.find((agent) => agent.id === selectedAgentId) ??
+    selectedAgentFallback;
+  const selectedLabel = selectedAgent
+    ? getAgentLabel(selectedAgent)
+    : "No agent";
+
+  function onSelectAgent(agent: WorkerAgentRecord) {
+    setSelectedAgentId?.(agent.id);
+    applyAgentDefaults({
+      agent,
+      setWorkerModel,
+      setWorkerReasoningLevel,
+      setWorkerSpeed,
+    });
+  }
+
+  return (
+    <Menu.Root modal={false}>
+      <Menu.Trigger
+        aria-label={`Worker agent: ${selectedLabel}`}
+        className="h-9 text-grayscale-10 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled || agents.length === 0}
+        type="button"
+      >
+        <Cpu size={16} weight="bold" aria-hidden="true" />
+        <span className="font-semibold text-grayscale-12">{selectedLabel}</span>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner sideOffset={8}>
+          <Menu.Popup className="w-56">
+            <Menu.RadioGroup
+              value={selectedAgentId ?? ""}
+              onValueChange={(value) => {
+                const agent = agents.find(
+                  (candidate) => candidate.id === value,
+                );
+
+                if (agent) {
+                  onSelectAgent(agent);
+                }
+              }}
+            >
+              {agents.map((agent) => (
+                <Menu.RadioItem key={agent.id} value={agent.id}>
+                  <Menu.RadioItemIndicator />
+                  <span className="min-w-0 truncate">
+                    {getAgentLabel(agent)}
+                  </span>
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioGroup>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+function applyAgentDefaults({
+  agent,
+  setWorkerModel,
+  setWorkerReasoningLevel,
+  setWorkerSpeed,
+}: {
+  agent: WorkerAgentRecord;
+  setWorkerModel: (model: WorkerModel) => void;
+  setWorkerReasoningLevel: (reasoningLevel: WorkerReasoningLevel) => void;
+  setWorkerSpeed: (speed: WorkerSpeed) => void;
+}) {
+  const model = normalizeWorkerModel(agent.codexModel);
+
+  setWorkerModel(model);
+  setWorkerReasoningLevel(
+    normalizeWorkerReasoningLevel(agent.codexReasoningLevel),
+  );
+  setWorkerSpeed(
+    normalizeWorkerSpeed({
+      model,
+      speed: agent.codexSpeed,
+    }),
+  );
+}
+
+function getAgentLabel(agent: WorkerAgentRecord) {
+  const typeLabel = agent.type
+    ? `${agent.type.charAt(0).toUpperCase()}${agent.type.slice(1)}`
+    : "Agent";
+
+  return `${typeLabel} ${agent.id.slice(0, 8)}`;
 }

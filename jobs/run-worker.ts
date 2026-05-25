@@ -6,6 +6,7 @@ import {
   cleanCommandOutput,
   ensureLatestCodexOnSandbox,
   getSandboxStreamChunkText,
+  installCodexAuthOnSandbox,
   killWorkerPid,
   sandboxFactoryDir,
   shellQuote,
@@ -47,6 +48,7 @@ type RunWorkerPayload = {
 type WorkerRecord = {
   activeCommandId?: string;
   activePid?: number;
+  agent?: AgentRecord;
   codexSessionId?: string;
   codexModel?: string;
   codexReasoningLevel?: string;
@@ -60,6 +62,13 @@ type WorkerRecord = {
   id: string;
   sandboxId?: string;
   status?: string;
+};
+
+type AgentRecord = {
+  authEncrypted?: string;
+  gitEmail?: string;
+  gitName?: string;
+  id: string;
 };
 
 type SecretRecord = {
@@ -227,13 +236,24 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
 
-      await applyGitIdentity(sandbox, {
-        gitEmail: worker.factory.githubSettings?.gitEmail,
-        gitName: worker.factory.githubSettings?.gitName,
-      });
+      if (!resumeCodexSession && worker.agent?.authEncrypted) {
+        await installCodexAuthOnSandbox({
+          codexAuthJson: getAgentCodexAuthJson(worker.agent),
+          sandbox,
+        });
+        logTaskStep("info", "Agent Codex auth installed in worker sandbox", {
+          agentId: worker.agent.id,
+          sandboxId,
+          workerId: worker.id,
+        });
+      }
+
+      const gitIdentity = getWorkerGitIdentity(worker);
+
+      await applyGitIdentity(sandbox, gitIdentity);
       logTaskStep("info", "Git identity applied to worker sandbox", {
-        hasGitEmail: Boolean(worker.factory.githubSettings?.gitEmail),
-        hasGitName: Boolean(worker.factory.githubSettings?.gitName),
+        hasGitEmail: Boolean(gitIdentity.gitEmail),
+        hasGitName: Boolean(gitIdentity.gitName),
         sandboxId,
         workerId: worker.id,
       });
@@ -494,6 +514,7 @@ async function getWorker(workerId: string) {
   const result = await db.query({
     workers: {
       $: { where: { id: workerId } },
+      agent: {},
       factory: {
         githubSettings: {},
         secrets: {},
@@ -502,6 +523,30 @@ async function getWorker(workerId: string) {
   });
 
   return result.workers[0] as WorkerRecord | undefined;
+}
+
+function getAgentCodexAuthJson(agent: AgentRecord) {
+  const authJson = decryptSecretValue<unknown>(agent.authEncrypted);
+
+  if (!isJsonObject(authJson)) {
+    throw new Error("Worker agent Codex auth is missing or invalid");
+  }
+
+  return JSON.stringify(authJson, null, 2);
+}
+
+function getWorkerGitIdentity(worker: WorkerRecord) {
+  return {
+    gitEmail:
+      worker.agent?.gitEmail?.trim() ||
+      worker.factory?.githubSettings?.gitEmail,
+    gitName:
+      worker.agent?.gitName?.trim() || worker.factory?.githubSettings?.gitName,
+  };
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 async function getUserMessageEvent(eventId: string) {

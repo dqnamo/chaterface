@@ -28,6 +28,7 @@ test("factory access allows owners and active supervisors only", () => {
 
 test("permissions keep sensitive server-owned records private", () => {
   assert.match(permissionsSource, /valueEncrypted:\s+"false"/);
+  assert.match(permissionsSource, /authEncrypted:\s+"false"/);
   assert.match(permissionsSource, /tokenEncrypted:\s+"false"/);
   assert.match(
     permissionsSource,
@@ -49,6 +50,7 @@ test("permissions keep sensitive server-owned records private", () => {
 
 test("permissions prevent direct creation of server-owned integrations", () => {
   assert.match(permissionsSource, /factories:[\s\S]*?create:\s+"false"/);
+  assert.match(permissionsSource, /agents:[\s\S]*?create:\s+"false"/);
   assert.match(permissionsSource, /secrets:[\s\S]*?create:\s+"false"/);
   assert.match(permissionsSource, /factorySkills:[\s\S]*?create:\s+"false"/);
   assert.match(
@@ -68,10 +70,21 @@ test("supervisor invite acceptance can link the signed-in user", () => {
   );
 });
 
+test("agent permissions allow owners to update supported settings only", () => {
+  assert.match(
+    permissionsSource,
+    /agents:[\s\S]*?onlyUpdatesAgentSettings:[\s\S]*?\['codexModel', 'codexReasoningLevel', 'codexSpeed', 'gitEmail', 'gitName'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
+  );
+  assert.match(
+    permissionsSource,
+    /agents:[\s\S]*?update:\s+"isOwner && onlyUpdatesAgentSettings"/,
+  );
+});
+
 test("worker permissions keep server-owned runtime fields out of client writes", () => {
   assert.match(
     permissionsSource,
-    /onlyCreatesClientWorker:[\s\S]*?\['codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
+    /onlyCreatesClientWorker:[\s\S]*?\['agent', 'codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
   );
   assert.match(
     permissionsSource,
