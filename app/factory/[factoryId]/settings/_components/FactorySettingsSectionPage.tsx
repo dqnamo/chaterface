@@ -67,6 +67,7 @@ type SupervisorRecord = {
 };
 
 type AgentRecord = {
+  authStatus?: string;
   codexModel?: string;
   codexReasoningLevel?: string;
   codexSpeed?: string;
@@ -603,6 +604,14 @@ function FactoryAgentsPanel({
                 className="flex flex-col gap-3 rounded-lg border border-grayscale-3 bg-grayscale-1 p-3"
                 key={agent.id}
               >
+                {agent.authStatus === "unauthenticated" ? (
+                  <div
+                    className="rounded-lg border border-red-6 bg-red-2 px-3 py-2 text-red-11 text-sm"
+                    role="alert"
+                  >
+                    This agent needs a fresh Codex login before it can run.
+                  </div>
+                ) : null}
                 <div className="flex min-h-10 items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-2 text-grayscale-11">
@@ -623,8 +632,17 @@ function FactoryAgentsPanel({
                       disabled={!canManageAgents}
                       instantDb={instantDb}
                     />
-                    <span className="rounded-md border border-grayscale-3 bg-grayscale-2 px-2 py-0.5 font-medium text-grayscale-10 text-xs">
-                      Connected
+                    <span
+                      className={cn(
+                        "rounded-md border px-2 py-0.5 font-medium text-xs",
+                        agent.authStatus === "unauthenticated"
+                          ? "border-red-6 bg-red-2 text-red-11"
+                          : "border-grayscale-3 bg-grayscale-2 text-grayscale-10",
+                      )}
+                    >
+                      {agent.authStatus === "unauthenticated"
+                        ? "Unauthenticated"
+                        : "Connected"}
                     </span>
                   </div>
                 </div>
@@ -633,6 +651,13 @@ function FactoryAgentsPanel({
                   disabled={!canManageAgents}
                   instantDb={instantDb}
                 />
+                {agent.authStatus === "unauthenticated" && canManageAgents ? (
+                  <AgentAuthJsonForm
+                    agent={agent}
+                    factoryId={factoryId}
+                    instantDb={instantDb}
+                  />
+                ) : null}
               </div>
             ))}
           </div>
@@ -875,6 +900,118 @@ function AgentIdentityOptions({
         {isSaving ? "Saving..." : "Save details"}
       </Button>
     </div>
+  );
+}
+
+function AgentAuthJsonForm({
+  agent,
+  factoryId,
+  instantDb,
+}: {
+  agent: AgentRecord;
+  factoryId: string;
+  instantDb: AppDb;
+}) {
+  const { user } = instantDb.useAuth();
+  const authJsonId = useId();
+  const [authJsonText, setAuthJsonText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!user?.refresh_token) {
+      setError("You must be signed in to reconnect this agent.");
+      return;
+    }
+
+    let authJson: unknown;
+
+    try {
+      authJson = JSON.parse(authJsonText);
+    } catch {
+      setError("Codex auth JSON must be valid JSON.");
+      return;
+    }
+
+    if (!isJsonObject(authJson)) {
+      setError("Codex auth JSON must be a JSON object.");
+      return;
+    }
+
+    setError(null);
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(
+        `/api/factories/${factoryId}/agents/${agent.id}`,
+        {
+          body: JSON.stringify({ authJson }),
+          headers: {
+            authorization: `Bearer ${user.refresh_token}`,
+            "content-type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setError(result.error ?? "Agent could not be reconnected.");
+        return;
+      }
+
+      setAuthJsonText("");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <form
+      className="grid gap-2 border-grayscale-3 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+      onSubmit={onSubmit}
+    >
+      <label className="flex min-w-0 flex-col gap-1.5" htmlFor={authJsonId}>
+        <span className="font-medium text-grayscale-12 text-xs">
+          Fresh Codex auth JSON
+        </span>
+        <textarea
+          autoComplete="off"
+          className="min-h-24 resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 px-3 py-2 font-mono text-grayscale-12 text-xs outline-none placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
+          disabled={isSaving}
+          id={authJsonId}
+          onChange={(event) => setAuthJsonText(event.target.value)}
+          placeholder='{"tokens":{}}'
+          spellCheck={false}
+          value={authJsonText}
+        />
+        {error ? (
+          <span className="text-red-11 text-xs" role="alert">
+            {error}
+          </span>
+        ) : (
+          <span className="text-grayscale-10 text-xs">
+            Log in again locally, then paste the fresh{" "}
+            <code className="rounded bg-grayscale-3 px-1 py-0.5 font-mono text-xs">
+              ~/.codex/auth.json
+            </code>
+            .
+          </span>
+        )}
+      </label>
+      <Button
+        className="h-9 justify-center"
+        disabled={isSaving || !authJsonText.trim()}
+        type="submit"
+        variant="secondary"
+      >
+        {isSaving ? "Reconnecting..." : "Reconnect"}
+      </Button>
+    </form>
   );
 }
 

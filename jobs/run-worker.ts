@@ -8,6 +8,7 @@ import {
   getSandboxStreamChunkText,
   installCodexAuthOnSandbox,
   killWorkerPid,
+  readCodexAuthJsonFromSandbox,
   sandboxFactoryDir,
   shellQuote,
   streamCodexExec,
@@ -18,7 +19,7 @@ import {
   normalizeWorkerReasoningLevel,
   normalizeWorkerSpeed,
 } from "@/lib/codex/worker-options";
-import { decryptSecretValue } from "@/lib/crypto.server";
+import { decryptSecretValue, encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 import {
   createFactoryWorkerApiToken,
@@ -62,13 +63,21 @@ type WorkerRecord = {
   id: string;
   sandboxId?: string;
   status?: string;
+  updatedAt?: string;
 };
 
 type AgentRecord = {
   authEncrypted?: string;
+  authStatus?: string;
   gitEmail?: string;
   gitName?: string;
   id: string;
+};
+
+type AgentWorkerRecord = {
+  id: string;
+  sandboxId?: string;
+  updatedAt?: string;
 };
 
 type SecretRecord = {
@@ -190,6 +199,19 @@ export const runWorkerTask = task({
         tokenHeader: factoryWorkerTokenHeader,
       };
 
+      if (worker.agent?.authStatus === "unauthenticated") {
+        await failWorker(
+          payload.workerId,
+          "Codex agent needs a fresh login before it can run.",
+        );
+        workerAlreadyFailed = true;
+        logTaskStep("warn", "Worker agent is unauthenticated", {
+          agentId: worker.agent.id,
+          workerId: payload.workerId,
+        });
+        throw new Error("Codex agent needs a fresh login before it can run.");
+      }
+
       if (!worker.sandboxId && !defaultCheckpointId) {
         await failWorker(
           payload.workerId,
@@ -237,8 +259,13 @@ export const runWorkerTask = task({
       });
 
       if (!resumeCodexSession && worker.agent?.authEncrypted) {
+        const codexAuthJson = await getLatestAgentCodexAuthJson({
+          agent: worker.agent,
+          currentWorkerId: worker.id,
+        });
+
         await installCodexAuthOnSandbox({
-          codexAuthJson: getAgentCodexAuthJson(worker.agent),
+          codexAuthJson,
           sandbox,
         });
         logTaskStep("info", "Agent Codex auth installed in worker sandbox", {
@@ -374,6 +401,7 @@ export const runWorkerTask = task({
       let outputBytes = 0;
       let outputChunks = 0;
       let outputLines = 0;
+      let didMarkAgentUnauthenticated = false;
 
       try {
         for await (const chunk of stream) {
@@ -415,7 +443,9 @@ export const runWorkerTask = task({
               preview: truncateForLog(line),
               workerId: worker.id,
             });
-            await persistCodexLine(worker.id, line);
+            if (await persistCodexLine(worker.id, line, worker.agent?.id)) {
+              didMarkAgentUnauthenticated = true;
+            }
           }
         }
 
@@ -426,9 +456,14 @@ export const runWorkerTask = task({
             preview: truncateForLog(buffer),
             workerId: worker.id,
           });
-          await persistCodexLine(worker.id, buffer);
+          if (await persistCodexLine(worker.id, buffer, worker.agent?.id)) {
+            didMarkAgentUnauthenticated = true;
+          }
         }
       } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Codex stream failed";
+
         logTaskStep("error", "Codex stream failed", {
           error: serializeError(error),
           outputBytes,
@@ -439,13 +474,31 @@ export const runWorkerTask = task({
         await appendWorkerEvent(worker.id, {
           createdAt: new Date().toISOString(),
           data: {
-            message:
-              error instanceof Error ? error.message : "Codex stream failed",
+            message,
           },
           source: "codex",
           type: "codex_event",
         });
+        if (
+          worker.agent?.id &&
+          getCodexRefreshTokenReuseMessage({ message, type: "error" })
+        ) {
+          await markAgentUnauthenticated({
+            agentId: worker.agent.id,
+            message,
+            workerId: worker.id,
+          });
+          didMarkAgentUnauthenticated = true;
+        }
         exitCode = 1;
+      }
+
+      if (worker.agent?.id && !didMarkAgentUnauthenticated) {
+        await syncAgentCodexAuthFromSandbox({
+          agentId: worker.agent.id,
+          sandbox,
+          workerId: worker.id,
+        });
       }
 
       await finalizeWorker({
@@ -525,6 +578,146 @@ async function getWorker(workerId: string) {
   return result.workers[0] as WorkerRecord | undefined;
 }
 
+async function getLatestAgentCodexAuthJson({
+  agent,
+  currentWorkerId,
+}: {
+  agent: AgentRecord;
+  currentWorkerId: string;
+}) {
+  const latestWorkerAuthJson = await readLatestAgentCodexAuthJsonFromWorker({
+    agentId: agent.id,
+    currentWorkerId,
+  });
+
+  if (latestWorkerAuthJson) {
+    return latestWorkerAuthJson;
+  }
+
+  return getAgentCodexAuthJson(agent);
+}
+
+async function readLatestAgentCodexAuthJsonFromWorker({
+  agentId,
+  currentWorkerId,
+}: {
+  agentId: string;
+  currentWorkerId: string;
+}) {
+  const workers = await getAgentWorkers(agentId);
+  const candidates = workers
+    .filter(hasReadablePriorSandbox(currentWorkerId))
+    .sort((first, second) => {
+      const firstTime = Date.parse(first.updatedAt ?? "") || 0;
+      const secondTime = Date.parse(second.updatedAt ?? "") || 0;
+
+      return secondTime - firstTime;
+    });
+
+  for (const candidate of candidates) {
+    try {
+      const sandbox = await connectSandbox(candidate.sandboxId);
+      const authJsonText = await readCodexAuthJsonFromSandbox(sandbox);
+
+      if (!authJsonText) {
+        continue;
+      }
+
+      const authJson = parseCodexAuthJson(authJsonText);
+
+      await saveAgentCodexAuthJson(agentId, authJson);
+      logTaskStep("info", "Agent Codex auth synced from latest worker", {
+        agentId,
+        sourceWorkerId: candidate.id,
+        sourceSandboxId: candidate.sandboxId,
+      });
+
+      return JSON.stringify(authJson, null, 2);
+    } catch (error) {
+      logTaskStep("warn", "Could not sync Codex auth from prior worker", {
+        agentId,
+        error: serializeError(error),
+        sourceWorkerId: candidate.id,
+        sourceSandboxId: candidate.sandboxId,
+      });
+    }
+  }
+
+  return undefined;
+}
+
+function hasReadablePriorSandbox(currentWorkerId: string) {
+  return (
+    worker: AgentWorkerRecord,
+  ): worker is AgentWorkerRecord & { sandboxId: string } =>
+    worker.id !== currentWorkerId && Boolean(worker.sandboxId);
+}
+
+async function getAgentWorkers(agentId: string) {
+  const db = getAdminDb();
+  const result = await db.query({
+    agents: {
+      $: { where: { id: agentId } },
+      workers: {},
+    },
+  });
+  const agent = result.agents[0] as
+    | { workers?: AgentWorkerRecord[] }
+    | undefined;
+
+  return agent?.workers ?? [];
+}
+
+async function syncAgentCodexAuthFromSandbox({
+  agentId,
+  sandbox,
+  workerId,
+}: {
+  agentId: string;
+  sandbox: AppSandbox;
+  workerId: string;
+}) {
+  try {
+    const authJsonText = await readCodexAuthJsonFromSandbox(sandbox);
+
+    if (!authJsonText) {
+      logTaskStep("warn", "Worker sandbox did not contain Codex auth JSON", {
+        agentId,
+        workerId,
+      });
+      return;
+    }
+
+    const authJson = parseCodexAuthJson(authJsonText);
+
+    await saveAgentCodexAuthJson(agentId, authJson);
+    logTaskStep("info", "Agent Codex auth synced from worker sandbox", {
+      agentId,
+      workerId,
+    });
+  } catch (error) {
+    logTaskStep("warn", "Could not sync Codex auth from worker sandbox", {
+      agentId,
+      error: serializeError(error),
+      workerId,
+    });
+  }
+}
+
+async function saveAgentCodexAuthJson(
+  agentId: string,
+  authJson: Record<string, unknown>,
+) {
+  const db = getAdminDb();
+
+  await db.transact(
+    db.tx.agents[agentId].update({
+      authEncrypted: encryptSecretValue(authJson),
+      authStatus: "authenticated",
+    }),
+  );
+}
+
 function getAgentCodexAuthJson(agent: AgentRecord) {
   const authJson = decryptSecretValue<unknown>(agent.authEncrypted);
 
@@ -533,6 +726,16 @@ function getAgentCodexAuthJson(agent: AgentRecord) {
   }
 
   return JSON.stringify(authJson, null, 2);
+}
+
+function parseCodexAuthJson(value: string) {
+  const parsed = JSON.parse(value) as unknown;
+
+  if (!isJsonObject(parsed)) {
+    throw new Error("Codex auth JSON is invalid");
+  }
+
+  return parsed;
 }
 
 function getWorkerGitIdentity(worker: WorkerRecord) {
@@ -693,11 +896,15 @@ function getAttachmentExtension(attachment: AttachmentRecord) {
   return match ? `.${match[1].toLowerCase()}` : ".png";
 }
 
-async function persistCodexLine(workerId: string, line: string) {
+async function persistCodexLine(
+  workerId: string,
+  line: string,
+  agentId?: string,
+) {
   const trimmedLine = line.trim();
 
   if (!trimmedLine) {
-    return;
+    return false;
   }
 
   let data: unknown;
@@ -715,6 +922,17 @@ async function persistCodexLine(workerId: string, line: string) {
     type: "codex_event",
   });
 
+  const authErrorMessage = getCodexRefreshTokenReuseMessage(data);
+
+  if (agentId && authErrorMessage) {
+    await markAgentUnauthenticated({
+      agentId,
+      message: authErrorMessage,
+      workerId,
+    });
+    return true;
+  }
+
   const sessionId = findCodexSessionId(data);
 
   if (sessionId) {
@@ -726,6 +944,59 @@ async function persistCodexLine(workerId: string, line: string) {
       }),
     );
   }
+
+  return false;
+}
+
+async function markAgentUnauthenticated({
+  agentId,
+  message,
+  workerId,
+}: {
+  agentId: string;
+  message: string;
+  workerId: string;
+}) {
+  const db = getAdminDb();
+
+  await db.transact(
+    db.tx.agents[agentId].update({
+      authStatus: "unauthenticated",
+    }),
+  );
+  logTaskStep("warn", "Agent marked unauthenticated", {
+    agentId,
+    message,
+    workerId,
+  });
+}
+
+function getCodexRefreshTokenReuseMessage(data: unknown) {
+  const message = getCodexEventErrorMessage(data);
+
+  if (!message) {
+    return undefined;
+  }
+
+  return /refresh token was already used/i.test(message) ? message : undefined;
+}
+
+function getCodexEventErrorMessage(data: unknown): string | undefined {
+  if (!isJsonObject(data)) {
+    return undefined;
+  }
+
+  if (data.type === "error" && typeof data.message === "string") {
+    return data.message;
+  }
+
+  if (data.type === "turn.failed" && isJsonObject(data.error)) {
+    return typeof data.error.message === "string"
+      ? data.error.message
+      : undefined;
+  }
+
+  return undefined;
 }
 
 async function appendWorkerEvent(

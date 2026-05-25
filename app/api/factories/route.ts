@@ -114,6 +114,7 @@ export async function POST(request: Request) {
           ...factoryTransactions,
           db.tx.agents[agentId].update({
             authEncrypted: encryptSecretValue(codexAuthJson),
+            authStatus: "authenticated",
             codexModel: "gpt-5.5",
             codexReasoningLevel: "medium",
             codexSpeed: "standard",

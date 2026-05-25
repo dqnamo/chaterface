@@ -51,6 +51,7 @@ const _schema = i.schema({
     agents: i.entity({
       type: i.string(),
       authEncrypted: i.string(),
+      authStatus: i.string().indexed().optional(),
       codexModel: i.string().indexed().optional(),
       codexReasoningLevel: i.string().indexed().optional(),
       codexSpeed: i.string().indexed().optional(),

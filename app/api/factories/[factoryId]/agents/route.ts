@@ -74,6 +74,7 @@ export async function POST(request: Request, context: RouteContext) {
   await db.transact([
     db.tx.agents[agentId].update({
       authEncrypted: encryptSecretValue(body.authJson),
+      authStatus: "authenticated",
       codexModel: "gpt-5.5",
       codexReasoningLevel: "medium",
       codexSpeed: "standard",
@@ -90,6 +91,7 @@ export async function POST(request: Request, context: RouteContext) {
       codexModel: "gpt-5.5",
       codexReasoningLevel: "medium",
       codexSpeed: "standard",
+      authStatus: "authenticated",
       id: agentId,
       name,
       type: "codex",

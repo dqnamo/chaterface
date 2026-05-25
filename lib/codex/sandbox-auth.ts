@@ -103,6 +103,26 @@ export async function installCodexAuthOnSandbox({
   }
 }
 
+export async function readCodexAuthJsonFromSandbox(sandbox: AppSandbox) {
+  const result = await runSandboxCommand(
+    sandbox,
+    'test -f "$HOME/.codex/auth.json" && cat "$HOME/.codex/auth.json"',
+    30_000,
+  );
+
+  if (!result.success) {
+    return undefined;
+  }
+
+  const value = result.output.trim();
+
+  if (!value) {
+    return undefined;
+  }
+
+  return value;
+}
+
 export async function ensureLatestCodexOnSandbox(sandbox: AppSandbox) {
   const result = await runSandboxCommand(
     sandbox,
