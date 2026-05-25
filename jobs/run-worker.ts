@@ -1,6 +1,7 @@
 import { id } from "@instantdb/admin";
 import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
 import { getAppPublicUrl, getFactoryMcpGatewayUrl } from "@/lib/app-url";
+import { applyGitIdentity, type GithubSetup } from "@/lib/codex/github-setup";
 import {
   cleanCommandOutput,
   ensureLatestCodexOnSandbox,
@@ -44,6 +45,7 @@ type WorkerRecord = {
   codexSessionId?: string;
   factory?: {
     defaultSandboxCheckpointId?: string;
+    githubSettings?: Pick<GithubSetup, "gitEmail" | "gitName">;
     id: string;
     secrets?: SecretRecord[];
   };
@@ -214,6 +216,17 @@ export const runWorkerTask = task({
         sandboxRecreated,
         sandboxId,
         shouldInterrupt,
+        workerId: worker.id,
+      });
+
+      await applyGitIdentity(sandbox, {
+        gitEmail: worker.factory.githubSettings?.gitEmail,
+        gitName: worker.factory.githubSettings?.gitName,
+      });
+      logTaskStep("info", "Git identity applied to worker sandbox", {
+        hasGitEmail: Boolean(worker.factory.githubSettings?.gitEmail),
+        hasGitName: Boolean(worker.factory.githubSettings?.gitName),
+        sandboxId,
         workerId: worker.id,
       });
 
@@ -463,6 +476,7 @@ async function getWorker(workerId: string) {
     workers: {
       $: { where: { id: workerId } },
       factory: {
+        githubSettings: {},
         secrets: {},
       },
     },
