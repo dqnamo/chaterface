@@ -1,9 +1,5 @@
 import { id } from "@instantdb/admin";
-import {
-  getCurrentUserForApiRequest,
-  getOwnedFactory,
-  unauthorizedResponse,
-} from "@/lib/auth";
+import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
 import { encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 
@@ -62,14 +58,21 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { factoryId } = await context.params;
-  const factory = await getOwnedFactory<FactoryWithOwner>(factoryId, user);
+  const db = getAdminDb();
+  const factory = await getFactoryWithOwner(factoryId);
 
   if (!factory) {
     return Response.json({ error: "Factory not found" }, { status: 404 });
   }
 
+  if (factory.owner?.id !== user.id) {
+    return Response.json(
+      { error: "Only the factory owner can add agents" },
+      { status: 403 },
+    );
+  }
+
   const agentId = id();
-  const db = getAdminDb();
 
   await db.transact([
     db.tx.agents[agentId].update({
@@ -95,6 +98,18 @@ export async function POST(request: Request, context: RouteContext) {
       type: "codex",
     },
   });
+}
+
+async function getFactoryWithOwner(factoryId: string) {
+  const db = getAdminDb();
+  const result = await db.query({
+    factories: {
+      $: { where: { id: factoryId } },
+      owner: {},
+    },
+  });
+
+  return result.factories[0] as FactoryWithOwner | undefined;
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
