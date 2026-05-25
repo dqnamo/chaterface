@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 type CreateFactoryRequest = {
   codexAgent?: {
-    authJson?: unknown;
+    accessToken?: unknown;
     enabled?: boolean;
   };
   github?: unknown;
@@ -49,12 +49,14 @@ export async function POST(request: Request) {
   const now = new Date();
   const nowIso = now.toISOString();
   const shouldCreateCodexAgent = body.codexAgent?.enabled === true;
-  const codexAuthJson =
-    shouldCreateCodexAgent && body.codexAgent ? body.codexAgent.authJson : null;
+  const codexAccessToken =
+    shouldCreateCodexAgent && body.codexAgent
+      ? parseCodexAccessToken(body.codexAgent.accessToken)
+      : null;
 
-  if (shouldCreateCodexAgent && !isJsonObject(codexAuthJson)) {
+  if (shouldCreateCodexAgent && !codexAccessToken) {
     return Response.json(
-      { error: "Codex auth JSON file is required" },
+      { error: "Codex access token is required" },
       { status: 400 },
     );
   }
@@ -113,7 +115,7 @@ export async function POST(request: Request) {
       ? [
           ...factoryTransactions,
           db.tx.agents[agentId].update({
-            authEncrypted: encryptSecretValue(codexAuthJson),
+            authEncrypted: encryptSecretValue(codexAccessToken),
             codexModel: "gpt-5.5",
             codexReasoningLevel: "medium",
             codexSpeed: "standard",
@@ -154,6 +156,6 @@ export async function POST(request: Request) {
   }
 }
 
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+function parseCodexAccessToken(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }

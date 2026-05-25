@@ -6,7 +6,6 @@ import {
   BuildingsIcon,
   CheckIcon,
   CircleNotchIcon,
-  CopyIcon,
   CpuIcon,
   FolderSimpleIcon,
   GithubLogoIcon,
@@ -97,7 +96,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
   const [githubRepositories, setGithubRepositories] = useState<
     GithubRepositoryRow[]
   >([]);
-  const [codexAuthJsonText, setCodexAuthJsonText] = useState("");
+  const [codexAccessToken, setCodexAccessToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -180,10 +179,10 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
       return;
     }
 
-    const parsedCodexAuthJson = parseCodexAuthJson(codexAuthJsonText);
+    const parsedCodexAccessToken = parseCodexAccessToken(codexAccessToken);
 
-    if ("error" in parsedCodexAuthJson) {
-      setError(parsedCodexAuthJson.error);
+    if ("error" in parsedCodexAccessToken) {
+      setError(parsedCodexAccessToken.error);
       return;
     }
     setIsSaving(true);
@@ -197,7 +196,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
         },
         body: JSON.stringify({
           codexAgent: {
-            authJson: parsedCodexAuthJson.authJson,
+            accessToken: parsedCodexAccessToken.accessToken,
             enabled: true,
           },
           github: {
@@ -320,7 +319,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
 
           {step === "agent" ? (
             <AgentStep
-              codexAuthJsonText={codexAuthJsonText}
+              codexAccessToken={codexAccessToken}
               error={error}
               factoryName={trimmedName || "Untitled factory"}
               filledRepositoryCount={filledRepositories.length}
@@ -330,7 +329,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
               isSaving={isSaving}
               onBack={() => advanceToStep("github")}
               onSubmit={createFactory}
-              setCodexAuthJsonText={setCodexAuthJsonText}
+              setCodexAccessToken={setCodexAccessToken}
             />
           ) : null}
         </div>
@@ -813,7 +812,7 @@ function RepositoryRow({
 }
 
 function AgentStep({
-  codexAuthJsonText,
+  codexAccessToken,
   error,
   factoryName,
   filledRepositoryCount,
@@ -823,9 +822,9 @@ function AgentStep({
   isSaving,
   onBack,
   onSubmit,
-  setCodexAuthJsonText,
+  setCodexAccessToken,
 }: {
-  codexAuthJsonText: string;
+  codexAccessToken: string;
   error: string | null;
   factoryName: string;
   filledRepositoryCount: number;
@@ -835,31 +834,9 @@ function AgentStep({
   isSaving: boolean;
   onBack: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  setCodexAuthJsonText: Dispatch<SetStateAction<string>>;
+  setCodexAccessToken: Dispatch<SetStateAction<string>>;
 }) {
-  const authJsonId = useId();
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
-    "idle",
-  );
-
-  useEffect(() => {
-    if (copyState === "idle") {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => setCopyState("idle"), 2000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [copyState]);
-
-  async function copyCommand() {
-    try {
-      await navigator.clipboard.writeText("pbcopy < ~/.codex/auth.json");
-      setCopyState("copied");
-    } catch {
-      setCopyState("error");
-    }
-  }
+  const accessTokenId = useId();
 
   const githubSummary =
     filledRepositoryCount > 0
@@ -881,76 +858,33 @@ function AgentStep({
 
         <FieldGroup
           description={
-            "Paste auth.json from ~/.codex so the agent can sign into Codex from this factory's sandboxes."
+            "Paste a Codex access token so the agent can run Codex non-interactively in this factory's sandboxes."
           }
-          title="Codex auth"
+          title="Codex access token"
         >
-          <div className="flex flex-col gap-3">
-            <div className="rounded-lg border border-grayscale-3 bg-grayscale-2 p-3 dark:bg-grayscale-3/40">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-grayscale-12 text-sm">
-                    Copy from this machine
-                  </p>
-                  <p className="text-grayscale-10 text-xs">
-                    Runs locally and copies your existing Codex auth into the
-                    clipboard.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={copyCommand}
-                  disabled={isSaving}
-                  className="flex shrink-0 items-center gap-1.5 rounded-md border border-grayscale-4 bg-grayscale-1 px-2 py-1 font-medium text-grayscale-11 text-xs transition-colors hover:border-grayscale-6 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-grayscale-2"
-                >
-                  {copyState === "copied" ? (
-                    <>
-                      <CheckIcon size={12} weight="bold" aria-hidden="true" />
-                      Copied
-                    </>
-                  ) : copyState === "error" ? (
-                    <>
-                      <WarningCircleIcon
-                        size={12}
-                        weight="bold"
-                        aria-hidden="true"
-                      />
-                      Try again
-                    </>
-                  ) : (
-                    <>
-                      <CopyIcon size={12} weight="bold" aria-hidden="true" />
-                      Copy
-                    </>
-                  )}
-                </button>
-              </div>
-              <code className="mt-2 block overflow-x-auto rounded-md bg-grayscale-1 px-3 py-2 font-mono text-grayscale-11 text-xs">
-                pbcopy &lt; ~/.codex/auth.json
-              </code>
-            </div>
-
-            <label className="flex flex-col gap-1.5" htmlFor={authJsonId}>
-              <span className="font-medium text-grayscale-12 text-sm">
-                Codex auth JSON
-              </span>
-              <textarea
-                id={authJsonId}
-                value={codexAuthJsonText}
-                onChange={(event) => setCodexAuthJsonText(event.target.value)}
-                placeholder='{"tokens":{}}'
-                autoComplete="off"
-                disabled={isSaving}
-                spellCheck={false}
-                required
-                className="min-h-48 w-full resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 font-mono text-grayscale-12 text-xs outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
-              />
-              <span className="text-grayscale-10 text-xs">
-                Saved encrypted on the agent and copied as a file into the
-                default snapshot.
-              </span>
-            </label>
-          </div>
+          <label className="flex flex-col gap-1.5" htmlFor={accessTokenId}>
+            <span className="font-medium text-grayscale-12 text-sm">
+              Access token
+            </span>
+            <textarea
+              id={accessTokenId}
+              value={codexAccessToken}
+              onChange={(event) => setCodexAccessToken(event.target.value)}
+              placeholder="codex_access_token..."
+              autoComplete="off"
+              disabled={isSaving}
+              spellCheck={false}
+              required
+              className="min-h-32 w-full resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 font-mono text-grayscale-12 text-xs outline-none transition-colors placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
+            />
+            <span className="text-grayscale-10 text-xs">
+              Saved encrypted on the agent and passed to Codex as{" "}
+              <code className="rounded bg-grayscale-3 px-1 py-0.5 font-mono text-xs">
+                CODEX_ACCESS_TOKEN
+              </code>{" "}
+              for each run.
+            </span>
+          </label>
         </FieldGroup>
       </div>
       <StepFooter>
@@ -1118,28 +1052,16 @@ function extractRepoPathFromUrl(value: string): string {
   return segments.at(-1) ?? "";
 }
 
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function parseCodexAuthJson(
+function parseCodexAccessToken(
   value: string,
-): { authJson: Record<string, unknown> } | { error: string } {
+): { accessToken: string } | { error: string } {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
-    return { error: "Paste the Codex auth JSON before creating the factory." };
+    return {
+      error: "Paste the Codex access token before creating the factory.",
+    };
   }
 
-  try {
-    const parsed = JSON.parse(trimmedValue) as unknown;
-
-    if (!isJsonObject(parsed)) {
-      return { error: "Codex auth JSON must be a JSON object." };
-    }
-
-    return { authJson: parsed };
-  } catch {
-    return { error: "Codex auth JSON is not valid JSON." };
-  }
+  return { accessToken: trimmedValue };
 }
