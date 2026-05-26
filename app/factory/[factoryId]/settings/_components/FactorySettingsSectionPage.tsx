@@ -141,7 +141,7 @@ function FactorySettingsPageContent({
       ? {
           factories: {
             $: { where: { id: factoryId } },
-            agents: {},
+            ...(section === "agents" ? { agents: {} } : {}),
             owner: {},
             supervisors: {
               user: {},
@@ -347,7 +347,7 @@ function FactorySettingsPageContent({
   }
   const copy = settingsSectionCopy[section];
 
-  if (isAuthLoading || !user || isLoading) {
+  if (isAuthLoading || !user) {
     return (
       <main className="flex min-h-dvh items-center justify-center p-4 text-sm text-grayscale-11">
         Loading settings...
@@ -355,16 +355,35 @@ function FactorySettingsPageContent({
     );
   }
 
-  if (error || !factory) {
+  if (error) {
     return (
       <main className="flex min-h-dvh items-center justify-center p-4 text-center">
         <div className="max-w-md">
           <h1 className="font-semibold text-base text-grayscale-12">
             Settings could not be loaded
           </h1>
-          <p className="mt-2 text-grayscale-11 text-sm">
-            {error?.message ?? "Factory not found."}
-          </p>
+          <p className="mt-2 text-grayscale-11 text-sm">{error.message}</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center p-4 text-sm text-grayscale-11">
+        Loading settings...
+      </main>
+    );
+  }
+
+  if (!factory) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center p-4 text-center">
+        <div className="max-w-md">
+          <h1 className="font-semibold text-base text-grayscale-12">
+            Settings could not be loaded
+          </h1>
+          <p className="mt-2 text-grayscale-11 text-sm">Factory not found.</p>
         </div>
       </main>
     );
