@@ -4,6 +4,7 @@ import {
   getCurrentUserForApiRequest,
   unauthorizedResponse,
 } from "@/lib/auth";
+import { createAuthSyncHash } from "@/lib/codex/agent-auth-sync";
 import { encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 
@@ -75,6 +76,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     db.tx.agents[agent.id].update({
       authEncrypted: encryptSecretValue(body.authJson),
       authStatus: "authenticated",
+      authSyncHash: createAuthSyncHash(body.authJson),
+      authSyncedAt: new Date().toISOString(),
     }),
   );
 

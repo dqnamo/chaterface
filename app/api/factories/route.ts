@@ -1,6 +1,7 @@
 import { id } from "@instantdb/admin";
 import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
 import { BASIC_BILLING_PLAN, getTrialEndsAt } from "@/lib/billing";
+import { createAuthSyncHash } from "@/lib/codex/agent-auth-sync";
 import { applyGithubSetup } from "@/lib/codex/github-setup";
 import { createDefaultFactoryCheckpoint } from "@/lib/codex/sandbox-auth";
 import { encryptSecretValue } from "@/lib/crypto.server";
@@ -59,6 +60,10 @@ export async function POST(request: Request) {
     );
   }
 
+  const validatedCodexAuthJson = isJsonObject(codexAuthJson)
+    ? codexAuthJson
+    : undefined;
+
   const githubSettings = parseGithubSettingsInput(body.github);
 
   if ("error" in githubSettings) {
@@ -113,8 +118,10 @@ export async function POST(request: Request) {
       ? [
           ...factoryTransactions,
           db.tx.agents[agentId].update({
-            authEncrypted: encryptSecretValue(codexAuthJson),
+            authEncrypted: encryptSecretValue(validatedCodexAuthJson),
             authStatus: "authenticated",
+            authSyncHash: createAuthSyncHash(validatedCodexAuthJson ?? {}),
+            authSyncedAt: nowIso,
             codexModel: "gpt-5.5",
             codexReasoningLevel: "medium",
             codexSpeed: "standard",
