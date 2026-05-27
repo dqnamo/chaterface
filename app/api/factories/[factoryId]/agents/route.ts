@@ -5,6 +5,7 @@ import {
   getCurrentUserForApiRequest,
   unauthorizedResponse,
 } from "@/lib/auth";
+import { createAuthSyncHash } from "@/lib/codex/agent-auth-sync";
 import { encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 
@@ -70,11 +71,14 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const agentId = id();
+  const now = new Date().toISOString();
 
   await db.transact([
     db.tx.agents[agentId].update({
       authEncrypted: encryptSecretValue(body.authJson),
       authStatus: "authenticated",
+      authSyncHash: createAuthSyncHash(body.authJson),
+      authSyncedAt: now,
       codexModel: "gpt-5.5",
       codexReasoningLevel: "medium",
       codexSpeed: "standard",

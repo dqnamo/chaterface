@@ -1,6 +1,7 @@
 import { id } from "@instantdb/admin";
 import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
 import { getAppPublicUrl, getFactoryMcpGatewayUrl } from "@/lib/app-url";
+import { createAuthSyncHash } from "@/lib/codex/agent-auth-sync";
 import { applyGitIdentity, type GithubSetup } from "@/lib/codex/github-setup";
 import {
   cleanCommandOutput,
@@ -69,15 +70,12 @@ type WorkerRecord = {
 type AgentRecord = {
   authEncrypted?: string;
   authStatus?: string;
+  authSyncHash?: string;
+  authSyncedAt?: string;
+  authSyncedByWorkerId?: string;
   gitEmail?: string;
   gitName?: string;
   id: string;
-};
-
-type AgentWorkerRecord = {
-  id: string;
-  sandboxId?: string;
-  updatedAt?: string;
 };
 
 type SecretRecord = {
@@ -258,10 +256,9 @@ export const runWorkerTask = task({
         workerId: worker.id,
       });
 
-      if (!resumeCodexSession && worker.agent?.authEncrypted) {
+      if (worker.agent?.authEncrypted) {
         const codexAuthJson = await getLatestAgentCodexAuthJson({
           agent: worker.agent,
-          currentWorkerId: worker.id,
         });
 
         await installCodexAuthOnSandbox({
@@ -374,6 +371,7 @@ export const runWorkerTask = task({
         speed: worker.codexSpeed,
         workerId: worker.id,
         workerApiConfig,
+        watchCodexAuth: Boolean(worker.agent?.id),
       });
       const pid = await waitForWorkerPid({ sandbox, workerId: worker.id });
 
@@ -578,94 +576,8 @@ async function getWorker(workerId: string) {
   return result.workers[0] as WorkerRecord | undefined;
 }
 
-async function getLatestAgentCodexAuthJson({
-  agent,
-  currentWorkerId,
-}: {
-  agent: AgentRecord;
-  currentWorkerId: string;
-}) {
-  const latestWorkerAuthJson = await readLatestAgentCodexAuthJsonFromWorker({
-    agentId: agent.id,
-    currentWorkerId,
-  });
-
-  if (latestWorkerAuthJson) {
-    return latestWorkerAuthJson;
-  }
-
+async function getLatestAgentCodexAuthJson({ agent }: { agent: AgentRecord }) {
   return getAgentCodexAuthJson(agent);
-}
-
-async function readLatestAgentCodexAuthJsonFromWorker({
-  agentId,
-  currentWorkerId,
-}: {
-  agentId: string;
-  currentWorkerId: string;
-}) {
-  const workers = await getAgentWorkers(agentId);
-  const candidates = workers
-    .filter(hasReadablePriorSandbox(currentWorkerId))
-    .sort((first, second) => {
-      const firstTime = Date.parse(first.updatedAt ?? "") || 0;
-      const secondTime = Date.parse(second.updatedAt ?? "") || 0;
-
-      return secondTime - firstTime;
-    });
-
-  for (const candidate of candidates) {
-    try {
-      const sandbox = await connectSandbox(candidate.sandboxId);
-      const authJsonText = await readCodexAuthJsonFromSandbox(sandbox);
-
-      if (!authJsonText) {
-        continue;
-      }
-
-      const authJson = parseCodexAuthJson(authJsonText);
-
-      await saveAgentCodexAuthJson(agentId, authJson);
-      logTaskStep("info", "Agent Codex auth synced from latest worker", {
-        agentId,
-        sourceWorkerId: candidate.id,
-        sourceSandboxId: candidate.sandboxId,
-      });
-
-      return JSON.stringify(authJson, null, 2);
-    } catch (error) {
-      logTaskStep("warn", "Could not sync Codex auth from prior worker", {
-        agentId,
-        error: serializeError(error),
-        sourceWorkerId: candidate.id,
-        sourceSandboxId: candidate.sandboxId,
-      });
-    }
-  }
-
-  return undefined;
-}
-
-function hasReadablePriorSandbox(currentWorkerId: string) {
-  return (
-    worker: AgentWorkerRecord,
-  ): worker is AgentWorkerRecord & { sandboxId: string } =>
-    worker.id !== currentWorkerId && Boolean(worker.sandboxId);
-}
-
-async function getAgentWorkers(agentId: string) {
-  const db = getAdminDb();
-  const result = await db.query({
-    agents: {
-      $: { where: { id: agentId } },
-      workers: {},
-    },
-  });
-  const agent = result.agents[0] as
-    | { workers?: AgentWorkerRecord[] }
-    | undefined;
-
-  return agent?.workers ?? [];
 }
 
 async function syncAgentCodexAuthFromSandbox({
@@ -690,7 +602,7 @@ async function syncAgentCodexAuthFromSandbox({
 
     const authJson = parseCodexAuthJson(authJsonText);
 
-    await saveAgentCodexAuthJson(agentId, authJson);
+    await saveAgentCodexAuthJson(agentId, authJson, workerId);
     logTaskStep("info", "Agent Codex auth synced from worker sandbox", {
       agentId,
       workerId,
@@ -707,13 +619,30 @@ async function syncAgentCodexAuthFromSandbox({
 async function saveAgentCodexAuthJson(
   agentId: string,
   authJson: Record<string, unknown>,
+  workerId?: string,
 ) {
   const db = getAdminDb();
+  const authSyncHash = createAuthSyncHash(authJson);
+  const result = await db.query({
+    agents: {
+      $: { where: { id: agentId } },
+    },
+  });
+  const agent = result.agents[0] as { authSyncHash?: string } | undefined;
+
+  if (agent?.authSyncHash === authSyncHash) {
+    return;
+  }
+
+  const authSyncedAt = new Date().toISOString();
 
   await db.transact(
     db.tx.agents[agentId].update({
       authEncrypted: encryptSecretValue(authJson),
       authStatus: "authenticated",
+      authSyncHash,
+      authSyncedAt,
+      ...(workerId ? { authSyncedByWorkerId: workerId } : {}),
     }),
   );
 }

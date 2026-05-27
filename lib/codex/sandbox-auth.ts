@@ -212,6 +212,7 @@ export async function streamCodexExec({
   speed = defaultWorkerSpeed,
   workerId,
   workerApiConfig,
+  watchCodexAuth = false,
 }: {
   imagePaths?: string[];
   mcpConfig?: {
@@ -232,6 +233,7 @@ export async function streamCodexExec({
     token: string;
     tokenHeader: string;
   };
+  watchCodexAuth?: boolean;
 }) {
   return streamSandboxCommand(
     sandbox,
@@ -247,6 +249,7 @@ export async function streamCodexExec({
       speed,
       workerId,
       workerApiConfig,
+      watchCodexAuth,
     }),
   );
 }
@@ -310,6 +313,7 @@ function createCodexExecCommand({
   speed,
   workerId,
   workerApiConfig,
+  watchCodexAuth,
 }: {
   imagePaths?: string[];
   mcpConfig?: {
@@ -329,10 +333,13 @@ function createCodexExecCommand({
     token: string;
     tokenHeader: string;
   };
+  watchCodexAuth?: boolean;
 }) {
   const workerDir = `${factoryDir}/workers/${workerId}`;
   const pidPath = getWorkerPidPath(workerId);
   const promptPath = `${workerDir}/prompt.txt`;
+  const authWatcherPath = `${workerDir}/codex-auth-watcher.mjs`;
+  const authWatcherLogPath = `${workerDir}/codex-auth-watcher.log`;
   const workerPrompt = `${factoryWorkerInstructions}\n\nUser task:\n${prompt}`;
   const secretsPath = `${factoryDir}/secrets.env`;
   const codexModel = normalizeWorkerModel(model);
@@ -392,18 +399,153 @@ function createCodexExecCommand({
         "--json",
         "-",
       ].join(" ");
+  const authWatcherSetup =
+    watchCodexAuth && workerApiConfig
+      ? [
+          `printf %s ${shellQuote(createCodexAuthWatcherScript())} > ${shellQuote(authWatcherPath)}`,
+          `chmod 700 ${shellQuote(authWatcherPath)}`,
+        ].join("\n")
+      : `rm -f ${shellQuote(authWatcherPath)}`;
+  const authWatcherCommand =
+    watchCodexAuth && workerApiConfig
+      ? [
+          `watcher_pid=""`,
+          `cleanup_auth_watcher() { if test -n "$watcher_pid"; then kill "$watcher_pid" 2>/dev/null || true; wait "$watcher_pid" 2>/dev/null || true; fi; }`,
+          `trap cleanup_auth_watcher EXIT`,
+          `node ${shellQuote(authWatcherPath)} > ${shellQuote(authWatcherLogPath)} 2>&1 & watcher_pid=$!`,
+        ].join("; ")
+      : "";
 
   return [
     `mkdir -p ${shellQuote(workerDir)}`,
     `rm -f ${shellQuote(pidPath)}`,
+    authWatcherSetup,
     `printf %s ${shellQuote(workerPrompt)} > ${shellQuote(promptPath)}`,
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
-    `setsid /bin/bash -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${workerApiEnv ? `${workerApiEnv} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}cd ${shellQuote(sandboxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
+    `setsid /bin/bash -lc ${shellQuote(`${createCodexPathExport()} ${secretEnv ? `. ${shellQuote(secretsPath)} && ` : ""}${workerApiEnv ? `${workerApiEnv} && ` : ""}${mcpEnv ? `${mcpEnv} && ` : ""}${authWatcherCommand ? `${authWatcherCommand}; ` : ""}cd ${shellQuote(sandboxWorkspace)} && ${codexCommand} < ${shellQuote(promptPath)}`)} &`,
     "pid=$!",
     `echo "$pid" > ${shellQuote(pidPath)}`,
     'wait "$pid"',
+  ].join("\n");
+}
+
+function createCodexAuthWatcherScript() {
+  return [
+    'import { createHash } from "node:crypto";',
+    'import { readFile } from "node:fs/promises";',
+    'import { watch } from "node:fs";',
+    "",
+    'const authPath = process.env.HOME + "/.codex/auth.json";',
+    'const authDir = process.env.HOME + "/.codex";',
+    "const apiUrl = process.env.FACTORY_API_URL;",
+    "const token = process.env.FACTORY_WORKER_API_TOKEN;",
+    'const tokenHeader = process.env.FACTORY_WORKER_TOKEN_HEADER || "x-factory-worker-token";',
+    "let lastSyncedHash;",
+    "let retryDelay = 1000;",
+    "let timer;",
+    "let stopped = false;",
+    "",
+    "if (!apiUrl || !token) {",
+    '  console.error("Missing Factory worker auth sync environment.");',
+    "  process.exit(1);",
+    "}",
+    "",
+    "function stableStringify(value) {",
+    '  if (value === null || typeof value !== "object") {',
+    "    return JSON.stringify(value);",
+    "  }",
+    "",
+    "  if (Array.isArray(value)) {",
+    '    return "[" + value.map((item) => stableStringify(item)).join(",") + "]";',
+    "  }",
+    "",
+    "  return `{${Object.entries(value)",
+    "    .filter(([, item]) => item !== undefined)",
+    "    .sort(([first], [second]) => first.localeCompare(second))",
+    '    .map(([key, item]) => JSON.stringify(key) + ":" + stableStringify(item))',
+    '    .join(",")}}`;',
+    "}",
+    "",
+    "function hashAuth(value) {",
+    '  return createHash("sha256").update(stableStringify(value)).digest("hex");',
+    "}",
+    "",
+    "function scheduleSync(delay = 500) {",
+    "  if (stopped) {",
+    "    return;",
+    "  }",
+    "",
+    "  clearTimeout(timer);",
+    "  timer = setTimeout(syncAuth, delay);",
+    "}",
+    "",
+    "async function syncAuth() {",
+    "  if (stopped) {",
+    "    return;",
+    "  }",
+    "",
+    "  let authJson;",
+    "",
+    "  try {",
+    '    authJson = JSON.parse(await readFile(authPath, "utf8"));',
+    "  } catch {",
+    "    scheduleSync(1000);",
+    "    return;",
+    "  }",
+    "",
+    '  if (!authJson || typeof authJson !== "object" || Array.isArray(authJson)) {',
+    "    scheduleSync(1000);",
+    "    return;",
+    "  }",
+    "",
+    "  const authHash = hashAuth(authJson);",
+    "",
+    "  if (authHash === lastSyncedHash) {",
+    "    retryDelay = 1000;",
+    "    return;",
+    "  }",
+    "",
+    "  try {",
+    '    const response = await fetch(apiUrl + "/api/worker/agent-auth", {',
+    '      method: "POST",',
+    "      headers: {",
+    '        "Content-Type": "application/json",',
+    "        [tokenHeader]: token,",
+    "      },",
+    "      body: JSON.stringify({ authJson }),",
+    "    });",
+    "",
+    "    if (!response.ok) {",
+    '      throw new Error("Factory auth sync failed: " + response.status);',
+    "    }",
+    "",
+    "    lastSyncedHash = authHash;",
+    "    retryDelay = 1000;",
+    "  } catch (error) {",
+    "    console.error(error instanceof Error ? error.message : String(error));",
+    "    scheduleSync(retryDelay);",
+    "    retryDelay = Math.min(retryDelay * 2, 10000);",
+    "  }",
+    "}",
+    "",
+    "const watcher = watch(authDir, (_eventType, filename) => {",
+    "  if (!filename || String(filename) === 'auth.json') {",
+    "    scheduleSync();",
+    "  }",
+    "});",
+    "",
+    "function stop() {",
+    "  stopped = true;",
+    "  clearTimeout(timer);",
+    "  watcher.close();",
+    "  process.exit(0);",
+    "}",
+    "",
+    'process.on("SIGINT", stop);',
+    'process.on("SIGTERM", stop);',
+    "scheduleSync(0);",
   ].join("\n");
 }
 
