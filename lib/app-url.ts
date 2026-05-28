@@ -1,4 +1,4 @@
-const defaultAppPublicUrl = "https://app.factoryplane.com";
+const defaultAppPublicUrl = "https://factoryplane.com";
 
 export function getAppPublicUrl(request?: Request) {
   const configuredUrl = process.env.APP_PUBLIC_URL?.trim();

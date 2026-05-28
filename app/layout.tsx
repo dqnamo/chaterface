@@ -25,8 +25,8 @@ const pirataOne = Pirata_One({
 });
 
 export const metadata: Metadata = {
-  title: "FactoryPlane",
-  description: "The FactoryPlane platform app for collaborative cloud workers.",
+  title: "Factory",
+  description: "A Next.js starter using Chord UI, InstantDB, and Trigger.dev",
   applicationName: "FactoryPlane",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

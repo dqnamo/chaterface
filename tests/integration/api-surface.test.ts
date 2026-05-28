@@ -3,15 +3,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-const appRoot = process.cwd();
-const repoRoot = join(appRoot, "../..");
+const repoRoot = process.cwd();
 
 test("demo Trigger endpoint is not exposed", () => {
   assert.equal(
-    existsSync(join(appRoot, "app/api/hello-world/route.ts")),
+    existsSync(join(repoRoot, "app/api/hello-world/route.ts")),
     false,
   );
-  assert.equal(existsSync(join(appRoot, "jobs/example.ts")), false);
+  assert.equal(existsSync(join(repoRoot, "jobs/example.ts")), false);
 });
 
 test("deploy workflow gates production deploys on build and smoke checks", () => {
@@ -23,8 +22,5 @@ test("deploy workflow gates production deploys on build and smoke checks", () =>
   assert.match(workflow, /pnpm test:unit/);
   assert.match(workflow, /pnpm build/);
   assert.match(workflow, /Smoke test production server/);
-  assert.match(
-    workflow,
-    /pnpm --filter @factoryplane\/app start --hostname 127\.0\.0\.1 --port 3000/,
-  );
+  assert.match(workflow, /pnpm start --hostname 127\.0\.0\.1 --port 3000/);
 });
