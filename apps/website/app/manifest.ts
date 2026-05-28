@@ -4,7 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "FactoryPlane",
     short_name: "FactoryPlane",
-    description: "Cloud software factory using your existing coding agents.",
+    description:
+      "Open source, collaborative software factory running in the cloud using your existing codex agents.",
     start_url: "/",
     scope: "/",
     display: "standalone",
