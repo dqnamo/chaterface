@@ -1,10 +1,12 @@
 "use client";
 
+import { Dialog } from "@base-ui/react/dialog";
 import {
   CpuIcon,
   CreditCardIcon,
   TrashIcon,
   WarningIcon,
+  XIcon,
 } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -651,6 +653,12 @@ function FactoryAgentsPanel({
                       disabled={!canManageAgents}
                       instantDb={instantDb}
                     />
+                    <AgentAuthJsonDialog
+                      agent={agent}
+                      disabled={!canManageAgents}
+                      factoryId={factoryId}
+                      instantDb={instantDb}
+                    />
                     <span
                       className={cn(
                         "rounded-md border px-2 py-0.5 font-medium text-xs",
@@ -670,13 +678,6 @@ function FactoryAgentsPanel({
                   disabled={!canManageAgents}
                   instantDb={instantDb}
                 />
-                {agent.authStatus === "unauthenticated" && canManageAgents ? (
-                  <AgentAuthJsonForm
-                    agent={agent}
-                    factoryId={factoryId}
-                    instantDb={instantDb}
-                  />
-                ) : null}
               </div>
             ))}
           </div>
@@ -922,20 +923,37 @@ function AgentIdentityOptions({
   );
 }
 
-function AgentAuthJsonForm({
+function AgentAuthJsonDialog({
   agent,
+  disabled,
   factoryId,
   instantDb,
 }: {
   agent: AgentRecord;
+  disabled?: boolean;
   factoryId: string;
   instantDb: AppDb;
 }) {
   const { user } = instantDb.useAuth();
   const authJsonId = useId();
+  const [open, setOpen] = useState(false);
   const [authJsonText, setAuthJsonText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const isUnauthenticated = agent.authStatus === "unauthenticated";
+
+  function onOpenChange(nextOpen: boolean) {
+    if (isSaving) {
+      return;
+    }
+
+    setOpen(nextOpen);
+
+    if (!nextOpen) {
+      setAuthJsonText("");
+      setError(null);
+    }
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -984,53 +1002,99 @@ function AgentAuthJsonForm({
       }
 
       setAuthJsonText("");
+      setOpen(false);
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <form
-      className="grid gap-2 border-grayscale-3 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-      onSubmit={onSubmit}
-    >
-      <label className="flex min-w-0 flex-col gap-1.5" htmlFor={authJsonId}>
-        <span className="font-medium text-grayscale-12 text-xs">
-          Fresh Codex auth JSON
-        </span>
-        <textarea
-          autoComplete="off"
-          className="min-h-24 resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 px-3 py-2 font-mono text-grayscale-12 text-xs outline-none placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
-          disabled={isSaving}
-          id={authJsonId}
-          onChange={(event) => setAuthJsonText(event.target.value)}
-          placeholder='{"tokens":{}}'
-          spellCheck={false}
-          value={authJsonText}
-        />
-        {error ? (
-          <span className="text-red-11 text-xs" role="alert">
-            {error}
-          </span>
-        ) : (
-          <span className="text-grayscale-10 text-xs">
-            Log in again locally, then paste the fresh{" "}
-            <code className="rounded bg-grayscale-3 px-1 py-0.5 font-mono text-xs">
-              ~/.codex/auth.json
-            </code>
-            .
-          </span>
-        )}
-      </label>
+    <>
       <Button
-        className="h-9 justify-center"
-        disabled={isSaving || !authJsonText.trim()}
-        type="submit"
-        variant="secondary"
+        className="h-8 justify-center"
+        disabled={disabled}
+        onClick={() => onOpenChange(true)}
+        type="button"
+        variant={isUnauthenticated ? "primary" : "secondary"}
       >
-        {isSaving ? "Reconnecting..." : "Reconnect"}
+        Authenticate
       </Button>
-    </form>
+      <Dialog.Root open={open} onOpenChange={onOpenChange}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-100 bg-grayscale-12/20 backdrop-blur-sm" />
+          <Dialog.Popup className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-100 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-xl flex-col overflow-hidden rounded-lg border border-grayscale-3 bg-white text-grayscale-12 shadow-xl outline-none dark:border-grayscale-4 dark:bg-grayscale-2">
+            <div className="flex items-start justify-between gap-4 border-grayscale-3 border-b px-4 py-3 dark:border-grayscale-4">
+              <div className="min-w-0">
+                <Dialog.Title className="font-semibold text-base text-grayscale-12">
+                  Authenticate agent
+                </Dialog.Title>
+                <Dialog.Description className="mt-0.5 text-grayscale-10 text-sm">
+                  Paste a Codex auth JSON file for {getAgentDisplayName(agent)}.
+                </Dialog.Description>
+              </div>
+              <Dialog.Close
+                aria-label="Close authentication dialog"
+                className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-b-2 border-grayscale-3 bg-white text-grayscale-11 transition-colors hover:border-grayscale-4 hover:bg-grayscale-2 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-60 dark:border-grayscale-4 dark:bg-grayscale-3 dark:hover:border-grayscale-5 dark:hover:bg-grayscale-4"
+                disabled={isSaving}
+                title="Close authentication dialog"
+              >
+                <XIcon aria-hidden="true" size={16} weight="bold" />
+              </Dialog.Close>
+            </div>
+
+            <form className="grid gap-4 p-4" onSubmit={onSubmit}>
+              <label
+                className="flex min-w-0 flex-col gap-1.5"
+                htmlFor={authJsonId}
+              >
+                <span className="font-medium text-grayscale-12 text-xs">
+                  Codex auth JSON
+                </span>
+                <textarea
+                  autoComplete="off"
+                  className="min-h-44 resize-y rounded-lg border border-grayscale-3 bg-grayscale-1 px-3 py-2 font-mono text-grayscale-12 text-xs outline-none placeholder:text-grayscale-9 focus:border-accent-9 dark:bg-grayscale-1"
+                  disabled={isSaving}
+                  id={authJsonId}
+                  onChange={(event) => setAuthJsonText(event.target.value)}
+                  placeholder='{"tokens":{}}'
+                  spellCheck={false}
+                  value={authJsonText}
+                />
+                {error ? (
+                  <span className="text-red-11 text-xs" role="alert">
+                    {error}
+                  </span>
+                ) : (
+                  <span className="text-grayscale-10 text-xs">
+                    Log in again locally, then paste the fresh{" "}
+                    <code className="rounded bg-grayscale-3 px-1 py-0.5 font-mono text-xs">
+                      ~/.codex/auth.json
+                    </code>
+                    .
+                  </span>
+                )}
+              </label>
+
+              <div className="flex justify-end gap-2">
+                <Dialog.Close
+                  className="flex cursor-pointer flex-row items-center gap-1.5 rounded-lg border border-b-2 border-grayscale-3 bg-white px-2 py-1 font-medium text-grayscale-11 text-sm transition-colors hover:border-grayscale-4 hover:bg-grayscale-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-grayscale-4 dark:bg-grayscale-3 dark:hover:border-grayscale-5 dark:hover:bg-grayscale-4"
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Dialog.Close>
+                <Button
+                  className="h-9 justify-center"
+                  disabled={isSaving || !authJsonText.trim()}
+                  type="submit"
+                >
+                  {isSaving ? "Authenticating..." : "Authenticate"}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   );
 }
 
