@@ -7,10 +7,10 @@ const repoRoot = process.cwd();
 
 test("demo Trigger endpoint is not exposed", () => {
   assert.equal(
-    existsSync(join(repoRoot, "app/app/api/hello-world/route.ts")),
+    existsSync(join(repoRoot, "apps/app/app/api/hello-world/route.ts")),
     false,
   );
-  assert.equal(existsSync(join(repoRoot, "app/jobs/example.ts")), false);
+  assert.equal(existsSync(join(repoRoot, "apps/app/jobs/example.ts")), false);
 });
 
 test("deploy workflow gates production deploys on build and smoke checks", () => {

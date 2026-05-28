@@ -9,6 +9,11 @@ This repo has two apps:
 - `app` — the FactoryPlane product app, API routes, Instant schema, and Trigger.dev jobs.
 - `website` — the public website, mirroring the existing homepage experience.
 
+They live under `apps/`:
+
+- `apps/app`
+- `apps/website`
+
 Root scripts are orchestrated with Turborepo, so package builds and typechecks
 can be cached while app-specific scripts still live in each workspace.
 
@@ -50,7 +55,7 @@ resume when the app reconnects or creates a public URL.
 
 ## Trigger.dev
 
-Jobs live in `/app/jobs`, configured by `/app/trigger.config.ts`.
+Jobs live in `/apps/app/jobs`, configured by `/apps/app/trigger.config.ts`.
 
 ```bash
 pnpm trigger:dev
@@ -85,14 +90,14 @@ Configure these repository secrets:
 - `INSTANT_APP_ADMIN_TOKEN`
 - `APP_PUBLIC_URL`, or set it as a repository variable
 - `TRIGGER_PROJECT_REF`, the Trigger.dev project ref used by
-  `app/trigger.config.ts`
+  `apps/app/trigger.config.ts`
 - `TRIGGER_ACCESS_TOKEN`, a Trigger.dev personal access token from
   https://cloud.trigger.dev/account/tokens
 
 ## InstantDB
 
-The starter schema and permissions live in `app/instant.schema.ts` and
-`app/instant.perms.ts`.
+The starter schema and permissions live in `apps/app/instant.schema.ts` and
+`apps/app/instant.perms.ts`.
 
 Configure an Instant webhook for the `events` namespace and `create` action:
 

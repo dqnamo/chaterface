@@ -2,8 +2,8 @@ import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { defineConfig } from "@trigger.dev/sdk";
 
-if (existsSync("../.env.local")) {
-  loadEnvFile("../.env.local");
+if (existsSync("../../.env.local")) {
+  loadEnvFile("../../.env.local");
 }
 
 if (existsSync(".env.local")) {
