@@ -26,7 +26,8 @@ const pirataOne = Pirata_One({
 
 export const metadata: Metadata = {
   title: "Factory",
-  description: "A Next.js starter using Chord UI, InstantDB, and Trigger.dev",
+  description:
+    "Open source, collaborative software factory running in the cloud using your existing codex agents.",
   applicationName: "FactoryPlane",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

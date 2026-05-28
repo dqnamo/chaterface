@@ -77,14 +77,18 @@ export default function Home() {
           </div>
           <p className="max-w-lg text-balance text-lg font-medium leading-6 text-grayscale-12 mt-8">
             Open source, collaborative software factory running in the cloud
-            using your existing coding agents.
+            using your existing codex agents.
           </p>
           <p className="max-w-lg text-balance text-sm leading-6 text-grayscale-11 mt-1">
             Spin up workers in the cloud, invite supervisors, and steer the work
             together — all from one place.
           </p>
           <div className="mt-4 flex flex-row flex-wrap items-center gap-2">
-            <Button className="text-xs" href="https://app.factoryplane.com/factories" variant="primary">
+            <Button
+              className="text-xs"
+              href="https://app.factoryplane.com/factories"
+              variant="primary"
+            >
               <RocketLaunchIcon size={16} weight="bold" />
               Get Started
             </Button>
