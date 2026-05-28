@@ -9,6 +9,9 @@ This repo has two apps:
 - `app` — the FactoryPlane product app, API routes, Instant schema, and Trigger.dev jobs.
 - `website` — the public website, mirroring the existing homepage experience.
 
+Root scripts are orchestrated with Turborepo, so package builds and typechecks
+can be cached while app-specific scripts still live in each workspace.
+
 ## Getting Started
 
 ```bash
