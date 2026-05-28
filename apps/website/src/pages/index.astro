@@ -1,0 +1,125 @@
+---
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="FactoryPlane is an open-source collaborative software factory for cloud coding agents."
+    />
+    <link rel="icon" type="image/png" href="/icons/factoryplane-icon.png" />
+    <title>FactoryPlane</title>
+  </head>
+  <body>
+    <header class="site-header" aria-label="Primary navigation">
+      <a class="brand" href="/" aria-label="FactoryPlane home">
+        <img src="/icons/factoryplane-icon.png" alt="" />
+        <span>FactoryPlane</span>
+      </a>
+      <nav>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#plans">Plans</a>
+        <a href="https://github.com/dqnamo/factoryplane">GitHub</a>
+      </nav>
+      <a class="header-action" href="https://app.factoryplane.com">Open app</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <img
+          class="hero-image"
+          src="/factoryplane-hero.png"
+          alt="FactoryPlane dashboard preview on a workstation"
+        />
+        <div class="hero-shade" aria-hidden="true"></div>
+        <div class="hero-content">
+          <div class="hero-lockup">
+            <img src="/icons/factoryplane-icon.png" alt="" />
+            <span>FactoryPlane</span>
+          </div>
+          <h1>Collaborative software factories for cloud coding agents.</h1>
+          <p>
+            Spin up workers, invite supervisors, connect tools, and steer agent
+            work from one shared operational surface.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="https://app.factoryplane.com">Get started</a>
+            <a class="button secondary" href="https://github.com/dqnamo/factoryplane">View source</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="capabilities" aria-labelledby="capabilities-heading">
+        <div class="section-heading">
+          <p>Platform</p>
+          <h2 id="capabilities-heading">Everything needed to run agent work in one place.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <h3>Cloud workers</h3>
+            <p>
+              Spawn a dedicated worker for every task, follow-up, and
+              long-running run.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Shared supervision</h3>
+            <p>
+              Invite product, engineering, and ops teammates into the same
+              factory.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Tool integrations</h3>
+            <p>
+              Connect MCP servers, secrets, GitHub credentials, and reusable
+              skills.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section plans-section" id="plans" aria-labelledby="plans-heading">
+        <div class="section-heading">
+          <p>Plans</p>
+          <h2 id="plans-heading">Self-host or start with the hosted app.</h2>
+        </div>
+        <div class="plans">
+          <article class="plan">
+            <p class="plan-eyebrow">Open source</p>
+            <h3>Free</h3>
+            <p class="plan-description">
+              Run FactoryPlane on your own infrastructure.
+            </p>
+            <a href="https://github.com/dqnamo/factoryplane">View GitHub</a>
+          </article>
+          <article class="plan">
+            <p class="plan-eyebrow">Hosted</p>
+            <h3>Basic</h3>
+            <p class="plan-description">
+              Start with hosted factories, supervisors, and cloud workers.
+            </p>
+            <a href="https://app.factoryplane.com">Launch app</a>
+          </article>
+          <article class="plan">
+            <p class="plan-eyebrow">Teams</p>
+            <h3>Pro</h3>
+            <p class="plan-description">
+              Add unlimited supervisors and higher-scale collaboration.
+            </p>
+            <a href="https://app.factoryplane.com">Start trial</a>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>FactoryPlane</span>
+      <a href="https://app.factoryplane.com">app.factoryplane.com</a>
+    </footer>
+  </body>
+</html>
