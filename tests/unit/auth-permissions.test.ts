@@ -28,8 +28,8 @@ test("factory access allows owners and active supervisors only", () => {
 
 test("permissions keep sensitive server-owned records private", () => {
   assert.match(permissionsSource, /valueEncrypted:\s+"false"/);
-  assert.match(permissionsSource, /authEncrypted:\s+"false"/);
   assert.match(permissionsSource, /tokenEncrypted:\s+"false"/);
+  assert.match(permissionsSource, /authEncrypted:\s+"false"/);
   assert.match(
     permissionsSource,
     /factoryStripeBillings:[\s\S]*?view:\s+"false"/,
@@ -46,6 +46,11 @@ test("permissions keep sensitive server-owned records private", () => {
     permissionsSource,
     /factoryMcpWorkerTokens:[\s\S]*?view:\s+"false"/,
   );
+});
+
+test("agent permissions allow factory members to delete agents without client creation", () => {
+  assert.match(permissionsSource, /agents:[\s\S]*?create:\s+"false"/);
+  assert.match(permissionsSource, /agents:[\s\S]*?delete:\s+"isFactoryMember"/);
 });
 
 test("permissions prevent direct creation of server-owned integrations", () => {

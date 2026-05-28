@@ -95,7 +95,7 @@ const rules = {
       view: "isFactoryMember",
       create: "false",
       update: "isFactoryMember && onlyUpdatesAgentSettings",
-      delete: "false",
+      delete: "isFactoryMember",
     },
     fields: {
       authEncrypted: "false",

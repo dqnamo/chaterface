@@ -189,6 +189,8 @@ function FactorySettingsPageContent({
   const [billingError, setBillingError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
   const lastSavedNameRef = useRef("");
   const factoryNameId = useId();
 
@@ -304,6 +306,32 @@ function FactorySettingsPageContent({
           : "Factory could not be deleted.",
       );
       setIsDeleting(false);
+    }
+  }
+
+  async function deleteAgent(agent: AgentRecord) {
+    const confirmed = window.confirm(
+      `Delete ${formatAgentType(agent.type)} "${agent.id}"? This permanently removes the agent from this factory.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingAgentId(agent.id);
+    setAgentError(null);
+
+    try {
+      await instantDb.transact(instantDb.tx.agents[agent.id].delete());
+    } catch (deleteAgentError) {
+      console.error(deleteAgentError);
+      setAgentError(
+        deleteAgentError instanceof Error
+          ? deleteAgentError.message
+          : "Agent could not be deleted.",
+      );
+    } finally {
+      setDeletingAgentId(null);
     }
   }
 
@@ -478,9 +506,12 @@ function FactorySettingsPageContent({
         <FactoryAgentsPanel
           agents={agents}
           canManageAgents={canManageAgents}
+          deletingAgentId={deletingAgentId}
+          error={agentError}
           factoryId={factoryId}
           instantDb={instantDb}
           isLoading={isLoading}
+          onDeleteAgent={deleteAgent}
         />
       ) : null}
 
@@ -593,15 +624,21 @@ function FactorySettingsPageContent({
 function FactoryAgentsPanel({
   agents,
   canManageAgents,
+  deletingAgentId,
+  error,
   factoryId,
   instantDb,
   isLoading,
+  onDeleteAgent,
 }: {
   agents: AgentRecord[];
   canManageAgents: boolean;
+  deletingAgentId: string | null;
+  error: string | null;
   factoryId: string;
   instantDb: AppDb;
   isLoading: boolean;
+  onDeleteAgent: (agent: AgentRecord) => void;
 }) {
   return (
     <FactorySectionCard>
@@ -614,6 +651,11 @@ function FactoryAgentsPanel({
           </p>
         )}
 
+        {error ? (
+          <p className="text-red-11 text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
         {isLoading ? (
           <p className="text-grayscale-10 text-sm">Loading agents...</p>
         ) : agents.length > 0 ? (
@@ -663,6 +705,18 @@ function FactoryAgentsPanel({
                         ? "Unauthenticated"
                         : "Connected"}
                     </span>
+                    {canManageAgents ? (
+                      <button
+                        aria-label={`Delete ${getAgentDisplayName(agent)} agent`}
+                        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-grayscale-4 text-grayscale-10 transition-colors hover:border-red-7 hover:bg-red-2 hover:text-red-11 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={deletingAgentId === agent.id}
+                        onClick={() => onDeleteAgent(agent)}
+                        title="Delete agent"
+                        type="button"
+                      >
+                        <TrashIcon aria-hidden="true" size={14} weight="bold" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
                 <AgentIdentityOptions
