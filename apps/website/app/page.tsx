@@ -84,7 +84,7 @@ export default function Home() {
             together — all from one place.
           </p>
           <div className="mt-4 flex flex-row flex-wrap items-center gap-2">
-            <Button className="text-xs" href="/login" variant="primary">
+            <Button className="text-xs" href="https://app.factoryplane.com/factories" variant="primary">
               <RocketLaunchIcon size={16} weight="bold" />
               Get Started
             </Button>
