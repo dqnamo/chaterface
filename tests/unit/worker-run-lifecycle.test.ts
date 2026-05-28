@@ -6,7 +6,7 @@ import {
   getNextQueuedEvent,
   isMissingSandboxError,
   shouldFinalizeWorker,
-} from "../../lib/worker-run-lifecycle.ts";
+} from "../../app/lib/worker-run-lifecycle.ts";
 
 test("worker finalization ignores stale and retired workers", () => {
   assert.equal(

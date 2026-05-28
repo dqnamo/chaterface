@@ -53,12 +53,12 @@ jobs:
       - name: Run unit and integration tests
         run: pnpm test:unit
 
-      - name: Build Next.js application
+      - name: Build Next.js applications
         run: pnpm build
 
       - name: Smoke test production server
         run: |
-          pnpm start --hostname 127.0.0.1 --port 3000 > /tmp/factoryplane-next.log 2>&1 &
+          pnpm start:app > /tmp/factoryplane-next.log 2>&1 &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 
@@ -74,9 +74,11 @@ jobs:
 
       - name: Push Instant schema
         run: pnpm dlx instant-cli@latest --token "$INSTANT_APP_ADMIN_TOKEN" push schema --app "$INSTANT_APP_ID" --yes
+        working-directory: app
 
       - name: Push Instant permissions
         run: pnpm dlx instant-cli@latest --token "$INSTANT_APP_ADMIN_TOKEN" push perms --app "$INSTANT_APP_ID" --yes
+        working-directory: app
 
       - name: Configure Trigger project
         run: |
@@ -88,7 +90,7 @@ jobs:
             throw new Error("Missing TRIGGER_PROJECT_REF");
           }
 
-          const configPath = "trigger.config.ts";
+          const configPath = "app/trigger.config.ts";
           const source = fs.readFileSync(configPath, "utf8");
           fs.writeFileSync(
             configPath,
@@ -101,6 +103,7 @@ jobs:
 
       - name: Deploy Trigger.dev
         run: pnpm dlx trigger.dev@latest deploy --env prod --skip-update-check
+        working-directory: app
 
   e2e:
     name: Playwright production flows

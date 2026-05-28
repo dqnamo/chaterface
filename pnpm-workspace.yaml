@@ -1,3 +1,7 @@
+packages:
+  - app
+  - website
+
 allowBuilds:
   core-js: false
   protobufjs: false

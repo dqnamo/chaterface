@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   getEventFeedItems,
   getEventSender,
-} from "../../components/events/event-utils.ts";
+} from "../../app/components/events/event-utils.ts";
 
 test("event feed items skip queued user messages", () => {
   const items = getEventFeedItems([

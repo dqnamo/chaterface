@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   shouldProcessSupervisorInvite,
   shouldTriggerWorkerRunForEvent,
-} from "../../lib/instant-webhook-events.ts";
+} from "../../app/lib/instant-webhook-events.ts";
 
 test("worker run webhooks only react to factory user messages", () => {
   assert.equal(

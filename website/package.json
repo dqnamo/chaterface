@@ -1,0 +1,33 @@
+{
+  "name": "@factoryplane/website",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3001",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 3001",
+    "typecheck": "tsc --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.4.1",
+    "@phosphor-icons/react": "^2.1.10",
+    "@radix-ui/colors": "^3.0.0",
+    "clsx": "^2.1.1",
+    "next": "16.2.6",
+    "next-themes": "^0.4.6",
+    "posthog-js": "^1.373.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "streamdown": "^2.5.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
