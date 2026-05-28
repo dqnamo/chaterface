@@ -4,7 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 const sandboxAuthSource = readFileSync(
-  join(process.cwd(), "lib/codex/sandbox-auth.ts"),
+  join(process.cwd(), "app/lib/codex/sandbox-auth.ts"),
   "utf8",
 );
 

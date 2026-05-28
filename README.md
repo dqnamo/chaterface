@@ -1,19 +1,35 @@
-# Factory
+# FactoryPlane
 
 A Next.js starter using Chord UI, InstantDB, and Trigger.dev.
+
+## Monorepo
+
+This repo has two apps:
+
+- `app` — the FactoryPlane product app, API routes, Instant schema, and Trigger.dev jobs.
+- `website` — the public website, mirroring the existing homepage experience.
 
 ## Getting Started
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open the app at [http://localhost:3000](http://localhost:3000) and the
+website at [http://localhost:3001](http://localhost:3001).
+
+You can also run them separately:
+
+```bash
+pnpm dev:app
+pnpm dev:website
+```
 
 ## Environment
 
-Copy the variables from `.env.example` into `.env.local` and fill them in:
+Copy the variables from `.env.example` into `.env.local` at the repo root and
+fill them in:
 
 - `NEXT_PUBLIC_INSTANT_APP_ID` from InstantDB
 - `UPSTASH_BOX_API_KEY` from Upstash Box
@@ -31,11 +47,11 @@ resume when the app reconnects or creates a public URL.
 
 ## Trigger.dev
 
-Jobs live in `/jobs`, configured by `trigger.config.ts`.
+Jobs live in `/app/jobs`, configured by `/app/trigger.config.ts`.
 
 ```bash
-npm run trigger:dev
-npm run trigger:deploy
+pnpm trigger:dev
+pnpm trigger:deploy
 ```
 
 ## Tests
@@ -65,14 +81,15 @@ Configure these repository secrets:
 - `NEXT_PUBLIC_INSTANT_APP_ID`, optional when it matches `INSTANT_APP_ID`
 - `INSTANT_APP_ADMIN_TOKEN`
 - `APP_PUBLIC_URL`, or set it as a repository variable
-- `TRIGGER_PROJECT_REF`, the Trigger.dev project ref used by `trigger.config.ts`
+- `TRIGGER_PROJECT_REF`, the Trigger.dev project ref used by
+  `app/trigger.config.ts`
 - `TRIGGER_ACCESS_TOKEN`, a Trigger.dev personal access token from
   https://cloud.trigger.dev/account/tokens
 
 ## InstantDB
 
-The starter schema and permissions live in `instant.schema.ts` and
-`instant.perms.ts`.
+The starter schema and permissions live in `app/instant.schema.ts` and
+`app/instant.perms.ts`.
 
 Configure an Instant webhook for the `events` namespace and `create` action:
 

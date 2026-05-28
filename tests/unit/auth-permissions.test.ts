@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { canAccessFactory } from "../../lib/auth-access.ts";
+import { canAccessFactory } from "../../app/lib/auth-access.ts";
 
 const permissionsSource = readFileSync(
-  join(process.cwd(), "instant.perms.ts"),
+  join(process.cwd(), "app/instant.perms.ts"),
   "utf8",
 );
 

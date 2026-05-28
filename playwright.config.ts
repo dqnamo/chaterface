@@ -29,7 +29,7 @@ export default defineConfig({
   },
   webServer: shouldStartLocalServer
     ? {
-        command: "pnpm dev --hostname 127.0.0.1 --port 3000",
+        command: "pnpm dev:app",
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
         url: baseURL,
