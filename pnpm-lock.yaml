@@ -24,7 +24,7 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  app:
+  apps/app:
     dependencies:
       '@base-ui/react':
         specifier: ^1.4.1
@@ -124,7 +124,7 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  website:
+  apps/website:
     dependencies:
       '@base-ui/react':
         specifier: ^1.4.1

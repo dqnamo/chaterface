@@ -16,9 +16,9 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./app/*"]
+      "@/*": ["./apps/app/*"]
     }
   },
   "include": ["tests/**/*.ts"],
-  "exclude": ["node_modules", "app/.next", "website/.next"]
+  "exclude": ["node_modules", "apps/app/.next", "apps/website/.next"]
 }

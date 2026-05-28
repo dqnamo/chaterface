@@ -4,11 +4,11 @@ import {
   getEffectiveBillingPlan,
   getFactorySeatCount,
   isPaidStripeStatus,
-} from "../../app/lib/billing.ts";
+} from "../../apps/app/lib/billing.ts";
 import {
   getCheckoutSessionBillingContext,
   isSupportedStripeBillingEvent,
-} from "../../app/lib/stripe-webhook-events.ts";
+} from "../../apps/app/lib/stripe-webhook-events.ts";
 
 test("billing plan treats active trials as pro access", () => {
   const now = new Date("2026-05-24T12:00:00.000Z");

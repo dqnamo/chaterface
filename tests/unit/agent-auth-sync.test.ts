@@ -9,7 +9,7 @@ import {
   type WorkerAgentAuthSyncDeps,
   type WorkerAgentAuthSyncToken,
   type WorkerAgentAuthSyncWorker,
-} from "../../app/lib/codex/agent-auth-sync.ts";
+} from "../../apps/app/lib/codex/agent-auth-sync.ts";
 
 test("auth sync hashing is stable for object key order", () => {
   const first = {
