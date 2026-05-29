@@ -38,7 +38,10 @@ import { cn } from "@/helpers/classname-helper";
 import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { UserAvatarColorValue } from "@/helpers/user-avatar-colors";
 import { getUserDisplayName } from "@/helpers/user-identity";
-import { getWorkerFallbackName } from "@/helpers/worker-activity";
+import {
+  getWorkerActivityMessage,
+  getWorkerFallbackName,
+} from "@/helpers/worker-activity";
 import { getWorkerStatusTone } from "@/helpers/worker-status";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
@@ -787,13 +790,11 @@ function WorkerSidebarLink({
   const href = `/factory/${factoryId}/workers/${worker.id}`;
   const statusTone = getWorkerStatusTone(worker.status);
   const workerName = getWorkerFallbackName(worker);
-  const activityMessage = worker.activityMessage?.trim();
+  const activityMessage = getWorkerActivityMessage(worker);
   const createdAtLabel = DateTime.fromISO(worker.createdAt ?? "").toRelative();
-  const secondaryLabel = activityMessage
-    ? createdAtLabel
-      ? `${workerName} · ${createdAtLabel}`
-      : workerName
-    : createdAtLabel;
+  const secondaryLabel = createdAtLabel
+    ? `${workerName} · ${createdAtLabel}`
+    : workerName;
 
   return (
     <Link
@@ -806,9 +807,7 @@ function WorkerSidebarLink({
     >
       <span className="flex min-w-0 items-start gap-2">
         <span className="min-w-0 flex-1">
-          <span className="block truncate">
-            {activityMessage || workerName}
-          </span>
+          <span className="block truncate">{activityMessage}</span>
           {secondaryLabel ? (
             <span className="block truncate text-grayscale-10 text-xs">
               {secondaryLabel}
