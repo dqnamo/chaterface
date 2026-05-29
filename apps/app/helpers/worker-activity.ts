@@ -1,5 +1,11 @@
 export const defaultWorkerActivityMessage = "Getting onboarded...";
 
+export function getWorkerActivityMessage(worker: {
+  activityMessage?: null | string;
+}) {
+  return worker.activityMessage?.trim() || defaultWorkerActivityMessage;
+}
+
 export function getWorkerFallbackName(worker: {
   id: string;
   name?: null | string;
