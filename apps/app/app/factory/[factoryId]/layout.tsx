@@ -19,7 +19,7 @@ import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import FactoryComputerSidebar from "@/components/factory/FactoryComputerSidebar";
 import FactoryMonogram from "@/components/factory/FactoryMonogram";
 import FactorySettingsSidebar from "@/components/factory/FactorySettingsSidebar";
@@ -720,7 +720,9 @@ function WorkerSidebar({
             workers={activeWorkers}
           />
           <WorkerSidebarSection
+            collapsible
             currentPathname={currentPathname}
+            defaultCollapsed
             factoryId={factoryId}
             onNavigate={onNavigate}
             supervisorsByWorkerId={supervisorsByWorkerId}
@@ -734,31 +736,78 @@ function WorkerSidebar({
 }
 
 function WorkerSidebarSection({
+  collapsible = false,
   currentPathname,
+  defaultCollapsed = false,
   factoryId,
   onNavigate,
   supervisorsByWorkerId,
   title,
   workers,
 }: {
+  collapsible?: boolean;
   currentPathname: string;
+  defaultCollapsed?: boolean;
   factoryId: string;
   onNavigate?: () => void;
   supervisorsByWorkerId: Record<string, FactorySupervisorPresence[]>;
   title: string;
   workers: WorkerRecord[];
 }) {
+  const currentWorkerId = workers.find(
+    (worker) =>
+      currentPathname === `/factory/${factoryId}/workers/${worker.id}`,
+  )?.id;
+  const sectionId = useId();
+  const workerListId = `${sectionId}-worker-list`;
+  const [isCollapsed, setIsCollapsed] = useState(
+    collapsible && defaultCollapsed && !currentWorkerId,
+  );
+
+  useEffect(() => {
+    if (currentWorkerId) {
+      setIsCollapsed(false);
+    }
+  }, [currentWorkerId]);
+
   if (workers.length === 0) {
     return null;
   }
 
   return (
     <section className="min-w-0">
-      <h2 className="flex flex-row items-center justify-between px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
-        <span>{title}</span>
-        <NumberFlow className="ml-2 tabular-nums" value={workers.length} />
-      </h2>
-      <div className="flex flex-col gap-px">
+      {collapsible ? (
+        <h2>
+          <button
+            aria-controls={workerListId}
+            aria-expanded={!isCollapsed}
+            className="flex w-full flex-row items-center justify-between rounded-md px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
+            onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+            type="button"
+          >
+            <span className="flex min-w-0 items-center gap-1">
+              <CaretDownIcon
+                className={cn(
+                  "size-3 shrink-0 transition-transform",
+                  isCollapsed && "-rotate-90",
+                )}
+                weight="bold"
+              />
+              <span className="truncate">{title}</span>
+            </span>
+            <NumberFlow className="ml-2 tabular-nums" value={workers.length} />
+          </button>
+        </h2>
+      ) : (
+        <h2 className="flex flex-row items-center justify-between px-2 pb-1 font-mono font-semibold text-grayscale-10 text-xs uppercase">
+          <span>{title}</span>
+          <NumberFlow className="ml-2 tabular-nums" value={workers.length} />
+        </h2>
+      )}
+      <div
+        className={cn("flex flex-col gap-px", isCollapsed && "hidden")}
+        id={workerListId}
+      >
         {workers.map((worker) => (
           <WorkerSidebarLink
             currentPathname={currentPathname}
