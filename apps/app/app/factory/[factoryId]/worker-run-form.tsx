@@ -39,6 +39,7 @@ import { queueWorkerMessage, triggerWorkerRun } from "./worker-message-client";
 
 export type WorkerRecord = {
   activePid?: number;
+  activityMessage?: string;
   agent?: WorkerAgentRecord;
   codexSessionId?: string;
   codexModel?: string;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getCodexAgentMessageText,
   getEventFeedItems,
   getEventSender,
 } from "../../apps/app/components/events/event-utils.ts";
@@ -43,5 +44,25 @@ test("event sender reads supervisor snapshots", () => {
       id: "user-1",
       name: "ruthie",
     },
+  );
+});
+
+test("Codex event text unwraps worker structured responses", () => {
+  assert.equal(
+    getCodexAgentMessageText({
+      item: {
+        content: [
+          {
+            text: JSON.stringify({
+              newActivityMessage: "Reviewing permissions",
+              response: "I found one issue.",
+            }),
+          },
+        ],
+        role: "assistant",
+        type: "message",
+      },
+    }),
+    "I found one issue.",
   );
 });

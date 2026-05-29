@@ -108,7 +108,7 @@ test("permissions let factory members read and act on capability records", () =>
 test("worker permissions keep server-owned runtime fields out of client writes", () => {
   assert.match(
     permissionsSource,
-    /onlyCreatesClientWorker:[\s\S]*?\['agent', 'codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
+    /onlyCreatesClientWorker:[\s\S]*?\['activityMessage', 'agent', 'codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt'\][\s\S]*?codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported/,
   );
   assert.match(
     permissionsSource,

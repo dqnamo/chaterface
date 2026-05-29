@@ -20,6 +20,7 @@ import {
   normalizeWorkerReasoningLevel,
   normalizeWorkerSpeed,
 } from "@/lib/codex/worker-options";
+import { getWorkerStructuredResponse } from "@/lib/codex/worker-response";
 import { decryptSecretValue, encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 import {
@@ -50,6 +51,7 @@ type RunWorkerPayload = {
 type WorkerRecord = {
   activeCommandId?: string;
   activePid?: number;
+  activityMessage?: string;
   agent?: AgentRecord;
   codexSessionId?: string;
   codexModel?: string;
@@ -863,15 +865,26 @@ async function persistCodexLine(
   }
 
   const sessionId = findCodexSessionId(data);
+  const structuredResponse = getWorkerStructuredResponse(data);
+  const workerUpdates: {
+    activityMessage?: string;
+    codexSessionId?: string;
+    updatedAt: string;
+  } = {
+    updatedAt: new Date().toISOString(),
+  };
 
   if (sessionId) {
+    workerUpdates.codexSessionId = sessionId;
+  }
+
+  if (structuredResponse?.newActivityMessage) {
+    workerUpdates.activityMessage = structuredResponse.newActivityMessage;
+  }
+
+  if (workerUpdates.codexSessionId || workerUpdates.activityMessage) {
     const db = getAdminDb();
-    await db.transact(
-      db.tx.workers[workerId].update({
-        codexSessionId: sessionId,
-        updatedAt: new Date().toISOString(),
-      }),
-    );
+    await db.transact(db.tx.workers[workerId].update(workerUpdates));
   }
 
   return false;

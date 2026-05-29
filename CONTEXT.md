@@ -20,6 +20,10 @@ _Avoid_: bot, assistant
 An execution thread that belongs to a Factory and owns one persistent sandbox.
 _Avoid_: run, job
 
+**Worker Activity Message**:
+A short description of the work a supervisor should associate with a Worker. It may describe the current or most recent work focus; Worker Status determines whether the Worker is actively running.
+_Avoid_: worker name, title, status message
+
 **Worker Status**:
 The execution readiness state of a Worker.
 _Avoid_: job status
@@ -62,7 +66,8 @@ _Avoid_: worker, run
 - A **Factory** has zero or more **Agents**.
 - A **Factory** has zero or more **Workers**.
 - A **Worker** owns exactly one persistent sandbox.
-- A **Worker Status** is one of `queued`, `running`, `idle`, or `failed`.
+- A **Worker** has zero or one **Worker Activity Message**.
+- A **Worker Status** is one of `queued`, `running`, `idle`, `failed`, or `retired`.
 - A **Worker** has zero or one **Codex Session** until the first Codex exec run reports its session id.
 - A **Worker** has zero or one **Active Codex Process** while Codex exec is running.
 - A **Worker** has zero or one **Active Command** to prevent interrupted Codex exec tasks from overwriting a newer prompt.

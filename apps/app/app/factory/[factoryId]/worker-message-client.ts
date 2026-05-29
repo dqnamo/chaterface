@@ -4,6 +4,7 @@ import { faker } from "@faker-js/faker";
 import { id } from "@instantdb/react";
 import type { ImageAttachment } from "@/components/factory/WorkerComposer";
 import { createSupervisorMessageSender } from "@/helpers/user-identity";
+import { defaultWorkerActivityMessage } from "@/helpers/worker-activity";
 import {
   normalizeWorkerModel,
   normalizeWorkerReasoningLevel,
@@ -118,6 +119,7 @@ export async function triggerWorkerRun({
         updatedAt: now,
         ...(isNewWorker
           ? {
+              activityMessage: defaultWorkerActivityMessage,
               createdAt: now,
               name: faker.person.firstName(),
             }
