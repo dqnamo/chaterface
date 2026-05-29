@@ -9,8 +9,12 @@ A top-level user-owned environment for software workflow execution.
 _Avoid_: workspace, tenant, project
 
 **Default Snapshot**:
-The baseline Box snapshot attached to a Factory and used as the starting filesystem state for later work.
+The minimal Box snapshot attached to a Factory and used to create or recreate Worker sandboxes.
 _Avoid_: auth snapshot, template, image
+
+**Worker Provisioning**:
+The idempotent setup pass that applies Factory configuration to a Worker sandbox before Codex runs.
+_Avoid_: baseline update, worker snapshot
 
 **Agent**:
 A configured automation identity available to a Factory.
@@ -80,11 +84,13 @@ _Avoid_: worker, run
 - Instant webhooks observe new **User Message Events** and trigger the **Worker Trigger Task**; the client does not make a second server request to start execution.
 - A **Worker Trigger Task** is infrastructure for executing a Worker; it is not the Worker itself.
 - A **Factory** has zero or one **Default Snapshot**.
+- **Worker Provisioning** applies Agents, GitHub settings, and Skills before execution; Secrets, Worker API credentials, and MCP credentials are injected for the individual run.
+- A **Default Snapshot** is an implementation seed, not a user-curated Worker filesystem.
 
 ## Example dialogue
 
 > **Dev:** "When a user creates a **Factory**, do we create a **Worker** immediately?"
-> **Domain expert:** "No. Creation prepares the **Default Snapshot**; **Workers** are created later when execution starts."
+> **Domain expert:** "No. Creation prepares the minimal **Default Snapshot**; **Workers** are created later and receive **Worker Provisioning** before execution."
 
 ## Flagged ambiguities
 

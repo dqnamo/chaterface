@@ -86,7 +86,7 @@ function CapabilitiesPanelContent({
             Capabilities
           </h2>
           <p className="mt-1 text-sm text-grayscale-11">
-            Skills and MCP servers are applied to new workers.
+            Skills and MCP servers are applied before workers run.
           </p>
         </div>
       ) : null}

@@ -17,7 +17,7 @@ const sectionCopy = {
     title: "Integrations",
   },
   skills: {
-    description: "Install skills that new workers should receive by default.",
+    description: "Install skills that workers should receive before they run.",
     loading: "Loading skills...",
     title: "Skills",
   },

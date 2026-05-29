@@ -23,7 +23,6 @@ type RouteContext = {
 
 type CapabilityFactoryRecord = FactoryAccessRecord & {
   capabilitySandboxId?: string;
-  defaultSandboxCheckpointId?: string;
   id: string;
 };
 

@@ -549,7 +549,7 @@ function McpConnectionList({
             No MCP servers connected yet.
           </p>
           <p className="mt-1 text-grayscale-10 text-xs">
-            New workers currently start without external MCP tools.
+            Workers currently run without external MCP tools.
           </p>
         </div>
       </EmptyState>

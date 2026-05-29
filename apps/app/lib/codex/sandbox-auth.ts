@@ -27,8 +27,6 @@ export const sandboxFactoryDir = `${sandboxWorkspace}/.factoryplane`;
 const factoryDir = sandboxFactoryDir;
 const codexNpmPrefix = `${factoryDir}/npm-global`;
 const codexBinDir = `${codexNpmPrefix}/bin`;
-const codexAuthArchivePath = `${factoryDir}/codex-auth.tgz`;
-const codexHomeArchivePath = `${factoryDir}/codex-home.tgz`;
 const factoryWorkerInstructions = `You are running inside a Software Factory worker sandbox.
 
 You have access to the repository workspace at /workspace/home.
@@ -128,9 +126,10 @@ export async function ensureLatestCodexOnSandbox(sandbox: AppSandbox) {
   const result = await runSandboxCommand(
     sandbox,
     [
+      `stamp=${shellQuote(`${factoryDir}/codex-install-checked-at`)}`,
+      `now="$(date +%s)"`,
       `mkdir -p ${shellQuote(codexBinDir)}`,
-      `npm install -g --prefix ${shellQuote(codexNpmPrefix)} --cache ${shellQuote(`${factoryDir}/npm-cache`)} --registry=https://registry.npmjs.org/ @openai/codex@latest`,
-      `${createCodexPathExport()} command -v codex && codex --version`,
+      `if command -v ${shellQuote(`${codexBinDir}/codex`)} >/dev/null 2>&1 && test -s "$stamp" && test "$((now - $(cat "$stamp" 2>/dev/null || echo 0)))" -lt 21600; then ${shellQuote(`${codexBinDir}/codex`)} --version; else npm install -g --prefix ${shellQuote(codexNpmPrefix)} --cache ${shellQuote(`${factoryDir}/npm-cache`)} --registry=https://registry.npmjs.org/ @openai/codex@latest && printf %s "$now" > "$stamp" && ${shellQuote(`${codexBinDir}/codex`)} --version; fi`,
     ].join(" && "),
     120_000,
   );
@@ -144,60 +143,6 @@ export async function ensureLatestCodexOnSandbox(sandbox: AppSandbox) {
   }
 
   return cleanCommandOutput(result.output);
-}
-
-export async function ensureCodexCli(sandbox: AppSandbox) {
-  await ensureLatestCodexOnSandbox(sandbox);
-}
-
-export async function snapshotCodexHome(
-  sandbox: AppSandbox,
-  factoryId: string,
-) {
-  const archiveResult = await runSandboxCommand(
-    sandbox,
-    [
-      `mkdir -p ${shellQuote(factoryDir)}`,
-      `paths=""`,
-      `if test -d "$HOME/.codex"; then paths="$paths .codex"; fi`,
-      `if test -d "$HOME/.agents"; then paths="$paths .agents"; fi`,
-      `if test -z "$paths"; then echo "Missing Codex home files"; exit 1; fi`,
-      `tar -C "$HOME" -czf ${shellQuote(codexHomeArchivePath)} $paths`,
-    ].join(" && "),
-    30_000,
-  );
-
-  if (!archiveResult.success) {
-    throw new Error(
-      `Could not archive Codex home: ${
-        cleanCommandOutput(archiveResult.output) || "No output"
-      }`,
-    );
-  }
-
-  return createCheckpoint(
-    sandbox,
-    `factory-${factoryId.slice(0, 8)}-codex-home`,
-  );
-}
-
-export async function restoreCodexHome(sandbox: AppSandbox) {
-  const result = await runSandboxCommand(
-    sandbox,
-    [
-      `if test -f ${shellQuote(codexHomeArchivePath)}; then tar -C "$HOME" -xzf ${shellQuote(codexHomeArchivePath)}; elif test -f ${shellQuote(codexAuthArchivePath)}; then tar -C "$HOME" -xzf ${shellQuote(codexAuthArchivePath)}; elif test -d "$HOME/.codex"; then true; else echo "Missing Codex home archive"; exit 1; fi`,
-      `test -d "$HOME/.codex"`,
-    ].join(" && "),
-    30_000,
-  );
-
-  if (!result.success) {
-    throw new Error(
-      `Codex home restore failed: ${
-        cleanCommandOutput(result.output) || "No output"
-      }`,
-    );
-  }
 }
 
 export async function streamCodexExec({

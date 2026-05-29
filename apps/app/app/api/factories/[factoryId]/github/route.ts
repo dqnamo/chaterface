@@ -4,14 +4,6 @@ import {
   getCurrentUserForApiRequest,
   unauthorizedResponse,
 } from "@/lib/auth";
-import {
-  getFactoryCapabilitySandbox,
-  snapshotFactoryCapabilities,
-} from "@/lib/codex/factory-capabilities";
-import {
-  applyGithubSetup,
-  type GithubRepositorySetup,
-} from "@/lib/codex/github-setup";
 import { decryptSecretValue, encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
 import { parseGithubSettingsInput } from "@/lib/factory/github-settings";
@@ -30,8 +22,6 @@ type GithubSettingsRecord = {
 };
 
 type FactoryWithGithubSettings = FactoryAccessRecord & {
-  capabilitySandboxId?: string;
-  defaultSandboxCheckpointId?: string;
   githubSettings?: GithubSettingsRecord;
   id: string;
 };
@@ -77,19 +67,6 @@ export async function POST(request: Request, context: RouteContext) {
     decryptSecretValue<string>(factory.githubSettings?.tokenEncrypted);
 
   try {
-    const sandbox = await getFactoryCapabilitySandbox({
-      factory,
-      factoryId,
-    });
-
-    await applyGithubSetup(sandbox, {
-      gitEmail: parsed.gitEmail,
-      gitName: parsed.gitName,
-      repositories: parsed.repositories as GithubRepositorySetup[],
-      token,
-    });
-    await snapshotFactoryCapabilities({ factoryId, sandbox });
-
     await db.transact([
       db.tx.factoryGithubSettings[factoryId].update({
         appliedAt: now,

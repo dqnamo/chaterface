@@ -6,12 +6,7 @@ import {
   getCurrentUserForApiRequest,
   unauthorizedResponse,
 } from "@/lib/auth";
-import {
-  getFactoryCapabilitySandbox,
-  installSkills,
-  type SkillCandidate,
-  snapshotFactoryCapabilities,
-} from "@/lib/codex/factory-capabilities";
+import type { SkillCandidate } from "@/lib/codex/factory-capabilities";
 
 export const runtime = "nodejs";
 
@@ -27,8 +22,6 @@ type RouteContext = {
 };
 
 type CapabilityFactoryRecord = FactoryAccessRecord & {
-  capabilitySandboxId?: string;
-  defaultSandboxCheckpointId?: string;
   id: string;
 };
 
@@ -73,21 +66,6 @@ export async function POST(request: Request, context: RouteContext) {
       return Response.json({ error: "Factory not found" }, { status: 404 });
     }
     canRecordFailure = true;
-
-    const sandbox = await getFactoryCapabilitySandbox({
-      factory,
-      factoryId,
-    });
-
-    await installSkills({
-      repoUrl,
-      sandbox,
-      skillPaths: skills.map((skill) => skill.path),
-    });
-    await snapshotFactoryCapabilities({
-      factoryId,
-      sandbox,
-    });
 
     const installedAt = new Date().toISOString();
     const skillIds = skills.map(() => id());

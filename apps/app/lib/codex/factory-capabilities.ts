@@ -1,23 +1,16 @@
 import "server-only";
 
 import { getAdminDbCore } from "@/lib/admin-db-core";
-import {
-  cleanCommandOutput,
-  ensureCodexCli,
-  restoreCodexHome,
-  shellQuote,
-  snapshotCodexHome,
-} from "@/lib/codex/sandbox-auth";
+import { cleanCommandOutput, shellQuote } from "@/lib/codex/sandbox-auth";
 import {
   type AppSandbox,
   connectSandbox,
-  createWorkerSandbox,
+  createFactorySandbox,
   runSandboxCommand,
 } from "@/lib/sandbox/service";
 
 type FactorySecretRecord = {
   capabilitySandboxId?: string;
-  defaultSandboxCheckpointId?: string;
   id: string;
 };
 
@@ -35,25 +28,10 @@ export async function getFactoryCapabilitySandbox({
   factoryId: string;
 }) {
   if (factory.capabilitySandboxId) {
-    const sandbox = await connectSandbox(factory.capabilitySandboxId);
-    await ensureCodexCli(sandbox);
-    return sandbox;
+    return connectSandbox(factory.capabilitySandboxId);
   }
 
-  const checkpointId = factory.defaultSandboxCheckpointId;
-
-  if (!checkpointId) {
-    throw new Error("Connect Codex before configuring capabilities.");
-  }
-
-  const sandbox = await createWorkerSandbox({
-    checkpointId,
-    factoryId,
-    workerId: `capabilities-${Date.now()}`,
-  });
-
-  await restoreCodexHome(sandbox);
-  await ensureCodexCli(sandbox);
+  const sandbox = await createFactorySandbox(factoryId);
 
   const db = getAdminDbCore();
   await db.transact(
@@ -61,26 +39,6 @@ export async function getFactoryCapabilitySandbox({
   );
 
   return sandbox;
-}
-
-export async function snapshotFactoryCapabilities({
-  sandbox,
-  factoryId,
-}: {
-  sandbox: AppSandbox;
-  factoryId: string;
-}) {
-  const checkpoint = await snapshotCodexHome(sandbox, factoryId);
-  const db = getAdminDbCore();
-
-  await db.transact(
-    db.tx.factories[factoryId].update({
-      capabilitySandboxId: sandbox.id,
-      defaultSandboxCheckpointId: checkpoint.id,
-    }),
-  );
-
-  return checkpoint;
 }
 
 export async function listSkillCandidates(
