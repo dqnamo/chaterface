@@ -2,7 +2,7 @@ import { id } from "@instantdb/admin";
 import { logger, metadata, task, tasks } from "@trigger.dev/sdk";
 import { getAppPublicUrl, getFactoryMcpGatewayUrl } from "@/lib/app-url";
 import { createAuthSyncHash } from "@/lib/codex/agent-auth-sync";
-import { applyGitIdentity, type GithubSetup } from "@/lib/codex/github-setup";
+import { applyGitIdentity } from "@/lib/codex/github-setup";
 import {
   cleanCommandOutput,
   ensureLatestCodexOnSandbox,
@@ -20,6 +20,10 @@ import {
   normalizeWorkerReasoningLevel,
   normalizeWorkerSpeed,
 } from "@/lib/codex/worker-options";
+import {
+  provisionWorkerSandbox,
+  type WorkerProvisioningFactory,
+} from "@/lib/codex/worker-provisioning";
 import { getWorkerStructuredResponse } from "@/lib/codex/worker-response";
 import { decryptSecretValue, encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
@@ -53,13 +57,14 @@ type WorkerRecord = {
   activePid?: number;
   activityMessage?: string;
   agent?: AgentRecord;
+  appliedFactoryConfigAt?: string;
+  appliedFactoryConfigHash?: string;
   codexSessionId?: string;
   codexModel?: string;
   codexReasoningLevel?: string;
   codexSpeed?: string;
-  factory?: {
+  factory?: WorkerProvisioningFactory & {
     defaultSandboxCheckpointId?: string;
-    githubSettings?: Pick<GithubSetup, "gitEmail" | "gitName">;
     id: string;
     secrets?: SecretRecord[];
   };
@@ -273,6 +278,34 @@ export const runWorkerTask = task({
           workerId: worker.id,
         });
       }
+
+      const provisioning = await provisionWorkerSandbox({
+        appliedHash: worker.appliedFactoryConfigHash,
+        factory: worker.factory,
+        force: !resumeCodexSession || sandboxRecreated,
+        sandbox,
+      });
+      if (
+        provisioning.applied ||
+        worker.appliedFactoryConfigHash !== provisioning.hash
+      ) {
+        await db.transact(
+          db.tx.workers[worker.id].update({
+            appliedFactoryConfigAt: new Date().toISOString(),
+            appliedFactoryConfigHash: provisioning.hash,
+            updatedAt: new Date().toISOString(),
+          }),
+        );
+      }
+      logTaskStep("info", "Worker sandbox provisioning complete", {
+        applied: provisioning.applied,
+        gitRepositoryCount: provisioning.summary.gitRepositoryCount,
+        gitTokenConfigured: provisioning.summary.gitTokenConfigured,
+        hash: provisioning.hash,
+        sandboxId,
+        skillCount: provisioning.summary.skillCount,
+        workerId: worker.id,
+      });
 
       const gitIdentity = getWorkerGitIdentity(worker);
 
@@ -571,6 +604,7 @@ async function getWorker(workerId: string) {
       factory: {
         githubSettings: {},
         secrets: {},
+        skills: {},
       },
     },
   });

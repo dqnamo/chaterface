@@ -2,7 +2,6 @@ import { id } from "@instantdb/admin";
 import { getCurrentUserForApiRequest, unauthorizedResponse } from "@/lib/auth";
 import { BASIC_BILLING_PLAN, getTrialEndsAt } from "@/lib/billing";
 import { createAuthSyncHash } from "@/lib/codex/agent-auth-sync";
-import { applyGithubSetup } from "@/lib/codex/github-setup";
 import { createDefaultFactoryCheckpoint } from "@/lib/codex/sandbox-auth";
 import { encryptSecretValue } from "@/lib/crypto.server";
 import { getAdminDb } from "@/lib/db.server";
@@ -72,7 +71,6 @@ export async function POST(request: Request) {
 
   try {
     const sandbox = await createFactorySandbox(factoryId);
-    await applyGithubSetup(sandbox, githubSettings);
     const checkpoint = await createDefaultFactoryCheckpoint({
       factoryId,
       sandbox,

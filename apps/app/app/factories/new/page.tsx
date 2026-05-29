@@ -65,7 +65,7 @@ const STEP_DEFINITIONS: readonly StepDefinition[] = [
   },
   {
     description:
-      "Add the credentials and repositories your agents should clone into the default snapshot.",
+      "Add the credentials and repositories workers should apply before they run.",
     icon: GithubLogoIcon,
     id: "github",
     label: "GitHub",
@@ -273,7 +273,7 @@ function NewFactoryWizard({ instantDb }: { instantDb: AppDb }) {
               New factory
             </h1>
             <p className="text-grayscale-11 text-sm">
-              A factory is a workspace with its own snapshots, agents, and
+              A factory is a workspace with its own workers, agents, and
               supervisors. Three quick steps and you're in.
             </p>
           </div>
@@ -643,7 +643,7 @@ function GithubStep({
         </FieldGroup>
 
         <FieldGroup
-          description="Cloned into the default snapshot. Clone paths can be relative (e.g. code/repo) or under /workspace/home."
+          description="Applied before workers run. Clone paths can be relative (e.g. code/repo) or under /workspace/home."
           title={`Repositories${filledRepositoryCount > 0 ? ` (${filledRepositoryCount})` : ""}`}
           trailing={
             <Button

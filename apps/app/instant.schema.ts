@@ -72,6 +72,8 @@ const _schema = i.schema({
       activeCommandId: i.string().indexed().optional(),
       activePid: i.number().optional(),
       activityMessage: i.string().optional(),
+      appliedFactoryConfigAt: i.string().indexed().optional(),
+      appliedFactoryConfigHash: i.string().optional(),
       codexSessionId: i.string().indexed().optional(),
       codexModel: i.string().indexed().optional(),
       codexReasoningLevel: i.string().indexed().optional(),

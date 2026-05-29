@@ -118,7 +118,7 @@ function FactoryGithubPageContent({
       }
 
       setToken("");
-      setNotice("GitHub setup was applied to new workers.");
+      setNotice("GitHub setup will be applied before workers run.");
     } catch (saveError) {
       console.error(saveError);
       setFormError(
@@ -176,7 +176,7 @@ function FactoryGithubPageContent({
   return (
     <FactorySectionPageShell
       title="GitHub"
-      description="Configure git identity, repository access, and baseline clones for new workers."
+      description="Configure git identity, repository access, and repository setup for workers."
     >
       <FactorySectionCard>
         <form className="flex flex-col gap-5" onSubmit={saveGithubSettings}>

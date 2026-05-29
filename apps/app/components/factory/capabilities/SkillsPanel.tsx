@@ -147,7 +147,7 @@ export function SkillsPanel({
 
       setCandidates([]);
       setSelectedPaths(new Set());
-      setNotice("Selected skills were installed for new workers.");
+      setNotice("Selected skills will be installed before workers run.");
     } catch (installError) {
       console.error(installError);
       setNotice(null);
