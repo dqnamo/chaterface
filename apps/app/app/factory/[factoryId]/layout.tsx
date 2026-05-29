@@ -38,6 +38,7 @@ import { cn } from "@/helpers/classname-helper";
 import type { FactoryColorValue } from "@/helpers/factory-colors";
 import type { UserAvatarColorValue } from "@/helpers/user-avatar-colors";
 import { getUserDisplayName } from "@/helpers/user-identity";
+import { getWorkerFallbackName } from "@/helpers/worker-activity";
 import { getWorkerStatusTone } from "@/helpers/worker-status";
 import type { AppDb } from "@/lib/db.client";
 import { db } from "@/lib/db.client";
@@ -52,6 +53,7 @@ type FactoryRecord = {
 };
 
 type WorkerRecord = {
+  activityMessage?: string;
   createdAt?: string;
   id: string;
   name?: string;
@@ -784,6 +786,14 @@ function WorkerSidebarLink({
 }) {
   const href = `/factory/${factoryId}/workers/${worker.id}`;
   const statusTone = getWorkerStatusTone(worker.status);
+  const workerName = getWorkerFallbackName(worker);
+  const activityMessage = worker.activityMessage?.trim();
+  const createdAtLabel = DateTime.fromISO(worker.createdAt ?? "").toRelative();
+  const secondaryLabel = activityMessage
+    ? createdAtLabel
+      ? `${workerName} · ${createdAtLabel}`
+      : workerName
+    : createdAtLabel;
 
   return (
     <Link
@@ -797,11 +807,13 @@ function WorkerSidebarLink({
       <span className="flex min-w-0 items-start gap-2">
         <span className="min-w-0 flex-1">
           <span className="block truncate">
-            {worker.name ?? `Worker ${worker.id.slice(0, 8)}`}
+            {activityMessage || workerName}
           </span>
-          <span className="block truncate text-grayscale-10 text-xs">
-            {DateTime.fromISO(worker.createdAt ?? "").toRelative()}
-          </span>
+          {secondaryLabel ? (
+            <span className="block truncate text-grayscale-10 text-xs">
+              {secondaryLabel}
+            </span>
+          ) : null}
         </span>
         <WorkerSupervisorPresenceStack supervisors={supervisors} />
         {statusTone.isSpinner ? (

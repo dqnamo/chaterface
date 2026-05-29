@@ -135,7 +135,7 @@ const rules = {
       isFactoryMember:
         "auth.id in data.ref('factory.owner.id') || auth.id in data.ref('factory.supervisors.user.id')",
       onlyCreatesClientWorker:
-        "request.modifiedFields.all(field, field in ['agent', 'codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt']) && data.status == 'queued' && data.retiredAt == null && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
+        "request.modifiedFields.all(field, field in ['activityMessage', 'agent', 'codexModel', 'codexReasoningLevel', 'codexSpeed', 'createdAt', 'factory', 'name', 'retiredAt', 'status', 'updatedAt']) && data.status == 'queued' && data.retiredAt == null && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
       onlyQueuesClientWorker:
         "request.modifiedFields.all(field, field in ['codexModel', 'codexReasoningLevel', 'codexSpeed', 'retiredAt', 'status', 'updatedAt']) && newData.retiredAt == null && newData.status in ['queued', 'running'] && codexModelIsSupported && codexReasoningLevelIsSupported && codexSpeedIsSupported",
       onlyRetiresClientWorker:

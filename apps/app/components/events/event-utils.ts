@@ -88,11 +88,17 @@ export function getMcpConnectionRequest(data: unknown) {
 }
 
 export function getCodexAgentMessageText(data: unknown) {
+  const structuredResponseText = getWorkerStructuredResponseText(data);
+
+  if (structuredResponseText) {
+    return structuredResponseText;
+  }
+
   if (isRecord(data) && isAssistantLikeMessage(data)) {
     const directText = getTextValue(data);
 
     if (directText) {
-      return directText;
+      return getWorkerStructuredResponseText(directText) ?? directText;
     }
   }
 
@@ -102,7 +108,9 @@ export function getCodexAgentMessageText(data: unknown) {
     .filter(Boolean)
     .join("\n\n");
 
-  return messageText || null;
+  return messageText
+    ? (getWorkerStructuredResponseText(messageText) ?? messageText)
+    : null;
 }
 
 export function getDiagnosticMessage(data: unknown) {
@@ -206,6 +214,14 @@ function getMessageItems(data: unknown) {
     return [data.message];
   }
 
+  if (
+    isRecord(data) &&
+    isRecord(data.msg) &&
+    isAssistantLikeMessage(data.msg)
+  ) {
+    return [data.msg];
+  }
+
   if (isRecord(data) && Array.isArray(data.items)) {
     return data.items.filter(
       (item): item is Record<string, unknown> =>
@@ -284,6 +300,24 @@ function isCodexJsonEvent(event: EventRecord) {
   return (
     event.source === "codex" && getCodexAgentMessageText(event.data) === null
   );
+}
+
+function getWorkerStructuredResponseText(value: unknown) {
+  const parsedValue = typeof value === "string" ? parseJson(value) : value;
+
+  if (!isRecord(parsedValue) || typeof parsedValue.response !== "string") {
+    return null;
+  }
+
+  return parsedValue.response;
+}
+
+function parseJson(value: string) {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function getPayloadType(data: unknown): string | null {

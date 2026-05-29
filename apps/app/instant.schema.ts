@@ -71,6 +71,7 @@ const _schema = i.schema({
     workers: i.entity({
       activeCommandId: i.string().indexed().optional(),
       activePid: i.number().optional(),
+      activityMessage: i.string().optional(),
       codexSessionId: i.string().indexed().optional(),
       codexModel: i.string().indexed().optional(),
       codexReasoningLevel: i.string().indexed().optional(),

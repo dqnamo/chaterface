@@ -1,3 +1,4 @@
+import { workerStructuredResponseSchema } from "@/lib/codex/worker-response";
 import {
   type AppSandbox,
   createCheckpoint,
@@ -340,7 +341,11 @@ function createCodexExecCommand({
   const promptPath = `${workerDir}/prompt.txt`;
   const authWatcherPath = `${workerDir}/codex-auth-watcher.mjs`;
   const authWatcherLogPath = `${workerDir}/codex-auth-watcher.log`;
-  const workerPrompt = `${factoryWorkerInstructions}\n\nUser task:\n${prompt}`;
+  const responseSchemaPath = `${workerDir}/response-schema.json`;
+  const responseInstructions = resume
+    ? "Your final response must match the configured JSON schema. Put the markdown response for the supervisor in `response`. Set `newActivityMessage` to a concise Worker Activity Message only when the work focus changed; otherwise set it to null."
+    : "Your final response must match the configured JSON schema. Put the markdown response for the supervisor in `response`. Because this is the first Codex run for this Worker, set `newActivityMessage` to a concise Worker Activity Message that describes the work focus.";
+  const workerPrompt = `${factoryWorkerInstructions}\n\n${responseInstructions}\n\nUser task:\n${prompt}`;
   const secretsPath = `${factoryDir}/secrets.env`;
   const codexModel = normalizeWorkerModel(model);
   const codexReasoningLevel = normalizeWorkerReasoningLevel(reasoningLevel);
@@ -373,7 +378,10 @@ function createCodexExecCommand({
   const reasoningLevelArgs = createCodexReasoningLevelArgs(codexReasoningLevel);
   const codexCommand = resume
     ? [
-        "codex exec resume",
+        "codex exec",
+        "--output-schema",
+        shellQuote(responseSchemaPath),
+        "resume",
         sessionId ? shellQuote(sessionId) : "--last",
         "--model",
         shellQuote(codexModel),
@@ -388,6 +396,8 @@ function createCodexExecCommand({
       ].join(" ")
     : [
         "codex exec",
+        "--output-schema",
+        shellQuote(responseSchemaPath),
         "--model",
         shellQuote(codexModel),
         reasoningLevelArgs,
@@ -421,6 +431,7 @@ function createCodexExecCommand({
     `rm -f ${shellQuote(pidPath)}`,
     authWatcherSetup,
     `printf %s ${shellQuote(workerPrompt)} > ${shellQuote(promptPath)}`,
+    `printf %s ${shellQuote(JSON.stringify(workerStructuredResponseSchema))} > ${shellQuote(responseSchemaPath)}`,
     secretEnv
       ? `printf %s ${shellQuote(secretEnv)} > ${shellQuote(secretsPath)} && chmod 600 ${shellQuote(secretsPath)}`
       : `rm -f ${shellQuote(secretsPath)}`,
