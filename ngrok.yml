@@ -1,0 +1,10 @@
+version: 3
+endpoints:
+  - name: web-app
+    url: https://app.interface.ngrok.pro
+    upstream:
+      url: 3001
+  - name: api
+    url: https://api.interface.ngrok.pro
+    upstream:
+      url: 3002

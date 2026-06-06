@@ -1,0 +1,47 @@
+{
+	"name": "web-app",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "next dev --port 3001",
+		"trigger:dev": "trigger dev --env-file .env.local",
+		"build": "next build",
+		"start": "next start --port 3001",
+		"lint": "biome check .",
+		"check-types": "next typegen && tsc --noEmit"
+	},
+	"dependencies": {
+		"@base-ui/react": "^1.5.0",
+		"@instantdb/react": "^1.0.43",
+		"@phosphor-icons/react": "^2.1.10",
+		"@pierre/diffs": "^1.2.7",
+		"@radix-ui/colors": "^3.0.0",
+		"@repo/db": "workspace:*",
+		"@repo/encryption": "workspace:*",
+		"@repo/ui": "workspace:*",
+		"@trigger.dev/sdk": "^4.4.6",
+		"clsx": "^2.1.1",
+		"e2b": "^2.27.1",
+		"luxon": "^3.7.2",
+		"motion": "^12.40.0",
+		"next": "16.2.0",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"react-resizable-panels": "^4.11.2",
+		"tailwind-merge": "^3.6.0"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@tailwindcss/postcss": "^4.3.0",
+		"@trigger.dev/build": "^4.4.6",
+		"@types/luxon": "^3.7.1",
+		"@types/node": "^22.15.3",
+		"@types/react": "19.2.2",
+		"@types/react-dom": "19.2.2",
+		"postcss": "^8.5.15",
+		"tailwindcss": "^4.3.0",
+		"trigger.dev": "^4.4.6",
+		"typescript": "5.9.2"
+	}
+}

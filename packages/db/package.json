@@ -1,0 +1,24 @@
+{
+	"name": "@repo/db",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./schema": "./src/schema.ts",
+		"./admin": "./src/admin.ts",
+		"./client": "./src/client.ts"
+	},
+	"scripts": {
+		"lint": "biome check .",
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@instantdb/admin": "^1.0.43",
+		"@instantdb/react": "^1.0.43"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "^22.15.3",
+		"typescript": "5.9.2"
+	}
+}

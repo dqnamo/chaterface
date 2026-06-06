@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../trigger/codex-system-prompt.ts"],
+  "sourcesContent": ["import { readFileSync } from \"node:fs\";\nimport path from \"node:path\";\n\nconst SYSTEM_PROMPT_PATH = path.join(\n\tprocess.cwd(),\n\t\"trigger/prompts/system.md\",\n);\n\nexport const getCodexDeveloperInstructions = () => {\n\treturn readFileSync(SYSTEM_PROMPT_PATH, \"utf8\").trim();\n};\n\nexport const formatCodexDeveloperInstructionsConfig = (instructions: string) => {\n\treturn `developer_instructions=\"\"\"\\n${instructions}\\n\"\"\"`;\n};\n"],
+  "mappings": ";;;;;;AAAA;AAAA,SAAS,oBAAoB;AAC7B,OAAO,UAAU;AAEjB,IAAM,qBAAqB,KAAK;AAAA,EAC/B,QAAQ,IAAI;AAAA,EACZ;AACD;AAEO,IAAM,gCAAgC,6BAAM;AAClD,SAAO,aAAa,oBAAoB,MAAM,EAAE,KAAK;AACtD,GAF6C;AAItC,IAAM,yCAAyC,wBAAC,iBAAyB;AAC/E,SAAO;AAAA,EAA+B,YAAY;AAAA;AACnD,GAFsD;",
+  "names": []
+}
