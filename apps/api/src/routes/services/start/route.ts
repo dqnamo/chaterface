@@ -1,5 +1,6 @@
 import db, { id } from "@repo/db/admin";
 import { Sandbox } from "e2b";
+import type { CommandHandle } from "e2b";
 import type { RouteHandler } from "../../../lib/file-router.js";
 
 type StartServiceBody = {
@@ -57,6 +58,7 @@ export const POST: RouteHandler = async (c) => {
 						agentToken: token,
 					},
 				},
+				services: {},
 			},
 		})
 		.then((data) => data.tasks[0]);
@@ -88,7 +90,7 @@ export const POST: RouteHandler = async (c) => {
 			.link({ task: task.id }),
 	);
 
-	let process: Awaited<ReturnType<typeof sandbox.commands.run>>;
+	let process: CommandHandle;
 
 	try {
 		process = await sandbox.commands.run(
