@@ -11,7 +11,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
-import { Button } from "./Button";
 import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
 import TaskStatusDots from "./TaskStatusDots";
@@ -60,23 +59,28 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						<SidebarSimpleIcon weight="bold" />
 					</button>
 				</div>
-				<Button
-					nativeButton={false}
-					className="w-full min-w-0 justify-between gap-4 py-2 pr-2 pl-3"
-					render={
-						<Link href={`/${currentOrgHandle}/factories/${currentFactoryId}`} />
-					}
+				<Link
+					href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+					className="group relative flex w-full min-w-0 overflow-visible"
 				>
-					<p className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1">
-						New Task
-					</p>
-					<p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
-						N
-					</p>
-				</Button>
+					<span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-black p-2 pr-2 pl-3 transition-transform duration-150 group-hover:scale-96">
+						<CornerBrackets
+							placement="outside"
+							spacing={1}
+							translate={1.5}
+							color="black"
+						/>
+						<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
+							New Task
+						</p>
+						<p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
+							N
+						</p>
+					</span>
+				</Link>
 			</div>
-			<div className="mt-2 flex flex-row items-center justify-between">
-				<p className="px-3 font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+			<div className="mt-2 flex flex-row items-center justify-between px-3">
+				<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
 					Tasks
 				</p>
 				<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">

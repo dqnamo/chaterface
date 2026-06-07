@@ -3,7 +3,6 @@
 import { id } from "@instantdb/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -11,7 +10,7 @@ import {
 	DEFAULT_CODEX_REASONING_EFFORT,
 	DEFAULT_CODEX_SPEED,
 } from "@/codex-options";
-import CornerBrackets from "@/components/CornerBrackets";
+import { Button } from "@/components/Button";
 import CornerCubes from "@/components/CornerCubes";
 import { Input, Textarea } from "@/components/Input";
 import Logo from "@/components/Logo";
@@ -65,7 +64,6 @@ export default function FactoryPage() {
 		},
 	});
 
-	const tasks = data?.tasks;
 	const agents = data?.agents;
 	const resolvedAgentId = agentId || agents?.[0]?.id;
 	const agentItems =
@@ -193,20 +191,9 @@ export default function FactoryPage() {
 						/>
 					</div>
 					<div className="flex flex-row items-center justify-center gap-2 ml-auto">
-						<button
-							type="button"
-							onClick={createTask}
-							className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
-						>
-							<CornerBrackets
-								placement="outside"
-								spacing={1}
-								translate={1.5}
-								size={1.5}
-								color="grayscale-12"
-							/>
+						<Button type="button" onClick={createTask}>
 							Create Task
-						</button>
+						</Button>
 					</div>
 				</div>
 			</div>

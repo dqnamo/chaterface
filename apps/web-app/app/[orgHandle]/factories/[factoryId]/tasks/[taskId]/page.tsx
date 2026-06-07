@@ -32,11 +32,13 @@ import {
 	DEFAULT_CODEX_REASONING_EFFORT,
 	DEFAULT_CODEX_SPEED,
 } from "@/codex-options";
+import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
 import Event, { buildTimeline } from "@/components/Event";
 import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
+import { ScrollArea } from "@/components/ScrollArea";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
 import { cn } from "@/helpers/classname-helper";
@@ -522,28 +524,31 @@ export default function TaskPage() {
 						</AnimatePresence>
 					</div>
 				</div>
-				<div
-					ref={scrollContainerRef}
-					onScroll={handleScroll}
-					className="flex h-full flex-col gap-4 overflow-y-auto"
-				>
-					<div className="flex flex-col p-4 max-w-3xl mx-auto w-full">
-						{canLoadNextPage && (
-							<button
-								type="button"
-								onClick={loadNextPage}
-								className="mx-auto mb-2 text-xs text-grayscale-10 hover:text-grayscale-12"
-							>
-								Load earlier messages
-							</button>
-						)}
-						<AnimatePresence initial={false}>
-							{timeline.map((node) => (
-								<Event key={node.key} node={node} />
-							))}
-						</AnimatePresence>
-					</div>
-				</div>
+				<ScrollArea.Root className="h-full">
+					<ScrollArea.Viewport ref={scrollContainerRef} onScroll={handleScroll}>
+						<ScrollArea.Content className="flex min-h-full flex-col gap-4">
+							<div className="mx-auto flex w-full max-w-3xl flex-col p-4">
+								{canLoadNextPage && (
+									<button
+										type="button"
+										onClick={loadNextPage}
+										className="mx-auto mb-2 text-xs text-grayscale-10 hover:text-grayscale-12"
+									>
+										Load earlier messages
+									</button>
+								)}
+								<AnimatePresence initial={false}>
+									{timeline.map((node) => (
+										<Event key={node.key} node={node} />
+									))}
+								</AnimatePresence>
+							</div>
+						</ScrollArea.Content>
+					</ScrollArea.Viewport>
+					<ScrollArea.Scrollbar>
+						<ScrollArea.Thumb />
+					</ScrollArea.Scrollbar>
+				</ScrollArea.Root>
 				<div className="flex flex-col pb-2 px-2">
 					<div className="flex flex-col gap-2">
 						<div className="flex flex-col max-w-3xl mx-auto w-full bg-white border border-grayscale-4 relative">
@@ -577,20 +582,13 @@ export default function TaskPage() {
 									/>
 								</div>
 								<div className="flex flex-row items-center justify-center gap-2 ml-auto">
-									<button
+									<Button
 										type="button"
 										onClick={sendMessage}
-										className="shrink-0 relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
+										className="shrink-0"
 									>
-										<CornerBrackets
-											placement="outside"
-											spacing={1}
-											translate={1.5}
-											size={1.5}
-											color="grayscale-12"
-										/>
 										Send Message
-									</button>
+									</Button>
 								</div>
 							</div>
 						</div>

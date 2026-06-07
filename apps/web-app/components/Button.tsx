@@ -21,13 +21,14 @@ const mergeClassName = <TState,>(
 export type ButtonVariant = "primary";
 
 const baseClassName =
-	"group relative flex flex-row items-center justify-center gap-2 overflow-visible px-3 py-1.5 text-xs font-medium transition-transform duration-150 hover:scale-96";
+	"group relative flex min-w-0 flex-row items-center justify-center gap-4 overflow-visible bg-black p-2 pr-2 pl-3 transition-transform duration-150 hover:scale-96";
 
 const variantClassName: Record<ButtonVariant, string> = {
-	primary: "bg-grayscale-12 text-grayscale-1",
+	primary: "",
 };
 
 export type ButtonProps = ComponentProps<typeof BaseButton> & {
+	shortcut?: string;
 	variant?: ButtonVariant;
 };
 
@@ -35,6 +36,7 @@ export function Button({
 	variant = "primary",
 	className,
 	children,
+	shortcut,
 	...props
 }: ButtonProps) {
 	return (
@@ -49,10 +51,16 @@ export function Button({
 				placement="outside"
 				spacing={1}
 				translate={1.5}
-				size={1.5}
-				color="grayscale-12"
+				color="black"
 			/>
-			{children}
+			<span className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
+				{children}
+			</span>
+			{shortcut ? (
+				<span className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
+					{shortcut}
+				</span>
+			) : null}
 		</BaseButton>
 	);
 }

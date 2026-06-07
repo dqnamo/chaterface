@@ -1,9 +1,9 @@
+import type { InstaQLEntity } from "@instantdb/react";
 import {
 	CheckCircleIcon,
 	CircleNotchIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
-import type { InstaQLEntity } from "@instantdb/react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import type { AppSchema } from "@/instant.schema";
@@ -28,6 +28,11 @@ export type TimelineNode = {
 	startedAt?: string;
 };
 
+type TimelineContext = {
+	runKey: string;
+	turnKey: string;
+};
+
 const OUTPUT_PREVIEW_LIMIT = 6000;
 
 const toneClasses: Record<Tone, string> = {
@@ -49,53 +54,77 @@ const phaseClasses: Record<TimelinePhase, string> = {
  * (started/completed/failed) that describe the same underlying unit of work.
  */
 export function buildTimeline(events: readonly EventEntity[]): TimelineNode[] {
-	const sorted = [...events].sort((a, b) => {
-		// The task creation event always leads the timeline.
-		const aIsNewTask = a.type === "factoryplane.new_task";
-		const bIsNewTask = b.type === "factoryplane.new_task";
-
-		if (aIsNewTask !== bIsNewTask) {
-			return aIsNewTask ? -1 : 1;
-		}
-
-		return String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? ""));
-	});
-
+	const sorted = [...events].sort(compareEvents);
 	const nodes: TimelineNode[] = [];
 	const indexByKey = new Map<string, number>();
+	let unscopedRunIndex = 0;
+	let runKey = `run:unscoped:${unscopedRunIndex}`;
+	let turnKey = `turn:${runKey}:pending`;
 
-	for (const event of sorted) {
-		// Turn completion is implied by the next event arriving; drop the noise.
-		if (event.type === "codex.turn.completed") {
-			continue;
-		}
-
-		const group = groupInfoFor(event);
-
-		if (!group) {
-			nodes.push({ key: event.id, event });
-			continue;
-		}
-
-		const existingIndex = indexByKey.get(group.key);
+	const upsertNode = (
+		key: string,
+		event: EventEntity,
+		phase?: TimelinePhase,
+	) => {
+		const existingIndex = indexByKey.get(key);
 
 		if (existingIndex === undefined) {
-			indexByKey.set(group.key, nodes.length);
+			indexByKey.set(key, nodes.length);
 			nodes.push({
-				key: group.key,
+				key,
 				event,
-				phase: group.phase,
+				phase,
 				startedAt: event.createdAt ? String(event.createdAt) : undefined,
 			});
-			continue;
+			return;
 		}
 
 		const node = nodes[existingIndex];
 
 		if (node) {
 			node.event = event;
-			node.phase = mergePhase(node.phase, group.phase);
+			node.phase = phase ? mergePhase(node.phase, phase) : node.phase;
 		}
+	};
+
+	for (const event of sorted) {
+		const type = event.type ?? "";
+
+		if (
+			type === "factoryplane.new_task" ||
+			type === "factoryplane.new_user_message"
+		) {
+			runKey = `run:${event.id}`;
+			turnKey = `turn:${runKey}:pending`;
+			upsertNode(event.id, event);
+			continue;
+		}
+
+		if (type === "codex.turn.started") {
+			turnKey = `turn:${event.id}`;
+			upsertNode(turnKey, event, "running");
+			continue;
+		}
+
+		if (type === "codex.turn.completed") {
+			upsertNode(turnKey, event, "success");
+
+			unscopedRunIndex += runKey.startsWith("run:unscoped:") ? 1 : 0;
+			if (runKey.startsWith("run:unscoped:")) {
+				runKey = `run:unscoped:${unscopedRunIndex}`;
+				turnKey = `turn:${runKey}:pending`;
+			}
+			continue;
+		}
+
+		const group = groupInfoFor(event, { runKey, turnKey });
+
+		if (!group) {
+			nodes.push({ key: event.id, event });
+			continue;
+		}
+
+		upsertNode(group.key, event, group.phase);
 	}
 
 	return nodes;
@@ -103,6 +132,7 @@ export function buildTimeline(events: readonly EventEntity[]): TimelineNode[] {
 
 function groupInfoFor(
 	event: EventEntity,
+	context: TimelineContext,
 ): { key: string; phase: TimelinePhase } | null {
 	const type = event.type ?? "";
 	const data = asRecord(event.data) ?? {};
@@ -115,14 +145,17 @@ function groupInfoFor(
 				? "success"
 				: "running";
 
-		return { key: `setup:${step}`, phase };
+		return { key: `${context.runKey}:setup:${step}`, phase };
 	}
 
 	if (type.startsWith("codex.item.")) {
 		const item = asRecord(data.item);
 		const itemType = item ? getString(item, "type") : undefined;
 
-		if (item && (itemType === "command_execution" || itemType === "file_change")) {
+		if (
+			item &&
+			(itemType === "command_execution" || itemType === "file_change")
+		) {
 			const id = getString(item, "id") ?? event.id;
 			const status = getString(item, "status");
 			const exitCode = getNumber(item, "exit_code");
@@ -133,11 +166,78 @@ function groupInfoFor(
 						? "success"
 						: "running";
 
-			return { key: `item:${id}`, phase };
+			return { key: `${context.turnKey}:item:${id}`, phase };
 		}
 	}
 
 	return null;
+}
+
+function compareEvents(a: EventEntity, b: EventEntity) {
+	const timeCompare = getEventTime(a) - getEventTime(b);
+
+	if (timeCompare !== 0) {
+		return timeCompare;
+	}
+
+	const rankCompare = getEventSortRank(a) - getEventSortRank(b);
+
+	if (rankCompare !== 0) {
+		return rankCompare;
+	}
+
+	return String(a.id).localeCompare(String(b.id));
+}
+
+function getEventTime(event: EventEntity) {
+	const timestamp =
+		event.createdAt ??
+		getString((event as unknown as JsonRecord) ?? {}, "serverCreatedAt");
+	const time = parseTimestamp(timestamp);
+
+	return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+}
+
+function getEventSortRank(event: EventEntity) {
+	const type = event.type ?? "";
+
+	if (type === "factoryplane.new_task") {
+		return 0;
+	}
+
+	if (type === "factoryplane.new_user_message") {
+		return 1;
+	}
+
+	if (type === "codex.thread.started") {
+		return 2;
+	}
+
+	if (type === "codex.turn.started") {
+		return 3;
+	}
+
+	if (type === "codex.item.started") {
+		return 4;
+	}
+
+	if (type === "codex.item.completed") {
+		return 5;
+	}
+
+	if (type === "codex.turn.completed") {
+		return 6;
+	}
+
+	if (type.endsWith("_started") || type.endsWith(".started")) {
+		return 7;
+	}
+
+	if (type.endsWith("_completed") || type.endsWith("_failed")) {
+		return 8;
+	}
+
+	return 9;
 }
 
 function mergePhase(
@@ -176,7 +276,12 @@ export default function Event({ node }: { node: TimelineNode }) {
 
 	if (type === "factoryplane.new_user_message") {
 		return (
-			<EventCard glyph="ME" meta={timestamp} title="Message sent" tone="neutral">
+			<EventCard
+				glyph="ME"
+				meta={timestamp}
+				title="Message sent"
+				tone="neutral"
+			>
 				<MessageBubble>
 					{getString(data, "content") ?? "Empty message"}
 				</MessageBubble>
@@ -197,22 +302,15 @@ export default function Event({ node }: { node: TimelineNode }) {
 			<EventCard
 				glyph="AI"
 				meta={timestamp}
-				subtitle={getString(data, "threadId")}
-				title="Agent thread started"
+				subtitle={getString(data, "thread_id") ?? getString(data, "threadId")}
+				title="Agent connected"
 				tone="accent"
 			/>
 		);
 	}
 
-	if (type === "codex.turn.started") {
-		return (
-			<EventCard
-				glyph="AI"
-				meta={timestamp}
-				title="Agent turn started"
-				tone="accent"
-			/>
-		);
+	if (type === "codex.turn.started" || type === "codex.turn.completed") {
+		return <TurnEvent data={data} phase={phase} timestamp={timestamp} />;
 	}
 
 	if (type.startsWith("codex.item.")) {
@@ -236,6 +334,50 @@ export default function Event({ node }: { node: TimelineNode }) {
 			tone={type.includes("failed") ? "danger" : "neutral"}
 		>
 			<RawPayload value={event.data} />
+		</EventCard>
+	);
+}
+
+function TurnEvent({
+	data,
+	phase,
+	timestamp,
+}: {
+	data: JsonRecord;
+	phase?: TimelinePhase;
+	timestamp?: string;
+}) {
+	const usage = asRecord(data.usage);
+	const resolvedPhase = phase ?? "running";
+	const title =
+		resolvedPhase === "success"
+			? "Agent turn completed"
+			: resolvedPhase === "failed"
+				? "Agent turn failed"
+				: "Agent turn started";
+
+	return (
+		<EventCard
+			glyph="AI"
+			logo
+			meta={timestamp}
+			phase={resolvedPhase}
+			title={title}
+			tone="accent"
+		>
+			{usage ? (
+				<DetailGrid
+					items={[
+						["input", formatNumber(getNumber(usage, "input_tokens"))],
+						["output", formatNumber(getNumber(usage, "output_tokens"))],
+						["cached", formatNumber(getNumber(usage, "cached_input_tokens"))],
+						[
+							"reasoning",
+							formatNumber(getNumber(usage, "reasoning_output_tokens")),
+						],
+					]}
+				/>
+			) : null}
 		</EventCard>
 	);
 }
@@ -476,28 +618,15 @@ function AgentMessage({
 	timestamp?: string;
 }) {
 	return (
-		<motion.article
-			animate={{ opacity: 1, y: 0 }}
-			className="py-2"
-			initial={{ opacity: 0, y: 6 }}
-			layout="position"
-			transition={{ duration: 0.18, ease: "easeOut" }}
+		<EventCard
+			glyph="AI"
+			logo
+			meta={timestamp}
+			title="Agent message"
+			tone="accent"
 		>
-			<div className="flex flex-col gap-2 border border-grayscale-4 bg-grayscale-1 p-3">
-				<div className="flex items-center gap-2">
-					<span className="flex size-5 shrink-0 items-center justify-center bg-accent-3">
-						<Logo size={3} />
-					</span>
-					<span className="text-xs font-medium text-grayscale-12">Agent</span>
-					{timestamp ? (
-						<span className="ml-auto text-[11px] text-grayscale-10">
-							{timestamp}
-						</span>
-					) : null}
-				</div>
-				<MessageBubble>{text}</MessageBubble>
-			</div>
-		</motion.article>
+			<MessageBubble>{text}</MessageBubble>
+		</EventCard>
 	);
 }
 
@@ -523,7 +652,7 @@ function EventCard({
 	return (
 		<motion.article
 			animate={{ opacity: 1, y: 0 }}
-			className="flex gap-2.5 py-2"
+			className="relative flex gap-2.5 py-2 before:absolute before:top-9 before:bottom-[-0.5rem] before:left-3.5 before:w-px before:bg-grayscale-4 last:before:hidden"
 			initial={{ opacity: 0, y: 6 }}
 			layout="position"
 			transition={{ duration: 0.18, ease: "easeOut" }}
@@ -704,20 +833,38 @@ function getRecordArray(record: JsonRecord, key: string): JsonRecord[] {
 }
 
 function formatTimestamp(value: unknown): string | undefined {
-	if (typeof value !== "string") {
+	const time = parseTimestamp(value);
+
+	if (Number.isNaN(time)) {
 		return undefined;
 	}
 
-	const date = new Date(value);
-
-	if (Number.isNaN(date.getTime())) {
-		return undefined;
-	}
+	const date = new Date(time);
 
 	return date.toLocaleTimeString([], {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
+}
+
+function parseTimestamp(value: unknown) {
+	if (typeof value === "string") {
+		const time = Date.parse(value);
+
+		return Number.isNaN(time) ? Number.NaN : time;
+	}
+
+	if (value instanceof Date) {
+		const time = value.getTime();
+
+		return Number.isNaN(time) ? Number.NaN : time;
+	}
+
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+
+	return Number.NaN;
 }
 
 function formatEventType(type: string) {
