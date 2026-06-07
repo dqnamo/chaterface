@@ -72,7 +72,7 @@ function Tab({ className, render, children, ...props }: TabsTabProps) {
 						placement="inside"
 						spacing={1}
 						translate={1.5}
-						size={1.5}
+						size={6}
 						color={
 							state.active
 								? "var(--color-accent-9)"

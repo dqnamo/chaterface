@@ -31,7 +31,7 @@ const CORNER_BORDERS: Record<string, string> = {
 };
 
 export default function CornerBrackets({
-	size = 2,
+	size = 8,
 	spacing,
 	translate,
 	color = "grayscale-4",
@@ -43,8 +43,8 @@ export default function CornerBrackets({
 	active = false,
 	className = "",
 }: CornerBracketsProps) {
-	const resolvedSpacing = spacing ?? (placement === "outside" ? 1 : 1.5);
-	const resolvedTranslate = translate ?? (placement === "outside" ? 1.5 : 1);
+	const resolvedSpacing = spacing ?? (placement === "outside" ? 4 : 1.5);
+	const resolvedTranslate = translate ?? (placement === "outside" ? 6 : 1);
 
 	const corners = getCornerLayouts({
 		placement,

@@ -90,8 +90,8 @@ export default function HomePage() {
 				>
 					<CornerBrackets
 						placement="outside"
-						spacing={1}
-						translate={1.5}
+						spacing={4}
+						translate={6}
 						color="black"
 					/>
 					<BuildingsIcon weight="bold" className="size-4 text-grayscale-2 group-hover:text-grayscale-1 transition-colors" />
@@ -156,9 +156,9 @@ export default function HomePage() {
 							>
 								<CornerBrackets
 									placement="outside"
-									spacing={1}
-									translate={1.5}
-									size={1.5}
+									spacing={4}
+									translate={6}
+									size={6}
 									color="grayscale-12"
 								/>
 								Create

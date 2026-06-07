@@ -49,8 +49,8 @@ export function Button({
 		>
 			<CornerBrackets
 				placement="outside"
-				spacing={1}
-				translate={1.5}
+				spacing={4}
+				translate={6}
 				color="black"
 			/>
 			<span className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">

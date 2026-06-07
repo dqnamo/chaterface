@@ -24,7 +24,7 @@ type CornerCubesProps = {
 };
 
 export default function CornerCubes({
-	size = 2,
+	size = 8,
 	spacing,
 	translate,
 	color = "grayscale-4",
@@ -36,8 +36,8 @@ export default function CornerCubes({
 	active = false,
 	className = "",
 }: CornerCubesProps) {
-	const resolvedSpacing = spacing ?? (placement === "outside" ? 1 : 1.5);
-	const resolvedTranslate = translate ?? (placement === "outside" ? 1.5 : 1);
+	const resolvedSpacing = spacing ?? (placement === "outside" ? 4 : 1.5);
+	const resolvedTranslate = translate ?? (placement === "outside" ? 6 : 1);
 
 	const corners = getCornerLayouts({
 		placement,

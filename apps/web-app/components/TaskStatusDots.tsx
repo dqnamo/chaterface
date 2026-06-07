@@ -1,7 +1,8 @@
-import type { TaskDotStatus } from "@/helpers/task-status-helper";
 import { cn } from "@/helpers/classname-helper";
+import type { TaskDotStatus } from "@/helpers/task-status-helper";
 
-const FAILED_PATTERN = [true, false, false, false, false, true] as const;
+const FAILED_PATTERN = [true, true, true, true, true, true] as const;
+const DOT_INDICES = [0, 1, 2, 3, 4, 5] as const;
 
 const statusLabels: Record<TaskDotStatus, string> = {
 	idle: "Task idle",
@@ -32,14 +33,14 @@ export default function TaskStatusDots({
 			role="status"
 			style={{ gap }}
 		>
-			{Array.from({ length: 6 }, (_, index) => {
+			{DOT_INDICES.map((index) => {
 				const isFilled = pattern ? pattern[index] : true;
 				const isRunning = status === "running";
 				const isIdle = status === "idle";
 
 				return (
 					<div
-						key={index}
+						key={`task-status-dot-${index}`}
 						className={cn(
 							"task-status-dot",
 							isRunning && "task-status-dot--running",

@@ -22,6 +22,10 @@ type Event = InstaQLEntity<AppSchema, "events">;
 type Task = InstaQLEntity<AppSchema, "tasks">;
 type Agent = InstaQLEntity<AppSchema, "agents">;
 type Factory = InstaQLEntity<AppSchema, "factories">;
+type Repository = InstaQLEntity<AppSchema, "repositories">;
+type FactoryWithRepositories = Factory & {
+	repositories?: Repository[];
+};
 type CodexEvent = {
 	type: string;
 	data: unknown;
@@ -107,7 +111,9 @@ export const processEventTask = task({
 					},
 					task: {
 						agent: {},
-						factory: {},
+						factory: {
+							repositories: {},
+						},
 					},
 				},
 			})
@@ -176,7 +182,11 @@ const processNewUserMessage = async (
 	);
 };
 
-const setupTaskSandbox = async (agent: Agent, task: Task, factory: Factory) => {
+const setupTaskSandbox = async (
+	agent: Agent,
+	task: Task,
+	factory: FactoryWithRepositories,
+) => {
 	if (!agent.auth || !factory) {
 		throw new Error(`Agent ${agent.id} is missing auth or factory`);
 	}
@@ -221,6 +231,18 @@ const setupTaskSandbox = async (agent: Agent, task: Task, factory: Factory) => {
 
 	console.log(codexUpdate);
 
+	const repositoryGithubEnvs = await setupRepositoryGithubAuth(
+		sandbox,
+		task.id,
+		factory,
+	);
+	await cloneFactoryRepositories(
+		sandbox,
+		task.id,
+		factory,
+		repositoryGithubEnvs,
+	);
+
 	const diffWorkspacePath = await runSetupStep(
 		task.id,
 		"diff_baseline",
@@ -234,6 +256,216 @@ const setupTaskSandbox = async (agent: Agent, task: Task, factory: Factory) => {
 	);
 
 	return sandbox;
+};
+
+const cloneFactoryRepositories = async (
+	sandbox: Sandbox,
+	taskId: string,
+	factory: FactoryWithRepositories,
+	envs: Record<string, string>,
+) => {
+	const repositories = factory.repositories ?? [];
+
+	if (repositories.length === 0) {
+		return;
+	}
+
+	const workspacePath = await getSandboxWorkspacePath(sandbox);
+
+	await runSetupStep(
+		taskId,
+		"repositories",
+		"Clone repositories",
+		() =>
+			sandbox.commands.run(
+				[
+					"set -e",
+					`cd ${shellQuote(workspacePath)}`,
+					buildGithubAuthNoticeCommand(),
+					buildGithubAuthHeaderCommand(),
+					...repositories.map((repository) =>
+						buildCloneRepositoryCommand(
+							repository,
+							Boolean(envs.GITHUB_ACCESS_TOKEN),
+						),
+					),
+				].join("\n"),
+				{ timeoutMs: 10 * 60 * 1000, envs },
+			),
+		{ timeoutMs: 11 * 60 * 1000 },
+	);
+};
+
+const setupRepositoryGithubAuth = async (
+	sandbox: Sandbox,
+	taskId: string,
+	factory: Factory,
+) => {
+	const envs = await getFactoryGithubAuthEnvs(factory);
+
+	if (!envs.GITHUB_ACCESS_TOKEN) {
+		return envs;
+	}
+
+	await runSetupStep(
+		taskId,
+		"repository_auth",
+		"Validate repository GitHub token",
+		() => validateGithubToken(sandbox, envs),
+		{ timeoutMs: 35_000 },
+	);
+
+	return envs;
+};
+
+const buildGithubAuthNoticeCommand = () =>
+	[
+		'if [ -z "$GITHUB_ACCESS_TOKEN" ]; then',
+		'  printf "No factory GitHub token configured; private GitHub repositories will fail to clone. Add one in factory settings.\\n" >&2',
+		"fi",
+	].join("\n");
+
+const buildGithubAuthHeaderCommand = () =>
+	[
+		'if [ -n "$GITHUB_ACCESS_TOKEN" ]; then',
+		'  GITHUB_AUTH_HEADER="$(printf "x-access-token:%s" "$GITHUB_ACCESS_TOKEN" | base64 | tr -d "\\n")"',
+		"fi",
+	].join("\n");
+
+const getFactoryGithubAuthEnvs = async (
+	factory: Factory,
+): Promise<Record<string, string>> => {
+	if (!factory.githubAccessTokenEncrypted) {
+		return {
+			GIT_TERMINAL_PROMPT: "0",
+		};
+	}
+
+	const encryptionService = createEncryptionService(
+		process.env.SECRET_ENCRYPTION_KEY ?? "",
+	);
+	const githubAccessToken = await encryptionService.decrypt(
+		factory.githubAccessTokenEncrypted,
+	);
+
+	return {
+		GITHUB_ACCESS_TOKEN: githubAccessToken,
+		GH_TOKEN: githubAccessToken,
+		GIT_TERMINAL_PROMPT: "0",
+	};
+};
+
+const validateGithubToken = async (
+	sandbox: Sandbox,
+	envs: Record<string, string>,
+) => {
+	let authStderr = "";
+
+	try {
+		const ghAuth = await sandbox.commands.run(
+			[
+				"set +e",
+				'login="$(gh api user --jq .login 2>&1)"',
+				"status=$?",
+				'if [ "$status" -ne 0 ]; then',
+				'  printf "GitHub CLI auth failed while validating factory GitHub token:\\n%s\\n" "$login" >&2',
+				'  exit "$status"',
+				"fi",
+				'printf "Authenticated GitHub CLI as %s\\n" "$login"',
+			].join("\n"),
+			{
+				timeoutMs: 30_000,
+				envs,
+				onStdout: (data) => {
+					console.log(data);
+				},
+				onStderr: (data) => {
+					authStderr += data;
+					console.error(data);
+				},
+			},
+		);
+		console.log(ghAuth);
+	} catch (error) {
+		throw new Error(
+			[
+				"GitHub CLI auth failed",
+				authStderr.trim() || getErrorMessage(error),
+			].join(": "),
+		);
+	}
+};
+
+const buildCloneRepositoryCommand = (
+	repository: Repository,
+	hasGithubAccessToken: boolean,
+) => {
+	const path =
+		normalizeRepositoryPath(repository.path) ??
+		getRepositoryDefaultPath(repository.url);
+	const githubCloneUrl = getGithubHttpsCloneUrl(repository.url);
+	const cloneUrl = githubCloneUrl ?? repository.url.trim();
+	const args = ["git"];
+
+	if (githubCloneUrl && hasGithubAccessToken) {
+		args.push(
+			"-c",
+			`'http.https://github.com/.extraheader=Authorization: Basic '"$GITHUB_AUTH_HEADER"`,
+		);
+	}
+
+	args.push("clone");
+
+	if (repository.branch?.trim()) {
+		args.push("--branch", shellQuote(repository.branch.trim()));
+	}
+
+	args.push(shellQuote(cloneUrl), shellQuote(path));
+	return args.join(" ");
+};
+
+const getGithubHttpsCloneUrl = (url: string) => {
+	const trimmed = url.trim();
+	const httpsMatch = trimmed.match(
+		/^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/i,
+	);
+
+	if (httpsMatch?.[1] && httpsMatch[2]) {
+		return `https://github.com/${httpsMatch[1]}/${httpsMatch[2].replace(/\.git$/i, "")}.git`;
+	}
+
+	const sshMatch = trimmed.match(
+		/^(?:git@github\.com:|ssh:\/\/git@github\.com\/)([^/\s]+)\/([^/\s]+?)(?:\.git)?$/i,
+	);
+
+	if (sshMatch?.[1] && sshMatch[2]) {
+		return `https://github.com/${sshMatch[1]}/${sshMatch[2].replace(/\.git$/i, "")}.git`;
+	}
+
+	return undefined;
+};
+
+const getRepositoryDefaultPath = (url: string) => {
+	const lastSegment = url.split("/").pop()?.trim() || "repository";
+	return (
+		normalizeRepositoryPath(lastSegment.replace(/\.git$/i, "")) ?? "repository"
+	);
+};
+
+const normalizeRepositoryPath = (value: string | undefined) => {
+	if (!value) {
+		return undefined;
+	}
+
+	const segments = value
+		.trim()
+		.replaceAll("\\", "/")
+		.split("/")
+		.filter(
+			(segment) => segment.length > 0 && segment !== "." && segment !== "..",
+		);
+
+	return segments.length > 0 ? segments.join("/") : undefined;
 };
 
 const runCodexExec = async (
@@ -462,58 +694,14 @@ const setupRun = async (sandbox: Sandbox, task: Task, factory: Factory) => {
 		"github_auth",
 		"Validate GitHub token",
 		async () => {
-			const encryptionService = createEncryptionService(
-				process.env.SECRET_ENCRYPTION_KEY ?? "",
-			);
+			const githubEnvs = await getFactoryGithubAuthEnvs(factory);
 
-			if (!factory.githubAccessTokenEncrypted) {
+			if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
 				throw new Error(`Factory ${factory.id} is missing GitHub access token`);
 			}
 
-			const githubAccessToken = await encryptionService.decrypt(
-				factory.githubAccessTokenEncrypted,
-			);
-
-			envs.GITHUB_ACCESS_TOKEN = githubAccessToken;
-			envs.GH_TOKEN = githubAccessToken;
-
-			let authStderr = "";
-
-			try {
-				const ghAuth = await sandbox.commands.run(
-					[
-						"set +e",
-						'login="$(gh api user --jq .login 2>&1)"',
-						"status=$?",
-						'if [ "$status" -ne 0 ]; then',
-						'  printf "GitHub CLI auth failed while validating factory GitHub token:\\n%s\\n" "$login" >&2',
-						'  exit "$status"',
-						"fi",
-						'printf "Authenticated GitHub CLI as %s\\n" "$login"',
-					].join("\n"),
-					{
-						timeoutMs: 30_000,
-						envs,
-						onStdout: (data) => {
-							console.log(data);
-						},
-						onStderr: (data) => {
-							authStderr += data;
-							console.error(data);
-						},
-					},
-				);
-				console.log(ghAuth);
-			} catch (error) {
-				delete envs.GITHUB_ACCESS_TOKEN;
-				delete envs.GH_TOKEN;
-				throw new Error(
-					[
-						"GitHub CLI auth failed",
-						authStderr.trim() || getErrorMessage(error),
-					].join(": "),
-				);
-			}
+			Object.assign(envs, githubEnvs);
+			await validateGithubToken(sandbox, envs);
 		},
 	);
 

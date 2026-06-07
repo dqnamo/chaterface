@@ -154,7 +154,7 @@ function Item({
 		>
 			<CornerBrackets
 				placement="inside"
-				size={1.5}
+				size={6}
 				color={cornerColor}
 				active={false}
 				className={cornerClassName}
@@ -172,7 +172,7 @@ function LinkItem({ className, children, ...props }: ContextMenuLinkItemProps) {
 		>
 			<CornerBrackets
 				placement="inside"
-				size={1.5}
+				size={6}
 				color="grayscale-8"
 				active={false}
 			/>
@@ -196,7 +196,7 @@ function SubmenuTrigger({
 		>
 			<CornerBrackets
 				placement="inside"
-				size={1.5}
+				size={6}
 				color="grayscale-8"
 				active={false}
 				className="group-data-[popup-open]:opacity-100 group-data-[popup-open]:translate-x-0 group-data-[popup-open]:translate-y-0"
@@ -229,7 +229,7 @@ function RadioItem({
 		>
 			<CornerBrackets
 				placement="inside"
-				size={1.5}
+				size={6}
 				color="grayscale-8"
 				active={false}
 				className="group-data-[checked]:hidden"
@@ -253,7 +253,7 @@ function RadioItemIndicator({
 		>
 			<CornerBrackets
 				placement="inside"
-				size={1.5}
+				size={6}
 				color="accent-9"
 				active={true}
 			/>
@@ -279,7 +279,7 @@ function CheckboxItem({
 		>
 			<CornerBrackets
 				placement="inside"
-				size={1.5}
+				size={6}
 				color="grayscale-8"
 				active={false}
 				className="group-data-[checked]:hidden"
@@ -303,7 +303,7 @@ function CheckboxItemIndicator({
 		>
 			<CornerBrackets
 				placement="inside"
-				size={1.5}
+				size={6}
 				color="accent-9"
 				active={true}
 			/>

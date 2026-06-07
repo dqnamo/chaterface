@@ -510,7 +510,7 @@ export default function TaskPage() {
 								placement="inside"
 								spacing={1}
 								translate={1.5}
-								size={1.5}
+								size={6}
 								color="var(--color-green-9)"
 							/>
 							<CheckCircleIcon
@@ -576,9 +576,9 @@ export default function TaskPage() {
 						<div className="flex flex-col max-w-3xl mx-auto w-full bg-white border border-grayscale-4 relative">
 							<CornerCubes
 								placement="outside"
-								spacing={0.75}
-								translate={3}
-								size={1.5}
+								spacing={3}
+								translate={12}
+								size={6}
 								color="var(--color-grayscale-6)"
 								active={true}
 							/>
@@ -721,7 +721,7 @@ export default function TaskPage() {
 											placement="inside"
 											spacing={1}
 											translate={1.5}
-											size={1.5}
+											size={6}
 											color="var(--color-red-9)"
 										/>
 										<XCircleIcon

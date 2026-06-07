@@ -70,9 +70,9 @@ function Popup({ className, children, ...props }: DialogPopupProps) {
 			<div className="pointer-events-none absolute inset-0 scale-100 transition-transform duration-300 ease-out group-data-[ending-style]/popup:scale-90 group-data-[starting-style]/popup:scale-90">
 				<CornerBrackets
 					placement="outside"
-					spacing={0.75}
-					translate={3}
-					size={2.5}
+					spacing={3}
+					translate={12}
+					size={10}
 					color="var(--color-grayscale-10)"
 					active={true}
 				/>

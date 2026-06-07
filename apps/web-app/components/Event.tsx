@@ -293,6 +293,10 @@ export default function Event({ node }: { node: TimelineNode }) {
 		return <ServiceEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
+	if (type.startsWith("factoryplane.repository_")) {
+		return <RepositoryEvent data={data} timestamp={timestamp} type={type} />;
+	}
+
 	if (type.startsWith("factoryplane.setup_step_")) {
 		return <SetupStepEvent data={data} phase={phase} timestamp={timestamp} />;
 	}
@@ -455,6 +459,43 @@ function ServiceEvent({
 						) : undefined,
 					],
 					["error", getString(data, "error")],
+				]}
+			/>
+		</EventCard>
+	);
+}
+
+function RepositoryEvent({
+	data,
+	timestamp,
+	type,
+}: {
+	data: JsonRecord;
+	timestamp?: string;
+	type: string;
+}) {
+	const url = getString(data, "url");
+	const title =
+		type === "factoryplane.repository_created"
+			? "Repository added"
+			: type === "factoryplane.repository_updated"
+				? "Repository updated"
+				: "Repository removed";
+
+	return (
+		<EventCard
+			glyph="RP"
+			meta={timestamp}
+			phase="success"
+			subtitle={url ?? getString(data, "repositoryId")}
+			title={title}
+			tone="success"
+		>
+			<DetailGrid
+				items={[
+					["repository", getString(data, "repositoryId")],
+					["path", getString(data, "path")],
+					["branch", getString(data, "branch")],
 				]}
 			/>
 		</EventCard>

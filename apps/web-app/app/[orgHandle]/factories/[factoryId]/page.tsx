@@ -119,9 +119,9 @@ export default function FactoryPage() {
 			<div className="flex flex-col max-w-xl w-full bg-white border border-grayscale-4 relative">
 				<CornerCubes
 					placement="outside"
-					spacing={0.75}
-					translate={3}
-					size={1.5}
+					spacing={3}
+					translate={12}
+					size={6}
 					color="var(--color-grayscale-6)"
 					active={true}
 				/>

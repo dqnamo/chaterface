@@ -48,25 +48,13 @@ const CORNER_DIRECTIONS: Record<
 	},
 };
 
-function outsideOffset(units: number): string {
-	return `${units * 0.25}rem`;
-}
-
-function insideOffset(units: number): string {
+function offset(units: number): string {
 	return `${units}px`;
 }
 
-function getOffset(placement: Placement, units: number): string {
-	return placement === "outside" ? outsideOffset(units) : insideOffset(units);
-}
-
-function signedOffset(
-	placement: Placement,
-	units: number,
-	sign: 1 | -1,
-): string {
-	const offset = getOffset(placement, units);
-	return sign === -1 ? `calc(-1 * ${offset})` : offset;
+function signedOffset(units: number, sign: 1 | -1): string {
+	const value = offset(units);
+	return sign === -1 ? `calc(-1 * ${value})` : value;
 }
 
 export function getCornerLayouts({
@@ -91,27 +79,19 @@ export function getCornerLayouts({
 				: ((direction.outsideTranslateY * -1) as 1 | -1);
 		const position: CSSProperties = {};
 
-		position[direction.xProperty] = signedOffset(
-			placement,
-			spacing,
-			positionSign,
-		);
-		position[direction.yProperty] = signedOffset(
-			placement,
-			spacing,
-			positionSign,
-		);
+		position[direction.xProperty] = signedOffset(spacing, positionSign);
+		position[direction.yProperty] = signedOffset(spacing, positionSign);
 
 		return {
 			key: corner,
 			position,
-			translateX: signedOffset(placement, translate, translateXSign),
-			translateY: signedOffset(placement, translate, translateYSign),
+			translateX: signedOffset(translate, translateXSign),
+			translateY: signedOffset(translate, translateYSign),
 		};
 	});
 }
 
 export function getCornerSizeStyle(size: number): CSSProperties {
-	const dimension = outsideOffset(size);
+	const dimension = offset(size);
 	return { width: dimension, height: dimension };
 }

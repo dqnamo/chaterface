@@ -3,6 +3,7 @@ import {
 	CaretDownIcon,
 	CaretRightIcon,
 	CheckIcon,
+	FadersHorizontalIcon,
 	SidebarSimpleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
@@ -10,13 +11,15 @@ import db from "@repo/db/client";
 import type { AppSchema } from "@repo/db/schema";
 import { DateTime } from "luxon";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
 import TaskStatusDots from "./TaskStatusDots";
+
+import { Button } from "./Button";
 
 type Task = InstaQLEntity<AppSchema, "tasks">;
 
@@ -36,6 +39,7 @@ const taskTx = (taskId: string) => {
 
 export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const { orgHandle, factoryId, taskId } = useParams();
+	const pathname = usePathname();
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
 	const currentTaskId = taskId as string;
@@ -58,6 +62,8 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 		}),
 		[tasks],
 	);
+	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
+	const isSettingsSelected = pathname.startsWith(settingsHref);
 
 	return (
 		<div className="flex h-full w-full flex-col gap-2 overflow-y-auto px-2 py-2">
@@ -73,24 +79,42 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					</button>
 				</div>
 				<Link
-					href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-					className="group relative flex w-full min-w-0 overflow-visible"
+					href={settingsHref}
+					className={cn(
+						"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+						isSettingsSelected ? "bg-grayscale-3" : "",
+					)}
 				>
-					<span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-black p-2 pr-2 pl-3 transition-transform duration-150 group-hover:scale-96">
-						<CornerBrackets
-							placement="outside"
-							spacing={1}
-							translate={1.5}
-							color="black"
-						/>
-						<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
-							New Task
-						</p>
-						<p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
-							N
-						</p>
-					</span>
+					<CornerBrackets
+						placement="inside"
+						color={isSettingsSelected ? "accent-9" : "grayscale-8"}
+						size={6}
+						active={isSettingsSelected}
+					/>
+					<FadersHorizontalIcon weight="bold" className="size-4 shrink-0" />
+					<span className="min-w-0 flex-1 truncate">Settings</span>
 				</Link>
+				<div className="p-1.5 mt-2">
+          <Link
+            href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+            className="group relative flex w-full min-w-0 overflow-visible"
+          >
+            <span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 ">
+              <CornerBrackets
+                placement="outside"
+                spacing={4}
+                translate={4}
+                color="black"
+              />
+              <p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
+                New Task
+              </p>
+              <p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
+                N
+              </p>
+            </span>
+          </Link>
+        </div>
 			</div>
 			<div className="mt-2 flex flex-row items-center justify-between px-3">
 				<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
@@ -199,7 +223,7 @@ const TaskSidebarItem = ({
 				<CornerBrackets
 					placement="inside"
 					color={selected ? "accent-9" : "grayscale-8"}
-					size={1.5}
+					size={6}
 					active={selected}
 				/>
 				<span className="min-w-0 flex-1 truncate">{task.name}</span>

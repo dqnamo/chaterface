@@ -189,6 +189,19 @@ const _schema = i.schema({
 				label: "factory",
 			},
 		},
+		factoryRepositories: {
+			forward: {
+				on: "factories",
+				has: "many",
+				label: "repositories",
+			},
+			reverse: {
+				on: "repositories",
+				has: "one",
+				label: "factory",
+				onDelete: "cascade",
+			},
+		},
 		organisationFactories: {
 			forward: {
 				on: "organisations",
