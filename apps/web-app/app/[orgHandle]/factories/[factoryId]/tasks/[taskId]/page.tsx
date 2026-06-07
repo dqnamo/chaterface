@@ -282,6 +282,7 @@ export default function TaskPage() {
 	const events = eventsData?.events;
 	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
 	const services = task?.services ?? [];
+	const isTaskCompleted = Boolean(task?.completedAt);
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
 
@@ -345,6 +346,19 @@ export default function TaskPage() {
 
 	const stopService = async (serviceId: string) => {
 		await db.transact(serviceTx(serviceId).delete());
+	};
+
+	const markTaskComplete = async () => {
+		if (!task || isTaskCompleted) {
+			return;
+		}
+
+		await db.transact(
+			taskTx(task.id).update({
+				completedAt: DateTime.now().toISO(),
+				status: "complete",
+			}),
+		);
 	};
 
 	useEffect(() => {
@@ -448,6 +462,7 @@ export default function TaskPage() {
 		await db.transact(
 			taskTx(task.id).update({
 				status: "in_progress",
+				completedAt: undefined,
 				agentModel,
 				agentReasoningEffort,
 				agentSpeed,
@@ -483,7 +498,14 @@ export default function TaskPage() {
 						<p className="text-sm text-grayscale-11 p-1">{task?.name}</p>
 					</div>
 					<div className="flex flex-row items-center">
-						<div className="bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-green-3">
+						<button
+							type="button"
+							onClick={markTaskComplete}
+							disabled={isTaskCompleted}
+							className={cn(
+								"bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-green-3 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-grayscale-3",
+							)}
+						>
 							<CornerBrackets
 								placement="inside"
 								spacing={1}
@@ -500,7 +522,7 @@ export default function TaskPage() {
 								className="size-4 text-green-9 group-hover:block hidden"
 							/>
 							<p className="text-xs text-grayscale-12">Mark as complete</p>
-						</div>
+						</button>
 						<AnimatePresence initial={false}>
 							{!isMobile && isRightCollapsed && (
 								<motion.button

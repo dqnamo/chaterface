@@ -1,5 +1,7 @@
 import type { InstaQLEntity } from "@instantdb/react";
 import {
+	CaretDownIcon,
+	CaretRightIcon,
 	CheckIcon,
 	SidebarSimpleIcon,
 	XCircleIcon,
@@ -9,6 +11,7 @@ import type { AppSchema } from "@repo/db/schema";
 import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import { ContextMenu } from "./ContextMenu";
@@ -36,6 +39,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
 	const currentTaskId = taskId as string;
+	const [isCompletedExpanded, setIsCompletedExpanded] = useState(false);
 
 	const { data } = db.useQuery({
 		tasks: {
@@ -46,6 +50,15 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 			},
 		},
 	});
+	const tasks = data?.tasks ?? [];
+	const { activeTasks, completedTasks } = useMemo(
+		() => ({
+			activeTasks: tasks.filter((task) => !task.completedAt),
+			completedTasks: tasks.filter((task) => task.completedAt),
+		}),
+		[tasks],
+	);
+
 	return (
 		<div className="flex h-full w-full flex-col gap-2 overflow-y-auto px-2 py-2">
 			<div>
@@ -84,11 +97,11 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					Tasks
 				</p>
 				<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-					{data?.tasks?.length}
+					{activeTasks.length}
 				</p>
 			</div>
 			<div className="flex flex-col gap-px">
-				{data?.tasks?.map((task) => (
+				{activeTasks.map((task) => (
 					<TaskSidebarItem
 						key={task.id}
 						href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
@@ -97,6 +110,36 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						selected={task.id === currentTaskId}
 					/>
 				))}
+			</div>
+			<div className="mt-2 flex flex-col gap-px">
+				<button
+					type="button"
+					onClick={() => setIsCompletedExpanded((expanded) => !expanded)}
+					className="flex w-full items-center justify-between gap-2 px-3 py-1 text-left font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase transition-colors hover:text-grayscale-12"
+				>
+					<span className="flex min-w-0 items-center gap-1.5">
+						<span className="truncate">Completed Tasks</span>
+						{isCompletedExpanded ? (
+							<CaretDownIcon weight="bold" className="size-3 shrink-0" />
+						) : (
+							<CaretRightIcon weight="bold" className="size-3 shrink-0" />
+						)}
+					</span>
+					<span>{completedTasks.length}</span>
+				</button>
+				{isCompletedExpanded ? (
+					<div className="flex flex-col gap-px">
+						{completedTasks.map((task) => (
+							<TaskSidebarItem
+								key={task.id}
+								href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
+								fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+								task={task}
+								selected={task.id === currentTaskId}
+							/>
+						))}
+					</div>
+				) : null}
 			</div>
 		</div>
 	);
@@ -125,7 +168,7 @@ const TaskSidebarItem = ({
 		await db.transact(
 			taskTx(task.id).update({
 				completedAt: DateTime.now().toISO(),
-				status: "idle",
+				status: "complete",
 			}),
 		);
 	};
@@ -159,15 +202,8 @@ const TaskSidebarItem = ({
 					size={1.5}
 					active={selected}
 				/>
-				<span
-					className={cn(
-						"min-w-0 flex-1 truncate",
-						isCompleted ? "line-through decoration-grayscale-8" : "",
-					)}
-				>
-					{task.name}
-				</span>
-				<TaskStatusDots status={status} />
+				<span className="min-w-0 flex-1 truncate">{task.name}</span>
+				{isCompleted ? null : <TaskStatusDots status={status} />}
 			</ContextMenu.Trigger>
 			<ContextMenu.Portal>
 				<ContextMenu.Positioner>
