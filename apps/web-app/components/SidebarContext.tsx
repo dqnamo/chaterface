@@ -2,25 +2,94 @@
 
 import { SidebarSimpleIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
-import { createContext, useContext } from "react";
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useState,
+} from "react";
 import { cn } from "@/helpers/classname-helper";
 
+const MOBILE_QUERY = "(max-width: 767px)";
+
+export function useIsMobile() {
+	const [isMobile, setIsMobile] = useState(false);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia(MOBILE_QUERY);
+		const handleChange = (event: MediaQueryListEvent) =>
+			setIsMobile(event.matches);
+
+		setIsMobile(mediaQuery.matches);
+		mediaQuery.addEventListener("change", handleChange);
+
+		return () => mediaQuery.removeEventListener("change", handleChange);
+	}, []);
+
+	return isMobile;
+}
+
 type SidebarContextValue = {
+	isMobile: boolean;
+	// Left task sidebar
 	isCollapsed: boolean;
 	collapse: () => void;
 	expand: () => void;
 	toggle: () => void;
+	// Right preview panel (registered by pages that render one)
+	hasRightPanel: boolean;
+	setHasRightPanel: (value: boolean) => void;
+	isRightCollapsed: boolean;
+	collapseRight: () => void;
+	expandRight: () => void;
+	toggleRight: () => void;
 };
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
-export function SidebarProvider({
-	value,
-	children,
-}: {
-	value: SidebarContextValue;
-	children: React.ReactNode;
-}) {
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+	const isMobile = useIsMobile();
+
+	const [isCollapsed, setIsCollapsed] = useState(false);
+	const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+	const [hasRightPanel, setHasRightPanel] = useState(false);
+
+	// Default both drawers closed on mobile and open on desktop. Re-applied
+	// whenever we cross the mobile breakpoint.
+	useEffect(() => {
+		setIsCollapsed(isMobile);
+		setIsRightCollapsed(isMobile);
+	}, [isMobile]);
+
+	const collapse = useCallback(() => setIsCollapsed(true), []);
+	const expand = useCallback(() => setIsCollapsed(false), []);
+	const toggle = useCallback(
+		() => setIsCollapsed((collapsed) => !collapsed),
+		[],
+	);
+
+	const collapseRight = useCallback(() => setIsRightCollapsed(true), []);
+	const expandRight = useCallback(() => setIsRightCollapsed(false), []);
+	const toggleRight = useCallback(
+		() => setIsRightCollapsed((collapsed) => !collapsed),
+		[],
+	);
+
+	const value: SidebarContextValue = {
+		isMobile,
+		isCollapsed,
+		collapse,
+		expand,
+		toggle,
+		hasRightPanel,
+		setHasRightPanel,
+		isRightCollapsed,
+		collapseRight,
+		expandRight,
+		toggleRight,
+	};
+
 	return (
 		<SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
 	);
@@ -37,7 +106,12 @@ export function useSidebar() {
 }
 
 export function ExpandSidebarButton({ className }: { className?: string }) {
-	const { isCollapsed, expand } = useSidebar();
+	const { isCollapsed, expand, isMobile } = useSidebar();
+
+	// On mobile the header owns the sidebar toggle.
+	if (isMobile) {
+		return null;
+	}
 
 	return (
 		<AnimatePresence initial={false}>

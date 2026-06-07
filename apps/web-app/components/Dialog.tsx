@@ -62,7 +62,7 @@ function Popup({ className, children, ...props }: DialogPopupProps) {
 	return (
 		<BaseDialog.Popup
 			className={mergeClassName(
-				"group/popup fixed top-1/2 left-1/2 z-50 flex w-full max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col border border-grayscale-4 bg-white outline-none transition-all duration-200 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"group/popup fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col border border-grayscale-4 bg-white outline-none transition-all duration-200 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
 				className,
 			)}
 			{...props}

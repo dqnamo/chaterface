@@ -3,13 +3,13 @@
 import { AnimatePresence, motion } from "motion/react";
 import {
 	type PointerEvent as ReactPointerEvent,
-	useCallback,
-	useMemo,
 	useRef,
 	useState,
 } from "react";
+import MobileDrawer from "@/components/MobileDrawer";
+import MobileHeader from "@/components/MobileHeader";
 import Sidebar from "@/components/Sidebar";
-import { SidebarProvider } from "@/components/SidebarContext";
+import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 
 const MIN_SIDEBAR_SIZE = 160;
 const MAX_SIDEBAR_SIZE = 480;
@@ -20,24 +20,20 @@ export default function FactoryLayout({
 }: {
 	children: React.ReactNode;
 }) {
-	const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+	return (
+		<SidebarProvider>
+			<FactoryLayoutChrome>{children}</FactoryLayoutChrome>
+		</SidebarProvider>
+	);
+}
+
+function FactoryLayoutChrome({ children }: { children: React.ReactNode }) {
+	const { isMobile, isCollapsed, collapse } = useSidebar();
 	const [sidebarSize, setSidebarSize] = useState(DEFAULT_SIDEBAR_SIZE);
 	const isResizing = useRef(false);
 
-	const collapse = useCallback(() => setIsSidebarCollapsed(true), []);
-	const expand = useCallback(() => setIsSidebarCollapsed(false), []);
-	const toggle = useCallback(
-		() => setIsSidebarCollapsed((collapsed) => !collapsed),
-		[],
-	);
-
-	const sidebarContext = useMemo(
-		() => ({ isCollapsed: isSidebarCollapsed, collapse, expand, toggle }),
-		[isSidebarCollapsed, collapse, expand, toggle],
-	);
-
 	const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-		if (isSidebarCollapsed) {
+		if (isCollapsed) {
 			return;
 		}
 
@@ -69,36 +65,44 @@ export default function FactoryLayout({
 	};
 
 	return (
-		<SidebarProvider value={sidebarContext}>
-			<div className="relative flex h-full w-full overflow-hidden">
-				<motion.div
-					className="relative shrink-0"
-					style={{ width: sidebarSize }}
-					initial={false}
-					animate={{ marginLeft: isSidebarCollapsed ? -sidebarSize : 0 }}
-					transition={{ type: "spring", stiffness: 420, damping: 42 }}
-				>
-					<div className="h-full" style={{ width: sidebarSize }}>
-						<Sidebar onToggleCollapse={collapse} />
-					</div>
-				</motion.div>
+		<div className="relative flex h-full w-full flex-col overflow-hidden md:flex-row">
+			<MobileHeader />
 
-				<AnimatePresence initial={false}>
-					{!isSidebarCollapsed && (
-						<motion.div
-							aria-label="Resize task sidebar"
-							onPointerDown={startResize}
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							transition={{ duration: 0.15 }}
-							className="relative z-10 w-px shrink-0 cursor-col-resize bg-grayscale-4 transition-colors hover:bg-accent-8"
-						/>
-					)}
-				</AnimatePresence>
+			{isMobile ? (
+				<MobileDrawer side="left" isOpen={!isCollapsed} onClose={collapse}>
+					<Sidebar onToggleCollapse={collapse} />
+				</MobileDrawer>
+			) : (
+				<>
+					<motion.div
+						className="relative shrink-0"
+						style={{ width: sidebarSize }}
+						initial={false}
+						animate={{ marginLeft: isCollapsed ? -sidebarSize : 0 }}
+						transition={{ type: "spring", stiffness: 420, damping: 42 }}
+					>
+						<div className="h-full" style={{ width: sidebarSize }}>
+							<Sidebar onToggleCollapse={collapse} />
+						</div>
+					</motion.div>
 
-				<div className="relative min-w-0 flex-1">{children}</div>
-			</div>
-		</SidebarProvider>
+					<AnimatePresence initial={false}>
+						{!isCollapsed && (
+							<motion.div
+								aria-label="Resize task sidebar"
+								onPointerDown={startResize}
+								initial={{ opacity: 0 }}
+								animate={{ opacity: 1 }}
+								exit={{ opacity: 0 }}
+								transition={{ duration: 0.15 }}
+								className="relative z-10 w-px shrink-0 cursor-col-resize bg-grayscale-4 transition-colors hover:bg-accent-8"
+							/>
+						)}
+					</AnimatePresence>
+				</>
+			)}
+
+			<div className="relative min-w-0 flex-1">{children}</div>
+		</div>
 	);
 }

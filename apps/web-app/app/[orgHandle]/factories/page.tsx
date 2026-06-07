@@ -119,7 +119,7 @@ export default function FactoriesPage() {
 					Select a factory to manage your tasks
 				</p>
 			</div>
-			<div className="grid grid-cols-3 max-w-xl w-full mt-8 gap-2">
+			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-xl w-full mt-8 gap-2 px-4">
 				{factories?.map((factory) => (
 					<Link
 						key={factory.id}

@@ -34,8 +34,9 @@ import CornerCubes from "@/components/CornerCubes";
 import Event, { buildTimeline } from "@/components/Event";
 import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
-import { ExpandSidebarButton } from "@/components/SidebarContext";
+import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
+import { cn } from "@/helpers/classname-helper";
 
 const MIN_PREVIEW_SIZE = 320;
 const MAX_PREVIEW_SIZE = 720;
@@ -176,14 +177,26 @@ const getDiffHeaderIconClassName = (type: FileDiffMetadata["type"]) => {
 export default function TaskPage() {
 	const { taskId } = useParams();
 	const { user } = db.useAuth();
+	const {
+		isMobile,
+		isRightCollapsed,
+		collapseRight,
+		expandRight,
+		setHasRightPanel,
+	} = useSidebar();
 	const [message, setMessage] = useState("");
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
 	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
 		DEFAULT_CODEX_REASONING_EFFORT,
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
-	const [isPreviewCollapsed, setIsPreviewCollapsed] = useState(false);
 	const [previewSize, setPreviewSize] = useState(DEFAULT_PREVIEW_SIZE);
+
+	useEffect(() => {
+		setHasRightPanel(true);
+
+		return () => setHasRightPanel(false);
+	}, [setHasRightPanel]);
 	const [rightPanelTab, setRightPanelTab] = useState("services");
 	const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
 		null,
@@ -202,7 +215,7 @@ export default function TaskPage() {
 	}, [patchText, taskId]);
 
 	const startPreviewResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-		if (isPreviewCollapsed) {
+		if (isRightCollapsed) {
 			return;
 		}
 
@@ -380,8 +393,8 @@ export default function TaskPage() {
 	}
 
 	return (
-		<div className="flex h-dvh w-full overflow-hidden">
-			<div className="flex h-dvh min-w-0 flex-1 flex-col">
+		<div className="flex h-full w-full overflow-hidden">
+			<div className="flex h-full min-w-0 flex-1 flex-col">
 				<div className="flex flex-row items-center justify-between p-1.5 border-b border-grayscale-4">
 					<div className="flex flex-row items-center">
 						<ExpandSidebarButton />
@@ -407,11 +420,11 @@ export default function TaskPage() {
 							<p className="text-xs text-grayscale-12">Mark as complete</p>
 						</div>
 						<AnimatePresence initial={false}>
-							{isPreviewCollapsed && (
+							{!isMobile && isRightCollapsed && (
 								<motion.button
 									type="button"
 									aria-label="Expand preview panel"
-									onClick={() => setIsPreviewCollapsed(false)}
+									onClick={expandRight}
 									initial={{ width: 0, marginLeft: 0, opacity: 0 }}
 									animate={{ width: 24, marginLeft: 6, opacity: 1 }}
 									exit={{ width: 0, marginLeft: 0, opacity: 0 }}
@@ -489,24 +502,47 @@ export default function TaskPage() {
 					</div>
 				</div>
 			</div>
-			<AnimatePresence initial={false}>
-				{!isPreviewCollapsed && (
-					<motion.div
-						aria-label="Resize chat and service preview"
-						onPointerDown={startPreviewResize}
+			{!isMobile && (
+				<AnimatePresence initial={false}>
+					{!isRightCollapsed && (
+						<motion.div
+							aria-label="Resize chat and service preview"
+							onPointerDown={startPreviewResize}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							transition={{ duration: 0.15 }}
+							className="w-px shrink-0 cursor-col-resize bg-grayscale-4 transition-colors hover:bg-accent-8"
+						/>
+					)}
+				</AnimatePresence>
+			)}
+			<AnimatePresence>
+				{isMobile && !isRightCollapsed && (
+					<motion.button
+						type="button"
+						aria-label="Close preview panel"
+						onClick={collapseRight}
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
-						transition={{ duration: 0.15 }}
-						className="w-px shrink-0 cursor-col-resize bg-grayscale-4 transition-colors hover:bg-accent-8"
+						transition={{ duration: 0.2 }}
+						className="fixed inset-0 z-40 bg-grayscale-12/30"
 					/>
 				)}
 			</AnimatePresence>
 			<motion.div
-				className="relative flex shrink-0 flex-col"
-				style={{ width: previewSize }}
+				className={cn(
+					"relative flex shrink-0 flex-col",
+					isMobile && "fixed inset-y-0 right-0 z-50 w-full bg-grayscale-1",
+				)}
+				style={isMobile ? undefined : { width: previewSize }}
 				initial={false}
-				animate={{ marginRight: isPreviewCollapsed ? -previewSize : 0 }}
+				animate={
+					isMobile
+						? { x: isRightCollapsed ? "100%" : "0%" }
+						: { marginRight: isRightCollapsed ? -previewSize : 0 }
+				}
 				transition={{ type: "spring", stiffness: 420, damping: 42 }}
 			>
 				<Tabs.Root
@@ -527,7 +563,7 @@ export default function TaskPage() {
 						<button
 							type="button"
 							aria-label="Collapse preview panel"
-							onClick={() => setIsPreviewCollapsed(true)}
+							onClick={collapseRight}
 							className="ml-auto flex size-6 shrink-0 cursor-pointer items-center justify-center group bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
 						>
 							<SidebarSimpleIcon

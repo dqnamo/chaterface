@@ -62,7 +62,7 @@ export default function HomePage() {
 				<h1 className="text-md font-medium text-grayscale-12">Your Organisations</h1>
 				<p className="text-sm text-grayscale-11">Select your organisation to manage your factories</p>
 			</div>
-			<div className="grid grid-cols-3 max-w-xl w-full mt-8 gap-2">
+			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-xl w-full mt-8 gap-2 px-4">
 				{organisations?.map((organisation) => (
 					<Link key={organisation.id} href={`/${organisation.handle}/factories`} className="relative bg-white flex flex-row items-center gap-3 group border border-grayscale-4 p-3 transition-colors duration-150 hover:border-grayscale-6">
 						<CornerBrackets
