@@ -53,8 +53,10 @@ const _schema = i.schema({
 		}),
 		tasks: i.entity({
 			name: i.string().indexed(),
+			status: i.string().optional(),
 			instructions: i.string().optional(),
 			createdAt: i.date().optional(),
+			completedAt: i.date().optional(),
 			sandboxId: i.string().optional(),
 			agentThreadId: i.string().optional(),
 			agentPid: i.number().optional(),

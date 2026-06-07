@@ -1,17 +1,35 @@
 import type { InstaQLEntity } from "@instantdb/react";
+import {
+	CheckIcon,
+	SidebarSimpleIcon,
+	XCircleIcon,
+} from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import type { AppSchema } from "@repo/db/schema";
-import { SidebarSimpleIcon } from "@phosphor-icons/react";
+import { DateTime } from "luxon";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/helpers/classname-helper";
+import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import { Button } from "./Button";
+import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
+import TaskStatusDots from "./TaskStatusDots";
 
 type Task = InstaQLEntity<AppSchema, "tasks">;
 
 type SidebarProps = {
 	onToggleCollapse: () => void;
+};
+
+const taskTx = (taskId: string) => {
+	const tx = db.tx.tasks[taskId];
+
+	if (!tx) {
+		throw new Error(`Task transaction builder ${taskId} not found`);
+	}
+
+	return tx;
 };
 
 export default function Sidebar({ onToggleCollapse }: SidebarProps) {
@@ -46,9 +64,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					nativeButton={false}
 					className="w-full min-w-0 justify-between gap-4 py-2 pr-2 pl-3"
 					render={
-						<Link
-							href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-						/>
+						<Link href={`/${currentOrgHandle}/factories/${currentFactoryId}`} />
 					}
 				>
 					<p className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1">
@@ -72,6 +88,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					<TaskSidebarItem
 						key={task.id}
 						href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
+						fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
 						task={task}
 						selected={task.id === currentTaskId}
 					/>
@@ -82,30 +99,99 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 }
 
 const TaskSidebarItem = ({
+	fallbackHref,
 	href,
 	task,
 	selected,
 }: {
+	fallbackHref: string;
 	href: string;
 	task: Task;
 	selected: boolean;
 }) => {
+	const router = useRouter();
+	const status = toTaskDotStatus(task.status);
+	const isCompleted = Boolean(task.completedAt);
+
+	const markComplete = async () => {
+		if (isCompleted) {
+			return;
+		}
+
+		await db.transact(
+			taskTx(task.id).update({
+				completedAt: DateTime.now().toISO(),
+				status: "idle",
+			}),
+		);
+	};
+
+	const deleteTask = async () => {
+		await db.transact(taskTx(task.id).delete());
+
+		if (selected) {
+			router.push(fallbackHref);
+		}
+	};
+
 	return (
-		<Link
-			key={task.id}
-			href={href}
-			className={cn(
-				"group relative block truncate text-sm text-grayscale-11 hover:text-grayscale-12 transition-colors px-3 py-1.5 hover:bg-grayscale-2",
-				selected ? "bg-grayscale-3" : "",
-			)}
-		>
-			<CornerBrackets
-				placement="inside"
-				color={selected ? "accent-9" : "grayscale-8"}
-				size={1.5}
-				active={selected}
-			/>
-			{task.name}
-		</Link>
+		<ContextMenu.Root>
+			<ContextMenu.Trigger
+				render={
+					<Link
+						key={task.id}
+						href={href}
+						className={cn(
+							"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+							selected ? "bg-grayscale-3" : "",
+							isCompleted ? "text-grayscale-9" : "",
+						)}
+					/>
+				}
+			>
+				<CornerBrackets
+					placement="inside"
+					color={selected ? "accent-9" : "grayscale-8"}
+					size={1.5}
+					active={selected}
+				/>
+				<span
+					className={cn(
+						"min-w-0 flex-1 truncate",
+						isCompleted ? "line-through decoration-grayscale-8" : "",
+					)}
+				>
+					{task.name}
+				</span>
+				<TaskStatusDots status={status} />
+			</ContextMenu.Trigger>
+			<ContextMenu.Portal>
+				<ContextMenu.Positioner>
+					<ContextMenu.Popup>
+						<ContextMenu.Item onClick={markComplete} disabled={isCompleted}>
+							<CheckIcon size={14} weight="bold" className="shrink-0" />
+							<span>Mark complete</span>
+						</ContextMenu.Item>
+						<ContextMenu.Separator />
+						<ContextMenu.Item
+							onClick={deleteTask}
+							cornerColor="var(--color-red-9)"
+							cornerClassName="group-data-[highlighted]:opacity-100 group-data-[highlighted]:translate-x-0 group-data-[highlighted]:translate-y-0"
+							className="text-grayscale-12 data-[highlighted]:bg-red-3"
+						>
+							<XCircleIcon
+								weight="bold"
+								className="size-4 shrink-0 text-red-9 group-data-[highlighted]:hidden"
+							/>
+							<XCircleIcon
+								weight="fill"
+								className="hidden size-4 shrink-0 text-red-9 group-data-[highlighted]:block"
+							/>
+							<span>Delete</span>
+						</ContextMenu.Item>
+					</ContextMenu.Popup>
+				</ContextMenu.Positioner>
+			</ContextMenu.Portal>
+		</ContextMenu.Root>
 	);
 };

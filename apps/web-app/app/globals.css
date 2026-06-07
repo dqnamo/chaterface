@@ -88,3 +88,18 @@
 	--color-blue-12: var(--blue-12);	
 }
 
+@keyframes task-status-dot-spin {
+	0%,
+	100% {
+		opacity: 0.2;
+	}
+
+	50% {
+		opacity: 1;
+	}
+}
+
+.task-status-dot--running {
+	animation: task-status-dot-spin 0.9s ease-in-out infinite;
+}
+

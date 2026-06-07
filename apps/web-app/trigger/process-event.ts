@@ -68,6 +68,17 @@ const taskTx = (taskId: string) => {
 	return tx;
 };
 
+const updateTaskStatus = async (
+	taskId: string,
+	status: "idle" | "in_progress" | "failed",
+) => {
+	await db.transact(
+		taskTx(taskId).update({
+			status,
+		}),
+	);
+};
+
 const eventTx = (eventId: string) => {
 	const tx = db.tx.events[eventId];
 
@@ -111,15 +122,20 @@ export const processEventTask = task({
 			return;
 		}
 
-		if (event?.type === "factoryplane.new_task") {
-			await processNewTask(agent as Agent, task as Task, factory as Factory);
-		} else if (event?.type === "factoryplane.new_user_message") {
-			await processNewUserMessage(
-				event as Event,
-				task as Task,
-				agent as Agent,
-				factory as Factory,
-			);
+		try {
+			if (event?.type === "factoryplane.new_task") {
+				await processNewTask(agent as Agent, task as Task, factory as Factory);
+			} else if (event?.type === "factoryplane.new_user_message") {
+				await processNewUserMessage(
+					event as Event,
+					task as Task,
+					agent as Agent,
+					factory as Factory,
+				);
+			}
+		} catch (error) {
+			await updateTaskStatus(task.id, "failed");
+			throw error;
 		}
 	},
 });
@@ -253,6 +269,10 @@ const runCodexExec = async (
 	try {
 		const result = await command.wait();
 		console.log(result);
+
+		if (!wasInterrupted) {
+			await updateTaskStatus(task.id, "idle");
+		}
 	} catch (error) {
 		const currentPid = await getTaskAgentPid(task.id);
 

@@ -81,6 +81,7 @@ export default function FactoryPage() {
 			taskTx(taskId)
 				.create({
 					name: taskName,
+					status: "in_progress",
 					instructions: taskInstructions,
 					createdAt: DateTime.now().toISO(),
 					agentModel,
@@ -133,9 +134,11 @@ export default function FactoryPage() {
 					</div>
 					<Input
 						type="text"
+						className="text-sm"
 						placeholder="Task Name"
 						value={taskName}
 						onChange={(e) => setTaskName(e.target.value)}
+						onSubmit={createTask}
 					/>
 				</div>
 				<div className="flex flex-col p-3 gap-3">
@@ -146,9 +149,11 @@ export default function FactoryPage() {
 						</p>
 					</div>
 					<Textarea
+						className="text-sm"
 						placeholder="Task Instructions"
 						value={taskInstructions}
 						onChange={(e) => setTaskInstructions(e.target.value)}
+						onSubmit={createTask}
 					/>
 				</div>
 				<div className="flex flex-row items-center justify-between p-3">
@@ -206,9 +211,6 @@ export default function FactoryPage() {
 				</div>
 			</div>
 
-			<p className="text-xs mt-4 text-grayscale-10">
-				Press ⌘ + Enter to create more tasks.
-			</p>
 			{/* <input
 				type="text"
 				placeholder="Task Name"

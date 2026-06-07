@@ -20,8 +20,11 @@ import { useParams } from "next/navigation";
 import {
 	type CSSProperties,
 	type PointerEvent as ReactPointerEvent,
+	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import {
@@ -251,17 +254,92 @@ export default function TaskPage() {
 					id: taskId as string,
 				},
 			},
-			events: {},
 			services: {},
 		},
 	});
 
+	const {
+		data: eventsData,
+		canLoadNextPage,
+		loadNextPage,
+	} = db.useInfiniteQuery({
+		events: {
+			$: {
+				where: {
+					"task.id": taskId as string,
+				},
+				limit: 30,
+				order: {
+					serverCreatedAt: "desc",
+				},
+			},
+		},
+	});
+
 	const task = data?.tasks?.[0];
-	const events = task?.events;
+	const events = eventsData?.events;
 	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
 	const services = task?.services ?? [];
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
+
+	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+	const isPinnedToBottomRef = useRef(true);
+	const isLoadingOlderRef = useRef(false);
+	const previousScrollHeightRef = useRef(0);
+	const hasInitialScrolledRef = useRef(false);
+
+	const handleScroll = useCallback(() => {
+		const container = scrollContainerRef.current;
+
+		if (!container) {
+			return;
+		}
+
+		const distanceFromBottom =
+			container.scrollHeight - container.scrollTop - container.clientHeight;
+		isPinnedToBottomRef.current = distanceFromBottom < 80;
+
+		if (
+			container.scrollTop < 80 &&
+			canLoadNextPage &&
+			!isLoadingOlderRef.current
+		) {
+			isLoadingOlderRef.current = true;
+			previousScrollHeightRef.current = container.scrollHeight;
+			loadNextPage();
+		}
+	}, [canLoadNextPage, loadNextPage]);
+
+	useLayoutEffect(() => {
+		const container = scrollContainerRef.current;
+
+		if (!container || timeline.length === 0) {
+			return;
+		}
+
+		// First time we have messages, jump straight to the newest ones.
+		if (!hasInitialScrolledRef.current) {
+			container.scrollTop = container.scrollHeight;
+			hasInitialScrolledRef.current = true;
+			return;
+		}
+
+		// Older messages were just prepended; keep the viewport anchored so the
+		// content the user was reading doesn't jump.
+		if (isLoadingOlderRef.current) {
+			const heightDelta =
+				container.scrollHeight - previousScrollHeightRef.current;
+			container.scrollTop += heightDelta;
+			isLoadingOlderRef.current = false;
+			return;
+		}
+
+		// New messages arrived while the user was at the bottom: follow along.
+		if (isPinnedToBottomRef.current) {
+			container.scrollTop = container.scrollHeight;
+		}
+	}, [timeline]);
 
 	const stopService = async (serviceId: string) => {
 		await db.transact(serviceTx(serviceId).delete());
@@ -362,10 +440,12 @@ export default function TaskPage() {
 			return;
 		}
 
+		isPinnedToBottomRef.current = true;
 		setMessage("");
 
 		await db.transact(
 			taskTx(task.id).update({
+				status: "in_progress",
 				agentModel,
 				agentReasoningEffort,
 				agentSpeed,
@@ -442,8 +522,21 @@ export default function TaskPage() {
 						</AnimatePresence>
 					</div>
 				</div>
-				<div className="flex h-full flex-col gap-4 overflow-y-auto">
+				<div
+					ref={scrollContainerRef}
+					onScroll={handleScroll}
+					className="flex h-full flex-col gap-4 overflow-y-auto"
+				>
 					<div className="flex flex-col p-4 max-w-3xl mx-auto w-full">
+						{canLoadNextPage && (
+							<button
+								type="button"
+								onClick={loadNextPage}
+								className="mx-auto mb-2 text-xs text-grayscale-10 hover:text-grayscale-12"
+							>
+								Load earlier messages
+							</button>
+						)}
 						<AnimatePresence initial={false}>
 							{timeline.map((node) => (
 								<Event key={node.key} node={node} />
@@ -465,9 +558,11 @@ export default function TaskPage() {
 
 							<div className="flex flex-col p-3 gap-3">
 								<Textarea
+									className="text-sm"
 									placeholder="Task Instructions"
 									value={message}
 									onChange={(e) => setMessage(e.target.value)}
+									onSubmit={sendMessage}
 								/>
 							</div>
 							<div className="flex flex-row items-center justify-between p-3">

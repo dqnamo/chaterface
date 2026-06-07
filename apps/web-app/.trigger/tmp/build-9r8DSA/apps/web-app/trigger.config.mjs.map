@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../../trigger.config.ts"],
+  "sourcesContent": ["import { additionalFiles } from \"@trigger.dev/build/extensions/core\";\nimport { defineConfig } from \"@trigger.dev/sdk\";\n\nexport default defineConfig({\n\t\t\t\tproject: process.env.TRIGGER_PROJECT_REF ?? \"proj_set_in_env_local\",\n\t\t\t\tdirs: [\"./trigger\"],\n\t\t\t\tmaxDuration: 900,\n\t\t\t\tlegacyDevProcessCwdBehaviour: false,\n\t\t\t\tbuild: {},\n});\nexport const resolveEnvVars = undefined;"],
+  "mappings": ";;;;;;;;;;;;;AAAA;AAGA,IAAO,yBAAQ,aAAa;AAAA,EACxB,SAAS,QAAQ,IAAI,uBAAuB;AAAA,EAC5C,MAAM,CAAC,WAAW;AAAA,EAClB,aAAa;AAAA,EACb,8BAA8B;AAAA,EAC9B,OAAO,CAAC;AACZ,CAAC;AACM,IAAM,iBAAiB;",
+  "names": []
+}
