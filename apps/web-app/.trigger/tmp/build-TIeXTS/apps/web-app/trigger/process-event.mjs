@@ -173,6 +173,13 @@ var taskTx = /* @__PURE__ */ __name((taskId) => {
   }
   return tx;
 }, "taskTx");
+var eventTx = /* @__PURE__ */ __name((eventId) => {
+  const tx = admin_default.tx.events[eventId];
+  if (!tx) {
+    throw new Error(`Event transaction builder ${eventId} not found`);
+  }
+  return tx;
+}, "eventTx");
 var processEventTask = task({
   id: "process-event",
   retry: {
@@ -241,25 +248,47 @@ var setupTaskSandbox = /* @__PURE__ */ __name(async (agent, task2, factory) => {
   if (!agent.auth || !factory) {
     throw new Error(`Agent ${agent.id} is missing auth or factory`);
   }
-  const sandbox = await import_e2b.Sandbox.create("codex", {
-    timeoutMs: 10 * 60 * 1e3,
-    lifecycle: {
-      onTimeout: "pause",
-      autoResume: true
-    }
-  });
+  const sandbox = await runSetupStep(
+    task2.id,
+    "sandbox",
+    "Create sandbox",
+    () => import_e2b.Sandbox.create("codex", {
+      timeoutMs: 10 * 60 * 1e3,
+      lifecycle: {
+        onTimeout: "pause",
+        autoResume: true
+      }
+    }),
+    { timeoutMs: 12e4 }
+  );
   await admin_default.transact(
     taskTx(task2.id).update({
       sandboxId: sandbox.sandboxId
     })
   );
-  await sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth));
-  const codexUpdate = await sandbox.commands.run(
-    "npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
-    { timeoutMs: 0 }
+  await runSetupStep(
+    task2.id,
+    "codex_auth",
+    "Write Codex auth",
+    () => sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth))
+  );
+  const codexUpdate = await runSetupStep(
+    task2.id,
+    "codex_update",
+    "Update Codex",
+    () => sandbox.commands.run(
+      "npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
+      { timeoutMs: 12e4 }
+    ),
+    { timeoutMs: 13e4 }
   );
   console.log(codexUpdate);
-  const diffWorkspacePath = await createTaskWorkspaceBaseline(sandbox, task2.id);
+  const diffWorkspacePath = await runSetupStep(
+    task2.id,
+    "diff_baseline",
+    "Create diff baseline",
+    () => createTaskWorkspaceBaseline(sandbox, task2.id)
+  );
   await admin_default.transact(
     taskTx(task2.id).update({
       diffWorkspacePath
@@ -270,9 +299,11 @@ var setupTaskSandbox = /* @__PURE__ */ __name(async (agent, task2, factory) => {
 var runCodexExec = /* @__PURE__ */ __name(async (sandbox, task2, factory, prompt, options = {}, agentId) => {
   const { envs, agentToken } = await setupRun(sandbox, task2, factory);
   const output = createCodexOutputHandler(task2.id);
-  const command = await sandbox.commands.run(
-    buildCodexExecCommand(task2, prompt, options),
-    {
+  const command = await runSetupStep(
+    task2.id,
+    "codex_launch",
+    options.resumeLast ? "Resume Codex" : "Start Codex",
+    () => sandbox.commands.run(buildCodexExecCommand(task2, prompt, options), {
       background: true,
       timeoutMs: 0,
       envs,
@@ -280,7 +311,7 @@ var runCodexExec = /* @__PURE__ */ __name(async (sandbox, task2, factory, prompt
       onStderr: /* @__PURE__ */ __name((data) => {
         console.error(data);
       }, "onStderr")
-    }
+    })
   );
   await updateTaskAgentPid(task2.id, command.pid);
   let wasInterrupted = false;
@@ -434,27 +465,63 @@ var setupRun = /* @__PURE__ */ __name(async (sandbox, task2, factory) => {
       agentToken
     })
   );
-  const encryptionService = createEncryptionService(
-    process.env.SECRET_ENCRYPTION_KEY ?? ""
-  );
-  if (!factory.githubAccessTokenEncrypted) {
-    throw new Error(`Factory ${factory.id} is missing GitHub access token`);
-  }
-  const githubAccessToken = await encryptionService.decrypt(
-    factory.githubAccessTokenEncrypted
-  );
   const envs = {
-    FACTORYPLANE_AUTH_TOKEN: agentToken,
-    GITHUB_ACCESS_TOKEN: githubAccessToken
+    FACTORYPLANE_AUTH_TOKEN: agentToken
   };
-  const ghAuth = await sandbox.commands.run(
-    'printf "%s" "$GITHUB_ACCESS_TOKEN" | gh auth login --with-token',
-    {
-      timeoutMs: 3e4,
-      envs
+  await runOptionalSetupStep(
+    task2.id,
+    "github_auth",
+    "Validate GitHub token",
+    async () => {
+      const encryptionService = createEncryptionService(
+        process.env.SECRET_ENCRYPTION_KEY ?? ""
+      );
+      if (!factory.githubAccessTokenEncrypted) {
+        throw new Error(`Factory ${factory.id} is missing GitHub access token`);
+      }
+      const githubAccessToken = await encryptionService.decrypt(
+        factory.githubAccessTokenEncrypted
+      );
+      envs.GITHUB_ACCESS_TOKEN = githubAccessToken;
+      envs.GH_TOKEN = githubAccessToken;
+      let authStderr = "";
+      try {
+        const ghAuth = await sandbox.commands.run(
+          [
+            "set +e",
+            'login="$(gh api user --jq .login 2>&1)"',
+            "status=$?",
+            'if [ "$status" -ne 0 ]; then',
+            '  printf "GitHub CLI auth failed while validating factory GitHub token:\\n%s\\n" "$login" >&2',
+            '  exit "$status"',
+            "fi",
+            'printf "Authenticated GitHub CLI as %s\\n" "$login"'
+          ].join("\n"),
+          {
+            timeoutMs: 3e4,
+            envs,
+            onStdout: /* @__PURE__ */ __name((data) => {
+              console.log(data);
+            }, "onStdout"),
+            onStderr: /* @__PURE__ */ __name((data) => {
+              authStderr += data;
+              console.error(data);
+            }, "onStderr")
+          }
+        );
+        console.log(ghAuth);
+      } catch (error) {
+        delete envs.GITHUB_ACCESS_TOKEN;
+        delete envs.GH_TOKEN;
+        throw new Error(
+          [
+            "GitHub CLI auth failed",
+            authStderr.trim() || getErrorMessage(error)
+          ].join(": ")
+        );
+      }
     }
   );
-  console.log(ghAuth);
   return { envs, agentToken };
 }, "setupRun");
 var postRun = /* @__PURE__ */ __name(async (taskId, agentToken) => {
@@ -631,11 +698,11 @@ var persistCodexEvents = /* @__PURE__ */ __name(async (taskId, events) => {
   }
   await admin_default.transact(
     events.map((event) => {
-      const eventTx = admin_default.tx.events[randomUUID()];
-      if (!eventTx) {
+      const eventTx2 = admin_default.tx.events[randomUUID()];
+      if (!eventTx2) {
         throw new Error("Failed to create InstantDB event transaction");
       }
-      return eventTx.create({
+      return eventTx2.create({
         type: event.type,
         data: event.data,
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -643,6 +710,83 @@ var persistCodexEvents = /* @__PURE__ */ __name(async (taskId, events) => {
     })
   );
 }, "persistCodexEvents");
+var runSetupStep = /* @__PURE__ */ __name(async (taskId, step, title, action, options = {}) => {
+  console.log("Setup step started", { taskId, step, title });
+  await persistFactoryplaneEvent(taskId, "factoryplane.setup_step_started", {
+    step,
+    title,
+    status: "started"
+  });
+  try {
+    const result = await runWithTimeout(action(), title, options.timeoutMs);
+    console.log("Setup step completed", { taskId, step, title });
+    await persistFactoryplaneEvent(
+      taskId,
+      "factoryplane.setup_step_completed",
+      {
+        step,
+        title,
+        status: "completed"
+      }
+    );
+    return result;
+  } catch (error) {
+    console.error("Setup step failed", {
+      taskId,
+      step,
+      title,
+      error
+    });
+    await persistFactoryplaneEvent(taskId, "factoryplane.setup_step_failed", {
+      step,
+      title,
+      status: "failed",
+      error: getErrorMessage(error)
+    });
+    throw error;
+  }
+}, "runSetupStep");
+var runWithTimeout = /* @__PURE__ */ __name(async (promise, label, timeoutMs) => {
+  if (!timeoutMs) {
+    return promise;
+  }
+  let timeout;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}, "runWithTimeout");
+var runOptionalSetupStep = /* @__PURE__ */ __name(async (taskId, step, title, action) => {
+  try {
+    await runSetupStep(taskId, step, title, action);
+  } catch (error) {
+    console.warn("Optional setup step failed", {
+      taskId,
+      step,
+      error
+    });
+  }
+}, "runOptionalSetupStep");
+var persistFactoryplaneEvent = /* @__PURE__ */ __name(async (taskId, type, data) => {
+  await admin_default.transact(
+    eventTx(randomUUID()).create({
+      type,
+      data,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    }).link({ task: taskId })
+  );
+}, "persistFactoryplaneEvent");
+var getErrorMessage = /* @__PURE__ */ __name((error) => {
+  return error instanceof Error ? error.message : String(error);
+}, "getErrorMessage");
 var getStringDataValue = /* @__PURE__ */ __name((data, key) => {
   if (!isRecord(data)) {
     return void 0;

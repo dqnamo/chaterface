@@ -6,17 +6,17 @@ import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import Logo from "@/components/Logo";
 import {
-	CODEX_MODEL_OPTIONS,
-	CODEX_REASONING_EFFORT_OPTIONS,
-	CODEX_SPEED_OPTIONS,
 	DEFAULT_CODEX_MODEL,
 	DEFAULT_CODEX_REASONING_EFFORT,
 	DEFAULT_CODEX_SPEED,
 } from "@/codex-options";
 import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
+import { Input, Textarea } from "@/components/Input";
+import Logo from "@/components/Logo";
+import { ModelConfigMenu } from "@/components/ModelConfigMenu";
+import { Select } from "@/components/Select";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 
 const taskTx = (taskId: string) => {
@@ -68,6 +68,8 @@ export default function FactoryPage() {
 	const tasks = data?.tasks;
 	const agents = data?.agents;
 	const resolvedAgentId = agentId || agents?.[0]?.id;
+	const agentItems =
+		agents?.map((agent) => ({ value: agent.id, label: agent.name })) ?? [];
 
 	const createTask = async () => {
 		if (!resolvedAgentId) {
@@ -111,8 +113,9 @@ export default function FactoryPage() {
 			<ExpandSidebarButton className="absolute left-2 top-2 z-20" />
 			<Logo size={8} />
 			<div className="flex flex-col gap-px items-center justify-center">
-				<h1 className="text-lg font-medium text-grayscale-12">What do you want to build?</h1>
-				
+				<h1 className="text-lg font-medium text-grayscale-12">
+					What do you want to build?
+				</h1>
 			</div>
 			<div className="flex flex-col max-w-xl w-full bg-white border border-grayscale-4 relative">
 				<CornerCubes
@@ -128,55 +131,68 @@ export default function FactoryPage() {
 						<p className="text-xs text-grayscale-11">Name</p>
 						<p className="text-xs text-grayscale-10">The name of the task.</p>
 					</div>
-					<input type="text" placeholder="Task Name" className="bg-grayscale-2 p-2 focus:border-b-grayscale-8 transition-colors duration-150 text-xs outline-none" value={taskName} onChange={(e) => setTaskName(e.target.value)} />
+					<Input
+						type="text"
+						placeholder="Task Name"
+						value={taskName}
+						onChange={(e) => setTaskName(e.target.value)}
+					/>
 				</div>
 				<div className="flex flex-col p-3 gap-3">
 					<div className="flex flex-col">
 						<p className="text-xs text-grayscale-11">Instructions</p>
-						<p className="text-xs text-grayscale-10">The instructions for the task.</p>
+						<p className="text-xs text-grayscale-10">
+							The instructions for the task.
+						</p>
 					</div>
-					<textarea placeholder="Task Instructions" className="bg-grayscale-2 p-2 focus:border-b-grayscale-8 transition-colors duration-150 text-xs outline-none resize-none min-h-24" value={taskInstructions} onChange={(e) => setTaskInstructions(e.target.value)} />
+					<Textarea
+						placeholder="Task Instructions"
+						value={taskInstructions}
+						onChange={(e) => setTaskInstructions(e.target.value)}
+					/>
 				</div>
 				<div className="flex flex-row items-center justify-between p-3">
 					<div className="flex flex-row items-center justify-center gap-2">
-						<div className="relative group overflow-visible">
-							<CornerBrackets
-								placement="outside"
-								spacing={1}
-								translate={1.5}
-								size={1.5}
-								color="grayscale-8"
-							/>
-							<select value={resolvedAgentId ?? ""} onChange={(e) => setAgentId(e.target.value)} className="text-xs outline-none border border-grayscale-4 p-2">
-								<option value="">Select an agent</option>
-								{agents?.map((agent) => (
-									<option value={agent.id} key={agent.id}>
-										{agent.name}
-									</option>
-								))}
-							</select>
-						</div>
+						<Select.Root
+							items={agentItems}
+							value={resolvedAgentId ?? null}
+							onValueChange={(value) => setAgentId(value ?? "")}
+						>
+							<Select.Trigger>
+								<Select.Value placeholder="Select an agent" />
+								<Select.Icon />
+							</Select.Trigger>
+							<Select.Portal>
+								<Select.Positioner>
+									<Select.Popup>
+										<Select.List>
+											{agents?.map((agent) => (
+												<Select.Item value={agent.id} key={agent.id}>
+													<Select.ItemText>{agent.name}</Select.ItemText>
+													<Select.ItemIndicator />
+												</Select.Item>
+											))}
+										</Select.List>
+									</Select.Popup>
+								</Select.Positioner>
+							</Select.Portal>
+						</Select.Root>
 
-						<div className="relative group overflow-visible">
-							<CornerBrackets
-								placement="outside"
-								spacing={1}
-								translate={1.5}
-								size={1.5}
-								color="grayscale-8"
-							/>
-							<select value={agentModel} onChange={(e) => setAgentModel(e.target.value)} className="text-xs outline-none border border-grayscale-4 p-2">
-								<option value="">Select a model</option>
-								{CODEX_MODEL_OPTIONS.map((option) => (
-									<option value={option.value} key={option.value}>
-										{option.label}
-									</option>
-								))}
-							</select>
-						</div>
+						<ModelConfigMenu
+							model={agentModel}
+							reasoningEffort={agentReasoningEffort}
+							speed={agentSpeed}
+							onModelChange={setAgentModel}
+							onReasoningEffortChange={setAgentReasoningEffort}
+							onSpeedChange={setAgentSpeed}
+						/>
 					</div>
 					<div className="flex flex-row items-center justify-center gap-2 ml-auto">
-						<button type="button" onClick={createTask} className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible">
+						<button
+							type="button"
+							onClick={createTask}
+							className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
+						>
 							<CornerBrackets
 								placement="outside"
 								spacing={1}
@@ -186,11 +202,13 @@ export default function FactoryPage() {
 							/>
 							Create Task
 						</button>
-						</div>
+					</div>
 				</div>
 			</div>
 
-			<p className="text-xs mt-4 text-grayscale-10">Press ⌘ + Enter to create more tasks.</p>
+			<p className="text-xs mt-4 text-grayscale-10">
+				Press ⌘ + Enter to create more tasks.
+			</p>
 			{/* <input
 				type="text"
 				placeholder="Task Name"

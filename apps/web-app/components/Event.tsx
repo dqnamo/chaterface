@@ -1,4 +1,10 @@
+import {
+	CheckCircleIcon,
+	CircleNotchIcon,
+	XCircleIcon,
+} from "@phosphor-icons/react";
 import type { InstaQLEntity } from "@instantdb/react";
+import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import type { AppSchema } from "@/instant.schema";
 import Logo from "./Logo";
@@ -7,32 +13,150 @@ type EventEntity = InstaQLEntity<AppSchema, "events">;
 type JsonRecord = Record<string, unknown>;
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 
-const OUTPUT_PREVIEW_LIMIT = 6000;
+/** A resolved lifecycle state for a grouped (started -> finished) timeline row. */
+export type TimelinePhase = "running" | "success" | "failed";
 
-const toneClasses: Record<Tone, { icon: string; pill: string }> = {
-	neutral: {
-		icon: "bg-grayscale-3 text-grayscale-11",
-		pill: "bg-grayscale-3 text-grayscale-11",
-	},
-	accent: {
-		icon: "bg-accent-3 text-accent-11",
-		pill: "bg-accent-3 text-accent-11",
-	},
-	success: {
-		icon: "bg-accent-3 text-accent-11",
-		pill: "bg-accent-3 text-accent-11",
-	},
-	warning: {
-		icon: "bg-grayscale-3 text-grayscale-12",
-		pill: "bg-grayscale-3 text-grayscale-12",
-	},
-	danger: {
-		icon: "bg-red-100 text-red-700",
-		pill: "bg-red-100 text-red-700",
-	},
+/**
+ * A single row in the timeline. Lifecycle events that share a key (e.g. a
+ * setup step's `started` and `completed` events) are folded into one node so
+ * the row stays in place and just updates its icon as it progresses.
+ */
+export type TimelineNode = {
+	key: string;
+	event: EventEntity;
+	phase?: TimelinePhase;
+	startedAt?: string;
 };
 
-export default function Event({ event }: { event: EventEntity }) {
+const OUTPUT_PREVIEW_LIMIT = 6000;
+
+const toneClasses: Record<Tone, string> = {
+	neutral: "bg-grayscale-3 text-grayscale-11",
+	accent: "bg-accent-3 text-accent-11",
+	success: "bg-green-3 text-green-11",
+	warning: "bg-grayscale-3 text-grayscale-12",
+	danger: "bg-red-3 text-red-11",
+};
+
+const phaseClasses: Record<TimelinePhase, string> = {
+	running: "bg-accent-3 text-accent-11",
+	success: "bg-green-3 text-green-11",
+	failed: "bg-red-3 text-red-11",
+};
+
+/**
+ * Folds a flat list of events into timeline nodes, merging lifecycle pairs
+ * (started/completed/failed) that describe the same underlying unit of work.
+ */
+export function buildTimeline(events: readonly EventEntity[]): TimelineNode[] {
+	const sorted = [...events].sort((a, b) => {
+		// The task creation event always leads the timeline.
+		const aIsNewTask = a.type === "factoryplane.new_task";
+		const bIsNewTask = b.type === "factoryplane.new_task";
+
+		if (aIsNewTask !== bIsNewTask) {
+			return aIsNewTask ? -1 : 1;
+		}
+
+		return String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? ""));
+	});
+
+	const nodes: TimelineNode[] = [];
+	const indexByKey = new Map<string, number>();
+
+	for (const event of sorted) {
+		// Turn completion is implied by the next event arriving; drop the noise.
+		if (event.type === "codex.turn.completed") {
+			continue;
+		}
+
+		const group = groupInfoFor(event);
+
+		if (!group) {
+			nodes.push({ key: event.id, event });
+			continue;
+		}
+
+		const existingIndex = indexByKey.get(group.key);
+
+		if (existingIndex === undefined) {
+			indexByKey.set(group.key, nodes.length);
+			nodes.push({
+				key: group.key,
+				event,
+				phase: group.phase,
+				startedAt: event.createdAt ? String(event.createdAt) : undefined,
+			});
+			continue;
+		}
+
+		const node = nodes[existingIndex];
+
+		if (node) {
+			node.event = event;
+			node.phase = mergePhase(node.phase, group.phase);
+		}
+	}
+
+	return nodes;
+}
+
+function groupInfoFor(
+	event: EventEntity,
+): { key: string; phase: TimelinePhase } | null {
+	const type = event.type ?? "";
+	const data = asRecord(event.data) ?? {};
+
+	if (type.startsWith("factoryplane.setup_step_")) {
+		const step = getString(data, "step") ?? "step";
+		const phase: TimelinePhase = type.endsWith("_failed")
+			? "failed"
+			: type.endsWith("_completed")
+				? "success"
+				: "running";
+
+		return { key: `setup:${step}`, phase };
+	}
+
+	if (type.startsWith("codex.item.")) {
+		const item = asRecord(data.item);
+		const itemType = item ? getString(item, "type") : undefined;
+
+		if (item && (itemType === "command_execution" || itemType === "file_change")) {
+			const id = getString(item, "id") ?? event.id;
+			const status = getString(item, "status");
+			const exitCode = getNumber(item, "exit_code");
+			const phase: TimelinePhase =
+				status === "failed" || (exitCode !== undefined && exitCode !== 0)
+					? "failed"
+					: status === "completed" || type.endsWith(".completed")
+						? "success"
+						: "running";
+
+			return { key: `item:${id}`, phase };
+		}
+	}
+
+	return null;
+}
+
+function mergePhase(
+	prev: TimelinePhase | undefined,
+	next: TimelinePhase,
+): TimelinePhase {
+	if (prev === "failed" || next === "failed") {
+		return "failed";
+	}
+
+	if (prev === "success" || next === "success") {
+		return "success";
+	}
+
+	return next;
+}
+
+export default function Event({ node }: { node: TimelineNode }) {
+	const { event, phase } = node;
 	const type = event.type ?? "event";
 	const data = asRecord(event.data) ?? {};
 	const timestamp = formatTimestamp(event.createdAt);
@@ -40,7 +164,7 @@ export default function Event({ event }: { event: EventEntity }) {
 	if (type === "factoryplane.new_task") {
 		return (
 			<EventCard
-				icon="FP"
+				glyph="FP"
 				logo
 				meta={timestamp}
 				subtitle={getString(data, "taskId")}
@@ -52,7 +176,7 @@ export default function Event({ event }: { event: EventEntity }) {
 
 	if (type === "factoryplane.new_user_message") {
 		return (
-			<EventCard icon="ME" meta={timestamp} title="Message sent" tone="neutral">
+			<EventCard glyph="ME" meta={timestamp} title="Message sent" tone="neutral">
 				<MessageBubble>
 					{getString(data, "content") ?? "Empty message"}
 				</MessageBubble>
@@ -64,10 +188,14 @@ export default function Event({ event }: { event: EventEntity }) {
 		return <ServiceEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
+	if (type.startsWith("factoryplane.setup_step_")) {
+		return <SetupStepEvent data={data} phase={phase} timestamp={timestamp} />;
+	}
+
 	if (type === "codex.thread.started") {
 		return (
 			<EventCard
-				icon="AI"
+				glyph="AI"
 				meta={timestamp}
 				subtitle={getString(data, "threadId")}
 				title="Agent thread started"
@@ -76,27 +204,61 @@ export default function Event({ event }: { event: EventEntity }) {
 		);
 	}
 
-	if (type === "codex.turn.completed") {
-		return null;
-	}
-
 	if (type === "codex.turn.started") {
-		return <CodexTurnStartedEvent timestamp={timestamp} />;
+		return (
+			<EventCard
+				glyph="AI"
+				meta={timestamp}
+				title="Agent turn started"
+				tone="accent"
+			/>
+		);
 	}
 
 	if (type.startsWith("codex.item.")) {
-		return <CodexItemEvent data={data} timestamp={timestamp} type={type} />;
+		return (
+			<CodexItemEvent
+				data={data}
+				phase={phase}
+				timestamp={timestamp}
+				type={type}
+			/>
+		);
 	}
 
 	return (
 		<EventCard
-			icon="EV"
+			glyph="EV"
 			meta={timestamp}
+			phase={type.includes("failed") ? "failed" : undefined}
 			subtitle={type}
 			title={formatEventType(type)}
 			tone={type.includes("failed") ? "danger" : "neutral"}
 		>
 			<RawPayload value={event.data} />
+		</EventCard>
+	);
+}
+
+function SetupStepEvent({
+	data,
+	phase,
+	timestamp,
+}: {
+	data: JsonRecord;
+	phase?: TimelinePhase;
+	timestamp?: string;
+}) {
+	return (
+		<EventCard
+			glyph="ST"
+			meta={timestamp}
+			phase={phase ?? "running"}
+			subtitle={getString(data, "step")}
+			title={getString(data, "title") ?? "Setup step"}
+			tone="accent"
+		>
+			<DetailGrid items={[["error", getString(data, "error")]]} />
 		</EventCard>
 	);
 }
@@ -124,9 +286,9 @@ function ServiceEvent({
 
 	return (
 		<EventCard
-			icon="SV"
+			glyph="SV"
 			meta={timestamp}
-			status={statusFromType(type)}
+			phase={isFailure ? "failed" : "success"}
 			subtitle={name}
 			title={title}
 			tone={isFailure ? "danger" : "success"}
@@ -157,24 +319,14 @@ function ServiceEvent({
 	);
 }
 
-function CodexTurnStartedEvent({ timestamp }: { timestamp?: string }) {
-	return (
-		<EventCard
-			icon="AI"
-			meta={timestamp}
-			status="started"
-			title="Agent turn started"
-			tone="accent"
-		/>
-	);
-}
-
 function CodexItemEvent({
 	data,
+	phase,
 	timestamp,
 	type,
 }: {
 	data: JsonRecord;
+	phase?: TimelinePhase;
 	timestamp?: string;
 	type: string;
 }) {
@@ -184,7 +336,7 @@ function CodexItemEvent({
 	if (!item) {
 		return (
 			<EventCard
-				icon="AI"
+				glyph="AI"
 				meta={timestamp}
 				subtitle={type}
 				title="Agent item"
@@ -197,35 +349,27 @@ function CodexItemEvent({
 
 	if (itemType === "agent_message") {
 		return (
-			<EventCard
-				icon="AI"
-				meta={timestamp}
-				status={getString(item, "status")}
-				title="Agent message"
-				tone="neutral"
-			>
-				<MessageBubble>
-					{getString(item, "text") ?? "No message text"}
-				</MessageBubble>
-			</EventCard>
+			<AgentMessage
+				text={getString(item, "text") ?? "No message text"}
+				timestamp={timestamp}
+			/>
 		);
 	}
 
 	if (itemType === "command_execution") {
 		return (
-			<CommandExecutionEvent item={item} timestamp={timestamp} type={type} />
+			<CommandExecutionEvent item={item} phase={phase} timestamp={timestamp} />
 		);
 	}
 
 	if (itemType === "file_change") {
-		return <FileChangeEvent item={item} timestamp={timestamp} type={type} />;
+		return <FileChangeEvent item={item} phase={phase} timestamp={timestamp} />;
 	}
 
 	return (
 		<EventCard
-			icon="IT"
+			glyph="IT"
 			meta={timestamp}
-			status={getString(item, "status")}
 			subtitle={itemType}
 			title={formatEventType(type)}
 			tone={toneForStatus(getString(item, "status"))}
@@ -237,33 +381,32 @@ function CodexItemEvent({
 
 function CommandExecutionEvent({
 	item,
+	phase,
 	timestamp,
-	type,
 }: {
 	item: JsonRecord;
+	phase?: TimelinePhase;
 	timestamp?: string;
-	type: string;
 }) {
 	const command = getString(item, "command");
 	const exitCode = getNumber(item, "exit_code");
-	const status = getString(item, "status") ?? statusFromType(type);
 	const output = getString(item, "aggregated_output");
-	const tone = exitCode && exitCode !== 0 ? "danger" : toneForStatus(status);
+	const resolvedPhase = phase ?? "running";
 	const title =
-		tone === "danger"
+		resolvedPhase === "failed"
 			? "Command failed"
-			: type.endsWith(".started")
-				? "Command started"
-				: "Command completed";
+			: resolvedPhase === "success"
+				? "Command completed"
+				: "Running command";
 
 	return (
 		<EventCard
-			icon="$"
+			glyph="$"
 			meta={timestamp}
-			status={status}
+			phase={resolvedPhase}
 			subtitle={exitCode === undefined ? undefined : `exit ${exitCode}`}
 			title={title}
-			tone={tone}
+			tone="accent"
 		>
 			{command ? <CodeBlock>{command}</CodeBlock> : null}
 			{output ? <OutputPreview output={output} /> : null}
@@ -273,28 +416,26 @@ function CommandExecutionEvent({
 
 function FileChangeEvent({
 	item,
+	phase,
 	timestamp,
-	type,
 }: {
 	item: JsonRecord;
+	phase?: TimelinePhase;
 	timestamp?: string;
-	type: string;
 }) {
 	const changes = getRecordArray(item, "changes");
-	const status = getString(item, "status") ?? statusFromType(type);
+	const resolvedPhase = phase ?? "running";
 
 	return (
 		<EventCard
-			icon="FS"
+			glyph="FS"
 			meta={timestamp}
-			status={status}
+			phase={resolvedPhase}
 			subtitle={summarizeCount(changes.length, "file change")}
 			title={
-				type.endsWith(".started")
-					? "File change started"
-					: "File change completed"
+				resolvedPhase === "success" ? "File changes" : "Writing file changes"
 			}
-			tone={toneForStatus(status)}
+			tone="accent"
 		>
 			{changes.length > 0 ? (
 				<ul className="flex flex-col gap-1">
@@ -327,72 +468,130 @@ function FileChangeEvent({
 	);
 }
 
+function AgentMessage({
+	text,
+	timestamp,
+}: {
+	text: string;
+	timestamp?: string;
+}) {
+	return (
+		<motion.article
+			animate={{ opacity: 1, y: 0 }}
+			className="py-2"
+			initial={{ opacity: 0, y: 6 }}
+			layout="position"
+			transition={{ duration: 0.18, ease: "easeOut" }}
+		>
+			<div className="flex flex-col gap-2 border border-grayscale-4 bg-grayscale-1 p-3">
+				<div className="flex items-center gap-2">
+					<span className="flex size-5 shrink-0 items-center justify-center bg-accent-3">
+						<Logo size={3} />
+					</span>
+					<span className="text-xs font-medium text-grayscale-12">Agent</span>
+					{timestamp ? (
+						<span className="ml-auto text-[11px] text-grayscale-10">
+							{timestamp}
+						</span>
+					) : null}
+				</div>
+				<MessageBubble>{text}</MessageBubble>
+			</div>
+		</motion.article>
+	);
+}
+
 function EventCard({
 	children,
-	icon,
+	glyph,
 	logo = false,
 	meta,
-	status,
+	phase,
 	subtitle,
 	title,
 	tone,
 }: {
 	children?: ReactNode;
-	icon: string;
+	glyph: string;
 	logo?: boolean;
 	meta?: string;
-	status?: string;
+	phase?: TimelinePhase;
 	subtitle?: ReactNode;
 	title: string;
 	tone: Tone;
 }) {
-	const classes = toneClasses[tone];
-
 	return (
-		<article className="py-2">
-			<div className="flex gap-2.5">
-				<div
-					className={cx(
-						"mt-0.5 flex size-7 shrink-0 items-center justify-center font-mono text-[10px] font-semibold",
-						classes.icon,
-					)}
-				>
-					{logo ? <Logo size={4} /> : icon}
-				</div>
-				<div className="flex min-w-0 flex-1 flex-col gap-2">
-					<div className="flex min-w-0 flex-col gap-1">
-						<div className="flex flex-wrap items-center gap-2">
-							<p className="font-medium text-sm text-grayscale-12">{title}</p>
-							{status ? <StatusPill status={status} tone={tone} /> : null}
-							{meta ? (
-								<span className="text-[11px] text-grayscale-10">{meta}</span>
-							) : null}
-						</div>
-						{subtitle ? (
-							<p className="break-words font-mono text-[11px] text-grayscale-10">
-								{subtitle}
-							</p>
+		<motion.article
+			animate={{ opacity: 1, y: 0 }}
+			className="flex gap-2.5 py-2"
+			initial={{ opacity: 0, y: 6 }}
+			layout="position"
+			transition={{ duration: 0.18, ease: "easeOut" }}
+		>
+			<StatusIcon glyph={glyph} logo={logo} phase={phase} tone={tone} />
+			<div className="flex min-w-0 flex-1 flex-col gap-2">
+				<div className="flex min-w-0 flex-col gap-1">
+					<div className="flex flex-wrap items-center gap-2">
+						<p className="font-medium text-sm text-grayscale-12">{title}</p>
+						{meta ? (
+							<span className="text-[11px] text-grayscale-10">{meta}</span>
 						) : null}
 					</div>
-					{children ? (
-						<div className="flex flex-col gap-2">{children}</div>
+					{subtitle ? (
+						<p className="break-words font-mono text-[11px] text-grayscale-10">
+							{subtitle}
+						</p>
 					) : null}
 				</div>
+				{children ? (
+					<div className="flex flex-col gap-2">{children}</div>
+				) : null}
 			</div>
-		</article>
+		</motion.article>
 	);
 }
 
-function StatusPill({ status, tone }: { status: string; tone: Tone }) {
+function StatusIcon({
+	glyph,
+	logo,
+	phase,
+	tone,
+}: {
+	glyph: string;
+	logo: boolean;
+	phase?: TimelinePhase;
+	tone: Tone;
+}) {
 	return (
-		<span
+		<div
 			className={cx(
-				"px-2 py-0.5 font-mono text-[10px] font-medium uppercase leading-none",
-				toneClasses[tone].pill,
+				"relative z-10 flex size-7 shrink-0 items-center justify-center font-mono text-[10px] font-semibold",
+				phase ? phaseClasses[phase] : toneClasses[tone],
 			)}
 		>
-			{formatStatus(status)}
-		</span>
+			<AnimatePresence initial={false} mode="popLayout">
+				<motion.span
+					animate={{ scale: 1, opacity: 1 }}
+					className="flex items-center justify-center"
+					exit={{ scale: 0.6, opacity: 0 }}
+					initial={{ scale: 0.6, opacity: 0 }}
+					key={phase ?? "glyph"}
+					transition={{ duration: 0.15, ease: "easeOut" }}
+				>
+					{phase === "running" ? (
+						<CircleNotchIcon className="size-4 animate-spin" weight="bold" />
+					) : phase === "success" ? (
+						<CheckCircleIcon className="size-4" weight="fill" />
+					) : phase === "failed" ? (
+						<XCircleIcon className="size-4" weight="fill" />
+					) : logo ? (
+						<Logo size={4} />
+					) : (
+						glyph
+					)}
+				</motion.span>
+			</AnimatePresence>
+		</div>
 	);
 }
 
@@ -528,19 +727,6 @@ function formatEventType(type: string) {
 		.replace(/[._-]/g, " ");
 
 	return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function formatStatus(status: string) {
-	return status.replace(/[._-]/g, " ");
-}
-
-function statusFromType(type: string) {
-	return (
-		type
-			.split(".")
-			.at(-1)
-			?.replace(/^service_/, "") ?? "event"
-	);
 }
 
 function toneForStatus(status: string | undefined): Tone {

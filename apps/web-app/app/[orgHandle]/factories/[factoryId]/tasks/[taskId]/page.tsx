@@ -25,16 +25,15 @@ import {
 	useState,
 } from "react";
 import {
-	CODEX_MODEL_OPTIONS,
-	CODEX_REASONING_EFFORT_OPTIONS,
-	CODEX_SPEED_OPTIONS,
 	DEFAULT_CODEX_MODEL,
 	DEFAULT_CODEX_REASONING_EFFORT,
 	DEFAULT_CODEX_SPEED,
 } from "@/codex-options";
 import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
-import Event from "@/components/Event";
+import Event, { buildTimeline } from "@/components/Event";
+import { Textarea } from "@/components/Input";
+import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
 
@@ -246,6 +245,7 @@ export default function TaskPage() {
 
 	const task = data?.tasks?.[0];
 	const events = task?.events;
+	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
 	const services = task?.services ?? [];
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
@@ -430,10 +430,12 @@ export default function TaskPage() {
 					</div>
 				</div>
 				<div className="flex h-full flex-col gap-4 overflow-y-auto">
-					<div className="flex flex-col p-4 gap-2 max-w-3xl mx-auto w-full">
-						{events?.map((event) => (
-							<Event key={event.id} event={event} />
-						))}
+					<div className="flex flex-col p-4 max-w-3xl mx-auto w-full">
+						<AnimatePresence initial={false}>
+							{timeline.map((node) => (
+								<Event key={node.key} node={node} />
+							))}
+						</AnimatePresence>
 					</div>
 				</div>
 				<div className="flex flex-col pb-2 px-2">
@@ -449,88 +451,22 @@ export default function TaskPage() {
 							/>
 
 							<div className="flex flex-col p-3 gap-3">
-								<textarea
+								<Textarea
 									placeholder="Task Instructions"
-									className="bg-grayscale-2 p-2 focus:border-b-grayscale-8 transition-colors duration-150 text-xs outline-none resize-none min-h-24"
 									value={message}
 									onChange={(e) => setMessage(e.target.value)}
 								/>
 							</div>
 							<div className="flex flex-row items-center justify-between p-3">
 								<div className="flex flex-row items-center justify-center gap-2">
-									<div className="relative group overflow-visible">
-										<CornerBrackets
-											placement="outside"
-											spacing={1}
-											translate={1.5}
-											size={1.5}
-											color="grayscale-8"
-										/>
-									</div>
-
-									<div className="relative group overflow-visible">
-										<CornerBrackets
-											placement="outside"
-											spacing={1}
-											translate={1.5}
-											size={1.5}
-											color="grayscale-8"
-										/>
-										<select
-											value={agentModel}
-											onChange={(e) => setAgentModel(e.target.value)}
-											className="text-xs outline-none border border-grayscale-4 p-2"
-										>
-											<option value="">Select a model</option>
-											{CODEX_MODEL_OPTIONS.map((option) => (
-												<option value={option.value} key={option.value}>
-													{option.label}
-												</option>
-											))}
-										</select>
-									</div>
-									<div className="relative group overflow-visible">
-										<CornerBrackets
-											placement="outside"
-											spacing={1}
-											translate={1.5}
-											size={1.5}
-											color="grayscale-8"
-										/>
-										<select
-											value={agentReasoningEffort}
-											onChange={(e) => setAgentReasoningEffort(e.target.value)}
-											className="text-xs outline-none border border-grayscale-4 p-2"
-										>
-											<option value="">Select a reasoning effort</option>
-											{CODEX_REASONING_EFFORT_OPTIONS.map((option) => (
-												<option value={option.value} key={option.value}>
-													{option.label}
-												</option>
-											))}
-										</select>
-									</div>
-									<div className="relative group overflow-visible">
-										<CornerBrackets
-											placement="outside"
-											spacing={1}
-											translate={1.5}
-											size={1.5}
-											color="grayscale-8"
-										/>
-										<select
-											value={agentSpeed}
-											onChange={(e) => setAgentSpeed(e.target.value)}
-											className="text-xs outline-none border border-grayscale-4 p-2"
-										>
-											<option value="">Select a speed</option>
-											{CODEX_SPEED_OPTIONS.map((option) => (
-												<option value={option.value} key={option.value}>
-													{option.label}
-												</option>
-											))}
-										</select>
-									</div>
+									<ModelConfigMenu
+										model={agentModel}
+										reasoningEffort={agentReasoningEffort}
+										speed={agentSpeed}
+										onModelChange={setAgentModel}
+										onReasoningEffortChange={setAgentReasoningEffort}
+										onSpeedChange={setAgentSpeed}
+									/>
 								</div>
 								<div className="flex flex-row items-center justify-center gap-2 ml-auto">
 									<button

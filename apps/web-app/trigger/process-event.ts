@@ -31,6 +31,10 @@ type RunCodexExecOptions = {
 	resumeLast?: boolean;
 };
 
+type SetupStepOptions = {
+	timeoutMs?: number;
+};
+
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
 const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
@@ -59,6 +63,16 @@ const taskTx = (taskId: string) => {
 
 	if (!tx) {
 		throw new Error(`Task transaction builder ${taskId} not found`);
+	}
+
+	return tx;
+};
+
+const eventTx = (eventId: string) => {
+	const tx = db.tx.events[eventId];
+
+	if (!tx) {
+		throw new Error(`Event transaction builder ${eventId} not found`);
 	}
 
 	return tx;
@@ -151,13 +165,20 @@ const setupTaskSandbox = async (agent: Agent, task: Task, factory: Factory) => {
 		throw new Error(`Agent ${agent.id} is missing auth or factory`);
 	}
 
-	const sandbox = await Sandbox.create("codex", {
-		timeoutMs: 10 * 60 * 1000,
-		lifecycle: {
-			onTimeout: "pause",
-			autoResume: true,
-		},
-	});
+	const sandbox = await runSetupStep(
+		task.id,
+		"sandbox",
+		"Create sandbox",
+		() =>
+			Sandbox.create("codex", {
+				timeoutMs: 10 * 60 * 1000,
+				lifecycle: {
+					onTimeout: "pause",
+					autoResume: true,
+				},
+			}),
+		{ timeoutMs: 120_000 },
+	);
 
 	await db.transact(
 		taskTx(task.id).update({
@@ -165,17 +186,31 @@ const setupTaskSandbox = async (agent: Agent, task: Task, factory: Factory) => {
 		}),
 	);
 
-	await sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth));
+	await runSetupStep(task.id, "codex_auth", "Write Codex auth", () =>
+		sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth)),
+	);
 
 	// update the codex version
-	const codexUpdate = await sandbox.commands.run(
-		"npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
-		{ timeoutMs: 0 },
+	const codexUpdate = await runSetupStep(
+		task.id,
+		"codex_update",
+		"Update Codex",
+		() =>
+			sandbox.commands.run(
+				"npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
+				{ timeoutMs: 120_000 },
+			),
+		{ timeoutMs: 130_000 },
 	);
 
 	console.log(codexUpdate);
 
-	const diffWorkspacePath = await createTaskWorkspaceBaseline(sandbox, task.id);
+	const diffWorkspacePath = await runSetupStep(
+		task.id,
+		"diff_baseline",
+		"Create diff baseline",
+		() => createTaskWorkspaceBaseline(sandbox, task.id),
+	);
 	await db.transact(
 		taskTx(task.id).update({
 			diffWorkspacePath,
@@ -195,17 +230,20 @@ const runCodexExec = async (
 ) => {
 	const { envs, agentToken } = await setupRun(sandbox, task, factory);
 	const output = createCodexOutputHandler(task.id);
-	const command = await sandbox.commands.run(
-		buildCodexExecCommand(task, prompt, options),
-		{
-			background: true,
-			timeoutMs: 0,
-			envs,
-			onStdout: output.append,
-			onStderr: (data) => {
-				console.error(data);
-			},
-		},
+	const command = await runSetupStep(
+		task.id,
+		"codex_launch",
+		options.resumeLast ? "Resume Codex" : "Start Codex",
+		() =>
+			sandbox.commands.run(buildCodexExecCommand(task, prompt, options), {
+				background: true,
+				timeoutMs: 0,
+				envs,
+				onStdout: output.append,
+				onStderr: (data) => {
+					console.error(data);
+				},
+			}),
 	);
 
 	await updateTaskAgentPid(task.id, command.pid);
@@ -395,29 +433,69 @@ const setupRun = async (sandbox: Sandbox, task: Task, factory: Factory) => {
 		}),
 	);
 
-	const encryptionService = createEncryptionService(
-		process.env.SECRET_ENCRYPTION_KEY ?? "",
-	);
-	if (!factory.githubAccessTokenEncrypted) {
-		throw new Error(`Factory ${factory.id} is missing GitHub access token`);
-	}
-
-	const githubAccessToken = await encryptionService.decrypt(
-		factory.githubAccessTokenEncrypted,
-	);
-	const envs = {
+	const envs: Record<string, string> = {
 		FACTORYPLANE_AUTH_TOKEN: agentToken,
-		GITHUB_ACCESS_TOKEN: githubAccessToken,
 	};
 
-	const ghAuth = await sandbox.commands.run(
-		'printf "%s" "$GITHUB_ACCESS_TOKEN" | gh auth login --with-token',
-		{
-			timeoutMs: 30_000,
-			envs,
+	await runOptionalSetupStep(
+		task.id,
+		"github_auth",
+		"Validate GitHub token",
+		async () => {
+			const encryptionService = createEncryptionService(
+				process.env.SECRET_ENCRYPTION_KEY ?? "",
+			);
+
+			if (!factory.githubAccessTokenEncrypted) {
+				throw new Error(`Factory ${factory.id} is missing GitHub access token`);
+			}
+
+			const githubAccessToken = await encryptionService.decrypt(
+				factory.githubAccessTokenEncrypted,
+			);
+
+			envs.GITHUB_ACCESS_TOKEN = githubAccessToken;
+			envs.GH_TOKEN = githubAccessToken;
+
+			let authStderr = "";
+
+			try {
+				const ghAuth = await sandbox.commands.run(
+					[
+						"set +e",
+						'login="$(gh api user --jq .login 2>&1)"',
+						"status=$?",
+						'if [ "$status" -ne 0 ]; then',
+						'  printf "GitHub CLI auth failed while validating factory GitHub token:\\n%s\\n" "$login" >&2',
+						'  exit "$status"',
+						"fi",
+						'printf "Authenticated GitHub CLI as %s\\n" "$login"',
+					].join("\n"),
+					{
+						timeoutMs: 30_000,
+						envs,
+						onStdout: (data) => {
+							console.log(data);
+						},
+						onStderr: (data) => {
+							authStderr += data;
+							console.error(data);
+						},
+					},
+				);
+				console.log(ghAuth);
+			} catch (error) {
+				delete envs.GITHUB_ACCESS_TOKEN;
+				delete envs.GH_TOKEN;
+				throw new Error(
+					[
+						"GitHub CLI auth failed",
+						authStderr.trim() || getErrorMessage(error),
+					].join(": "),
+				);
+			}
 		},
 	);
-	console.log(ghAuth);
 
 	return { envs, agentToken };
 };
@@ -661,6 +739,112 @@ const persistCodexEvents = async (taskId: string, events: CodexEvent[]) => {
 				.link({ task: taskId });
 		}),
 	);
+};
+
+const runSetupStep = async <T>(
+	taskId: string,
+	step: string,
+	title: string,
+	action: () => Promise<T>,
+	options: SetupStepOptions = {},
+) => {
+	console.log("Setup step started", { taskId, step, title });
+	await persistFactoryplaneEvent(taskId, "factoryplane.setup_step_started", {
+		step,
+		title,
+		status: "started",
+	});
+
+	try {
+		const result = await runWithTimeout(action(), title, options.timeoutMs);
+		console.log("Setup step completed", { taskId, step, title });
+		await persistFactoryplaneEvent(
+			taskId,
+			"factoryplane.setup_step_completed",
+			{
+				step,
+				title,
+				status: "completed",
+			},
+		);
+		return result;
+	} catch (error) {
+		console.error("Setup step failed", {
+			taskId,
+			step,
+			title,
+			error,
+		});
+		await persistFactoryplaneEvent(taskId, "factoryplane.setup_step_failed", {
+			step,
+			title,
+			status: "failed",
+			error: getErrorMessage(error),
+		});
+		throw error;
+	}
+};
+
+const runWithTimeout = async <T>(
+	promise: Promise<T>,
+	label: string,
+	timeoutMs: number | undefined,
+) => {
+	if (!timeoutMs) {
+		return promise;
+	}
+
+	let timeout: NodeJS.Timeout | undefined;
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		timeout = setTimeout(() => {
+			reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+		}, timeoutMs);
+	});
+
+	try {
+		return await Promise.race([promise, timeoutPromise]);
+	} finally {
+		if (timeout) {
+			clearTimeout(timeout);
+		}
+	}
+};
+
+const runOptionalSetupStep = async (
+	taskId: string,
+	step: string,
+	title: string,
+	action: () => Promise<void>,
+) => {
+	try {
+		await runSetupStep(taskId, step, title, action);
+	} catch (error) {
+		console.warn("Optional setup step failed", {
+			taskId,
+			step,
+			error,
+		});
+	}
+};
+
+const persistFactoryplaneEvent = async (
+	taskId: string,
+	type: string,
+	data: Record<string, unknown>,
+) => {
+	await db.transact(
+		eventTx(randomUUID())
+			.create({
+				type,
+				data,
+				createdAt: new Date().toISOString(),
+			})
+			.link({ task: taskId }),
+	);
+};
+
+const getErrorMessage = (error: unknown) => {
+	return error instanceof Error ? error.message : String(error);
 };
 
 const getStringDataValue = (data: unknown, key: string) => {

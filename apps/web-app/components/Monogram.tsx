@@ -15,9 +15,11 @@ function hashSeed(seed: string): number {
 export default function Monogram({
 	className,
 	seed,
+	letters = 2,
 }: {
 	className?: string;
 	seed?: string;
+	letters?: number;
 }) {
 	const color =
 		monogramColors[hashSeed(seed ?? "") % monogramColors.length];
@@ -26,7 +28,7 @@ export default function Monogram({
 			className={cn("size-10 flex items-center justify-center", className)}
 			style={{ backgroundColor: `var(--${color}-9)` }}
 		>
-      <p className="text-sm font-medium" style={{ color: `var(--${color}-1)` }}>{seed?.substring(0, 2).toUpperCase()}</p>
+      <p className="text-sm font-medium" style={{ color: `var(--${color}-1)` }}>{seed?.substring(0, letters).toUpperCase()}</p>
     </div>
 	);
 }

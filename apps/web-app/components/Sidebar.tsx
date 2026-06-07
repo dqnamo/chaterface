@@ -5,6 +5,7 @@ import { SidebarSimpleIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { cn } from "@/helpers/classname-helper";
+import { Button } from "./Button";
 import CornerBrackets from "./CornerBrackets";
 
 type Task = InstaQLEntity<AppSchema, "tasks">;
@@ -41,25 +42,22 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						<SidebarSimpleIcon weight="bold" />
 					</button>
 				</div>
-				<div className="group relative">
-          <Link
-            href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-            className="flex w-full min-w-0 flex-row items-center justify-between gap-4 bg-grayscale-12 p-2 pr-2 pl-3 transition-transform duration-150 group-hover:scale-97"
-          >
-            <CornerBrackets
-              placement="outside"
-              spacing={1}
-              translate={1}
-              color="var(--color-grayscale-12)"
-            />
-            <p className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1">
-              New Task
-            </p>
-            <p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
-              N
-            </p>
-          </Link>
-        </div>
+				<Button
+					nativeButton={false}
+					className="w-full min-w-0 justify-between gap-4 py-2 pr-2 pl-3"
+					render={
+						<Link
+							href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+						/>
+					}
+				>
+					<p className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1">
+						New Task
+					</p>
+					<p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
+						N
+					</p>
+				</Button>
 			</div>
 			<div className="mt-2 flex flex-row items-center justify-between">
 				<p className="px-3 font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
