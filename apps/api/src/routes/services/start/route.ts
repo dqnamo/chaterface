@@ -1,6 +1,6 @@
 import db, { id } from "@repo/db/admin";
-import { Sandbox } from "e2b";
 import type { CommandHandle } from "e2b";
+import { Sandbox } from "e2b";
 import type { RouteHandler } from "../../../lib/file-router.js";
 
 type StartServiceBody = {
@@ -54,11 +54,11 @@ export const POST: RouteHandler = async (c) => {
 		.query({
 			tasks: {
 				$: {
+					fields: ["sandboxId"],
 					where: {
 						agentToken: token,
 					},
 				},
-				services: {},
 			},
 		})
 		.then((data) => data.tasks[0]);

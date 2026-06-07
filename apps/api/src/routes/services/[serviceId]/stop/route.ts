@@ -38,11 +38,16 @@ export const POST: RouteHandler = async (c) => {
 		.query({
 			tasks: {
 				$: {
+					fields: ["sandboxId"],
 					where: {
 						agentToken: token,
 					},
 				},
-				services: {},
+				services: {
+					$: {
+						fields: ["name", "pid"],
+					},
+				},
 			},
 		})
 		.then((data) => data.tasks[0]);
