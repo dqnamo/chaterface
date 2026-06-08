@@ -12,6 +12,7 @@ import { Dialog } from "@/components/Dialog";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
 import Monogram from "@/components/Monogram";
+import SignOutButton from "@/components/SignOutButton";
 
 const factoryTx = (factoryId: string) => {
 	const tx = db.tx.factories[factoryId];
@@ -118,6 +119,7 @@ export default function FactoriesPage() {
 				<p className="text-sm text-grayscale-11">
 					Select a factory to manage your tasks
 				</p>
+				<SignOutButton className="mt-3" />
 			</div>
 			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-xl w-full mt-8 gap-2 px-4">
 				{factories?.map((factory) => (
@@ -158,7 +160,10 @@ export default function FactoriesPage() {
 						translate={6}
 						color="black"
 					/>
-					<ShapesIcon weight="bold" className="size-4 text-grayscale-2 group-hover:text-grayscale-1 transition-colors" />
+					<ShapesIcon
+						weight="bold"
+						className="size-4 text-grayscale-2 group-hover:text-grayscale-1 transition-colors"
+					/>
 					<p className="text-sm text-grayscale-2 group-hover:text-grayscale-1 transition-colors">
 						New Factory
 					</p>
@@ -170,7 +175,8 @@ export default function FactoriesPage() {
 							<div className="flex flex-col">
 								<Dialog.Title>Create Factory</Dialog.Title>
 								<Dialog.Description>
-									Set up a new factory for {organisation?.name ?? currentOrgHandle}.
+									Set up a new factory for{" "}
+									{organisation?.name ?? currentOrgHandle}.
 								</Dialog.Description>
 							</div>
 						</div>
@@ -224,9 +230,7 @@ export default function FactoriesPage() {
 									void createFactory().catch((error) => {
 										console.error("Failed to create factory", {
 											error:
-												error instanceof Error
-													? error.message
-													: String(error),
+												error instanceof Error ? error.message : String(error),
 										});
 									});
 								}}

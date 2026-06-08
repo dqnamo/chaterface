@@ -4,13 +4,14 @@ import { id } from "@instantdb/react";
 import { BuildingsIcon } from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
-import CornerBrackets from "../components/CornerBrackets";
 import Link from "next/link";
 import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
 import Monogram from "@/components/Monogram";
+import SignOutButton from "@/components/SignOutButton";
+import CornerBrackets from "../components/CornerBrackets";
 
 const organisationTx = (organisationId: string) => {
 	const tx = db.tx.organisations[organisationId];
@@ -19,6 +20,16 @@ const organisationTx = (organisationId: string) => {
 		throw new Error(
 			`Organisation transaction builder ${organisationId} not found`,
 		);
+	}
+
+	return tx;
+};
+
+const memberTx = (memberId: string) => {
+	const tx = db.tx.members[memberId];
+
+	if (!tx) {
+		throw new Error(`Member transaction builder ${memberId} not found`);
 	}
 
 	return tx;
@@ -42,11 +53,15 @@ export default function HomePage() {
 			}),
 		);
 
-		await db.transact(db.tx.members[id()]!.update({
-			createdAt: DateTime.now().toISO(),
-			joinedAt: DateTime.now().toISO(),
-			role: "owner",
-		}).link({ organisation: organisationId }));
+		await db.transact(
+			memberTx(id())
+				.update({
+					createdAt: DateTime.now().toISO(),
+					joinedAt: DateTime.now().toISO(),
+					role: "owner",
+				})
+				.link({ organisation: organisationId }),
+		);
 
 		setOrganisationName("");
 		setOrganisationHandle("");
@@ -59,21 +74,31 @@ export default function HomePage() {
 		<div className="h-full w-full flex flex-col items-center justify-center">
 			<Logo size={8} />
 			<div className="flex flex-col gap-px items-center justify-center mt-8">
-				<h1 className="text-md font-medium text-grayscale-12">Your Organisations</h1>
-				<p className="text-sm text-grayscale-11">Select your organisation to manage your factories</p>
+				<h1 className="text-md font-medium text-grayscale-12">
+					Your Organisations
+				</h1>
+				<p className="text-sm text-grayscale-11">
+					Select your organisation to manage your factories
+				</p>
+				<SignOutButton className="mt-3" />
 			</div>
 			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-xl w-full mt-8 gap-2 px-4">
 				{organisations?.map((organisation) => (
-					<Link key={organisation.id} href={`/${organisation.handle}/factories`} className="relative bg-white flex flex-row items-center gap-3 group border border-grayscale-4 p-3 transition-colors duration-150 hover:border-grayscale-6">
-						<CornerBrackets
-							placement="inside"
-							color="accent-9"
-						/>
+					<Link
+						key={organisation.id}
+						href={`/${organisation.handle}/factories`}
+						className="relative bg-white flex flex-row items-center gap-3 group border border-grayscale-4 p-3 transition-colors duration-150 hover:border-grayscale-6"
+					>
+						<CornerBrackets placement="inside" color="accent-9" />
 
 						<Monogram seed={organisation.name} letters={1} />
 						<div className="flex flex-col gap-1">
-							<h2 className="text-sm font-medium leading-none text-grayscale-11 group-hover:text-grayscale-12 transition-colors">{organisation.name}</h2>
-							<p className="text-xs leading-none text-grayscale-10 group-hover:text-grayscale-11 transition-colors">{organisation.handle}</p>
+							<h2 className="text-sm font-medium leading-none text-grayscale-11 group-hover:text-grayscale-12 transition-colors">
+								{organisation.name}
+							</h2>
+							<p className="text-xs leading-none text-grayscale-10 group-hover:text-grayscale-11 transition-colors">
+								{organisation.handle}
+							</p>
 						</div>
 					</Link>
 				))}
@@ -94,7 +119,10 @@ export default function HomePage() {
 						translate={6}
 						color="black"
 					/>
-					<BuildingsIcon weight="bold" className="size-4 text-grayscale-2 group-hover:text-grayscale-1 transition-colors" />
+					<BuildingsIcon
+						weight="bold"
+						className="size-4 text-grayscale-2 group-hover:text-grayscale-1 transition-colors"
+					/>
 					<p className="text-sm text-grayscale-2 group-hover:text-grayscale-1 transition-colors">
 						New Organisation
 					</p>
@@ -146,9 +174,7 @@ export default function HomePage() {
 									void createOrganisation().catch((error) => {
 										console.error("Failed to create organisation", {
 											error:
-												error instanceof Error
-													? error.message
-													: String(error),
+												error instanceof Error ? error.message : String(error),
 										});
 									});
 								}}
