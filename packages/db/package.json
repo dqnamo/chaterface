@@ -4,11 +4,24 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./schema": "./src/schema.ts",
-		"./admin": "./src/admin.ts",
-		"./client": "./src/client.ts"
+		"./schema": {
+			"types": "./src/schema.ts",
+			"development": "./src/schema.ts",
+			"default": "./dist/schema.js"
+		},
+		"./admin": {
+			"types": "./src/admin.ts",
+			"development": "./src/admin.ts",
+			"default": "./dist/admin.js"
+		},
+		"./client": {
+			"types": "./src/client.ts",
+			"development": "./src/client.ts",
+			"default": "./dist/client.js"
+		}
 	},
 	"scripts": {
+		"build": "tsc",
 		"lint": "biome check .",
 		"check-types": "tsc --noEmit"
 	},

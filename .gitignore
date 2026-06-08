@@ -18,6 +18,9 @@ coverage
 # Turbo
 .turbo
 
+# Trigger.dev generated files
+apps/web-app/.trigger/tmp/
+
 # Vercel
 .vercel
 
