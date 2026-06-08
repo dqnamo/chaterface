@@ -1,5 +1,5 @@
 import db, { id } from "@repo/db/admin";
-import { Sandbox } from "e2b";
+import { Sandbox } from "e2b/dist/index.mjs";
 import type { RouteHandler } from "../../../../lib/file-router.js";
 
 const serviceTx = (serviceId: string) => {

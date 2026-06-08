@@ -1,6 +1,6 @@
 import db from "@repo/db/admin";
 import { task } from "@trigger.dev/sdk";
-import { Sandbox } from "e2b";
+import { Sandbox } from "e2b/dist/index.mjs";
 
 import { syncAgentAuthFromSandbox } from "./sync-agent-auth";
 

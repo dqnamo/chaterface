@@ -1,6 +1,6 @@
 import db, { id } from "@repo/db/admin";
-import type { CommandHandle } from "e2b";
-import { Sandbox } from "e2b";
+import type { CommandHandle } from "e2b/dist/index.mjs";
+import { Sandbox } from "e2b/dist/index.mjs";
 import type { RouteHandler } from "../../../lib/file-router.js";
 
 type StartServiceBody = {

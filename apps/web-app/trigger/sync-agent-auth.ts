@@ -1,5 +1,5 @@
 import db from "@repo/db/admin";
-import type { Sandbox } from "e2b";
+import type { Sandbox } from "e2b/dist/index.mjs";
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 

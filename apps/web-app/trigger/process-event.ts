@@ -3,7 +3,7 @@ import type { InstaQLEntity } from "@instantdb/react";
 import db from "@repo/db/admin";
 import { createEncryptionService } from "@repo/encryption";
 import { task } from "@trigger.dev/sdk";
-import { Sandbox } from "e2b";
+import { Sandbox } from "e2b/dist/index.mjs";
 import {
 	CODEX_REASONING_EFFORT_OPTIONS,
 	DEFAULT_CODEX_MODEL,
