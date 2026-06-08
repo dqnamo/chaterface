@@ -34,6 +34,9 @@ type TimelineContext = {
 };
 
 const OUTPUT_PREVIEW_LIMIT = 6000;
+const previewsDomain =
+	process.env.NEXT_PUBLIC_FACTORYPLANE_PREVIEWS_DOMAIN ??
+	"previews.factoryplane.com";
 
 const toneClasses: Record<Tone, string> = {
 	neutral: "bg-grayscale-3 text-grayscale-11",
@@ -419,7 +422,7 @@ function ServiceEvent({
 	type: string;
 }) {
 	const name = getString(data, "name") ?? "Service";
-	const url = getString(data, "url");
+	const url = getPublicServiceUrl(data);
 	const isFailure = type.includes("failed");
 	const title =
 		type === "factoryplane.service_started"
@@ -463,6 +466,18 @@ function ServiceEvent({
 			/>
 		</EventCard>
 	);
+}
+
+function getPublicServiceUrl(data: JsonRecord) {
+	const url = getString(data, "url");
+
+	if (url && !url.includes(".e2b.app")) {
+		return url;
+	}
+
+	const serviceId = getString(data, "serviceId");
+
+	return serviceId ? `https://${serviceId}.${previewsDomain}` : undefined;
 }
 
 function RepositoryEvent({

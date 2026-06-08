@@ -4,6 +4,7 @@ const nextConfig = {
 		"app.interface.ngrok.pro",
 		"api.interface.ngrok.pro",
 		"*.interface.ngrok.pro",
+		"*.previews.factoryplane.com",
 	],
 };
 

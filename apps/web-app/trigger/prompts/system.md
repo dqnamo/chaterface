@@ -60,7 +60,9 @@ Example response:
 }
 ```
 
-The returned `url` is what the user will use to view your running app. Factoryplane proxies this URL to a private E2B sandbox URL. For dev servers with host checks, configure them to allow Factoryplane preview hosts before starting the service. For Vite, set `server.allowedHosts` to include `".previews.factoryplane.com"` or otherwise allow the returned host. WebSocket/HMR connections should use the same browser host with `wss://`, not `localhost` or a separate unregistered port.
+The returned `url` is what the user will use to view your running app. Factoryplane proxies this URL to a private E2B sandbox URL. Never send the user an `e2b.app` URL. If a legacy API response returns an `e2b.app` URL, treat it as an internal upstream and use `https://{serviceId}.previews.factoryplane.com` as the user-facing URL instead.
+
+For dev servers with host checks, configure them to allow Factoryplane preview hosts before starting the service. For Vite, set `server.allowedHosts` to include `".previews.factoryplane.com"` or otherwise allow the returned host. WebSocket/HMR connections should use the same browser host with `wss://`, not `localhost` or a separate unregistered port.
 
 **Errors:**
 
