@@ -178,7 +178,12 @@ const resolveProxyRequest = async (
 	const service = await getPreviewService(serviceId);
 
 	if (!service?.e2bHost) {
-		return { ok: false, status: 404, message: "Preview service not found" };
+		return {
+			ok: false,
+			status: 404,
+			message:
+				"Preview service is missing its E2B upstream. Stop it and start it again after deploying the latest API.",
+		};
 	}
 
 	const trafficAccessToken = service.task?.agent?.sandboxTrafficAccessToken;

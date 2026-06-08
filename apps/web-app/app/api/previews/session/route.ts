@@ -44,6 +44,9 @@ export async function POST(req: NextRequest) {
 						id: serviceId,
 					},
 				},
+				task: {
+					agent: {},
+				},
 			},
 		})
 		.then((result) => result.services[0]);
@@ -52,6 +55,26 @@ export async function POST(req: NextRequest) {
 		return NextResponse.json(
 			{ message: "Preview service not found" },
 			{ status: 404 },
+		);
+	}
+
+	if (!service.e2bHost) {
+		return NextResponse.json(
+			{
+				message:
+					"Preview service is missing its E2B upstream. Stop it and start it again after deploying the latest API.",
+			},
+			{ status: 409 },
+		);
+	}
+
+	if (!service.task?.agent?.sandboxTrafficAccessToken) {
+		return NextResponse.json(
+			{
+				message:
+					"Preview sandbox is missing a private access token. Recreate the agent sandbox and start the service again.",
+			},
+			{ status: 409 },
 		);
 	}
 

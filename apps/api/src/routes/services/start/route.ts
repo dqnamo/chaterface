@@ -59,6 +59,11 @@ export const POST: RouteHandler = async (c) => {
 						agentToken: token,
 					},
 				},
+				agent: {
+					$: {
+						fields: ["sandboxTrafficAccessToken"],
+					},
+				},
 			},
 		})
 		.then((data) => data.tasks[0]);
@@ -69,6 +74,16 @@ export const POST: RouteHandler = async (c) => {
 
 	if (!task.sandboxId) {
 		return c.json({ error: "Task is missing sandbox id" }, 400);
+	}
+
+	if (!task.agent?.sandboxTrafficAccessToken) {
+		return c.json(
+			{
+				error:
+					"Task agent sandbox is missing a private preview token. Recreate the agent sandbox before starting services.",
+			},
+			409,
+		);
 	}
 
 	const sandbox = await Sandbox.connect(task.sandboxId);

@@ -850,7 +850,8 @@ function ServicePreviewFrame({
 				});
 
 				if (!response.ok) {
-					throw new Error("Failed to create preview session");
+					const errorMessage = await getPreviewSessionError(response);
+					throw new Error(errorMessage);
 				}
 
 				const data = await response.json();
@@ -899,4 +900,18 @@ function ServicePreviewFrame({
 			className="h-full w-full"
 		/>
 	);
+}
+
+async function getPreviewSessionError(response: Response) {
+	try {
+		const data = await response.json();
+
+		if (typeof data.message === "string") {
+			return data.message;
+		}
+	} catch {
+		return "Failed to create preview session";
+	}
+
+	return "Failed to create preview session";
 }
