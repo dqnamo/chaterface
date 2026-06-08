@@ -180,12 +180,35 @@ export const POST: RouteHandler = async (c) => {
 					name: body.name,
 					portNumber: body.portNumber,
 					url,
+					e2bHost: host,
 					pid: process.pid,
 				},
 				createdAt: new Date().toISOString(),
 			})
 			.link({ task: task.id }),
 	]);
+
+	const persistedService = await getPersistedPreviewService(serviceId);
+
+	if (persistedService?.e2bHost !== host || persistedService.url !== url) {
+		await markServiceFailed(serviceId, task.id, {
+			name: body.name,
+			portNumber: body.portNumber,
+			url,
+			e2bHost: host,
+			pid: process.pid,
+			error: "Preview service metadata did not persist correctly",
+		});
+
+		return c.json(
+			{
+				error: "Preview service metadata did not persist correctly",
+				serviceId,
+				url,
+			},
+			500,
+		);
+	}
 
 	return c.json({
 		serviceId,
@@ -246,6 +269,21 @@ const markServiceFailed = async (
 			})
 			.link({ task: taskId }),
 	]);
+};
+
+const getPersistedPreviewService = async (serviceId: string) => {
+	return db
+		.query({
+			services: {
+				$: {
+					fields: ["url", "e2bHost"],
+					where: {
+						id: serviceId,
+					},
+				},
+			},
+		})
+		.then((data) => data.services[0]);
 };
 
 const waitForService = async (
