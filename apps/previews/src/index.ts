@@ -18,9 +18,7 @@ type PreviewService = {
 	id: string;
 	e2bHost?: string;
 	task?: {
-		agent?: {
-			sandboxTrafficAccessToken?: string;
-		};
+		sandboxTrafficAccessToken?: string;
 	};
 };
 
@@ -186,7 +184,7 @@ const resolveProxyRequest = async (
 		};
 	}
 
-	const trafficAccessToken = service.task?.agent?.sandboxTrafficAccessToken;
+	const trafficAccessToken = service.task?.sandboxTrafficAccessToken;
 
 	if (!trafficAccessToken) {
 		return {
@@ -214,9 +212,7 @@ const getPreviewService = async (
 					id: serviceId,
 				},
 			},
-			task: {
-				agent: {},
-			},
+			task: {},
 		},
 	});
 

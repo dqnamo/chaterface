@@ -44,6 +44,7 @@ type SetupStepOptions = {
 };
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
+const e2bPortPlaceholder = ["$", "{PORT}"].join("");
 const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
 const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
 const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
@@ -212,6 +213,10 @@ const setupTaskSandbox = async (
 					onTimeout: "pause",
 					autoResume: true,
 				},
+				network: {
+					allowPublicTraffic: false,
+					maskRequestHost: `localhost:${e2bPortPlaceholder}`,
+				},
 			}),
 		{ timeoutMs: 120_000 },
 	);
@@ -219,6 +224,7 @@ const setupTaskSandbox = async (
 	await db.transact(
 		taskTx(task.id).update({
 			sandboxId: sandbox.sandboxId,
+			sandboxTrafficAccessToken: sandbox.trafficAccessToken,
 		}),
 	);
 

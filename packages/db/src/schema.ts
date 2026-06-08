@@ -59,6 +59,7 @@ const _schema = i.schema({
 			createdAt: i.date().optional(),
 			completedAt: i.date().optional(),
 			sandboxId: i.string().optional(),
+			sandboxTrafficAccessToken: i.string().optional(),
 			agentThreadId: i.string().optional(),
 			agentPid: i.number().optional(),
 			agentModel: i.string().optional(),

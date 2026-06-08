@@ -44,9 +44,7 @@ export async function POST(req: NextRequest) {
 						id: serviceId,
 					},
 				},
-				task: {
-					agent: {},
-				},
+				task: {},
 			},
 		})
 		.then((result) => result.services[0]);
@@ -68,11 +66,11 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	if (!service.task?.agent?.sandboxTrafficAccessToken) {
+	if (!service.task?.sandboxTrafficAccessToken) {
 		return NextResponse.json(
 			{
 				message:
-					"Preview sandbox is missing a private access token. Recreate the agent sandbox and start the service again.",
+					"Preview sandbox is missing a private access token. Recreate the task sandbox and start the service again.",
 			},
 			{ status: 409 },
 		);
