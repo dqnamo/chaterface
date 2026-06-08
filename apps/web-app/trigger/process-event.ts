@@ -158,10 +158,21 @@ export const processEventTask = task({
 });
 
 const processNewTask = async (agent: Agent, task: Task, factory: Factory) => {
-	const sandbox = await setupTaskSandbox(agent, task, factory);
+	const { sandbox, diffWorkspacePath } = await setupTaskSandbox(
+		agent,
+		task,
+		factory,
+	);
 	const message = `${task.name}. ${task.instructions ?? ""}.`;
 
-	await runCodexExec(sandbox, task, factory, message, {}, agent.id);
+	await runCodexExec(
+		sandbox,
+		{ ...task, diffWorkspacePath },
+		factory,
+		message,
+		{},
+		agent.id,
+	);
 };
 
 const processNewUserMessage = async (
@@ -273,7 +284,7 @@ const setupTaskSandbox = async (
 		}),
 	);
 
-	return sandbox;
+	return { sandbox, diffWorkspacePath };
 };
 
 const installDefaultTaskEnvironmentPackages = async (
@@ -695,10 +706,10 @@ const generateTaskPatch = async (
 			"git init -q",
 			"git config user.email factoryplane@example.com",
 			"git config user.name Factoryplane",
-			"git add -A",
+			"git add -f -A",
 			"git commit --allow-empty -qm baseline",
 			`replace_factoryplane_dir ${shellQuote(workspacePath)} ${shellQuote(repoPath)}`,
-			"git add -A",
+			"git add -f -A",
 			"git diff --cached --binary --full-index HEAD",
 		].join("\n"),
 		{ timeoutMs: 120_000 },
