@@ -3,6 +3,10 @@
 import db from "@repo/db/client";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { Button } from "@/components/Button";
+import CornerCubes from "@/components/CornerCubes";
+import { Input } from "@/components/Input";
+import Logo from "@/components/Logo";
 
 type AuthGateProps = {
 	children: ReactNode;
@@ -15,13 +19,17 @@ export default function AuthGate({ children }: AuthGateProps) {
 	const [isCodeSent, setIsCodeSent] = useState(false);
 	const [error, setError] = useState<string>();
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const trimmedEmail = email.trim();
+	const trimmedCode = code.trim();
+	const canSubmit =
+		trimmedEmail.length > 0 && (!isCodeSent || trimmedCode.length > 0);
 
 	const sendMagicCode = async () => {
 		setError(undefined);
 		setIsSubmitting(true);
 
 		try {
-			await db.auth.sendMagicCode({ email });
+			await db.auth.sendMagicCode({ email: trimmedEmail });
 			setIsCodeSent(true);
 		} catch (error) {
 			setError(getErrorMessage(error, "Failed to send magic code"));
@@ -35,7 +43,10 @@ export default function AuthGate({ children }: AuthGateProps) {
 		setIsSubmitting(true);
 
 		try {
-			await db.auth.signInWithMagicCode({ email, code });
+			await db.auth.signInWithMagicCode({
+				email: trimmedEmail,
+				code: trimmedCode,
+			});
 		} catch (error) {
 			setError(getErrorMessage(error, "Failed to verify magic code"));
 		} finally {
@@ -43,12 +54,44 @@ export default function AuthGate({ children }: AuthGateProps) {
 		}
 	};
 
+	const submitAuth = () => {
+		if (isSubmitting || !canSubmit) {
+			return;
+		}
+
+		if (isCodeSent) {
+			void signInWithMagicCode();
+			return;
+		}
+
+		void sendMagicCode();
+	};
+
 	if (isLoading) {
-		return <div>Loading...</div>;
+		return (
+			<AuthShell>
+				<div className="flex flex-col items-center gap-4">
+					<Logo size={6} />
+					<p className="text-sm text-grayscale-11">Loading Factoryplane...</p>
+				</div>
+			</AuthShell>
+		);
 	}
 
 	if (authError) {
-		return <div>Uh oh! {authError.message}</div>;
+		return (
+			<AuthShell>
+				<div className="flex flex-col items-center gap-4">
+					<Logo size={6} />
+					<div className="flex max-w-md flex-col items-center gap-1 text-center">
+						<h1 className="text-lg font-medium text-grayscale-12">
+							Unable to authenticate
+						</h1>
+						<p className="text-sm text-red-11">{authError.message}</p>
+					</div>
+				</div>
+			</AuthShell>
+		);
 	}
 
 	if (user) {
@@ -56,48 +99,117 @@ export default function AuthGate({ children }: AuthGateProps) {
 	}
 
 	return (
-		<main>
-			<h1>Sign in</h1>
-			<p>Enter your email and we&apos;ll send you a magic code.</p>
-
-			<div className="flex flex-col gap-4">
-				<input
-					type="email"
-					placeholder="Email"
-					value={email}
-					onChange={(event) => setEmail(event.target.value)}
+		<AuthShell>
+			<Logo size={6} />
+			<div className="flex flex-col items-center justify-center gap-px text-center">
+				<h1 className="text-lg font-medium text-grayscale-12">
+					Sign in to Factoryplane
+				</h1>
+				<p className="text-sm text-grayscale-11">
+					Enter your email to receive a magic code.
+				</p>
+			</div>
+			<form
+				className="relative flex w-full max-w-md flex-col border border-grayscale-4 bg-white"
+				onSubmit={(event) => {
+					event.preventDefault();
+					submitAuth();
+				}}
+			>
+				<CornerCubes
+					placement="outside"
+					spacing={3}
+					translate={12}
+					size={6}
+					color="var(--color-grayscale-6)"
+					active={true}
 				/>
+				<div className="flex flex-col gap-3 p-3">
+					<div className="flex flex-col">
+						<p className="text-xs text-grayscale-11">Email</p>
+						<p className="text-xs text-grayscale-10">
+							Where your sign-in code will be sent.
+						</p>
+					</div>
+					<Input
+						type="email"
+						required
+						autoComplete="email"
+						className="text-sm"
+						placeholder="you@example.com"
+						value={email}
+						onChange={(event) => setEmail(event.target.value)}
+						disabled={isSubmitting || isCodeSent}
+					/>
+				</div>
 
 				{isCodeSent ? (
-					<input
-						type="text"
-						placeholder="Magic code"
-						value={code}
-						onChange={(event) => setCode(event.target.value)}
-					/>
+					<div className="flex flex-col gap-3 p-3">
+						<div className="flex flex-col">
+							<p className="text-xs text-grayscale-11">Magic code</p>
+							<p className="text-xs text-grayscale-10">
+								Enter the code sent to {trimmedEmail}.
+							</p>
+						</div>
+						<Input
+							type="text"
+							required
+							autoComplete="one-time-code"
+							className="text-sm"
+							placeholder="Magic code"
+							value={code}
+							onChange={(event) => setCode(event.target.value)}
+							disabled={isSubmitting}
+						/>
+					</div>
 				) : null}
 
-				{error ? <p>{error}</p> : null}
+				{error ? (
+					<div className="px-3 pb-3">
+						<p className="border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">
+							{error}
+						</p>
+					</div>
+				) : null}
 
-				<button
-					type="button"
-					disabled={isSubmitting}
-					onClick={() => {
-						if (isCodeSent) {
-							signInWithMagicCode();
-							return;
-						}
+				<div className="flex flex-row items-center justify-between gap-3 p-3">
+					{isCodeSent ? (
+						<button
+							type="button"
+							className="text-xs text-grayscale-10 transition-colors hover:text-grayscale-12"
+							disabled={isSubmitting}
+							onClick={() => {
+								setIsCodeSent(false);
+								setCode("");
+								setError(undefined);
+							}}
+						>
+							Use a different email
+						</button>
+					) : (
+						<span />
+					)}
+					<Button
+						type="submit"
+						disabled={isSubmitting || !canSubmit}
+						className="disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+					>
+						{isSubmitting
+							? "Submitting..."
+							: isCodeSent
+								? "Verify code"
+								: "Send code"}
+					</Button>
+				</div>
+			</form>
+		</AuthShell>
+	);
+}
 
-						sendMagicCode();
-					}}
-				>
-					{isSubmitting
-						? "Submitting..."
-						: isCodeSent
-							? "Verify code"
-							: "Send code"}
-				</button>
-			</div>
+function AuthShell({ children }: { children: ReactNode }) {
+	return (
+		<main className="flex h-full w-full flex-col items-center justify-center gap-4 px-4">
+			{children}
 		</main>
 	);
 }
