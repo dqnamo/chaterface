@@ -80,3 +80,15 @@ pnpm check
 ```sh
 pnpm build
 ```
+
+## InstantDB schema
+
+The schema source of truth is `packages/db/src/schema.ts`.
+The web app's `instant.schema.ts` re-exports `@repo/db/schema`, which resolves
+through `packages/db/dist` for normal CLI imports. Push with:
+
+```sh
+pnpm --filter web-app instant:push-schema
+```
+
+This builds `@repo/db` first so Instant CLI reads the current schema.

@@ -15,7 +15,7 @@ Authenticate Factoryplane API requests with a bearer token. The token is availab
 -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
-Base URL: `https://api.interface.ngrok.pro`
+Base URL: `{{FACTORYPLANE_API_URL}}`
 
 ### Start a service
 
@@ -43,7 +43,7 @@ You are working on a remote machine (this sandbox), not the user's laptop. Anyth
 **Example:**
 
 ```bash
-curl -X POST https://api.interface.ngrok.pro/services/start \
+curl -X POST {{FACTORYPLANE_API_URL}}/services/start \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"web","cwd":"/home/user/app","command":"npm run dev -- --host 0.0.0.0 --port 3000","portNumber":3000,"healthPath":"/"}'
@@ -60,7 +60,7 @@ Example response:
 }
 ```
 
-The returned `url` is what the user will use to view your running app. Factoryplane proxies this URL to a private E2B sandbox URL. Never send the user an `e2b.app` URL. If a legacy API response returns an `e2b.app` URL, treat it as an internal upstream and use `https://{serviceId}.previews.factoryplane.com` as the user-facing URL instead.
+The returned `url` is what the user will use to view your running app. Factoryplane proxies this URL to a private E2B sandbox URL. Never send the user an `e2b.app` URL.
 
 For dev servers with host checks, configure them to allow Factoryplane preview hosts before starting the service. For Vite, set `server.allowedHosts` to include `".previews.factoryplane.com"` or otherwise allow the returned host. WebSocket/HMR connections should use the same browser host with `wss://`, not `localhost` or a separate unregistered port.
 
@@ -78,7 +78,7 @@ Use this to see the services Factoryplane is managing for the current task.
 **Example:**
 
 ```bash
-curl https://api.interface.ngrok.pro/services \
+curl {{FACTORYPLANE_API_URL}}/services \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
@@ -91,7 +91,7 @@ Use this when a managed service is no longer needed or you need to restart it wi
 **Example:**
 
 ```bash
-curl -X POST https://api.interface.ngrok.pro/services/service-id/stop \
+curl -X POST {{FACTORYPLANE_API_URL}}/services/service-id/stop \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
@@ -104,7 +104,7 @@ Use this to see the repositories configured for this factory. These repositories
 **Example:**
 
 ```bash
-curl https://api.interface.ngrok.pro/repositories \
+curl {{FACTORYPLANE_API_URL}}/repositories \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
@@ -123,7 +123,7 @@ Use this when the user asks you to add a repository to the current factory's san
 **Example:**
 
 ```bash
-curl -X POST https://api.interface.ngrok.pro/repositories \
+curl -X POST {{FACTORYPLANE_API_URL}}/repositories \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://github.com/org/repo.git","path":"repo","branch":"main"}'
@@ -138,7 +138,7 @@ Use this to change the URL, path, or branch for an existing configured repositor
 **Example:**
 
 ```bash
-curl -X PATCH https://api.interface.ngrok.pro/repositories/repository-id \
+curl -X PATCH {{FACTORYPLANE_API_URL}}/repositories/repository-id \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"branch":"develop"}'
@@ -153,7 +153,7 @@ Use this to remove a repository from the current factory's sandbox setup.
 **Example:**
 
 ```bash
-curl -X DELETE https://api.interface.ngrok.pro/repositories/repository-id \
+curl -X DELETE {{FACTORYPLANE_API_URL}}/repositories/repository-id \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
