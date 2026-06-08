@@ -1,5 +1,6 @@
 const ENCRYPTION_VERSION = "v1";
 const IV_BYTE_LENGTH = 12;
+const SECRET_TOKEN_BYTE_LENGTH = 32;
 
 export type EncryptionService = {
 	encrypt(value: string): Promise<string>;
@@ -58,6 +59,31 @@ export const createEncryptionService = (
 			return new TextDecoder().decode(decrypted);
 		},
 	};
+};
+
+export const generateSecretToken = (prefix: string) => {
+	const trimmedPrefix = prefix.trim();
+
+	if (!trimmedPrefix) {
+		throw new Error("Secret token prefix must not be empty");
+	}
+
+	const crypto = getCrypto();
+	const bytes = crypto.getRandomValues(
+		new Uint8Array(SECRET_TOKEN_BYTE_LENGTH),
+	);
+
+	return `${trimmedPrefix}_${toBase64Url(bytes)}`;
+};
+
+export const hashSecretValue = async (value: string) => {
+	const crypto = getCrypto();
+	const digest = await crypto.subtle.digest(
+		"SHA-256",
+		new TextEncoder().encode(value),
+	);
+
+	return toBase64Url(new Uint8Array(digest));
 };
 
 const importAesKey = async (secretKey: string) => {
