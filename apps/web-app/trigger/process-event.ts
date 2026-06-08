@@ -272,7 +272,7 @@ const cloneFactoryRepositories = async (
 
 	const workspacePath = await getSandboxWorkspacePath(sandbox);
 
-	await runSetupStep(
+	await runOptionalSetupStep(
 		taskId,
 		"repositories",
 		"Clone repositories",
@@ -307,15 +307,18 @@ const setupRepositoryGithubAuth = async (
 		return envs;
 	}
 
-	await runSetupStep(
+	const validatedEnvs = await runOptionalSetupStep(
 		taskId,
 		"repository_auth",
 		"Validate repository GitHub token",
-		() => validateGithubToken(sandbox, envs),
+		async () => {
+			await validateGithubToken(sandbox, envs);
+			return envs;
+		},
 		{ timeoutMs: 35_000 },
 	);
 
-	return envs;
+	return validatedEnvs ?? { GIT_TERMINAL_PROMPT: "0" };
 };
 
 const buildGithubAuthNoticeCommand = () =>
@@ -1018,20 +1021,22 @@ const runWithTimeout = async <T>(
 	}
 };
 
-const runOptionalSetupStep = async (
+const runOptionalSetupStep = async <T>(
 	taskId: string,
 	step: string,
 	title: string,
-	action: () => Promise<void>,
+	action: () => Promise<T>,
+	options: SetupStepOptions = {},
 ) => {
 	try {
-		await runSetupStep(taskId, step, title, action);
+		return await runSetupStep(taskId, step, title, action, options);
 	} catch (error) {
 		console.warn("Optional setup step failed", {
 			taskId,
 			step,
 			error,
 		});
+		return undefined;
 	}
 };
 
