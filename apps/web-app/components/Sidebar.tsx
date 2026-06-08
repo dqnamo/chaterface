@@ -5,6 +5,7 @@ import {
 	CaretRightIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
+	MinusCircleIcon,
 	ShapesIcon,
 	SidebarSimpleIcon,
 	XCircleIcon,
@@ -365,15 +366,11 @@ const TaskSidebarItem = ({
 	const status = toTaskDotStatus(task.status);
 	const isCompleted = Boolean(task.completedAt);
 
-	const markComplete = async () => {
-		if (isCompleted) {
-			return;
-		}
-
+	const toggleCompletion = async () => {
 		await db.transact(
 			taskTx(task.id).update({
-				completedAt: DateTime.now().toISO(),
-				status: "complete",
+				completedAt: isCompleted ? undefined : DateTime.now().toISO(),
+				status: isCompleted ? "idle" : "complete",
 			}),
 		);
 	};
@@ -414,9 +411,13 @@ const TaskSidebarItem = ({
 			<ContextMenu.Portal>
 				<ContextMenu.Positioner>
 					<ContextMenu.Popup>
-						<ContextMenu.Item onClick={markComplete} disabled={isCompleted}>
-							<CheckIcon size={14} weight="bold" className="shrink-0" />
-							<span>Mark complete</span>
+						<ContextMenu.Item onClick={toggleCompletion}>
+							{isCompleted ? (
+								<MinusCircleIcon size={14} weight="bold" className="shrink-0" />
+							) : (
+								<CheckIcon size={14} weight="bold" className="shrink-0" />
+							)}
+							<span>{isCompleted ? "Uncomplete task" : "Mark complete"}</span>
 						</ContextMenu.Item>
 						<ContextMenu.Separator />
 						<ContextMenu.Item
