@@ -103,9 +103,7 @@ export const POST: RouteHandler = async (c) => {
 	}
 
 	await db.transact([
-		serviceTx(serviceId).update({
-			status: "stopped",
-		}),
+		serviceTx(serviceId).delete(),
 		eventTx(id())
 			.create({
 				type: "factoryplane.service_stopped",
@@ -124,6 +122,7 @@ export const POST: RouteHandler = async (c) => {
 		serviceId,
 		status: "stopped",
 		killed,
+		deleted: true,
 	});
 };
 
