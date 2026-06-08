@@ -1,9 +1,11 @@
 import type { InstaQLEntity } from "@instantdb/react";
 import {
+	BuildingsIcon,
 	CaretDownIcon,
 	CaretRightIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
+	ShapesIcon,
 	SidebarSimpleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
@@ -17,10 +19,19 @@ import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
+import { Menu } from "./Menu";
+import Monogram from "./Monogram";
 import { useSidebar } from "./SidebarContext";
 import TaskStatusDots from "./TaskStatusDots";
 
 type Task = InstaQLEntity<AppSchema, "tasks">;
+type Factory = Pick<InstaQLEntity<AppSchema, "factories">, "id" | "name">;
+type Organisation = Pick<
+	InstaQLEntity<AppSchema, "organisations">,
+	"id" | "name" | "handle"
+> & {
+	factories?: Factory[];
+};
 
 type SidebarProps = {
 	onToggleCollapse: () => void;
@@ -59,7 +70,33 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 			},
 		},
 	});
+	const { data: switcherData } = db.useQuery({
+		organisations: {
+			factories: {},
+		},
+	});
 	const tasks = data?.tasks ?? [];
+	const organisations = useMemo(
+		() =>
+			(switcherData?.organisations ?? [])
+				.map((organisation) => ({
+					id: organisation.id,
+					name: organisation.name,
+					handle: organisation.handle,
+					factories: [...(organisation.factories ?? [])]
+						.map((factory) => ({
+							id: factory.id,
+							name: factory.name,
+						}))
+						.sort((firstFactory, secondFactory) =>
+							firstFactory.name.localeCompare(secondFactory.name),
+						),
+				}))
+				.sort((firstOrganisation, secondOrganisation) =>
+					firstOrganisation.name.localeCompare(secondOrganisation.name),
+				),
+		[switcherData?.organisations],
+	);
 	const { activeTasks, completedTasks } = useMemo(
 		() => ({
 			activeTasks: tasks.filter((task) => !task.completedAt),
@@ -73,12 +110,18 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	return (
 		<div className="flex h-full w-full flex-col gap-2 overflow-y-auto px-2 py-2">
 			<div>
-				<div className="mb-4 flex flex-row items-center justify-between">
+				<div className="mb-4 flex flex-row items-center justify-between gap-2">
+					<FactorySwitcher
+						organisations={organisations}
+						currentOrgHandle={currentOrgHandle}
+						currentFactoryId={currentFactoryId}
+						onNavigate={closeAfterMobileNavigation}
+					/>
 					<button
 						type="button"
 						aria-label="Collapse sidebar"
 						onClick={onToggleCollapse}
-						className="ml-auto flex size-6 cursor-pointer items-center justify-center bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
+						className="flex size-6 shrink-0 cursor-pointer items-center justify-center bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
 					>
 						<SidebarSimpleIcon weight="bold" />
 					</button>
@@ -177,6 +220,133 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 		</div>
 	);
 }
+
+const FactorySwitcher = ({
+	organisations,
+	currentOrgHandle,
+	currentFactoryId,
+	onNavigate,
+}: {
+	organisations: Organisation[];
+	currentOrgHandle: string;
+	currentFactoryId: string;
+	onNavigate: () => void;
+}) => {
+	const router = useRouter();
+	const currentOrganisation = organisations.find(
+		(organisation) => organisation.handle === currentOrgHandle,
+	);
+	const currentFactory = currentOrganisation?.factories?.find(
+		(factory) => factory.id === currentFactoryId,
+	);
+	const triggerSeed =
+		currentFactory?.name ?? currentOrganisation?.name ?? currentOrgHandle;
+
+	const navigateTo = (href: string) => {
+		router.push(href);
+		onNavigate();
+	};
+
+	return (
+		<Menu.Root>
+			<Menu.Trigger className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
+				<Monogram
+					seed={triggerSeed}
+					letters={currentFactory ? 2 : 1}
+					className="size-7 shrink-0"
+				/>
+				<span className="flex min-w-0 flex-1 flex-col text-left">
+					<span className="truncate text-sm leading-tight text-grayscale-12">
+						{currentFactory?.name ?? currentOrganisation?.name ?? "Factories"}
+					</span>
+					<span className="truncate text-[11px] leading-tight text-grayscale-10">
+						{currentOrganisation?.name ?? currentOrgHandle}
+					</span>
+				</span>
+				<Menu.TriggerIcon />
+			</Menu.Trigger>
+			<Menu.Portal>
+				<Menu.Positioner align="start" sideOffset={8}>
+					<Menu.Popup className="w-72 max-w-[calc(100vw-1rem)]">
+						<Menu.Item onClick={() => navigateTo("/")}>
+							<BuildingsIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">All organisations</span>
+						</Menu.Item>
+						<Menu.Separator />
+						{organisations.map((organisation) => (
+							<Menu.Group key={organisation.id}>
+								<Menu.GroupLabel className="truncate">
+									{organisation.name}
+								</Menu.GroupLabel>
+								<Menu.Item
+									onClick={() =>
+										navigateTo(`/${organisation.handle}/factories`)
+									}
+									className={cn(
+										organisation.handle === currentOrgHandle && !currentFactory
+											? "bg-grayscale-2 text-grayscale-12"
+											: "",
+									)}
+								>
+									<BuildingsIcon weight="bold" className="size-4 shrink-0" />
+									<span className="min-w-0 flex-1 truncate">Factories</span>
+									{organisation.handle === currentOrgHandle &&
+									!currentFactory ? (
+										<CheckIcon
+											size={14}
+											weight="bold"
+											className="shrink-0 text-accent-9"
+										/>
+									) : null}
+								</Menu.Item>
+								{organisation.factories?.length ? (
+									organisation.factories.map((factory) => {
+										const selected =
+											organisation.handle === currentOrgHandle &&
+											factory.id === currentFactoryId;
+
+										return (
+											<Menu.Item
+												key={factory.id}
+												onClick={() =>
+													navigateTo(
+														`/${organisation.handle}/factories/${factory.id}`,
+													)
+												}
+												className={cn(
+													selected ? "bg-grayscale-2 text-grayscale-12" : "",
+												)}
+											>
+												<ShapesIcon weight="bold" className="size-4 shrink-0" />
+												<span className="min-w-0 flex-1 truncate">
+													{factory.name}
+												</span>
+												{selected ? (
+													<CheckIcon
+														size={14}
+														weight="bold"
+														className="shrink-0 text-accent-9"
+													/>
+												) : null}
+											</Menu.Item>
+										);
+									})
+								) : (
+									<Menu.Item disabled={true} className="text-grayscale-9">
+										<span className="min-w-0 flex-1 truncate">
+											No factories
+										</span>
+									</Menu.Item>
+								)}
+								<Menu.Separator />
+							</Menu.Group>
+						))}
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	);
+};
 
 const TaskSidebarItem = ({
 	fallbackHref,
