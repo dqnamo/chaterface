@@ -1,0 +1,51 @@
+name: Deploy main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Push schema and deploy tasks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Push Instant schema
+        working-directory: apps/web-app
+        env:
+          NEXT_PUBLIC_INSTANT_APP_ID: ${{ secrets.NEXT_PUBLIC_INSTANT_APP_ID }}
+          INSTANT_APP_ADMIN_TOKEN: ${{ secrets.INSTANT_APP_ADMIN_TOKEN }}
+        run: pnpx instant-cli@latest push schema --yes --token "$INSTANT_APP_ADMIN_TOKEN"
+
+      - name: Deploy Trigger.dev
+        working-directory: apps/web-app
+        env:
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+          TRIGGER_PROJECT_REF: ${{ secrets.TRIGGER_PROJECT_REF }}
+        run: pnpx trigger.dev@latest deploy
