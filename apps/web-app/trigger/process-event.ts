@@ -26,6 +26,10 @@ type Repository = InstaQLEntity<AppSchema, "repositories">;
 type FactoryWithRepositories = Factory & {
 	repositories?: Repository[];
 };
+type TaskEnvironmentPackage = {
+	command: string;
+	aptPackage: string;
+};
 type CodexEvent = {
 	type: string;
 	data: unknown;
@@ -43,6 +47,12 @@ const CODEX_AUTH_PATH = "~/.codex/auth.json";
 const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
 const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
 const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
+const DEFAULT_TASK_ENVIRONMENT_PACKAGES: TaskEnvironmentPackage[] = [
+	{
+		command: "rg",
+		aptPackage: "ripgrep",
+	},
+];
 const SANDBOX_DIFF_EXCLUDES = [
 	".git",
 	".codex",
@@ -231,6 +241,8 @@ const setupTaskSandbox = async (
 
 	console.log(codexUpdate);
 
+	await installDefaultTaskEnvironmentPackages(sandbox, task.id);
+
 	const repositoryGithubEnvs = await setupRepositoryGithubAuth(
 		sandbox,
 		task.id,
@@ -256,6 +268,53 @@ const setupTaskSandbox = async (
 	);
 
 	return sandbox;
+};
+
+const installDefaultTaskEnvironmentPackages = async (
+	sandbox: Sandbox,
+	taskId: string,
+) => {
+	if (DEFAULT_TASK_ENVIRONMENT_PACKAGES.length === 0) {
+		return;
+	}
+
+	await runSetupStep(
+		taskId,
+		"environment_packages",
+		"Install environment packages",
+		() =>
+			sandbox.commands.run(buildInstallEnvironmentPackagesCommand(), {
+				timeoutMs: 180_000,
+			}),
+		{ timeoutMs: 190_000 },
+	);
+};
+
+const buildInstallEnvironmentPackagesCommand = () => {
+	const packageArgs = DEFAULT_TASK_ENVIRONMENT_PACKAGES.map((pkg) =>
+		shellQuote(pkg.aptPackage),
+	).join(" ");
+	const commandChecks = DEFAULT_TASK_ENVIRONMENT_PACKAGES.map(
+		(pkg) => `command -v ${shellQuote(pkg.command)} >/dev/null 2>&1`,
+	).join(" && ");
+
+	return [
+		"set -e",
+		`if ${commandChecks}; then`,
+		"  exit 0",
+		"fi",
+		"export DEBIAN_FRONTEND=noninteractive",
+		'if [ "$(id -u)" -eq 0 ]; then',
+		'  SUDO=""',
+		"elif command -v sudo >/dev/null 2>&1; then",
+		'  SUDO="sudo"',
+		"else",
+		'  printf "Root privileges or sudo are required to install environment packages.\\n" >&2',
+		"  exit 1",
+		"fi",
+		"$SUDO apt-get update",
+		`$SUDO apt-get install -y --no-install-recommends ${packageArgs}`,
+	].join("\n");
 };
 
 const cloneFactoryRepositories = async (
