@@ -102,7 +102,7 @@ function FactoryLayoutChrome({ children }: { children: React.ReactNode }) {
 				</>
 			)}
 
-			<div className="relative min-w-0 flex-1">{children}</div>
+			<div className="relative min-h-0 min-w-0 flex-1">{children}</div>
 		</div>
 	);
 }

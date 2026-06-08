@@ -12,14 +12,13 @@ import type { AppSchema } from "@repo/db/schema";
 import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
+import { useSidebar } from "./SidebarContext";
 import TaskStatusDots from "./TaskStatusDots";
-
-import { Button } from "./Button";
 
 type Task = InstaQLEntity<AppSchema, "tasks">;
 
@@ -40,10 +39,16 @@ const taskTx = (taskId: string) => {
 export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const { orgHandle, factoryId, taskId } = useParams();
 	const pathname = usePathname();
+	const { isMobile, collapse } = useSidebar();
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
 	const currentTaskId = taskId as string;
 	const [isCompletedExpanded, setIsCompletedExpanded] = useState(false);
+	const closeAfterMobileNavigation = useCallback(() => {
+		if (isMobile) {
+			collapse();
+		}
+	}, [collapse, isMobile]);
 
 	const { data } = db.useQuery({
 		tasks: {
@@ -80,6 +85,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 				</div>
 				<Link
 					href={settingsHref}
+					onClick={closeAfterMobileNavigation}
 					className={cn(
 						"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 						isSettingsSelected ? "bg-grayscale-3" : "",
@@ -95,26 +101,27 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					<span className="min-w-0 flex-1 truncate">Settings</span>
 				</Link>
 				<div className="p-1.5 mt-2">
-          <Link
-            href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-            className="group relative flex w-full min-w-0 overflow-visible"
-          >
-            <span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 ">
-              <CornerBrackets
-                placement="outside"
-                spacing={4}
-                translate={4}
-                color="black"
-              />
-              <p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
-                New Task
-              </p>
-              <p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
-                N
-              </p>
-            </span>
-          </Link>
-        </div>
+					<Link
+						href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+						onClick={closeAfterMobileNavigation}
+						className="group relative flex w-full min-w-0 overflow-visible"
+					>
+						<span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 ">
+							<CornerBrackets
+								placement="outside"
+								spacing={4}
+								translate={4}
+								color="black"
+							/>
+							<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
+								New Task
+							</p>
+							<p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
+								N
+							</p>
+						</span>
+					</Link>
+				</div>
 			</div>
 			<div className="mt-2 flex flex-row items-center justify-between px-3">
 				<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
@@ -132,6 +139,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
 						task={task}
 						selected={task.id === currentTaskId}
+						onNavigate={closeAfterMobileNavigation}
 					/>
 				))}
 			</div>
@@ -160,6 +168,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
 								task={task}
 								selected={task.id === currentTaskId}
+								onNavigate={closeAfterMobileNavigation}
 							/>
 						))}
 					</div>
@@ -174,11 +183,13 @@ const TaskSidebarItem = ({
 	href,
 	task,
 	selected,
+	onNavigate,
 }: {
 	fallbackHref: string;
 	href: string;
 	task: Task;
 	selected: boolean;
+	onNavigate: () => void;
 }) => {
 	const router = useRouter();
 	const status = toTaskDotStatus(task.status);
@@ -212,6 +223,7 @@ const TaskSidebarItem = ({
 					<Link
 						key={task.id}
 						href={href}
+						onClick={onNavigate}
 						className={cn(
 							"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 							selected ? "bg-grayscale-3" : "",

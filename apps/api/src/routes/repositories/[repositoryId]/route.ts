@@ -114,6 +114,8 @@ export const DELETE: RouteHandler = async (c) => {
 		return c.json({ error: "Repository not found" }, 404);
 	}
 
+	const repositoryDetails = await getRepositoryDetails(repositoryId);
+
 	await db.transact([
 		repositoryTx(repositoryId).delete(),
 		eventTx(id())
@@ -121,9 +123,9 @@ export const DELETE: RouteHandler = async (c) => {
 				type: "factoryplane.repository_deleted",
 				data: {
 					repositoryId,
-					url: repository.url,
-					path: repository.path,
-					branch: repository.branch,
+					url: repositoryDetails?.url,
+					path: repositoryDetails?.path,
+					branch: repositoryDetails?.branch,
 				},
 				createdAt: new Date().toISOString(),
 			})
@@ -134,6 +136,21 @@ export const DELETE: RouteHandler = async (c) => {
 		repositoryId,
 		status: "deleted",
 	});
+};
+
+const getRepositoryDetails = async (repositoryId: string) => {
+	return db
+		.query({
+			repositories: {
+				$: {
+					fields: ["url", "path", "branch"],
+					where: {
+						id: repositoryId,
+					},
+				},
+			},
+		})
+		.then((data) => data.repositories[0]);
 };
 
 const parseUpdateRepositoryBody = (

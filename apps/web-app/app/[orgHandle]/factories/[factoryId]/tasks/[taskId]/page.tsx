@@ -490,9 +490,9 @@ export default function TaskPage() {
 	}
 
 	return (
-		<div className="flex h-full w-full overflow-hidden">
-			<div className="flex h-full min-w-0 flex-1 flex-col">
-				<div className="flex flex-row items-center justify-between p-1.5 border-b border-grayscale-4">
+		<div className="flex h-full min-h-0 w-full overflow-hidden">
+			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+				<div className="flex shrink-0 flex-row items-center justify-between border-b border-grayscale-4 p-1.5">
 					<div className="flex flex-row items-center">
 						<ExpandSidebarButton />
 						<p className="text-sm text-grayscale-11 p-1">{task?.name}</p>
@@ -546,7 +546,7 @@ export default function TaskPage() {
 						</AnimatePresence>
 					</div>
 				</div>
-				<ScrollArea.Root className="h-full">
+				<ScrollArea.Root className="min-h-0 flex-1">
 					<ScrollArea.Viewport ref={scrollContainerRef} onScroll={handleScroll}>
 						<ScrollArea.Content className="flex min-h-full flex-col gap-4">
 							<div className="mx-auto flex w-full max-w-3xl flex-col p-4">
@@ -571,7 +571,7 @@ export default function TaskPage() {
 						<ScrollArea.Thumb />
 					</ScrollArea.Scrollbar>
 				</ScrollArea.Root>
-				<div className="flex flex-col pb-2 px-2">
+				<div className="flex shrink-0 flex-col px-2 pb-2">
 					<div className="flex flex-col gap-2">
 						<div className="flex flex-col max-w-3xl mx-auto w-full bg-white border border-grayscale-4 relative">
 							<CornerCubes
