@@ -74,7 +74,8 @@ export const POST: RouteHandler = async (c) => {
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	const serviceId = id();
 	const host = sandbox.getHost(body.portNumber);
-	const url = `https://${host}`;
+	const e2bUrl = `https://${host}`;
+	const url = getPreviewUrl(serviceId);
 
 	await db.transact(
 		serviceTx(serviceId)
@@ -85,6 +86,8 @@ export const POST: RouteHandler = async (c) => {
 				healthPath: body.healthPath,
 				portNumber: body.portNumber,
 				status: "starting",
+				e2bHost: host,
+				e2bUrl,
 				url,
 			})
 			.link({ task: task.id }),
@@ -259,6 +262,12 @@ const waitForService = async (
 const buildServiceCommand = (cwd: string, command: string) => {
 	const script = `cd ${shellQuote(cwd)} && exec ${command}`;
 	return `/bin/bash -lc ${shellQuote(script)}`;
+};
+
+const getPreviewUrl = (serviceId: string) => {
+	const domain =
+		process.env.FACTORYPLANE_PREVIEWS_DOMAIN ?? "previews.factoryplane.com";
+	return `https://${serviceId}.${domain}`;
 };
 
 const getExitCode = (result: unknown) => {

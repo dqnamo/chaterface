@@ -743,10 +743,10 @@ export default function TaskPage() {
 											className="h-full"
 										>
 											{service.url ? (
-												<iframe
-													src={service.url}
-													title={`${service.name} preview`}
-													className="h-full w-full"
+												<ServicePreviewFrame
+													serviceId={service.id}
+													serviceName={service.name}
+													userToken={user?.refresh_token}
 												/>
 											) : (
 												<div className="flex h-full items-center justify-center text-xs text-grayscale-10">
@@ -813,5 +813,90 @@ export default function TaskPage() {
 				</Tabs.Root>
 			</motion.div>
 		</div>
+	);
+}
+
+function ServicePreviewFrame({
+	serviceId,
+	serviceName,
+	userToken,
+}: {
+	serviceId: string;
+	serviceName: string;
+	userToken: string | undefined;
+}) {
+	const [src, setSrc] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!userToken) {
+			setSrc(null);
+			return;
+		}
+
+		let cancelled = false;
+
+		const createPreviewSession = async () => {
+			setError(null);
+
+			try {
+				const response = await fetch("/api/previews/session", {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${userToken}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({ serviceId }),
+				});
+
+				if (!response.ok) {
+					throw new Error("Failed to create preview session");
+				}
+
+				const data = await response.json();
+
+				if (!cancelled) {
+					setSrc(typeof data.url === "string" ? data.url : null);
+				}
+			} catch (error) {
+				if (!cancelled) {
+					setError(
+						error instanceof Error
+							? error.message
+							: "Failed to create preview session",
+					);
+				}
+			}
+		};
+
+		createPreviewSession();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [serviceId, userToken]);
+
+	if (error) {
+		return (
+			<div className="flex h-full items-center justify-center text-xs text-red-10">
+				{error}
+			</div>
+		);
+	}
+
+	if (!src) {
+		return (
+			<div className="flex h-full items-center justify-center text-xs text-grayscale-10">
+				Loading preview...
+			</div>
+		);
+	}
+
+	return (
+		<iframe
+			src={src}
+			title={`${serviceName} preview`}
+			className="h-full w-full"
+		/>
 	);
 }

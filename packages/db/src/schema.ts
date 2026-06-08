@@ -38,6 +38,7 @@ const _schema = i.schema({
 			settings: i.json().optional(),
 			status: i.string().optional(),
 			sandboxId: i.string().optional(),
+			sandboxTrafficAccessToken: i.string().optional(),
 		}),
 		organisations: i.entity({
 			name: i.string().indexed(),
@@ -78,6 +79,8 @@ const _schema = i.schema({
 			name: i.string().indexed(),
 			portNumber: i.number().indexed(),
 			url: i.string().optional(),
+			e2bHost: i.string().optional(),
+			e2bUrl: i.string().optional(),
 			command: i.string().optional(),
 			cwd: i.string().optional(),
 			healthPath: i.string().optional(),

@@ -1,0 +1,24 @@
+{
+	"name": "previews",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "tsx watch --env-file .env.local src/index.ts",
+		"build": "tsc",
+		"start": "node --env-file .env.local dist/index.js",
+		"lint": "biome check .",
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@repo/db": "workspace:*",
+		"http-proxy": "^1.18.1"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/http-proxy": "^1.17.16",
+		"@types/node": "^22.15.3",
+		"tsx": "^4.19.4",
+		"typescript": "5.9.2"
+	}
+}

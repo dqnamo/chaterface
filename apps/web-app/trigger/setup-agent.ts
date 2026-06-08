@@ -14,6 +14,8 @@ function agentTx(agentId: string) {
 	return tx;
 }
 
+const e2bPortPlaceholder = ["$", "{PORT}"].join("");
+
 export const setupAgentTask = task({
 	id: "setup-agent",
 	retry: {
@@ -53,6 +55,10 @@ export const setupAgentTask = task({
 					onTimeout: "pause",
 					autoResume: true,
 				},
+				network: {
+					allowPublicTraffic: false,
+					maskRequestHost: `localhost:${e2bPortPlaceholder}`,
+				},
 			});
 
 			await sandbox.files.write(
@@ -78,6 +84,7 @@ export const setupAgentTask = task({
 			await db.transact(
 				agentTx(payload.agentId).update({
 					sandboxId: sandbox.sandboxId,
+					sandboxTrafficAccessToken: sandbox.trafficAccessToken,
 					status: "ready",
 				}),
 			);

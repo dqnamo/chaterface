@@ -54,13 +54,13 @@ Example response:
 ```json
 {
   "serviceId": "service-id",
-  "url": "https://3000-abc123.e2b.app",
+  "url": "https://service-id.previews.factoryplane.com",
   "status": "running",
   "pid": 123
 }
 ```
 
-The returned `url` is what the user will use to view your running app. For dev servers with host checks, configure them to allow E2B preview hosts before starting the service. For Vite, set `server.allowedHosts` to include `".e2b.app"` or otherwise allow the returned host.
+The returned `url` is what the user will use to view your running app. Factoryplane proxies this URL to a private E2B sandbox URL. For dev servers with host checks, configure them to allow Factoryplane preview hosts before starting the service. For Vite, set `server.allowedHosts` to include `".previews.factoryplane.com"` or otherwise allow the returned host. WebSocket/HMR connections should use the same browser host with `wss://`, not `localhost` or a separate unregistered port.
 
 **Errors:**
 
