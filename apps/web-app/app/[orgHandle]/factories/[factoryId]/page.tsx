@@ -108,7 +108,7 @@ export default function FactoryPage() {
 	};
 
 	return (
-		<div className="relative flex flex-col gap-4 h-full w-full items-center justify-center">
+		<div className="relative flex h-full w-full flex-col items-center justify-center gap-4 px-4 md:px-0">
 			<ExpandSidebarButton className="absolute left-2 top-2 z-20" />
 			<Logo size={8} />
 			<div className="flex flex-col gap-px items-center justify-center">
