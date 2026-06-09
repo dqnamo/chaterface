@@ -6,6 +6,7 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
+import { Streamdown } from "streamdown";
 import type { AppSchema } from "@/instant.schema";
 import Logo from "./Logo";
 
@@ -285,9 +286,7 @@ export default function Event({ node }: { node: TimelineNode }) {
 				title="Message sent"
 				tone="neutral"
 			>
-				<MessageBubble>
-					{getString(data, "content") ?? "Empty message"}
-				</MessageBubble>
+				<MessageBubble text={getString(data, "content") ?? "Empty message"} />
 			</EventCard>
 		);
 	}
@@ -681,7 +680,7 @@ function AgentMessage({
 			title="Agent message"
 			tone="accent"
 		>
-			<MessageBubble>{text}</MessageBubble>
+			<MessageBubble text={text} />
 		</EventCard>
 	);
 }
@@ -805,11 +804,16 @@ function DetailGrid({
 	);
 }
 
-function MessageBubble({ children }: { children: ReactNode }) {
+function MessageBubble({ text }: { text: string }) {
 	return (
-		<div className="whitespace-pre-wrap text-sm leading-6 text-grayscale-12">
-			{children}
-		</div>
+		<Streamdown
+			className="text-sm leading-6 text-grayscale-12 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
+			dir="auto"
+			lineNumbers={false}
+			mode="static"
+		>
+			{text}
+		</Streamdown>
 	);
 }
 

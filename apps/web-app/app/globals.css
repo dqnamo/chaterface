@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "streamdown/styles.css";
 
 @import "@radix-ui/colors/slate.css";
 @import "@radix-ui/colors/slate-dark.css";
@@ -16,6 +17,8 @@
 @import "@radix-ui/colors/blue.css";
 @import "@radix-ui/colors/blue-dark.css";
 
+
+@source "../../../node_modules/streamdown/dist/*.js";
 
 @theme inline {
 	--font-sans: var(--font-inter);
@@ -86,6 +89,37 @@
 	--color-blue-10: var(--blue-10);
 	--color-blue-11: var(--blue-11);
 	--color-blue-12: var(--blue-12);	
+
+	--color-background: var(--slate-1);
+	--color-foreground: var(--slate-12);
+	--color-card: var(--slate-1);
+	--color-card-foreground: var(--slate-12);
+	--color-muted: var(--slate-3);
+	--color-muted-foreground: var(--slate-11);
+	--color-border: var(--slate-4);
+	--color-input: var(--slate-4);
+	--color-primary: var(--indigo-9);
+	--color-primary-foreground: white;
+	--color-sidebar: var(--slate-2);
+	--color-sidebar-foreground: var(--slate-12);
+	--color-sidebar-border: var(--slate-4);
+}
+
+:root {
+	--background: var(--slate-1);
+	--foreground: var(--slate-12);
+	--card: var(--slate-1);
+	--card-foreground: var(--slate-12);
+	--muted: var(--slate-3);
+	--muted-foreground: var(--slate-11);
+	--border: var(--slate-4);
+	--input: var(--slate-4);
+	--primary: var(--indigo-9);
+	--primary-foreground: white;
+	--sidebar: var(--slate-2);
+	--sidebar-foreground: var(--slate-12);
+	--sidebar-border: var(--slate-4);
+	--radius: 0.5rem;
 }
 
 @keyframes task-status-dot-spin {
@@ -102,4 +136,3 @@
 .task-status-dot--running {
 	animation: task-status-dot-spin 0.9s ease-in-out infinite;
 }
-
