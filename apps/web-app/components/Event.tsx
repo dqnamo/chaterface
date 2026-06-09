@@ -6,7 +6,7 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
-import { Streamdown } from "streamdown";
+import { type LinkSafetyConfig, Streamdown } from "streamdown";
 import type { AppSchema } from "@/instant.schema";
 import Logo from "./Logo";
 
@@ -35,6 +35,7 @@ type TimelineContext = {
 };
 
 const OUTPUT_PREVIEW_LIMIT = 6000;
+const MESSAGE_LINK_SAFETY = { enabled: false } satisfies LinkSafetyConfig;
 const previewsDomain =
 	process.env.NEXT_PUBLIC_FACTORYPLANE_PREVIEWS_DOMAIN ??
 	"previews.factoryplane.com";
@@ -809,6 +810,7 @@ function MessageBubble({ text }: { text: string }) {
 		<Streamdown
 			className="text-sm leading-6 text-grayscale-12 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
 			dir="auto"
+			linkSafety={MESSAGE_LINK_SAFETY}
 			lineNumbers={false}
 			mode="static"
 		>
