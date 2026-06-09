@@ -35,6 +35,7 @@ const _schema = i.schema({
 			name: i.string().indexed(),
 			auth: i.json().optional(),
 			createdAt: i.date().optional(),
+			provider: i.string().optional(),
 			settings: i.json().optional(),
 			status: i.string().optional(),
 			sandboxId: i.string().optional(),
@@ -226,6 +227,18 @@ const _schema = i.schema({
 			},
 			reverse: {
 				on: "members",
+				has: "one",
+				label: "organisation",
+			},
+		},
+		organisationAgents: {
+			forward: {
+				on: "organisations",
+				has: "many",
+				label: "agents",
+			},
+			reverse: {
+				on: "agents",
 				has: "one",
 				label: "organisation",
 			},

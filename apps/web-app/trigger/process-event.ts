@@ -34,6 +34,7 @@ type CodexEvent = {
 	type: string;
 	data: unknown;
 };
+type AgentProvider = "codex" | "cursor";
 
 type RunCodexExecOptions = {
 	resumeLast?: boolean;
@@ -72,6 +73,46 @@ const SANDBOX_DIFF_EXCLUDES = [
 	".env",
 	".env.*",
 ];
+
+const getAgentProvider = (agent: {
+	provider?: string | null;
+}): AgentProvider => (agent.provider === "cursor" ? "cursor" : "codex");
+
+const getProviderLabel = (provider: AgentProvider) =>
+	provider === "cursor" ? "Cursor" : "Codex";
+
+const getCursorApiKey = (auth: unknown) => {
+	if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
+		return undefined;
+	}
+
+	const value = (auth as { apiKey?: unknown }).apiKey;
+	return typeof value === "string" && value.trim().length > 0
+		? value.trim()
+		: undefined;
+};
+
+const getCursorAuthEnvs = (agent: Agent): Record<string, string> => {
+	const apiKey = getCursorApiKey(agent.auth);
+
+	if (!apiKey) {
+		throw new Error(`Cursor agent ${agent.id} is missing auth.apiKey`);
+	}
+
+	return { CURSOR_API_KEY: apiKey };
+};
+
+const getCursorPathPrefix = () =>
+	'export PATH="$HOME/.cursor/bin:$HOME/.local/bin:$PATH"';
+
+const buildCursorInstallCommand = () =>
+	[
+		getCursorPathPrefix(),
+		"if ! command -v cursor-agent >/dev/null 2>&1; then",
+		"  curl https://cursor.com/install -fsS | bash",
+		"fi",
+		"cursor-agent --version",
+	].join("\n");
 
 const taskTx = (taskId: string) => {
 	const tx = db.tx.tasks[taskId];
@@ -165,13 +206,13 @@ const processNewTask = async (agent: Agent, task: Task, factory: Factory) => {
 	);
 	const message = `${task.name}. ${task.instructions ?? ""}.`;
 
-	await runCodexExec(
+	await runAgentExec(
 		sandbox,
 		{ ...task, diffWorkspacePath },
+		agent,
 		factory,
 		message,
 		{},
-		agent.id,
 	);
 };
 
@@ -193,15 +234,10 @@ const processNewUserMessage = async (
 	}
 
 	const sandbox = await Sandbox.connect(task.sandboxId);
-	await killTaskCodexProcess(sandbox, task);
-	await runCodexExec(
-		sandbox,
-		task,
-		factory,
-		content,
-		{ resumeLast: true },
-		agent.id,
-	);
+	await killTaskAgentProcess(sandbox, task);
+	await runAgentExec(sandbox, task, agent, factory, content, {
+		resumeLast: true,
+	});
 };
 
 const setupTaskSandbox = async (
@@ -231,6 +267,7 @@ const setupTaskSandbox = async (
 			}),
 		{ timeoutMs: 120_000 },
 	);
+	const provider = getAgentProvider(agent);
 
 	await db.transact(
 		taskTx(task.id).update({
@@ -239,24 +276,37 @@ const setupTaskSandbox = async (
 		}),
 	);
 
-	await runSetupStep(task.id, "codex_auth", "Write Codex auth", () =>
-		sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth)),
-	);
+	if (provider === "cursor") {
+		getCursorAuthEnvs(agent);
+		const cursorInstall = await runSetupStep(
+			task.id,
+			"cursor_update",
+			"Install Cursor CLI",
+			() =>
+				sandbox.commands.run(buildCursorInstallCommand(), {
+					timeoutMs: 120_000,
+				}),
+			{ timeoutMs: 130_000 },
+		);
+		console.log(cursorInstall);
+	} else {
+		await runSetupStep(task.id, "codex_auth", "Write Codex auth", () =>
+			sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth)),
+		);
 
-	// update the codex version
-	const codexUpdate = await runSetupStep(
-		task.id,
-		"codex_update",
-		"Update Codex",
-		() =>
-			sandbox.commands.run(
-				"npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
-				{ timeoutMs: 120_000 },
-			),
-		{ timeoutMs: 130_000 },
-	);
-
-	console.log(codexUpdate);
+		const codexUpdate = await runSetupStep(
+			task.id,
+			"codex_update",
+			"Update Codex",
+			() =>
+				sandbox.commands.run(
+					"npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
+					{ timeoutMs: 120_000 },
+				),
+			{ timeoutMs: 130_000 },
+		);
+		console.log(codexUpdate);
+	}
 
 	await installDefaultTaskEnvironmentPackages(sandbox, task.id);
 
@@ -547,30 +597,36 @@ const normalizeRepositoryPath = (value: string | undefined) => {
 	return segments.length > 0 ? segments.join("/") : undefined;
 };
 
-const runCodexExec = async (
+const runAgentExec = async (
 	sandbox: Sandbox,
 	task: Task,
+	agent: Agent,
 	factory: Factory,
 	prompt: string,
 	options: RunCodexExecOptions = {},
-	agentId: string,
 ) => {
-	const { envs, agentToken } = await setupRun(sandbox, task, factory);
-	const output = createCodexOutputHandler(task.id);
+	const provider = getAgentProvider(agent);
+	const { envs, agentToken } = await setupRun(sandbox, task, agent, factory);
+	const output = createAgentOutputHandler(task.id, provider);
 	const command = await runSetupStep(
 		task.id,
-		"codex_launch",
-		options.resumeLast ? "Resume Codex" : "Start Codex",
+		provider === "cursor" ? "cursor_launch" : "codex_launch",
+		options.resumeLast
+			? `Resume ${getProviderLabel(provider)}`
+			: `Start ${getProviderLabel(provider)}`,
 		() =>
-			sandbox.commands.run(buildCodexExecCommand(task, prompt, options), {
-				background: true,
-				timeoutMs: 0,
-				envs,
-				onStdout: output.append,
-				onStderr: (data) => {
-					console.error(data);
+			sandbox.commands.run(
+				buildAgentExecCommand(provider, task, prompt, options),
+				{
+					background: true,
+					timeoutMs: 0,
+					envs,
+					onStdout: output.append,
+					onStderr: (data) => {
+						console.error(data);
+					},
 				},
-			}),
+			),
 	);
 
 	await updateTaskAgentPid(task.id, command.pid);
@@ -588,7 +644,7 @@ const runCodexExec = async (
 		const currentPid = await getTaskAgentPid(task.id);
 
 		if (currentPid !== command.pid) {
-			console.log("Codex process was interrupted", {
+			console.log("Agent process was interrupted", {
 				taskId: task.id,
 				pid: command.pid,
 				error,
@@ -610,7 +666,9 @@ const runCodexExec = async (
 		}
 		await clearTaskAgentPid(task.id, command.pid);
 		await postRun(task.id, agentToken);
-		await syncAgentAuthFromSandbox(sandbox, agentId);
+		if (provider === "codex") {
+			await syncAgentAuthFromSandbox(sandbox, agent.id);
+		}
 	}
 };
 
@@ -756,7 +814,12 @@ replace_factoryplane_dir() {
 `;
 };
 
-const setupRun = async (sandbox: Sandbox, task: Task, factory: Factory) => {
+const setupRun = async (
+	sandbox: Sandbox,
+	task: Task,
+	agent: Agent,
+	factory: Factory,
+) => {
 	const agentToken = randomUUID();
 	await db.transact(
 		taskTx(task.id).update({
@@ -767,6 +830,10 @@ const setupRun = async (sandbox: Sandbox, task: Task, factory: Factory) => {
 	const envs: Record<string, string> = {
 		FACTORYPLANE_AUTH_TOKEN: agentToken,
 	};
+
+	if (getAgentProvider(agent) === "cursor") {
+		Object.assign(envs, getCursorAuthEnvs(agent));
+	}
 
 	await runOptionalSetupStep(
 		task.id,
@@ -789,6 +856,19 @@ const setupRun = async (sandbox: Sandbox, task: Task, factory: Factory) => {
 
 const postRun = async (taskId: string, agentToken: string) => {
 	await clearTaskAgentToken(taskId, agentToken);
+};
+
+const buildAgentExecCommand = (
+	provider: AgentProvider,
+	task: Task,
+	prompt: string,
+	options: RunCodexExecOptions = {},
+) => {
+	if (provider === "cursor") {
+		return buildCursorExecCommand(task, prompt, options);
+	}
+
+	return buildCodexExecCommand(task, prompt, options);
 };
 
 const buildCodexExecCommand = (
@@ -823,6 +903,26 @@ const buildCodexExecCommand = (
 	return args.join(" ");
 };
 
+const buildCursorExecCommand = (
+	task: Task,
+	prompt: string,
+	options: RunCodexExecOptions = {},
+) => {
+	const args = ["cursor-agent", "-p", "--force", "--output-format stream-json"];
+	const model = task.agentModel?.trim();
+
+	if (model) {
+		args.push(`--model ${shellQuote(model)}`);
+	}
+
+	if (options.resumeLast) {
+		args.push("--resume");
+	}
+
+	args.push(shellQuote(prompt));
+	return [getCursorPathPrefix(), args.join(" ")].join("\n");
+};
+
 const getTaskAgentModel = (task: Task) => {
 	return task.agentModel ?? DEFAULT_CODEX_MODEL;
 };
@@ -836,20 +936,20 @@ const getTaskAgentReasoningEffort = (task: Task) => {
 	return isValid ? effort : DEFAULT_CODEX_REASONING_EFFORT;
 };
 
-const killTaskCodexProcess = async (sandbox: Sandbox, task: Task) => {
+const killTaskAgentProcess = async (sandbox: Sandbox, task: Task) => {
 	if (typeof task.agentPid !== "number") {
 		return;
 	}
 
 	try {
 		const killed = await sandbox.commands.kill(task.agentPid);
-		console.log("Killed previous Codex process", {
+		console.log("Killed previous agent process", {
 			taskId: task.id,
 			pid: task.agentPid,
 			killed,
 		});
 	} catch (error) {
-		console.log("Failed to kill previous Codex process", {
+		console.log("Failed to kill previous agent process", {
 			taskId: task.id,
 			pid: task.agentPid,
 			error,
@@ -927,7 +1027,7 @@ const getTaskAgentToken = async (taskId: string) => {
 	return currentTask?.agentToken;
 };
 
-const createCodexOutputHandler = (taskId: string) => {
+const createAgentOutputHandler = (taskId: string, provider: AgentProvider) => {
 	let buffer = "";
 
 	const append = async (chunk: string) => {
@@ -936,7 +1036,7 @@ const createCodexOutputHandler = (taskId: string) => {
 		const lines = buffer.split(/\r?\n/);
 		buffer = lines.pop() ?? "";
 
-		await persistCodexEvents(taskId, parseCodexLines(lines));
+		await persistCodexEvents(taskId, parseAgentLines(lines, provider));
 	};
 
 	const flush = async () => {
@@ -947,14 +1047,14 @@ const createCodexOutputHandler = (taskId: string) => {
 			return;
 		}
 
-		const events = parseCodexLines([finalLine]);
+		const events = parseAgentLines([finalLine], provider);
 		await persistCodexEvents(taskId, events);
 	};
 
 	return { append, flush };
 };
 
-const parseCodexLines = (lines: string[]) => {
+const parseAgentLines = (lines: string[], provider: AgentProvider) => {
 	const events: CodexEvent[] = [];
 
 	for (const rawLine of lines) {
@@ -964,19 +1064,19 @@ const parseCodexLines = (lines: string[]) => {
 			continue;
 		}
 
-		events.push(parseCodexEvent(line));
+		events.push(parseAgentEvent(line, provider));
 	}
 
 	return events;
 };
 
-const parseCodexEvent = (line: string): CodexEvent => {
+const parseAgentEvent = (line: string, provider: AgentProvider): CodexEvent => {
 	try {
 		const data = JSON.parse(line) as unknown;
 
 		if (!isRecord(data)) {
 			return {
-				type: "codex.event",
+				type: `${provider}.event`,
 				data: {
 					value: data,
 					raw: line,
@@ -988,14 +1088,15 @@ const parseCodexEvent = (line: string): CodexEvent => {
 			typeof data.type === "string" && data.type.length > 0
 				? data.type
 				: "event";
+		const typePrefix = `${provider}.`;
 
 		return {
-			type: rawType.startsWith("codex.") ? rawType : `codex.${rawType}`,
+			type: rawType.startsWith(typePrefix) ? rawType : `${provider}.${rawType}`,
 			data,
 		};
 	} catch (error) {
 		return {
-			type: "codex.unparsed",
+			type: `${provider}.unparsed`,
 			data: {
 				raw: line,
 				error: error instanceof Error ? error.message : String(error),

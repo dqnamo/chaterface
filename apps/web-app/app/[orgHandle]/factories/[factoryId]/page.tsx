@@ -54,7 +54,14 @@ export default function FactoryPage() {
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 
 	const { data } = db.useQuery({
-		agents: {},
+		organisations: {
+			$: {
+				where: {
+					handle: currentOrgHandle,
+				},
+			},
+			agents: {},
+		},
 		tasks: {
 			$: {
 				where: {
@@ -64,7 +71,7 @@ export default function FactoryPage() {
 		},
 	});
 
-	const agents = data?.agents;
+	const agents = data?.organisations?.[0]?.agents;
 	const resolvedAgentId = agentId || agents?.[0]?.id;
 	const agentItems =
 		agents?.map((agent) => ({ value: agent.id, label: agent.name })) ?? [];

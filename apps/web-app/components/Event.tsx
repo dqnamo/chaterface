@@ -932,6 +932,7 @@ function parseTimestamp(value: unknown) {
 function formatEventType(type: string) {
 	const label = type
 		.replace(/^codex\./, "")
+		.replace(/^cursor\./, "")
 		.replace(/^factoryplane\./, "")
 		.replace(/[._-]/g, " ");
 
