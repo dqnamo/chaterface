@@ -103,6 +103,8 @@ export default function FactoryPage() {
 					type: "factoryplane.new_task",
 					data: {
 						taskId: taskId,
+						name: taskName,
+						instructions: taskInstructions,
 					},
 					createdAt: DateTime.now().toISO(),
 				})

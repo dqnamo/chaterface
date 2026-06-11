@@ -573,7 +573,7 @@ export default function TaskPage() {
 								)}
 								<AnimatePresence initial={false}>
 									{timeline.map((node) => (
-										<Event key={node.key} node={node} />
+										<Event key={node.key} node={node} task={task} />
 									))}
 								</AnimatePresence>
 							</div>
