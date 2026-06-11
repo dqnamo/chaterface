@@ -35,6 +35,7 @@ type CodexEvent = {
 	data: unknown;
 };
 type AgentProvider = "codex" | "cursor";
+type FactorySetupScriptKind = "new_task" | "new_turn";
 
 type RunCodexExecOptions = {
 	resumeLast?: boolean;
@@ -49,6 +50,8 @@ const e2bPortPlaceholder = ["$", "{PORT}"].join("");
 const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
 const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
 const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
+const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
+const FACTORY_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_TASK_ENVIRONMENT_PACKAGES: TaskEnvironmentPackage[] = [
 	{
 		command: "rg",
@@ -319,6 +322,14 @@ const setupTaskSandbox = async (
 		sandbox,
 		task.id,
 		factory,
+		repositoryGithubEnvs,
+	);
+	await runFactorySetupScript(
+		sandbox,
+		task.id,
+		factory,
+		"new_task",
+		factory.newTaskSetupScript,
 		repositoryGithubEnvs,
 	);
 
@@ -597,6 +608,74 @@ const normalizeRepositoryPath = (value: string | undefined) => {
 	return segments.length > 0 ? segments.join("/") : undefined;
 };
 
+const runFactorySetupScript = async (
+	sandbox: Sandbox,
+	taskId: string,
+	factory: Factory,
+	kind: FactorySetupScriptKind,
+	script: string | undefined | null,
+	envs: Record<string, string>,
+) => {
+	const scriptContent = script?.trim();
+
+	if (!scriptContent) {
+		return;
+	}
+
+	const workspacePath = await getSandboxWorkspacePath(sandbox);
+	const scriptPath = `${FACTORYPLANE_SCRIPT_DIR}/${kind}-${taskId}.sh`;
+	const title =
+		kind === "new_task"
+			? "Run new task setup script"
+			: "Run new turn setup script";
+
+	await runSetupStep(
+		taskId,
+		`factory_${kind}_setup_script`,
+		title,
+		async () => {
+			await sandbox.commands.run(
+				`mkdir -p ${shellQuote(FACTORYPLANE_SCRIPT_DIR)}`,
+				{ timeoutMs: 30_000 },
+			);
+			await sandbox.files.write(scriptPath, scriptContent);
+
+			return sandbox.commands.run(
+				buildRunFactorySetupScriptCommand(scriptPath, workspacePath),
+				{
+					timeoutMs: FACTORY_SETUP_SCRIPT_TIMEOUT_MS,
+					envs: {
+						...envs,
+						FACTORYPLANE_FACTORY_ID: factory.id,
+						FACTORYPLANE_TASK_ID: taskId,
+						FACTORYPLANE_WORKSPACE: workspacePath,
+					},
+				},
+			);
+		},
+		{ timeoutMs: FACTORY_SETUP_SCRIPT_TIMEOUT_MS + 30_000 },
+	);
+};
+
+const buildRunFactorySetupScriptCommand = (
+	scriptPath: string,
+	workspacePath: string,
+) =>
+	[
+		"set -e",
+		`chmod 700 ${shellQuote(scriptPath)}`,
+		`cd ${shellQuote(workspacePath)}`,
+		`IFS= read -r first_line < ${shellQuote(scriptPath)} || true`,
+		'case "$first_line" in',
+		"  '#!'*)",
+		`    ${shellQuote(scriptPath)}`,
+		"    ;;",
+		"  *)",
+		`    bash ${shellQuote(scriptPath)}`,
+		"    ;;",
+		"esac",
+	].join("\n");
+
 const runAgentExec = async (
 	sandbox: Sandbox,
 	task: Task,
@@ -835,21 +914,37 @@ const setupRun = async (
 		Object.assign(envs, getCursorAuthEnvs(agent));
 	}
 
-	await runOptionalSetupStep(
-		task.id,
-		"github_auth",
-		"Validate GitHub token",
-		async () => {
-			const githubEnvs = await getFactoryGithubAuthEnvs(factory);
+	try {
+		await runOptionalSetupStep(
+			task.id,
+			"github_auth",
+			"Validate GitHub token",
+			async () => {
+				const githubEnvs = await getFactoryGithubAuthEnvs(factory);
 
-			if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
-				throw new Error(`Factory ${factory.id} is missing GitHub access token`);
-			}
+				if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
+					throw new Error(
+						`Factory ${factory.id} is missing GitHub access token`,
+					);
+				}
 
-			Object.assign(envs, githubEnvs);
-			await validateGithubToken(sandbox, envs);
-		},
-	);
+				Object.assign(envs, githubEnvs);
+				await validateGithubToken(sandbox, envs);
+			},
+		);
+
+		await runFactorySetupScript(
+			sandbox,
+			task.id,
+			factory,
+			"new_turn",
+			factory.newTurnSetupScript,
+			envs,
+		);
+	} catch (error) {
+		await clearTaskAgentToken(task.id, agentToken);
+		throw error;
+	}
 
 	return { envs, agentToken };
 };

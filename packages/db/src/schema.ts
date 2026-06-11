@@ -24,6 +24,8 @@ const _schema = i.schema({
 			createdAt: i.date().optional(),
 			githubAccessTokenEncrypted: i.string().optional(),
 			gitAuthorName: i.string().optional(),
+			newTaskSetupScript: i.string().optional(),
+			newTurnSetupScript: i.string().optional(),
 		}),
 		repositories: i.entity({
 			url: i.string().indexed(),
