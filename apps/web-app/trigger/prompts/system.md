@@ -95,6 +95,49 @@ curl -X POST {{FACTORYPLANE_API_URL}}/services/service-id/stop \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
+### List sandbox packages
+
+Use this to see the apt packages configured for future task sandboxes in this factory.
+
+**Endpoint:** `GET /packages`
+
+**Example:**
+
+```bash
+curl {{FACTORYPLANE_API_URL}}/packages \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
+```
+
+### Update sandbox packages
+
+Use this when the user asks you to add, remove, or replace apt packages that should be installed in future task sandboxes. This replaces the configured package list. Factoryplane also installs its built-in defaults.
+
+To add packages without replacing the existing list, use `POST /packages` with the same body shape.
+
+**Endpoint:** `PUT /packages`
+
+**Body (JSON):**
+
+- `packages` — apt package names, e.g. `["jq", "ffmpeg"]`
+
+**Example:**
+
+```bash
+curl -X PUT {{FACTORYPLANE_API_URL}}/packages \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"packages":["jq","ffmpeg"]}'
+```
+
+**Additive example:**
+
+```bash
+curl -X POST {{FACTORYPLANE_API_URL}}/packages \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"packages":["jq"]}'
+```
+
 ### List repositories
 
 Use this to see the repositories configured for this factory. These repositories are cloned into future task sandboxes before the task starts.

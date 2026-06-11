@@ -30,6 +30,10 @@ type TaskEnvironmentPackage = {
 	command: string;
 	aptPackage: string;
 };
+type ConfiguredTaskEnvironmentPackage = {
+	aptPackage: string;
+	command?: string;
+};
 type CodexEvent = {
 	type: string;
 	data: unknown;
@@ -58,6 +62,7 @@ const DEFAULT_TASK_ENVIRONMENT_PACKAGES: TaskEnvironmentPackage[] = [
 		aptPackage: "ripgrep",
 	},
 ];
+const APT_PACKAGE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9+._:-]*$/;
 const SANDBOX_DIFF_EXCLUDES = [
 	".git",
 	".codex",
@@ -311,7 +316,7 @@ const setupTaskSandbox = async (
 		console.log(codexUpdate);
 	}
 
-	await installDefaultTaskEnvironmentPackages(sandbox, task.id);
+	await installTaskEnvironmentPackages(sandbox, task.id, factory);
 
 	const repositoryGithubEnvs = await setupRepositoryGithubAuth(
 		sandbox,
@@ -348,11 +353,14 @@ const setupTaskSandbox = async (
 	return { sandbox, diffWorkspacePath };
 };
 
-const installDefaultTaskEnvironmentPackages = async (
+const installTaskEnvironmentPackages = async (
 	sandbox: Sandbox,
 	taskId: string,
+	factory: Factory,
 ) => {
-	if (DEFAULT_TASK_ENVIRONMENT_PACKAGES.length === 0) {
+	const packages = getTaskEnvironmentPackages(factory);
+
+	if (packages.length === 0) {
 		return;
 	}
 
@@ -361,24 +369,77 @@ const installDefaultTaskEnvironmentPackages = async (
 		"environment_packages",
 		"Install environment packages",
 		() =>
-			sandbox.commands.run(buildInstallEnvironmentPackagesCommand(), {
+			sandbox.commands.run(buildInstallEnvironmentPackagesCommand(packages), {
 				timeoutMs: 180_000,
 			}),
 		{ timeoutMs: 190_000 },
 	);
 };
 
-const buildInstallEnvironmentPackagesCommand = () => {
-	const packageArgs = DEFAULT_TASK_ENVIRONMENT_PACKAGES.map((pkg) =>
-		shellQuote(pkg.aptPackage),
-	).join(" ");
-	const commandChecks = DEFAULT_TASK_ENVIRONMENT_PACKAGES.map(
-		(pkg) => `command -v ${shellQuote(pkg.command)} >/dev/null 2>&1`,
-	).join(" && ");
+const getTaskEnvironmentPackages = (
+	factory: Factory,
+): ConfiguredTaskEnvironmentPackage[] => {
+	const packages = new Map<string, ConfiguredTaskEnvironmentPackage>();
+
+	for (const pkg of DEFAULT_TASK_ENVIRONMENT_PACKAGES) {
+		packages.set(pkg.aptPackage, pkg);
+	}
+
+	for (const aptPackage of parseFactoryEnvironmentPackages(
+		factory.environmentPackages,
+	)) {
+		packages.set(aptPackage, { aptPackage });
+	}
+
+	return [...packages.values()];
+};
+
+const parseFactoryEnvironmentPackages = (value: unknown): string[] => {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	const seen = new Set<string>();
+	const packages: string[] = [];
+
+	for (const item of value) {
+		if (typeof item !== "string") {
+			continue;
+		}
+
+		const packageName = item.trim();
+
+		if (!APT_PACKAGE_NAME_PATTERN.test(packageName) || seen.has(packageName)) {
+			continue;
+		}
+
+		seen.add(packageName);
+		packages.push(packageName);
+	}
+
+	return packages;
+};
+
+const buildInstallEnvironmentPackagesCommand = (
+	packages: ConfiguredTaskEnvironmentPackage[],
+) => {
+	const packageLines = packages.map((pkg) => {
+		if (!pkg.command) {
+			return `set -- "$@" ${shellQuote(pkg.aptPackage)}`;
+		}
+
+		return [
+			`if ! command -v ${shellQuote(pkg.command)} >/dev/null 2>&1; then`,
+			`  set -- "$@" ${shellQuote(pkg.aptPackage)}`,
+			"fi",
+		].join("\n");
+	});
 
 	return [
 		"set -e",
-		`if ${commandChecks}; then`,
+		"set --",
+		...packageLines,
+		'if [ "$#" -eq 0 ]; then',
 		"  exit 0",
 		"fi",
 		"export DEBIAN_FRONTEND=noninteractive",
@@ -391,7 +452,7 @@ const buildInstallEnvironmentPackagesCommand = () => {
 		"  exit 1",
 		"fi",
 		"$SUDO apt-get update",
-		`$SUDO apt-get install -y --no-install-recommends ${packageArgs}`,
+		'$SUDO apt-get install -y --no-install-recommends "$@"',
 	].join("\n");
 };
 
