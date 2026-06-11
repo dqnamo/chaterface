@@ -5,16 +5,17 @@ import {
 	GitBranchIcon,
 	KeyIcon,
 	PlusIcon,
+	TerminalWindowIcon,
 	TrashIcon,
 } from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import type { AppSchema } from "@repo/db/schema";
 import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
-import { Input } from "@/components/Input";
+import { Input, Textarea } from "@/components/Input";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 
 type Repository = InstaQLEntity<AppSchema, "repositories">;
@@ -24,6 +25,16 @@ const repositoryTx = (repositoryId: string) => {
 
 	if (!tx) {
 		throw new Error(`Repository transaction builder ${repositoryId} not found`);
+	}
+
+	return tx;
+};
+
+const factoryTx = (factoryId: string) => {
+	const tx = db.tx.factories[factoryId];
+
+	if (!tx) {
+		throw new Error(`Factory transaction builder ${factoryId} not found`);
 	}
 
 	return tx;
@@ -56,6 +67,10 @@ export default function FactorySettingsPage() {
 	const [githubAccessToken, setGithubAccessToken] = useState("");
 	const [githubTokenStatus, setGithubTokenStatus] = useState<string>();
 	const [isSavingGithubToken, setIsSavingGithubToken] = useState(false);
+	const [newTaskSetupScript, setNewTaskSetupScript] = useState("");
+	const [newTurnSetupScript, setNewTurnSetupScript] = useState("");
+	const [setupScriptStatus, setSetupScriptStatus] = useState<string>();
+	const [isSavingSetupScripts, setIsSavingSetupScripts] = useState(false);
 
 	const { data } = db.useQuery({
 		factories: {
@@ -74,6 +89,11 @@ export default function FactorySettingsPage() {
 			new Date(a.createdAt ?? 0).getTime() -
 			new Date(b.createdAt ?? 0).getTime(),
 	);
+
+	useEffect(() => {
+		setNewTaskSetupScript(factory?.newTaskSetupScript ?? "");
+		setNewTurnSetupScript(factory?.newTurnSetupScript ?? "");
+	}, [factory?.newTaskSetupScript, factory?.newTurnSetupScript]);
 
 	const createRepository = async (form: HTMLFormElement) => {
 		const formData = new FormData(form);
@@ -169,6 +189,29 @@ export default function FactorySettingsPage() {
 		}
 	};
 
+	const saveSetupScripts = async () => {
+		setSetupScriptStatus(undefined);
+		setIsSavingSetupScripts(true);
+
+		try {
+			await db.transact(
+				factoryTx(currentFactoryId).update({
+					newTaskSetupScript: optionalString(newTaskSetupScript.trim()),
+					newTurnSetupScript: optionalString(newTurnSetupScript.trim()),
+				}),
+			);
+			setSetupScriptStatus("Setup scripts saved.");
+		} catch (error) {
+			setSetupScriptStatus(
+				error instanceof Error
+					? error.message
+					: "Failed to save setup scripts.",
+			);
+		} finally {
+			setIsSavingSetupScripts(false);
+		}
+	};
+
 	return (
 		<div className="relative flex h-full w-full min-w-0 flex-col overflow-y-auto bg-grayscale-1">
 			<ExpandSidebarButton className="absolute left-2 top-2 z-20" />
@@ -232,6 +275,71 @@ export default function FactorySettingsPage() {
 						{githubTokenStatus ? (
 							<p className="text-xs text-grayscale-10">{githubTokenStatus}</p>
 						) : null}
+					</div>
+				</section>
+
+				<section className="relative border border-grayscale-4 bg-white">
+					<CornerBrackets
+						placement="outside"
+						spacing={3}
+						translate={12}
+						size={6}
+						color="var(--color-grayscale-6)"
+						active={true}
+					/>
+					<div className="border-b border-grayscale-4 p-3">
+						<div className="flex items-center gap-2 text-sm font-medium text-grayscale-12">
+							<TerminalWindowIcon weight="bold" className="size-4" />
+							Setup Scripts
+						</div>
+					</div>
+					<div className="flex flex-col gap-4 p-3">
+						<div className="flex flex-col gap-1.5">
+							<label
+								htmlFor="new-task-setup-script"
+								className="text-xs text-grayscale-11"
+							>
+								New task script
+							</label>
+							<Textarea
+								id="new-task-setup-script"
+								className="min-h-40 font-mono"
+								placeholder="pnpm install"
+								value={newTaskSetupScript}
+								onChange={(event) => setNewTaskSetupScript(event.target.value)}
+							/>
+						</div>
+						<div className="flex flex-col gap-1.5">
+							<label
+								htmlFor="new-turn-setup-script"
+								className="text-xs text-grayscale-11"
+							>
+								New turn script
+							</label>
+							<Textarea
+								id="new-turn-setup-script"
+								className="min-h-40 font-mono"
+								placeholder="git status --short"
+								value={newTurnSetupScript}
+								onChange={(event) => setNewTurnSetupScript(event.target.value)}
+							/>
+						</div>
+						<div className="flex items-center justify-between gap-3">
+							{setupScriptStatus ? (
+								<p className="text-xs text-grayscale-10">{setupScriptStatus}</p>
+							) : (
+								<span />
+							)}
+							<Button
+								type="button"
+								disabled={isSavingSetupScripts}
+								onClick={() => {
+									void saveSetupScripts();
+								}}
+							>
+								{isSavingSetupScripts ? "Saving..." : "Save Scripts"}
+							</Button>
+						</div>
 					</div>
 				</section>
 
