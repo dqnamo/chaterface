@@ -12,6 +12,11 @@ import Logo from "./Logo";
 
 type EventEntity = InstaQLEntity<AppSchema, "events">;
 type JsonRecord = Record<string, unknown>;
+type TaskSummary = {
+	id?: string;
+	name?: string;
+	instructions?: string;
+};
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 /** A resolved lifecycle state for a grouped (started -> finished) timeline row. */
@@ -260,23 +265,20 @@ function mergePhase(
 	return next;
 }
 
-export default function Event({ node }: { node: TimelineNode }) {
+export default function Event({
+	node,
+	task,
+}: {
+	node: TimelineNode;
+	task?: TaskSummary;
+}) {
 	const { event, phase } = node;
 	const type = event.type ?? "event";
 	const data = asRecord(event.data) ?? {};
 	const timestamp = formatTimestamp(event.createdAt);
 
 	if (type === "factoryplane.new_task") {
-		return (
-			<EventCard
-				glyph="FP"
-				logo
-				meta={timestamp}
-				subtitle={getString(data, "taskId")}
-				title="New task created"
-				tone="accent"
-			/>
-		);
+		return <NewTaskEvent data={data} task={task} timestamp={timestamp} />;
 	}
 
 	if (type === "factoryplane.new_user_message") {
@@ -341,6 +343,34 @@ export default function Event({ node }: { node: TimelineNode }) {
 			tone={type.includes("failed") ? "danger" : "neutral"}
 		>
 			<RawPayload value={event.data} />
+		</EventCard>
+	);
+}
+
+function NewTaskEvent({
+	data,
+	task,
+	timestamp,
+}: {
+	data: JsonRecord;
+	task?: TaskSummary;
+	timestamp?: string;
+}) {
+	const taskId = getString(data, "taskId") ?? task?.id;
+	const name = getString(data, "name") ?? task?.name;
+	const instructions = getString(data, "instructions") ?? task?.instructions;
+
+	return (
+		<EventCard
+			glyph="FP"
+			logo
+			meta={timestamp}
+			subtitle={name ? "New task created" : taskId}
+			title={name ?? "New task created"}
+			tone="accent"
+		>
+			{instructions ? <MessageBubble text={instructions} /> : null}
+			{name ? <DetailGrid items={[["task", taskId]]} /> : null}
 		</EventCard>
 	);
 }
