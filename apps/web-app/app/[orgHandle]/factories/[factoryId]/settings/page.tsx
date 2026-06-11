@@ -4,6 +4,7 @@ import { type InstaQLEntity, id } from "@instantdb/react";
 import {
 	GitBranchIcon,
 	KeyIcon,
+	PackageIcon,
 	PlusIcon,
 	TerminalWindowIcon,
 	TrashIcon,
@@ -48,6 +49,46 @@ const getFormString = (formData: FormData, key: string) => {
 const optionalString = (value: string) =>
 	value.length > 0 ? value : undefined;
 
+const APT_PACKAGE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9+._:-]*$/;
+
+const parsePackageText = (value: string) => {
+	const seen = new Set<string>();
+	const packages: string[] = [];
+
+	for (const line of value.split(/\r?\n|,/)) {
+		const packageName = line.trim();
+
+		if (!packageName) {
+			continue;
+		}
+
+		if (!APT_PACKAGE_NAME_PATTERN.test(packageName)) {
+			return undefined;
+		}
+
+		if (seen.has(packageName)) {
+			continue;
+		}
+
+		seen.add(packageName);
+		packages.push(packageName);
+	}
+
+	return packages;
+};
+
+const parseEnvironmentPackages = (value: unknown) => {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	return value
+		.filter(
+			(packageName): packageName is string => typeof packageName === "string",
+		)
+		.filter((packageName) => APT_PACKAGE_NAME_PATTERN.test(packageName));
+};
+
 const optionalRepositoryPath = (value: string) => {
 	const segments = value
 		.trim()
@@ -71,6 +112,9 @@ export default function FactorySettingsPage() {
 	const [newTurnSetupScript, setNewTurnSetupScript] = useState("");
 	const [setupScriptStatus, setSetupScriptStatus] = useState<string>();
 	const [isSavingSetupScripts, setIsSavingSetupScripts] = useState(false);
+	const [environmentPackages, setEnvironmentPackages] = useState("");
+	const [packageStatus, setPackageStatus] = useState<string>();
+	const [isSavingPackages, setIsSavingPackages] = useState(false);
 
 	const { data } = db.useQuery({
 		factories: {
@@ -94,6 +138,12 @@ export default function FactorySettingsPage() {
 		setNewTaskSetupScript(factory?.newTaskSetupScript ?? "");
 		setNewTurnSetupScript(factory?.newTurnSetupScript ?? "");
 	}, [factory?.newTaskSetupScript, factory?.newTurnSetupScript]);
+
+	useEffect(() => {
+		setEnvironmentPackages(
+			parseEnvironmentPackages(factory?.environmentPackages).join("\n"),
+		);
+	}, [factory?.environmentPackages]);
 
 	const createRepository = async (form: HTMLFormElement) => {
 		const formData = new FormData(form);
@@ -212,6 +262,36 @@ export default function FactorySettingsPage() {
 		}
 	};
 
+	const savePackages = async () => {
+		setPackageStatus(undefined);
+
+		const packages = parsePackageText(environmentPackages);
+
+		if (!packages) {
+			setPackageStatus(
+				"Use apt package names only. Spaces and shell syntax are not allowed.",
+			);
+			return;
+		}
+
+		setIsSavingPackages(true);
+
+		try {
+			await db.transact(
+				factoryTx(currentFactoryId).update({
+					environmentPackages: packages.length > 0 ? packages : undefined,
+				}),
+			);
+			setPackageStatus("Packages saved.");
+		} catch (error) {
+			setPackageStatus(
+				error instanceof Error ? error.message : "Failed to save packages.",
+			);
+		} finally {
+			setIsSavingPackages(false);
+		}
+	};
+
 	return (
 		<div className="relative flex h-full w-full min-w-0 flex-col overflow-y-auto bg-grayscale-1">
 			<ExpandSidebarButton className="absolute left-2 top-2 z-20" />
@@ -275,6 +355,56 @@ export default function FactorySettingsPage() {
 						{githubTokenStatus ? (
 							<p className="text-xs text-grayscale-10">{githubTokenStatus}</p>
 						) : null}
+					</div>
+				</section>
+
+				<section className="relative border border-grayscale-4 bg-white">
+					<CornerBrackets
+						placement="outside"
+						spacing={3}
+						translate={12}
+						size={6}
+						color="var(--color-grayscale-6)"
+						active={true}
+					/>
+					<div className="border-b border-grayscale-4 p-3">
+						<div className="flex items-center gap-2 text-sm font-medium text-grayscale-12">
+							<PackageIcon weight="bold" className="size-4" />
+							Sandbox Packages
+						</div>
+					</div>
+					<div className="flex flex-col gap-3 p-3">
+						<div className="flex flex-col gap-1.5">
+							<label
+								htmlFor="environment-packages"
+								className="text-xs text-grayscale-11"
+							>
+								Apt packages
+							</label>
+							<Textarea
+								id="environment-packages"
+								className="min-h-28 font-mono"
+								placeholder={"jq\nffmpeg"}
+								value={environmentPackages}
+								onChange={(event) => setEnvironmentPackages(event.target.value)}
+							/>
+						</div>
+						<div className="flex items-center justify-between gap-3">
+							{packageStatus ? (
+								<p className="text-xs text-grayscale-10">{packageStatus}</p>
+							) : (
+								<span />
+							)}
+							<Button
+								type="button"
+								disabled={isSavingPackages}
+								onClick={() => {
+									void savePackages();
+								}}
+							>
+								{isSavingPackages ? "Saving..." : "Save Packages"}
+							</Button>
+						</div>
 					</div>
 				</section>
 
