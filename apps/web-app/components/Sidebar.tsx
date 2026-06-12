@@ -209,7 +209,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						aria-keyshortcuts="N"
 						className="group relative flex w-full min-w-0 overflow-visible"
 					>
-						<span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 ">
+						<span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 dark:bg-grayscale-6">
 							<CornerBrackets
 								placement="outside"
 								spacing={4}
