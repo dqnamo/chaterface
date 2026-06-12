@@ -26,6 +26,21 @@ const rules = {
 			delete: "auth.id != null",
 		},
 	},
+	organisations: {
+		allow: {
+			view: "auth.id != null && auth.id in data.ref('members.user.id')",
+		},
+	},
+	factories: {
+		allow: {
+			view: "auth.id != null && auth.id in data.ref('organisation.members.user.id')",
+		},
+	},
+	members: {
+		allow: {
+			view: "auth.id != null && (auth.id in data.ref('user.id') || auth.id in data.ref('organisation.members.user.id'))",
+		},
+	},
 } satisfies InstantRules;
 
 export default rules;

@@ -36,32 +36,41 @@ const memberTx = (memberId: string) => {
 };
 
 export default function HomePage() {
+	const { user } = db.useAuth();
+	const currentUserId = user?.id ?? "__unauthenticated__";
 	const { data } = db.useQuery({
-		organisations: {},
+		organisations: {
+			$: {
+				where: {
+					"members.user.id": currentUserId,
+				},
+			},
+		},
 	});
 	const [createOpen, setCreateOpen] = useState(false);
 	const [organisationName, setOrganisationName] = useState("");
 	const [organisationHandle, setOrganisationHandle] = useState("");
 
 	const createOrganisation = async () => {
+		if (!user?.id) {
+			return;
+		}
+
 		const organisationId = id();
-		await db.transact(
+		await db.transact([
 			organisationTx(organisationId).create({
 				name: organisationName,
 				handle: organisationHandle,
 				createdAt: DateTime.now().toISO(),
 			}),
-		);
-
-		await db.transact(
 			memberTx(id())
 				.update({
 					createdAt: DateTime.now().toISO(),
 					joinedAt: DateTime.now().toISO(),
 					role: "owner",
 				})
-				.link({ organisation: organisationId }),
-		);
+				.link({ organisation: organisationId, user: user.id }),
+		]);
 
 		setOrganisationName("");
 		setOrganisationHandle("");
