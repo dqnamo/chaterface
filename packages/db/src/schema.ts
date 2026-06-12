@@ -24,6 +24,7 @@ const _schema = i.schema({
 			createdAt: i.date().optional(),
 			githubAccessTokenEncrypted: i.string().optional(),
 			gitAuthorName: i.string().optional(),
+			gitAuthorEmail: i.string().optional(),
 			environmentPackages: i.json().optional(),
 			newTaskSetupScript: i.string().optional(),
 			newTurnSetupScript: i.string().optional(),

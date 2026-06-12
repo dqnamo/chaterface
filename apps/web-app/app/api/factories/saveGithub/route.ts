@@ -10,8 +10,21 @@ export async function POST(req: NextRequest) {
 		const body = (await req.json()) as {
 			factoryId?: string;
 			githubAccessToken?: string;
+			gitAuthorName?: string;
+			gitAuthorEmail?: string;
 		};
 		const { factoryId, githubAccessToken } = body;
+		const hasGitAuthorName = Object.hasOwn(body, "gitAuthorName");
+		const hasGitAuthorEmail = Object.hasOwn(body, "gitAuthorEmail");
+		const trimmedGithubAccessToken = githubAccessToken?.trim();
+		const gitAuthorName =
+			typeof body.gitAuthorName === "string"
+				? body.gitAuthorName.trim()
+				: undefined;
+		const gitAuthorEmail =
+			typeof body.gitAuthorEmail === "string"
+				? body.gitAuthorEmail.trim()
+				: undefined;
 		const authorizationHeader = req.headers.get("Authorization");
 		const refreshToken = authorizationHeader?.startsWith("Bearer ")
 			? authorizationHeader.slice("Bearer ".length)
@@ -23,18 +36,28 @@ export async function POST(req: NextRequest) {
 			hasAuthorizationHeader: Boolean(authorizationHeader),
 			hasRefreshToken: Boolean(refreshToken),
 			factoryId,
-			hasGithubAccessToken: Boolean(githubAccessToken),
+			hasGithubAccessToken: Boolean(trimmedGithubAccessToken),
+			hasGitAuthorName,
+			hasGitAuthorEmail,
 		});
 
-		if (!factoryId || !githubAccessToken) {
+		if (
+			!factoryId ||
+			(!trimmedGithubAccessToken && !hasGitAuthorName && !hasGitAuthorEmail)
+		) {
 			console.warn("saveGithub request missing required fields", {
 				requestId,
 				hasFactoryId: Boolean(factoryId),
-				hasGithubAccessToken: Boolean(githubAccessToken),
+				hasGithubAccessToken: Boolean(trimmedGithubAccessToken),
+				hasGitAuthorName,
+				hasGitAuthorEmail,
 			});
 
 			return NextResponse.json(
-				{ message: "factoryId and githubAccessToken are required", requestId },
+				{
+					message: "factoryId and at least one GitHub setting are required",
+					requestId,
+				},
 				{ status: 400 },
 			);
 		}
@@ -63,24 +86,6 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		const encryptionKey = process.env.SECRET_ENCRYPTION_KEY;
-		if (!encryptionKey) {
-			console.error("saveGithub secret encryption key is not configured", {
-				requestId,
-				factoryId,
-			});
-			return NextResponse.json(
-				{
-					message: "Secret encryption key is not configured",
-					requestId,
-				},
-				{ status: 500 },
-			);
-		}
-
-		const encryptionService = createEncryptionService(encryptionKey);
-		const githubAccessTokenEncrypted =
-			await encryptionService.encrypt(githubAccessToken);
 		const factoryTx = db.tx.factories[factoryId];
 
 		if (!factoryTx) {
@@ -94,11 +99,43 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		await db.transact(
-			factoryTx.update({
-				githubAccessTokenEncrypted,
-			}),
-		);
+		const update: {
+			githubAccessTokenEncrypted?: string;
+			gitAuthorName?: string;
+			gitAuthorEmail?: string;
+		} = {};
+
+		if (trimmedGithubAccessToken) {
+			const encryptionKey = process.env.SECRET_ENCRYPTION_KEY;
+			if (!encryptionKey) {
+				console.error("saveGithub secret encryption key is not configured", {
+					requestId,
+					factoryId,
+				});
+				return NextResponse.json(
+					{
+						message: "Secret encryption key is not configured",
+						requestId,
+					},
+					{ status: 500 },
+				);
+			}
+
+			const encryptionService = createEncryptionService(encryptionKey);
+			update.githubAccessTokenEncrypted = await encryptionService.encrypt(
+				trimmedGithubAccessToken,
+			);
+		}
+
+		if (hasGitAuthorName) {
+			update.gitAuthorName = gitAuthorName || undefined;
+		}
+
+		if (hasGitAuthorEmail) {
+			update.gitAuthorEmail = gitAuthorEmail || undefined;
+		}
+
+		await db.transact(factoryTx.update(update));
 
 		console.info("saveGithub credentials saved", {
 			requestId,
@@ -106,9 +143,8 @@ export async function POST(req: NextRequest) {
 			userId: user.id,
 		});
 
-		// TODO save the repository
 		return NextResponse.json(
-			{ message: "GitHub access token saved", requestId },
+			{ message: "GitHub settings saved", requestId },
 			{ status: 200 },
 		);
 	} catch (error) {
@@ -119,7 +155,7 @@ export async function POST(req: NextRequest) {
 		});
 
 		return NextResponse.json(
-			{ message: "Failed to save GitHub access token", requestId },
+			{ message: "Failed to save GitHub settings", requestId },
 			{ status: 500 },
 		);
 	}

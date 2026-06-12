@@ -31,6 +31,7 @@ export default function FactoriesPage() {
 	const [factoryName, setFactoryName] = useState("");
 	const [githubAccessToken, setGithubAccessToken] = useState("");
 	const [gitAuthorName, setGitAuthorName] = useState("");
+	const [gitAuthorEmail, setGitAuthorEmail] = useState("");
 	const { user } = db.useAuth();
 
 	const { data } = db.useQuery({
@@ -58,19 +59,20 @@ export default function FactoriesPage() {
 			organisationId: organisation.id,
 			hasGithubAccessToken: Boolean(githubAccessToken),
 		});
+		const trimmedGithubAccessToken = githubAccessToken.trim();
 
 		await db.transact(
 			factoryTx(factoryId)
 				.create({
 					name: factoryName,
 					createdAt: DateTime.now().toISO(),
-					gitAuthorName,
+					gitAuthorName: gitAuthorName.trim() || undefined,
+					gitAuthorEmail: gitAuthorEmail.trim() || undefined,
 				})
 				.link({ organisation: organisation.id }),
 		);
 
-		// if changes to github access token or git author name, save the repository
-		if (githubAccessToken) {
+		if (trimmedGithubAccessToken) {
 			const response = await fetch("/api/factories/saveGithub", {
 				method: "POST",
 				headers: {
@@ -79,7 +81,9 @@ export default function FactoriesPage() {
 				},
 				body: JSON.stringify({
 					factoryId,
-					githubAccessToken,
+					githubAccessToken: trimmedGithubAccessToken,
+					gitAuthorName: gitAuthorName.trim(),
+					gitAuthorEmail: gitAuthorEmail.trim(),
 				}),
 			});
 
@@ -106,6 +110,7 @@ export default function FactoriesPage() {
 		setFactoryName("");
 		setGithubAccessToken("");
 		setGitAuthorName("");
+		setGitAuthorEmail("");
 		setCreateOpen(false);
 	};
 
@@ -220,6 +225,20 @@ export default function FactoriesPage() {
 								placeholder="Git Author Name"
 								value={gitAuthorName}
 								onChange={(e) => setGitAuthorName(e.target.value)}
+							/>
+						</div>
+						<div className="flex flex-col p-3 gap-3">
+							<div className="flex flex-col">
+								<p className="text-xs text-grayscale-11">Git Author Email</p>
+								<p className="text-xs text-grayscale-10">
+									The email used for commits made by this factory.
+								</p>
+							</div>
+							<Input
+								type="email"
+								placeholder="Git Author Email"
+								value={gitAuthorEmail}
+								onChange={(e) => setGitAuthorEmail(e.target.value)}
 							/>
 						</div>
 						<div className="flex flex-row items-center justify-end gap-2 p-3">
