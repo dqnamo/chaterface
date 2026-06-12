@@ -12,9 +12,18 @@ import type { AppSchema } from "@repo/db/schema";
 import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import {
+	type AgentDefaultOptions,
+	DEFAULT_CODEX_MODEL,
+	DEFAULT_CODEX_REASONING_EFFORT,
+	DEFAULT_CODEX_SPEED,
+	getAgentDefaultOptions,
+	getAgentSettingsRecord,
+} from "@/codex-options";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
 import { Input, Textarea } from "@/components/Input";
+import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 
@@ -58,6 +67,11 @@ export default function AgentsPage() {
 	const [provider, setProvider] = useState<AgentProvider>("codex");
 	const [codexAuth, setCodexAuth] = useState("");
 	const [cursorApiKey, setCursorApiKey] = useState("");
+	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
+	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
+		DEFAULT_CODEX_REASONING_EFFORT,
+	);
+	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 	const [formError, setFormError] = useState<string>();
 
 	const { data, isLoading, error } = db.useQuery({
@@ -122,6 +136,11 @@ export default function AgentsPage() {
 					createdAt: DateTime.now().toISO(),
 					status: "creating",
 					auth,
+					settings: {
+						agentModel,
+						agentReasoningEffort,
+						agentSpeed,
+					},
 				})
 				.link({ organisation: organisation.id }),
 		);
@@ -133,6 +152,20 @@ export default function AgentsPage() {
 
 	const deleteAgent = async (agent: Agent) => {
 		await db.transact(agentTx(agent.id).delete());
+	};
+
+	const updateAgentDefaults = async (
+		agent: Agent,
+		defaults: Partial<AgentDefaultOptions>,
+	) => {
+		await db.transact(
+			agentTx(agent.id).update({
+				settings: {
+					...getAgentSettingsRecord(agent.settings),
+					...defaults,
+				},
+			}),
+		);
 	};
 
 	return (
@@ -174,34 +207,12 @@ export default function AgentsPage() {
 							<p className="p-3 text-sm text-red-11">{error.message}</p>
 						) : agents.length > 0 ? (
 							agents.map((agent) => (
-								<div
+								<AgentListItem
 									key={agent.id}
-									className="grid gap-3 p-3 md:grid-cols-[minmax(0,1fr)_auto]"
-								>
-									<div className="flex min-w-0 flex-col gap-1">
-										<div className="flex min-w-0 items-center gap-2">
-											<p className="truncate text-sm font-medium text-grayscale-12">
-												{agent.name}
-											</p>
-											<span className="shrink-0 bg-grayscale-2 px-1.5 py-0.5 font-mono text-[10px] text-grayscale-10 uppercase">
-												{getProviderLabel(agent.provider)}
-											</span>
-										</div>
-										<p className="text-xs text-grayscale-10">
-											{agent.status ?? "idle"}
-										</p>
-									</div>
-									<button
-										type="button"
-										onClick={() => {
-											void deleteAgent(agent);
-										}}
-										className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-red-11 transition-colors hover:bg-red-3 hover:text-red-12"
-									>
-										<TrashIcon weight="bold" className="size-3.5" />
-										Delete
-									</button>
-								</div>
+									agent={agent}
+									onDelete={deleteAgent}
+									onDefaultsChange={updateAgentDefaults}
+								/>
 							))
 						) : (
 							<p className="p-3 text-sm text-grayscale-10">
@@ -265,6 +276,22 @@ export default function AgentsPage() {
 								</Select.Root>
 							</Field>
 						</div>
+						<div className="flex flex-col gap-1.5">
+							<p className="text-xs text-grayscale-11">Task defaults</p>
+							<div className="flex flex-wrap items-center gap-2">
+								<ModelConfigMenu
+									model={agentModel}
+									reasoningEffort={agentReasoningEffort}
+									speed={agentSpeed}
+									onModelChange={setAgentModel}
+									onReasoningEffortChange={setAgentReasoningEffort}
+									onSpeedChange={setAgentSpeed}
+								/>
+								<p className="text-xs text-grayscale-10">
+									Applied to each new task that uses this agent.
+								</p>
+							</div>
+						</div>
 						<p className="text-xs text-grayscale-10">
 							{selectedProvider?.description}
 						</p>
@@ -305,6 +332,69 @@ export default function AgentsPage() {
 					</div>
 				</section>
 			</div>
+		</div>
+	);
+}
+
+function AgentListItem({
+	agent,
+	onDelete,
+	onDefaultsChange,
+}: {
+	agent: Agent;
+	onDelete: (agent: Agent) => Promise<void>;
+	onDefaultsChange: (
+		agent: Agent,
+		defaults: Partial<AgentDefaultOptions>,
+	) => Promise<void>;
+}) {
+	const defaults = getAgentDefaultOptions(agent.settings);
+
+	return (
+		<div className="grid gap-3 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+			<div className="flex min-w-0 flex-col gap-2">
+				<div className="flex min-w-0 flex-col gap-1">
+					<div className="flex min-w-0 items-center gap-2">
+						<p className="truncate text-sm font-medium text-grayscale-12">
+							{agent.name}
+						</p>
+						<span className="shrink-0 bg-grayscale-2 px-1.5 py-0.5 font-mono text-[10px] text-grayscale-10 uppercase">
+							{getProviderLabel(agent.provider)}
+						</span>
+					</div>
+					<p className="text-xs text-grayscale-10">{agent.status ?? "idle"}</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-2">
+					<ModelConfigMenu
+						model={defaults.agentModel}
+						reasoningEffort={defaults.agentReasoningEffort}
+						speed={defaults.agentSpeed}
+						onModelChange={(value) => {
+							void onDefaultsChange(agent, { agentModel: value });
+						}}
+						onReasoningEffortChange={(value) => {
+							void onDefaultsChange(agent, { agentReasoningEffort: value });
+						}}
+						onSpeedChange={(value) => {
+							void onDefaultsChange(agent, { agentSpeed: value });
+						}}
+					/>
+					<p className="text-xs text-grayscale-10">
+						Defaults: reasoning {defaults.agentReasoningEffort}, speed{" "}
+						{defaults.agentSpeed}
+					</p>
+				</div>
+			</div>
+			<button
+				type="button"
+				onClick={() => {
+					void onDelete(agent);
+				}}
+				className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-red-11 transition-colors hover:bg-red-3 hover:text-red-12"
+			>
+				<TrashIcon weight="bold" className="size-3.5" />
+				Delete
+			</button>
 		</div>
 	);
 }

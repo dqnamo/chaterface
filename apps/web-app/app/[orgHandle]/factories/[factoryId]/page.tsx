@@ -4,11 +4,12 @@ import { id } from "@instantdb/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	DEFAULT_CODEX_MODEL,
 	DEFAULT_CODEX_REASONING_EFFORT,
 	DEFAULT_CODEX_SPEED,
+	getAgentDefaultOptions,
 } from "@/codex-options";
 import { Button } from "@/components/Button";
 import CornerCubes from "@/components/CornerCubes";
@@ -73,8 +74,23 @@ export default function FactoryPage() {
 
 	const agents = data?.organisations?.[0]?.agents;
 	const resolvedAgentId = agentId || agents?.[0]?.id;
+	const selectedAgent = useMemo(
+		() => agents?.find((agent) => agent.id === resolvedAgentId),
+		[agents, resolvedAgentId],
+	);
 	const agentItems =
 		agents?.map((agent) => ({ value: agent.id, label: agent.name })) ?? [];
+
+	useEffect(() => {
+		if (!selectedAgent) {
+			return;
+		}
+
+		const defaults = getAgentDefaultOptions(selectedAgent.settings);
+		setAgentModel(defaults.agentModel);
+		setAgentReasoningEffort(defaults.agentReasoningEffort);
+		setAgentSpeed(defaults.agentSpeed);
+	}, [selectedAgent]);
 
 	const createTask = async () => {
 		if (!resolvedAgentId) {

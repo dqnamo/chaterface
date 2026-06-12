@@ -1,5 +1,6 @@
 "use client";
 
+import { LightningIcon } from "@phosphor-icons/react";
 import {
 	CODEX_MODEL_OPTIONS,
 	CODEX_REASONING_EFFORT_OPTIONS,
@@ -26,8 +27,19 @@ export function ModelConfigMenu({
 }: ModelConfigMenuProps) {
 	return (
 		<Menu.Root>
-			<Menu.Trigger>
-				<span className="truncate">{model}</span>
+			<Menu.Trigger className="min-w-0 max-w-full">
+				<span className="flex min-w-0 items-center gap-1.5">
+					<span className="truncate font-mono text-[11px]">{model}</span>
+					<span className="shrink-0 text-grayscale-9">/</span>
+					<span className="shrink-0 font-sans">{reasoningEffort}</span>
+					{speed === "fast" ? (
+						<LightningIcon
+							weight="fill"
+							className="size-3 shrink-0 text-yellow-9"
+							aria-label="Fast mode"
+						/>
+					) : null}
+				</span>
 				<Menu.TriggerIcon />
 			</Menu.Trigger>
 			<Menu.Portal>

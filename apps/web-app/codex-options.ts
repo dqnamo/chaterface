@@ -2,6 +2,12 @@ export const DEFAULT_CODEX_MODEL = "gpt-5.5";
 export const DEFAULT_CODEX_REASONING_EFFORT = "medium";
 export const DEFAULT_CODEX_SPEED = "standard";
 
+export type AgentDefaultOptions = {
+	agentModel: string;
+	agentReasoningEffort: string;
+	agentSpeed: string;
+};
+
 export const CODEX_MODEL_OPTIONS = [
 	{ value: "gpt-5.5", label: "gpt-5.5" },
 	{ value: "gpt-5.4", label: "gpt-5.4" },
@@ -30,7 +36,58 @@ export const getCodexSpeedConfigOverrides = (speed: string) => {
 
 export const getTaskAgentSpeed = (speed: string | undefined) => {
 	const resolved = speed ?? DEFAULT_CODEX_SPEED;
-	const isValid = CODEX_SPEED_OPTIONS.some((option) => option.value === resolved);
+	const isValid = CODEX_SPEED_OPTIONS.some(
+		(option) => option.value === resolved,
+	);
 
 	return isValid ? resolved : DEFAULT_CODEX_SPEED;
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getStringSetting = (
+	settings: Record<string, unknown>,
+	key: string,
+	fallback: string,
+	options: readonly { value: string }[],
+) => {
+	const value = settings[key];
+
+	if (typeof value !== "string") {
+		return fallback;
+	}
+
+	return options.some((option) => option.value === value) ? value : fallback;
+};
+
+export const getAgentDefaultOptions = (
+	settings: unknown,
+): AgentDefaultOptions => {
+	const record = isRecord(settings) ? settings : {};
+
+	return {
+		agentModel: getStringSetting(
+			record,
+			"agentModel",
+			DEFAULT_CODEX_MODEL,
+			CODEX_MODEL_OPTIONS,
+		),
+		agentReasoningEffort: getStringSetting(
+			record,
+			"agentReasoningEffort",
+			DEFAULT_CODEX_REASONING_EFFORT,
+			CODEX_REASONING_EFFORT_OPTIONS,
+		),
+		agentSpeed: getStringSetting(
+			record,
+			"agentSpeed",
+			DEFAULT_CODEX_SPEED,
+			CODEX_SPEED_OPTIONS,
+		),
+	};
+};
+
+export const getAgentSettingsRecord = (
+	settings: unknown,
+): Record<string, unknown> => (isRecord(settings) ? settings : {});
