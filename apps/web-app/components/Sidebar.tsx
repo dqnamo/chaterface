@@ -217,7 +217,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								translate={4}
 								color="grayscale-12"
 							/>
-							<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
+							<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
 								New Task
 							</p>
 							<ShortcutKey>N</ShortcutKey>

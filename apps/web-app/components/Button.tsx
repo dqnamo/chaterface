@@ -54,7 +54,7 @@ export function Button({
 				translate={6}
 				color="grayscale-12"
 			/>
-			<span className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
+			<span className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
 				{children}
 			</span>
 			{shortcut ? <ShortcutKey>{shortcut}</ShortcutKey> : null}
