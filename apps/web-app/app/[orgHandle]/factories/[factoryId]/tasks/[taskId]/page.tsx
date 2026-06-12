@@ -19,6 +19,7 @@ import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import {
 	type CSSProperties,
+	type DragEvent as ReactDragEvent,
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
 	useEffect,
@@ -36,6 +37,12 @@ import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
 import Event, { buildTimeline } from "@/components/Event";
+import {
+	hasImageFiles,
+	ImageAttachments,
+	uploadImageAttachments,
+	useImageAttachments,
+} from "@/components/ImageAttachments";
 import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { ScrollArea } from "@/components/ScrollArea";
@@ -190,6 +197,8 @@ export default function TaskPage() {
 		setHasRightPanel,
 	} = useSidebar();
 	const [message, setMessage] = useState("");
+	const [isSendingMessage, setIsSendingMessage] = useState(false);
+	const [isDraggingImages, setIsDraggingImages] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
 	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
 		DEFAULT_CODEX_REASONING_EFFORT,
@@ -209,6 +218,12 @@ export default function TaskPage() {
 	const [patchText, setPatchText] = useState<string | null>(null);
 	const [isPatchLoading, setIsPatchLoading] = useState(false);
 	const [patchError, setPatchError] = useState<string | null>(null);
+	const {
+		attachments: imageAttachments,
+		addFiles: addImageFiles,
+		removeAttachment: removeImageAttachment,
+		clearAttachments: clearImageAttachments,
+	} = useImageAttachments();
 	const diffFiles = useMemo<FileDiffMetadata[]>(() => {
 		if (!patchText?.trim()) {
 			return [];
@@ -449,36 +464,79 @@ export default function TaskPage() {
 	]);
 
 	const sendMessage = async () => {
-		if (!task) {
+		if (!task || isSendingMessage) {
 			return;
 		}
-		if (!message) {
+		const content = message.trim();
+
+		if (!content && imageAttachments.length === 0) {
 			return;
 		}
 
 		isPinnedToBottomRef.current = true;
-		setMessage("");
+		setIsSendingMessage(true);
 
-		await db.transact(
-			taskTx(task.id).update({
-				status: "in_progress",
-				completedAt: undefined,
-				agentModel,
-				agentReasoningEffort,
-				agentSpeed,
-			}),
-		);
+		try {
+			const images = await uploadImageAttachments(task.id, imageAttachments);
 
-		const eventId = id();
-		await db.transact(
-			eventTx(eventId)
-				.create({
-					type: "factoryplane.new_user_message",
-					data: { content: message },
-					createdAt: DateTime.now().toISO(),
-				})
-				.link({ task: taskId as string }),
-		);
+			setMessage("");
+			clearImageAttachments();
+
+			await db.transact(
+				taskTx(task.id).update({
+					status: "in_progress",
+					completedAt: undefined,
+					agentModel,
+					agentReasoningEffort,
+					agentSpeed,
+				}),
+			);
+
+			const eventId = id();
+			await db.transact(
+				eventTx(eventId)
+					.create({
+						type: "factoryplane.new_user_message",
+						data: { content, images },
+						createdAt: DateTime.now().toISO(),
+					})
+					.link({ task: taskId as string }),
+			);
+		} finally {
+			setIsSendingMessage(false);
+		}
+	};
+
+	const handleComposerDragOver = (
+		event: ReactDragEvent<HTMLFieldSetElement>,
+	) => {
+		if (!hasImageFiles(event.dataTransfer)) {
+			return;
+		}
+
+		event.preventDefault();
+		event.dataTransfer.dropEffect = "copy";
+		setIsDraggingImages(true);
+	};
+
+	const handleComposerDragLeave = (
+		event: ReactDragEvent<HTMLFieldSetElement>,
+	) => {
+		const nextTarget = event.relatedTarget as Node | null;
+
+		if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+			setIsDraggingImages(false);
+		}
+	};
+
+	const handleComposerDrop = (event: ReactDragEvent<HTMLFieldSetElement>) => {
+		if (!hasImageFiles(event.dataTransfer)) {
+			return;
+		}
+
+		event.preventDefault();
+		setIsDraggingImages(false);
+		addImageFiles(event.dataTransfer.files);
 	};
 
 	if (isLoading) {
@@ -585,7 +643,16 @@ export default function TaskPage() {
 				</ScrollArea.Root>
 				<div className="flex shrink-0 flex-col px-2 pb-2">
 					<div className="flex flex-col gap-2">
-						<div className="flex flex-col max-w-3xl mx-auto w-full bg-white border border-grayscale-4 relative">
+						<fieldset
+							aria-label="Task message composer"
+							className={cn(
+								"flex flex-col max-w-3xl mx-auto w-full bg-white border border-grayscale-4 relative transition-colors",
+								isDraggingImages && "border-accent-8 bg-accent-2",
+							)}
+							onDragLeave={handleComposerDragLeave}
+							onDragOver={handleComposerDragOver}
+							onDrop={handleComposerDrop}
+						>
 							<CornerCubes
 								placement="outside"
 								spacing={3}
@@ -599,9 +666,16 @@ export default function TaskPage() {
 								<Textarea
 									className="text-sm"
 									placeholder="Task Instructions"
+									disabled={isSendingMessage}
 									value={message}
 									onChange={(e) => setMessage(e.target.value)}
 									onSubmit={sendMessage}
+								/>
+								<ImageAttachments
+									attachments={imageAttachments}
+									disabled={isSendingMessage}
+									onAddFiles={addImageFiles}
+									onRemoveAttachment={removeImageAttachment}
 								/>
 							</div>
 							<div className="flex flex-row items-center justify-between p-3">
@@ -618,14 +692,15 @@ export default function TaskPage() {
 								<div className="flex flex-row items-center justify-center gap-2 ml-auto">
 									<Button
 										type="button"
+										disabled={isSendingMessage}
 										onClick={sendMessage}
 										className="shrink-0"
 									>
-										Send Message
+										{isSendingMessage ? "Sending..." : "Send Message"}
 									</Button>
 								</div>
 							</div>
-						</div>
+						</fieldset>
 					</div>
 				</div>
 			</div>

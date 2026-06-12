@@ -46,8 +46,18 @@ type CodexEvent = {
 };
 type AgentProvider = "codex" | "cursor";
 type FactorySetupScriptKind = "new_task" | "new_turn";
+type ImageAttachment = {
+	id: string;
+	path: string;
+	url?: string;
+	name: string;
+	contentType: string;
+	size: number;
+};
 
 type RunCodexExecOptions = {
+	images?: ImageAttachment[];
+	imagePaths?: string[];
 	resumeLast?: boolean;
 };
 
@@ -199,6 +209,7 @@ export const processEventTask = task({
 		try {
 			if (event?.type === "factoryplane.new_task") {
 				await processNewTask(
+					event as Event,
 					agent as Agent,
 					task as Task,
 					factory as FactoryWithRepositories,
@@ -219,6 +230,7 @@ export const processEventTask = task({
 });
 
 const processNewTask = async (
+	event: Event,
 	agent: Agent,
 	task: Task,
 	factory: FactoryWithRepositories,
@@ -236,7 +248,7 @@ const processNewTask = async (
 		agent,
 		factory,
 		message,
-		{},
+		{ images: getImageAttachments(event.data, task.id) },
 	);
 };
 
@@ -247,9 +259,13 @@ const processNewUserMessage = async (
 	factory: FactoryWithRepositories,
 ) => {
 	const content = getStringDataValue(event.data, "content");
+	const images = getImageAttachments(event.data, task.id);
 
-	if (!content) {
-		console.log("Skipping user message event without content", event.id);
+	if (!content && images.length === 0) {
+		console.log(
+			"Skipping user message event without content or images",
+			event.id,
+		);
 		return;
 	}
 
@@ -260,9 +276,17 @@ const processNewUserMessage = async (
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	await killTaskAgentProcess(sandbox, task);
 	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, factory);
-	await runAgentExec(sandbox, task, agent, factory, content, {
-		resumeLast: true,
-	});
+	await runAgentExec(
+		sandbox,
+		task,
+		agent,
+		factory,
+		content ?? "Please use the attached image input.",
+		{
+			images,
+			resumeLast: true,
+		},
+	);
 };
 
 const setupTaskSandbox = async (
@@ -948,6 +972,10 @@ const runAgentExec = async (
 	options: RunCodexExecOptions = {},
 ) => {
 	const provider = getAgentProvider(agent);
+	const imagePaths =
+		provider === "codex" && options.images?.length
+			? await materializeImageAttachments(sandbox, task.id, options.images)
+			: [];
 	const { envs, agentToken } = await setupRun(sandbox, task, agent, factory);
 	const output = createAgentOutputHandler(task.id, provider);
 	const command = await runSetupStep(
@@ -958,7 +986,10 @@ const runAgentExec = async (
 			: `Start ${getProviderLabel(provider)}`,
 		() =>
 			sandbox.commands.run(
-				buildAgentExecCommand(provider, task, prompt, options),
+				buildAgentExecCommand(provider, task, prompt, {
+					...options,
+					imagePaths,
+				}),
 				{
 					background: true,
 					timeoutMs: 0,
@@ -1012,6 +1043,50 @@ const runAgentExec = async (
 			await syncAgentAuthFromSandbox(sandbox, agent.id);
 		}
 	}
+};
+
+const materializeImageAttachments = async (
+	sandbox: Sandbox,
+	taskId: string,
+	images: ImageAttachment[],
+) => {
+	const validImages = images.filter((image) =>
+		image.path.startsWith(`tasks/${taskId}/images/`),
+	);
+
+	if (validImages.length === 0) {
+		return [];
+	}
+
+	const imageDir = `/tmp/factoryplane-images/${taskId}`;
+	const downloads = await Promise.all(
+		validImages.map(async (image, index) => {
+			const downloadUrl = await db.storage.getDownloadUrl(image.path);
+			const filePath = `${imageDir}/${String(index + 1).padStart(2, "0")}-${sanitizeSandboxFileName(image.name)}`;
+
+			return { downloadUrl, filePath };
+		}),
+	);
+
+	await runSetupStep(
+		taskId,
+		"image_attachments",
+		"Download image attachments",
+		() =>
+			sandbox.commands.run(
+				[
+					"set -e",
+					`mkdir -p ${shellQuote(imageDir)}`,
+					...downloads.map(
+						(download) =>
+							`curl -fL --retry 3 --retry-delay 1 -o ${shellQuote(download.filePath)} ${shellQuote(download.downloadUrl)}`,
+					),
+				].join("\n"),
+				{ timeoutMs: 120_000 },
+			),
+	);
+
+	return downloads.map((download) => download.filePath);
 };
 
 const createTaskWorkspaceBaseline = async (
@@ -1248,13 +1323,18 @@ const buildCodexExecCommand = (
 		...speedConfigOverrides.map((override) => `-c ${shellQuote(override)}`),
 		"--skip-git-repo-check",
 	];
+	const imageArgs = (options.imagePaths ?? []).map(
+		(imagePath) => `--image ${shellQuote(imagePath)}`,
+	);
 
 	if (options.resumeLast) {
 		args.push("resume --last");
+		args.push(...imageArgs);
 	} else {
 		args.push(
 			`-c ${shellQuote(formatCodexDeveloperInstructionsConfig(getCodexDeveloperInstructions()))}`,
 		);
+		args.push(...imageArgs);
 	}
 
 	args.push(shellQuote(prompt));
@@ -1604,8 +1684,64 @@ const getStringDataValue = (data: unknown, key: string) => {
 	return typeof value === "string" ? value : undefined;
 };
 
+const getImageAttachments = (
+	data: unknown,
+	taskId: string,
+): ImageAttachment[] => {
+	if (!isRecord(data) || !Array.isArray(data.images)) {
+		return [];
+	}
+
+	return data.images.flatMap((item) => {
+		if (!isRecord(item)) {
+			return [];
+		}
+
+		const path = getStringRecordValue(item, "path");
+		const id = getStringRecordValue(item, "id") ?? path;
+		const name = getStringRecordValue(item, "name") ?? "image";
+		const contentType = getStringRecordValue(item, "contentType") ?? "image";
+		const size = item.size;
+
+		if (
+			!id ||
+			!path?.startsWith(`tasks/${taskId}/images/`) ||
+			!contentType.startsWith("image")
+		) {
+			return [];
+		}
+
+		return [
+			{
+				id,
+				path,
+				url: getStringRecordValue(item, "url"),
+				name,
+				contentType,
+				size: typeof size === "number" && Number.isFinite(size) ? size : 0,
+			},
+		];
+	});
+};
+
+const getStringRecordValue = (record: Record<string, unknown>, key: string) => {
+	const value = record[key];
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const sanitizeSandboxFileName = (value: string) => {
+	const normalized = value
+		.trim()
+		.replaceAll("\\", "-")
+		.replaceAll("/", "-")
+		.replace(/[^a-zA-Z0-9._-]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+
+	return normalized || "image";
 };
 
 const shellQuote = (value: string) => {

@@ -17,6 +17,14 @@ type TaskSummary = {
 	name?: string;
 	instructions?: string;
 };
+type ImageAttachment = {
+	id: string;
+	path: string;
+	url?: string;
+	name: string;
+	contentType: string;
+	size: number;
+};
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 /** A resolved lifecycle state for a grouped (started -> finished) timeline row. */
@@ -282,6 +290,9 @@ export default function Event({
 	}
 
 	if (type === "factoryplane.new_user_message") {
+		const content = getString(data, "content");
+		const images = getImageAttachments(data);
+
 		return (
 			<EventCard
 				glyph="ME"
@@ -289,7 +300,8 @@ export default function Event({
 				title="Message sent"
 				tone="neutral"
 			>
-				<MessageBubble text={getString(data, "content") ?? "Empty message"} />
+				{content ? <MessageBubble text={content} /> : null}
+				<ImageAttachmentGrid images={images} />
 			</EventCard>
 		);
 	}
@@ -359,6 +371,7 @@ function NewTaskEvent({
 	const taskId = getString(data, "taskId") ?? task?.id;
 	const name = getString(data, "name") ?? task?.name;
 	const instructions = getString(data, "instructions") ?? task?.instructions;
+	const images = getImageAttachments(data);
 
 	return (
 		<EventCard
@@ -370,6 +383,7 @@ function NewTaskEvent({
 			tone="accent"
 		>
 			{instructions ? <MessageBubble text={instructions} /> : null}
+			<ImageAttachmentGrid images={images} />
 			{name ? <DetailGrid items={[["task", taskId]]} /> : null}
 		</EventCard>
 	);
@@ -853,6 +867,55 @@ function MessageBubble({ text }: { text: string }) {
 	);
 }
 
+function ImageAttachmentGrid({ images }: { images: ImageAttachment[] }) {
+	if (images.length === 0) {
+		return null;
+	}
+
+	return (
+		<div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2">
+			{images.map((image) => {
+				const contentType = image.contentType || "image";
+				const subtitle = [
+					contentType.replace(/^image\//, "").toUpperCase(),
+					formatFileSize(image.size),
+				]
+					.filter(Boolean)
+					.join(" · ");
+
+				return (
+					<a
+						className="group min-w-0 overflow-hidden border border-grayscale-4 bg-white transition-colors hover:border-accent-7"
+						href={image.url}
+						key={image.id}
+						rel="noreferrer"
+						target="_blank"
+					>
+						{image.url ? (
+							/* biome-ignore lint/performance/noImgElement: Instant Storage signed URLs are user uploads outside Next image config. */
+							<img
+								alt={image.name}
+								className="aspect-square w-full object-cover"
+								src={image.url}
+							/>
+						) : (
+							<div className="flex aspect-square w-full items-center justify-center bg-grayscale-2 text-xs text-grayscale-10">
+								Image
+							</div>
+						)}
+						<div className="min-w-0 px-2 py-1">
+							<p className="truncate text-xs text-grayscale-12">
+								{image.name || "image"}
+							</p>
+							<p className="text-[11px] text-grayscale-10">{subtitle}</p>
+						</div>
+					</a>
+				);
+			})}
+		</div>
+	);
+}
+
 function CodeBlock({ children }: { children: string }) {
 	return (
 		<pre className="overflow-x-auto bg-grayscale-2 p-2 text-[11px] leading-5 text-grayscale-12 ring-1 ring-grayscale-4">
@@ -928,6 +991,30 @@ function getRecordArray(record: JsonRecord, key: string): JsonRecord[] {
 	});
 }
 
+function getImageAttachments(record: JsonRecord): ImageAttachment[] {
+	return getRecordArray(record, "images").flatMap((item) => {
+		const id = getString(item, "id") ?? getString(item, "path");
+		const path = getString(item, "path");
+		const name = getString(item, "name") ?? "image";
+		const contentType = getString(item, "contentType") ?? "image";
+
+		if (!id || !path) {
+			return [];
+		}
+
+		return [
+			{
+				id,
+				path,
+				url: getString(item, "url"),
+				name,
+				contentType,
+				size: getNumber(item, "size") ?? 0,
+			},
+		];
+	});
+}
+
 function formatTimestamp(value: unknown): string | undefined {
 	const time = parseTimestamp(value);
 
@@ -997,6 +1084,23 @@ function formatNumber(value: number | undefined) {
 	return value === undefined
 		? undefined
 		: new Intl.NumberFormat().format(value);
+}
+
+function formatFileSize(size: number) {
+	if (!Number.isFinite(size) || size <= 0) {
+		return "0 B";
+	}
+
+	const units = ["B", "KB", "MB", "GB"];
+	let value = size;
+	let unitIndex = 0;
+
+	while (value >= 1024 && unitIndex < units.length - 1) {
+		value /= 1024;
+		unitIndex += 1;
+	}
+
+	return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
 }
 
 function summarizeCount(count: number, singular: string) {
