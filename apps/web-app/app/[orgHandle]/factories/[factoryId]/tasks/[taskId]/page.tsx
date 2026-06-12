@@ -19,6 +19,7 @@ import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import {
 	type CSSProperties,
+	type ClipboardEvent as ReactClipboardEvent,
 	type DragEvent as ReactDragEvent,
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
@@ -39,9 +40,9 @@ import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
 import Event, { buildTimeline } from "@/components/Event";
 import {
+	getImageFiles,
 	hasImageFiles,
 	ImageAttachments,
-	uploadImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
 import { Textarea } from "@/components/Input";
@@ -224,7 +225,11 @@ export default function TaskPage() {
 		addFiles: addImageFiles,
 		removeAttachment: removeImageAttachment,
 		clearAttachments: clearImageAttachments,
-	} = useImageAttachments();
+		uploadAttachments: uploadImageAttachments,
+	} = useImageAttachments({
+		taskId: taskId as string,
+		uploadImmediately: true,
+	});
 	const diffFiles = useMemo<FileDiffMetadata[]>(() => {
 		if (!patchText?.trim()) {
 			return [];
@@ -488,7 +493,7 @@ export default function TaskPage() {
 		setIsSendingMessage(true);
 
 		try {
-			const images = await uploadImageAttachments(task.id, imageAttachments);
+			const images = await uploadImageAttachments(task.id);
 
 			setMessage("");
 			clearImageAttachments();
@@ -547,7 +552,18 @@ export default function TaskPage() {
 
 		event.preventDefault();
 		setIsDraggingImages(false);
-		addImageFiles(event.dataTransfer.files);
+		addImageFiles(getImageFiles(event.dataTransfer));
+	};
+
+	const handleComposerPaste = (
+		event: ReactClipboardEvent<HTMLFieldSetElement>,
+	) => {
+		if (!hasImageFiles(event.clipboardData)) {
+			return;
+		}
+
+		event.preventDefault();
+		addImageFiles(getImageFiles(event.clipboardData));
 	};
 
 	if (isLoading) {
@@ -667,6 +683,7 @@ export default function TaskPage() {
 							onDragLeave={handleComposerDragLeave}
 							onDragOver={handleComposerDragOver}
 							onDrop={handleComposerDrop}
+							onPaste={handleComposerPaste}
 						>
 							<CornerCubes
 								placement="outside"
