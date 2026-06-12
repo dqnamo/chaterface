@@ -33,12 +33,14 @@ export default function FactoriesPage() {
 	const [gitAuthorName, setGitAuthorName] = useState("");
 	const [gitAuthorEmail, setGitAuthorEmail] = useState("");
 	const { user } = db.useAuth();
+	const currentUserId = user?.id ?? "__unauthenticated__";
 
 	const { data } = db.useQuery({
 		organisations: {
 			$: {
 				where: {
 					handle: currentOrgHandle,
+					"members.user.id": currentUserId,
 				},
 			},
 			factories: {},
