@@ -58,7 +58,7 @@ function Trigger({ className, ...props }: MenuTriggerProps) {
 				spacing={4}
 				translate={6}
 				size={6}
-				color="grayscale-8"
+				color="grayscale-6"
 				active={false}
 			/>
 			{props.children}
@@ -110,7 +110,7 @@ function Item({ className, children, ...props }: MenuItemProps) {
 			<CornerBrackets
 				placement="inside"
 				size={6}
-				color="grayscale-8"
+				color="grayscale-6"
 				active={false}
 			/>
 			{children}
@@ -134,7 +134,7 @@ function SubmenuTrigger({
 			<CornerBrackets
 				placement="inside"
 				size={6}
-				color="grayscale-8"
+				color="grayscale-6"
 				active={false}
 				className="group-data-[popup-open]:opacity-100 group-data-[popup-open]:translate-x-0 group-data-[popup-open]:translate-y-0"
 			/>
@@ -159,7 +159,7 @@ function RadioItem({ className, children, ...props }: MenuRadioItemProps) {
 			<CornerBrackets
 				placement="inside"
 				size={6}
-				color="grayscale-8"
+				color="grayscale-6"
 				active={false}
 				className="group-data-[checked]:hidden"
 			/>

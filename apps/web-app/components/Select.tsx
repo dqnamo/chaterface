@@ -63,7 +63,7 @@ function Trigger({ className, children, ...props }: SelectTriggerProps) {
 				spacing={4}
 				translate={6}
 				size={6}
-				color="grayscale-8"
+				color="grayscale-6"
 				active={false}
 			/>
 			{children}
@@ -122,7 +122,7 @@ function Item({ className, children, ...props }: SelectItemProps) {
 			<CornerBrackets
 				placement="inside"
 				size={6}
-				color="grayscale-8"
+				color="grayscale-6"
 				active={false}
 				className="group-data-[selected]:hidden"
 			/>
