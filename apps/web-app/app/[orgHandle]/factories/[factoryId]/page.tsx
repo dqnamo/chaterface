@@ -4,7 +4,12 @@ import { id } from "@instantdb/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import {
+	type DragEvent as ReactDragEvent,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import {
 	DEFAULT_CODEX_MODEL,
 	DEFAULT_CODEX_REASONING_EFFORT,
@@ -13,11 +18,18 @@ import {
 } from "@/codex-options";
 import { Button } from "@/components/Button";
 import CornerCubes from "@/components/CornerCubes";
+import {
+	hasImageFiles,
+	ImageAttachments,
+	uploadImageAttachments,
+	useImageAttachments,
+} from "@/components/ImageAttachments";
 import { Input, Textarea } from "@/components/Input";
 import Logo from "@/components/Logo";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
+import { cn } from "@/helpers/classname-helper";
 
 const taskTx = (taskId: string) => {
 	const tx = db.tx.tasks[taskId];
@@ -53,6 +65,14 @@ export default function FactoryPage() {
 		DEFAULT_CODEX_REASONING_EFFORT,
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
+	const [isCreating, setIsCreating] = useState(false);
+	const [isDraggingImages, setIsDraggingImages] = useState(false);
+	const {
+		attachments: imageAttachments,
+		addFiles: addImageFiles,
+		removeAttachment: removeImageAttachment,
+		clearAttachments: clearImageAttachments,
+	} = useImageAttachments();
 
 	const { data } = db.useQuery({
 		organisations: {
@@ -93,43 +113,85 @@ export default function FactoryPage() {
 	}, [selectedAgent]);
 
 	const createTask = async () => {
-		if (!resolvedAgentId) {
+		if (!resolvedAgentId || isCreating) {
 			return;
 		}
 
 		const taskId = id();
-		await db.transact(
-			taskTx(taskId)
-				.create({
-					name: taskName,
-					status: "in_progress",
-					instructions: taskInstructions,
-					createdAt: DateTime.now().toISO(),
-					agentModel,
-					agentReasoningEffort,
-					agentSpeed,
-				})
-				.link({ factory: currentFactoryId, agent: resolvedAgentId }),
-		);
+		setIsCreating(true);
 
-		const eventId = id();
-		await db.transact(
-			eventTx(eventId)
-				.create({
-					type: "factoryplane.new_task",
-					data: {
-						taskId: taskId,
+		try {
+			const images = await uploadImageAttachments(taskId, imageAttachments);
+
+			await db.transact(
+				taskTx(taskId)
+					.create({
 						name: taskName,
+						status: "in_progress",
 						instructions: taskInstructions,
-					},
-					createdAt: DateTime.now().toISO(),
-				})
-				.link({ task: taskId }),
-		);
+						createdAt: DateTime.now().toISO(),
+						agentModel,
+						agentReasoningEffort,
+						agentSpeed,
+					})
+					.link({ factory: currentFactoryId, agent: resolvedAgentId }),
+			);
 
-		router.push(
-			`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${taskId}`,
-		);
+			const eventId = id();
+			await db.transact(
+				eventTx(eventId)
+					.create({
+						type: "factoryplane.new_task",
+						data: {
+							taskId: taskId,
+							name: taskName,
+							instructions: taskInstructions,
+							images,
+						},
+						createdAt: DateTime.now().toISO(),
+					})
+					.link({ task: taskId }),
+			);
+
+			clearImageAttachments();
+			router.push(
+				`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${taskId}`,
+			);
+		} finally {
+			setIsCreating(false);
+		}
+	};
+
+	const handleComposerDragOver = (
+		event: ReactDragEvent<HTMLFieldSetElement>,
+	) => {
+		if (!hasImageFiles(event.dataTransfer)) {
+			return;
+		}
+
+		event.preventDefault();
+		event.dataTransfer.dropEffect = "copy";
+		setIsDraggingImages(true);
+	};
+
+	const handleComposerDragLeave = (
+		event: ReactDragEvent<HTMLFieldSetElement>,
+	) => {
+		const nextTarget = event.relatedTarget as Node | null;
+
+		if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+			setIsDraggingImages(false);
+		}
+	};
+
+	const handleComposerDrop = (event: ReactDragEvent<HTMLFieldSetElement>) => {
+		if (!hasImageFiles(event.dataTransfer)) {
+			return;
+		}
+
+		event.preventDefault();
+		setIsDraggingImages(false);
+		addImageFiles(event.dataTransfer.files);
 	};
 
 	return (
@@ -141,7 +203,16 @@ export default function FactoryPage() {
 					What do you want to build?
 				</h1>
 			</div>
-			<div className="flex flex-col max-w-xl w-full bg-white border border-grayscale-4 relative">
+			<fieldset
+				aria-label="New task composer"
+				className={cn(
+					"flex flex-col max-w-xl w-full bg-white border border-grayscale-4 relative transition-colors",
+					isDraggingImages && "border-accent-8 bg-accent-2",
+				)}
+				onDragLeave={handleComposerDragLeave}
+				onDragOver={handleComposerDragOver}
+				onDrop={handleComposerDrop}
+			>
 				<CornerCubes
 					placement="outside"
 					spacing={3}
@@ -174,9 +245,16 @@ export default function FactoryPage() {
 					<Textarea
 						className="text-sm"
 						placeholder="Task Instructions"
+						disabled={isCreating}
 						value={taskInstructions}
 						onChange={(e) => setTaskInstructions(e.target.value)}
 						onSubmit={createTask}
+					/>
+					<ImageAttachments
+						attachments={imageAttachments}
+						disabled={isCreating}
+						onAddFiles={addImageFiles}
+						onRemoveAttachment={removeImageAttachment}
 					/>
 				</div>
 				<div className="flex flex-row items-center justify-between p-3">
@@ -216,12 +294,12 @@ export default function FactoryPage() {
 						/>
 					</div>
 					<div className="flex flex-row items-center justify-center gap-2 ml-auto">
-						<Button type="button" onClick={createTask}>
-							Create Task
+						<Button type="button" disabled={isCreating} onClick={createTask}>
+							{isCreating ? "Creating..." : "Create Task"}
 						</Button>
 					</div>
 				</div>
-			</div>
+			</fieldset>
 
 			{/* <input
 				type="text"
