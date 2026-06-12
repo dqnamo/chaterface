@@ -738,36 +738,32 @@ function EventCard({
 	return (
 		<motion.article
 			animate={{ opacity: 1, y: 0 }}
-			className="group relative py-2"
+			className="relative py-2"
 			initial={{ opacity: 0, y: 6 }}
 			layout="position"
 			transition={{ duration: 0.18, ease: "easeOut" }}
 		>
-			<div className="flex min-w-0 flex-col gap-2 rounded-md border border-transparent px-3 py-2.5 transition-colors duration-150 group-hover:border-grayscale-4 group-hover:bg-grayscale-2/60">
+			<div className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
 				<div className="flex min-w-0 items-start justify-between gap-3">
-					<div className="flex min-w-0 items-start gap-2.5">
-						<StatusIcon glyph={glyph} logo={logo} phase={phase} tone={tone} />
-						<div className="min-w-0 pt-0.5">
-							<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-								<p className="font-medium text-sm leading-5 text-grayscale-12">
-									{title}
-								</p>
-								{subtitle ? (
-									<p className="break-words font-mono text-[11px] leading-4 text-grayscale-10">
-										{subtitle}
-									</p>
-								) : null}
-							</div>
-						</div>
+					<div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+						<p className="flex min-w-0 items-center gap-2 font-medium text-sm leading-5 text-grayscale-12">
+							<StatusIcon glyph={glyph} logo={logo} phase={phase} tone={tone} />
+							<span className="min-w-0 break-words">{title}</span>
+						</p>
+						{subtitle ? (
+							<p className="break-words font-mono text-[11px] leading-4 text-grayscale-10">
+								{subtitle}
+							</p>
+						) : null}
 					</div>
 					{meta ? (
-						<time className="shrink-0 pt-0.5 text-[11px] leading-5 text-grayscale-10">
+						<time className="shrink-0 text-[11px] leading-5 text-grayscale-10">
 							{meta}
 						</time>
 					) : null}
 				</div>
 				{children ? (
-					<div className="flex min-w-0 flex-col gap-2 pl-8">{children}</div>
+					<div className="flex min-w-0 flex-col gap-2">{children}</div>
 				) : null}
 			</div>
 		</motion.article>
@@ -788,7 +784,7 @@ function StatusIcon({
 	return (
 		<div
 			className={cx(
-				"flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold ring-1 ring-inset ring-current/10",
+				"flex size-4 shrink-0 items-center justify-center font-mono text-[8px] font-semibold ring-1 ring-inset ring-current/10",
 				phase ? phaseClasses[phase] : toneClasses[tone],
 			)}
 		>
@@ -802,13 +798,13 @@ function StatusIcon({
 					transition={{ duration: 0.15, ease: "easeOut" }}
 				>
 					{phase === "running" ? (
-						<CircleNotchIcon className="size-3.5 animate-spin" weight="bold" />
+						<CircleNotchIcon className="size-3 animate-spin" weight="bold" />
 					) : phase === "success" ? (
-						<CheckCircleIcon className="size-3.5" weight="fill" />
+						<CheckCircleIcon className="size-3" weight="fill" />
 					) : phase === "failed" ? (
-						<XCircleIcon className="size-3.5" weight="fill" />
+						<XCircleIcon className="size-3" weight="fill" />
 					) : logo ? (
-						<Logo size={3} />
+						<Logo size={2.5} />
 					) : (
 						glyph
 					)}
@@ -832,7 +828,7 @@ function DetailGrid({
 	}
 
 	return (
-		<dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-md bg-grayscale-2 px-3 py-2 text-xs">
+		<dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 bg-grayscale-2 px-3 py-2 text-xs">
 			{visibleItems.map(([label, value]) => (
 				<div className="contents" key={label}>
 					<dt className="font-medium text-grayscale-10">{label}</dt>
@@ -846,7 +842,7 @@ function DetailGrid({
 function MessageBubble({ text }: { text: string }) {
 	return (
 		<Streamdown
-			className="rounded-md bg-white px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:rounded-md [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-md [&_[data-streamdown=inline-code]]:rounded-sm [&_[data-streamdown=inline-code]]:bg-grayscale-3"
+			className="bg-white px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
 			dir="auto"
 			linkSafety={MESSAGE_LINK_SAFETY}
 			lineNumbers={false}
@@ -859,7 +855,7 @@ function MessageBubble({ text }: { text: string }) {
 
 function CodeBlock({ children }: { children: string }) {
 	return (
-		<pre className="overflow-x-auto rounded-md bg-grayscale-2 p-2 text-[11px] leading-5 text-grayscale-12 ring-1 ring-grayscale-4">
+		<pre className="overflow-x-auto bg-grayscale-2 p-2 text-[11px] leading-5 text-grayscale-12 ring-1 ring-grayscale-4">
 			<code>{children}</code>
 		</pre>
 	);
@@ -872,7 +868,7 @@ function OutputPreview({ output }: { output: string }) {
 			: output;
 
 	return (
-		<details className="group rounded-md bg-grayscale-2 ring-1 ring-grayscale-4">
+		<details className="group bg-grayscale-2 ring-1 ring-grayscale-4">
 			<summary className="cursor-pointer px-2 py-1.5 text-xs font-medium text-grayscale-11">
 				Output
 				{output.length > OUTPUT_PREVIEW_LIMIT
@@ -888,7 +884,7 @@ function OutputPreview({ output }: { output: string }) {
 
 function RawPayload({ value }: { value: unknown }) {
 	return (
-		<details className="rounded-md bg-grayscale-2 ring-1 ring-grayscale-4">
+		<details className="bg-grayscale-2 ring-1 ring-grayscale-4">
 			<summary className="cursor-pointer px-2 py-1.5 text-xs font-medium text-grayscale-11">
 				Payload
 			</summary>
