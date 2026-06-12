@@ -23,8 +23,10 @@ type Task = InstaQLEntity<AppSchema, "tasks">;
 type Agent = InstaQLEntity<AppSchema, "agents">;
 type Factory = InstaQLEntity<AppSchema, "factories">;
 type Repository = InstaQLEntity<AppSchema, "repositories">;
+type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
 type FactoryWithRepositories = Factory & {
 	repositories?: Repository[];
+	environmentFiles?: EnvironmentFile[];
 };
 type RepositorySecret = {
 	id: string;
@@ -191,6 +193,7 @@ export const processEventTask = task({
 						agent: {},
 						factory: {
 							repositories: {},
+							environmentFiles: {},
 						},
 					},
 				},
@@ -370,6 +373,7 @@ const setupTaskSandbox = async (
 		factory,
 		repositoryGithubEnvs,
 	);
+	await writeFactoryEnvironmentFiles(sandbox, task.id, factory);
 	await runFactorySetupScript(
 		sandbox,
 		task.id,
@@ -546,6 +550,69 @@ const cloneFactoryRepositories = async (
 			),
 		{ timeoutMs: 60_000 },
 	);
+};
+
+const writeFactoryEnvironmentFiles = async (
+	sandbox: Sandbox,
+	taskId: string,
+	factory: FactoryWithRepositories,
+) => {
+	const environmentFiles = getFactoryEnvironmentFiles(factory.environmentFiles);
+
+	if (environmentFiles.length === 0) {
+		return;
+	}
+
+	const workspacePath = await getSandboxWorkspacePath(sandbox);
+
+	await runSetupStep(
+		taskId,
+		"environment_files",
+		"Write environment files",
+		async () => {
+			await Promise.all(
+				environmentFiles.map(async (file) => {
+					const filePath = `${workspacePath}/${file.path}`;
+					const parentPath = filePath.slice(0, filePath.lastIndexOf("/"));
+
+					await sandbox.commands.run(`mkdir -p ${shellQuote(parentPath)}`, {
+						timeoutMs: 30_000,
+					});
+					await sandbox.files.write(filePath, file.content);
+				}),
+			);
+		},
+		{ timeoutMs: 60_000 },
+	);
+};
+
+const getFactoryEnvironmentFiles = (
+	files: EnvironmentFile[] | undefined,
+): Array<{ path: string; content: string }> => {
+	if (!files) {
+		return [];
+	}
+
+	const environmentFiles = new Map<string, { path: string; content: string }>();
+
+	for (const file of [...files].sort(
+		(a, b) =>
+			new Date(a.createdAt ?? 0).getTime() -
+			new Date(b.createdAt ?? 0).getTime(),
+	)) {
+		const path = normalizeEnvironmentFilePath(file.path);
+
+		if (!path) {
+			continue;
+		}
+
+		environmentFiles.set(path, {
+			path,
+			content: file.content,
+		});
+	}
+
+	return [...environmentFiles.values()];
 };
 
 const setupRepositoryGithubAuth = async (
@@ -891,6 +958,30 @@ const normalizeRepositoryPath = (value: string | undefined) => {
 		.filter(
 			(segment) => segment.length > 0 && segment !== "." && segment !== "..",
 		);
+
+	return segments.length > 0 ? segments.join("/") : undefined;
+};
+
+const normalizeEnvironmentFilePath = (value: string | undefined) => {
+	if (!value) {
+		return undefined;
+	}
+
+	const normalized = value.trim().replaceAll("\\", "/");
+
+	if (normalized.startsWith("/")) {
+		return undefined;
+	}
+
+	const segments = normalized.split("/");
+
+	if (
+		segments.some(
+			(segment) => segment.length === 0 || segment === "." || segment === "..",
+		)
+	) {
+		return undefined;
+	}
 
 	return segments.length > 0 ? segments.join("/") : undefined;
 };
