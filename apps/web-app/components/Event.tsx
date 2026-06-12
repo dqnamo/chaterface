@@ -752,20 +752,20 @@ function EventCard({
 	return (
 		<motion.article
 			animate={{ opacity: 1, y: 0 }}
-			className="relative py-2"
+			className="relative min-w-0 max-w-full overflow-hidden py-2"
 			initial={{ opacity: 0, y: 6 }}
 			layout="position"
 			transition={{ duration: 0.18, ease: "easeOut" }}
 		>
-			<div className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
+			<div className="flex min-w-0 max-w-full flex-col gap-2 px-3 py-2.5">
 				<div className="flex min-w-0 items-start justify-between gap-3">
 					<div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-						<p className="flex min-w-0 items-center gap-2 font-medium text-sm leading-5 text-grayscale-12">
+						<p className="flex min-w-0 max-w-full items-center gap-2 font-medium text-sm leading-5 text-grayscale-12">
 							<StatusIcon glyph={glyph} logo={logo} phase={phase} tone={tone} />
 							<span className="min-w-0 break-words">{title}</span>
 						</p>
 						{subtitle ? (
-							<p className="break-words font-mono text-[11px] leading-4 text-grayscale-10">
+							<p className="min-w-0 max-w-full break-words font-mono text-[11px] leading-4 text-grayscale-10">
 								{subtitle}
 							</p>
 						) : null}
@@ -777,7 +777,9 @@ function EventCard({
 					) : null}
 				</div>
 				{children ? (
-					<div className="flex min-w-0 flex-col gap-2">{children}</div>
+					<div className="flex min-w-0 max-w-full flex-col gap-2 overflow-hidden">
+						{children}
+					</div>
 				) : null}
 			</div>
 		</motion.article>
@@ -856,7 +858,7 @@ function DetailGrid({
 function MessageBubble({ text }: { text: string }) {
 	return (
 		<Streamdown
-			className="bg-white px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
+			className="min-w-0 max-w-full overflow-hidden break-words bg-white px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:max-w-full [&_[data-streamdown=code-block]]:overflow-x-auto [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
 			dir="auto"
 			linkSafety={MESSAGE_LINK_SAFETY}
 			lineNumbers={false}
@@ -918,7 +920,7 @@ function ImageAttachmentGrid({ images }: { images: ImageAttachment[] }) {
 
 function CodeBlock({ children }: { children: string }) {
 	return (
-		<pre className="overflow-x-auto bg-grayscale-2 p-2 text-[11px] leading-5 text-grayscale-12 ring-1 ring-grayscale-4">
+		<pre className="max-w-full overflow-x-auto bg-grayscale-2 p-2 text-[11px] leading-5 text-grayscale-12 ring-1 ring-grayscale-4">
 			<code>{children}</code>
 		</pre>
 	);
@@ -931,14 +933,14 @@ function OutputPreview({ output }: { output: string }) {
 			: output;
 
 	return (
-		<details className="group bg-grayscale-2 ring-1 ring-grayscale-4">
+		<details className="group min-w-0 max-w-full overflow-hidden bg-grayscale-2 ring-1 ring-grayscale-4">
 			<summary className="cursor-pointer px-2 py-1.5 text-xs font-medium text-grayscale-11">
 				Output
 				{output.length > OUTPUT_PREVIEW_LIMIT
 					? ` (last ${formatNumber(OUTPUT_PREVIEW_LIMIT)} chars)`
 					: ""}
 			</summary>
-			<pre className="max-h-64 overflow-auto p-2 text-[11px] leading-5 text-grayscale-12">
+			<pre className="max-h-64 max-w-full overflow-auto p-2 text-[11px] leading-5 text-grayscale-12">
 				<code>{preview}</code>
 			</pre>
 		</details>
@@ -947,11 +949,11 @@ function OutputPreview({ output }: { output: string }) {
 
 function RawPayload({ value }: { value: unknown }) {
 	return (
-		<details className="bg-grayscale-2 ring-1 ring-grayscale-4">
+		<details className="min-w-0 max-w-full overflow-hidden bg-grayscale-2 ring-1 ring-grayscale-4">
 			<summary className="cursor-pointer px-2 py-1.5 text-xs font-medium text-grayscale-11">
 				Payload
 			</summary>
-			<pre className="max-h-64 overflow-auto p-2 text-[11px] leading-5 text-grayscale-12">
+			<pre className="max-h-64 max-w-full overflow-auto p-2 text-[11px] leading-5 text-grayscale-12">
 				<code>{JSON.stringify(value, null, 2)}</code>
 			</pre>
 		</details>
