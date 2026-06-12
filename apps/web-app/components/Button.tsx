@@ -3,6 +3,7 @@
 import { Button as BaseButton } from "@base-ui/react/button";
 import type { ComponentProps } from "react";
 import CornerBrackets from "@/components/CornerBrackets";
+import { ShortcutKey } from "@/components/ShortcutKey";
 import { cn } from "@/helpers/classname-helper";
 
 type ClassName<TState> = string | ((state: TState) => string | undefined);
@@ -56,11 +57,7 @@ export function Button({
 			<span className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
 				{children}
 			</span>
-			{shortcut ? (
-				<span className="hidden aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase sm:flex">
-					{shortcut}
-				</span>
-			) : null}
+			{shortcut ? <ShortcutKey>{shortcut}</ShortcutKey> : null}
 		</BaseButton>
 	);
 }

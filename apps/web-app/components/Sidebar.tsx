@@ -24,6 +24,7 @@ import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
 import { Menu } from "./Menu";
 import Monogram from "./Monogram";
+import { ShortcutKey } from "./ShortcutKey";
 import { useSidebar } from "./SidebarContext";
 import TaskStatusDots from "./TaskStatusDots";
 
@@ -219,9 +220,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 							<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
 								New Task
 							</p>
-							<p className="hidden aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase sm:flex">
-								N
-							</p>
+							<ShortcutKey>N</ShortcutKey>
 						</span>
 					</Link>
 				</div>

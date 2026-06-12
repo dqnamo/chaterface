@@ -48,6 +48,7 @@ import {
 import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { ScrollArea } from "@/components/ScrollArea";
+import { ShortcutKey } from "@/components/ShortcutKey";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
 import { cn } from "@/helpers/classname-helper";
@@ -620,9 +621,7 @@ export default function TaskPage() {
 							<p className="text-xs text-grayscale-12">
 								{isTaskCompleted ? "Uncomplete task" : "Mark as complete"}
 							</p>
-							<p className="hidden aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase sm:flex">
-								D
-							</p>
+							<ShortcutKey>D</ShortcutKey>
 						</button>
 						<AnimatePresence initial={false}>
 							{!isMobile && isRightCollapsed && (
