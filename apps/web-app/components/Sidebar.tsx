@@ -5,7 +5,6 @@ import {
 	CaretRightIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
-	HeadCircuitIcon,
 	MinusCircleIcon,
 	ShapesIcon,
 	SidebarSimpleIcon,
@@ -109,11 +108,9 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 		[tasks],
 	);
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
-	const agentsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/agents`;
 	const newTaskHref = `/${currentOrgHandle}/factories/${currentFactoryId}`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
-	const isAgentsSelected = pathname.startsWith(agentsHref);
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
 	);
@@ -184,23 +181,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					/>
 					<BuildingsIcon weight="bold" className="size-4 shrink-0" />
 					<span className="min-w-0 flex-1 truncate">Organisation Settings</span>
-				</Link>
-				<Link
-					href={agentsHref}
-					onClick={closeAfterMobileNavigation}
-					className={cn(
-						"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-						isAgentsSelected ? "bg-grayscale-3" : "",
-					)}
-				>
-					<CornerBrackets
-						placement="inside"
-						color={isAgentsSelected ? "accent-9" : "grayscale-8"}
-						size={6}
-						active={isAgentsSelected}
-					/>
-					<HeadCircuitIcon weight="bold" className="size-4 shrink-0" />
-					<span className="min-w-0 flex-1 truncate">Agents</span>
 				</Link>
 				<div className="p-1.5 mt-2">
 					<Link
