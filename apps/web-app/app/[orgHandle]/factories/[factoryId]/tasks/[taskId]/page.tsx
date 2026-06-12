@@ -27,6 +27,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import {
 	DEFAULT_CODEX_MODEL,
 	DEFAULT_CODEX_REASONING_EFFORT,
@@ -348,7 +349,7 @@ export default function TaskPage() {
 		await db.transact(serviceTx(serviceId).delete());
 	};
 
-	const toggleTaskCompletion = async () => {
+	const toggleTaskCompletion = useCallback(async () => {
 		if (!task) {
 			return;
 		}
@@ -359,7 +360,17 @@ export default function TaskPage() {
 				status: isTaskCompleted ? "idle" : "complete",
 			}),
 		);
-	};
+	}, [isTaskCompleted, task]);
+
+	useHotkeys(
+		"d",
+		toggleTaskCompletion,
+		{
+			description: isTaskCompleted ? "Uncomplete task" : "Complete task",
+			preventDefault: true,
+		},
+		[isTaskCompleted, toggleTaskCompletion],
+	);
 
 	useEffect(() => {
 		if (!task) {
@@ -500,6 +511,7 @@ export default function TaskPage() {
 					<div className="flex flex-row items-center">
 						<button
 							type="button"
+							aria-keyshortcuts="D"
 							onClick={toggleTaskCompletion}
 							className={cn(
 								isTaskCompleted ? "hover:bg-blue-3" : "hover:bg-green-3",
@@ -533,6 +545,9 @@ export default function TaskPage() {
 							)}
 							<p className="text-xs text-grayscale-12">
 								{isTaskCompleted ? "Uncomplete task" : "Mark as complete"}
+							</p>
+							<p className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
+								D
 							</p>
 						</button>
 						<AnimatePresence initial={false}>
