@@ -57,7 +57,7 @@ export function Button({
 				{children}
 			</span>
 			{shortcut ? (
-				<span className="flex aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase">
+				<span className="hidden aspect-square size-5 shrink-0 items-center justify-center bg-grayscale-11/50 font-mono text-xs leading-none text-grayscale-8 uppercase sm:flex">
 					{shortcut}
 				</span>
 			) : null}
