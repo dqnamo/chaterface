@@ -41,6 +41,14 @@ const _schema = i.schema({
 			content: i.string(),
 			createdAt: i.date().optional(),
 		}),
+		apiKeys: i.entity({
+			name: i.string().indexed(),
+			tokenHash: i.string().unique().indexed(),
+			tokenPrefix: i.string().indexed(),
+			createdAt: i.date().optional(),
+			lastUsedAt: i.date().optional(),
+			revokedAt: i.date().optional(),
+		}),
 		agents: i.entity({
 			name: i.string().indexed(),
 			auth: i.json().optional(),
@@ -225,6 +233,19 @@ const _schema = i.schema({
 			},
 			reverse: {
 				on: "environmentFiles",
+				has: "one",
+				label: "factory",
+				onDelete: "cascade",
+			},
+		},
+		factoryApiKeys: {
+			forward: {
+				on: "factories",
+				has: "many",
+				label: "apiKeys",
+			},
+			reverse: {
+				on: "apiKeys",
 				has: "one",
 				label: "factory",
 				onDelete: "cascade",

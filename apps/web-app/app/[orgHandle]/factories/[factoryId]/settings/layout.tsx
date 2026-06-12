@@ -6,6 +6,7 @@ import {
 	GitBranchIcon,
 	KeyIcon,
 	PackageIcon,
+	TerminalIcon,
 	TerminalWindowIcon,
 } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -19,6 +20,11 @@ const SETTINGS_ITEMS = [
 		label: "GitHub Access",
 		slug: "",
 		Icon: KeyIcon,
+	},
+	{
+		label: "Developer Access",
+		slug: "developer-access",
+		Icon: TerminalIcon,
 	},
 	{
 		label: "Sandbox Packages",
