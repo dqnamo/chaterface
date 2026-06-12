@@ -51,7 +51,7 @@ const Viewport = forwardRef<HTMLDivElement, ScrollAreaViewportProps>(
 		<BaseScrollArea.Viewport
 			ref={ref}
 			className={mergeClassName(
-				"h-full w-full overscroll-contain outline-none",
+				"h-full w-full min-w-0 overflow-x-hidden overscroll-contain outline-none",
 				className,
 			)}
 			{...props}

@@ -633,8 +633,8 @@ export default function TaskPage() {
 				</div>
 				<ScrollArea.Root className="min-h-0 flex-1">
 					<ScrollArea.Viewport ref={scrollContainerRef} onScroll={handleScroll}>
-						<ScrollArea.Content className="flex min-h-full flex-col gap-4">
-							<div className="mx-auto flex w-full max-w-3xl flex-col p-4">
+						<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-4">
+							<div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col p-4">
 								{canLoadNextPage && (
 									<button
 										type="button"
