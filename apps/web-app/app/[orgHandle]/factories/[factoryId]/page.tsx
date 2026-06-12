@@ -5,6 +5,7 @@ import db from "@repo/db/client";
 import { DateTime } from "luxon";
 import { useParams, useRouter } from "next/navigation";
 import {
+	type ClipboardEvent as ReactClipboardEvent,
 	type DragEvent as ReactDragEvent,
 	useEffect,
 	useMemo,
@@ -19,9 +20,9 @@ import {
 import { Button } from "@/components/Button";
 import CornerCubes from "@/components/CornerCubes";
 import {
+	getImageFiles,
 	hasImageFiles,
 	ImageAttachments,
-	uploadImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
 import { Input, Textarea } from "@/components/Input";
@@ -65,6 +66,7 @@ export default function FactoryPage() {
 		DEFAULT_CODEX_REASONING_EFFORT,
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
+	const [pendingTaskId, setPendingTaskId] = useState(() => id());
 	const [isCreating, setIsCreating] = useState(false);
 	const [isDraggingImages, setIsDraggingImages] = useState(false);
 	const {
@@ -72,7 +74,11 @@ export default function FactoryPage() {
 		addFiles: addImageFiles,
 		removeAttachment: removeImageAttachment,
 		clearAttachments: clearImageAttachments,
-	} = useImageAttachments();
+		uploadAttachments: uploadImageAttachments,
+	} = useImageAttachments({
+		taskId: pendingTaskId,
+		uploadImmediately: true,
+	});
 
 	const { data } = db.useQuery({
 		organisations: {
@@ -117,11 +123,11 @@ export default function FactoryPage() {
 			return;
 		}
 
-		const taskId = id();
+		const taskId = pendingTaskId;
 		setIsCreating(true);
 
 		try {
-			const images = await uploadImageAttachments(taskId, imageAttachments);
+			const images = await uploadImageAttachments(taskId);
 
 			await db.transact(
 				taskTx(taskId)
@@ -154,6 +160,7 @@ export default function FactoryPage() {
 			);
 
 			clearImageAttachments();
+			setPendingTaskId(id());
 			router.push(
 				`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${taskId}`,
 			);
@@ -191,7 +198,18 @@ export default function FactoryPage() {
 
 		event.preventDefault();
 		setIsDraggingImages(false);
-		addImageFiles(event.dataTransfer.files);
+		addImageFiles(getImageFiles(event.dataTransfer));
+	};
+
+	const handleComposerPaste = (
+		event: ReactClipboardEvent<HTMLFieldSetElement>,
+	) => {
+		if (!hasImageFiles(event.clipboardData)) {
+			return;
+		}
+
+		event.preventDefault();
+		addImageFiles(getImageFiles(event.clipboardData));
 	};
 
 	return (
@@ -212,6 +230,7 @@ export default function FactoryPage() {
 				onDragLeave={handleComposerDragLeave}
 				onDragOver={handleComposerDragOver}
 				onDrop={handleComposerDrop}
+				onPaste={handleComposerPaste}
 			>
 				<CornerCubes
 					placement="outside"
