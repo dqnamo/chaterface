@@ -1,51 +1,27 @@
-'use client';
+"use client";
 
-import { id } from '@instantdb/react';
-import db from '@repo/db/client';
-import { useState } from 'react';
-import { DateTime } from 'luxon';
-import Agent from '@/components/Agent';
+import Link from "next/link";
+import Logo from "@/components/Logo";
 
-export default function AgentsPage() {
-
-  const [name, setName] = useState('');
-  const [auth, setAuth] = useState('');
-
-  const { data, isLoading, error } = db.useQuery({
-    agents: {}
-  });
-
-  const agents = data?.agents;
-
-  const createAgent = async () => {
-    const agentId = id();
-    await db.transact(
-      db.tx.agents[agentId]!.create({
-        name,
-        createdAt: DateTime.now().toISO(),
-        status: 'creating',
-        auth: JSON.parse(auth)
-      }),
-    );
-  };
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
-  if (!agents) return <div>No agents found</div>;
-
-  return <div>
-    <h1>Agents</h1>
-    <ul>
-      {agents.map((agent) => <Agent key={agent.id} agent={agent} />)}
-    </ul>
-
-    <div className='flex flex-col gap-4'>
-      <h2>Create Agent</h2>
-      <input type='text' placeholder='Name' value={name} onChange={(e) => setName(e.target.value)} />
-      <input type='text' placeholder='auth' value={auth} onChange={(e) => setAuth(e.target.value)} />
-      <button onClick={() => {
-        createAgent();
-      }}>Create</button>
-    </div>
-  </div>;
+export default function GlobalAgentsPage() {
+	return (
+		<div className="flex h-full w-full flex-col items-center justify-center gap-4 px-4 text-center">
+			<Logo size={8} />
+			<div className="flex max-w-sm flex-col gap-1">
+				<h1 className="text-lg font-medium text-grayscale-12">
+					Agents moved into organisations
+				</h1>
+				<p className="text-sm text-grayscale-10">
+					Open a factory and use the sidebar Agents page to create Codex or
+					Cursor agents for that organisation.
+				</p>
+			</div>
+			<Link
+				href="/"
+				className="border border-grayscale-4 px-3 py-1.5 text-xs font-medium text-grayscale-11 transition-colors hover:text-grayscale-12"
+			>
+				View Organisations
+			</Link>
+		</div>
+	);
 }

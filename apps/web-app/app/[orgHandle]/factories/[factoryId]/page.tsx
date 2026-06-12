@@ -54,7 +54,14 @@ export default function FactoryPage() {
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 
 	const { data } = db.useQuery({
-		agents: {},
+		organisations: {
+			$: {
+				where: {
+					handle: currentOrgHandle,
+				},
+			},
+			agents: {},
+		},
 		tasks: {
 			$: {
 				where: {
@@ -64,7 +71,7 @@ export default function FactoryPage() {
 		},
 	});
 
-	const agents = data?.agents;
+	const agents = data?.organisations?.[0]?.agents;
 	const resolvedAgentId = agentId || agents?.[0]?.id;
 	const agentItems =
 		agents?.map((agent) => ({ value: agent.id, label: agent.name })) ?? [];
@@ -96,6 +103,8 @@ export default function FactoryPage() {
 					type: "factoryplane.new_task",
 					data: {
 						taskId: taskId,
+						name: taskName,
+						instructions: taskInstructions,
 					},
 					createdAt: DateTime.now().toISO(),
 				})
@@ -108,7 +117,7 @@ export default function FactoryPage() {
 	};
 
 	return (
-		<div className="relative flex flex-col gap-4 h-full w-full items-center justify-center">
+		<div className="relative flex h-full w-full flex-col items-center justify-center gap-4 px-4 md:px-0">
 			<ExpandSidebarButton className="absolute left-2 top-2 z-20" />
 			<Logo size={8} />
 			<div className="flex flex-col gap-px items-center justify-center">

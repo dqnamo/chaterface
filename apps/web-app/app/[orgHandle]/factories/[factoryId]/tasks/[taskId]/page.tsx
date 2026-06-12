@@ -348,15 +348,15 @@ export default function TaskPage() {
 		await db.transact(serviceTx(serviceId).delete());
 	};
 
-	const markTaskComplete = async () => {
-		if (!task || isTaskCompleted) {
+	const toggleTaskCompletion = async () => {
+		if (!task) {
 			return;
 		}
 
 		await db.transact(
 			taskTx(task.id).update({
-				completedAt: DateTime.now().toISO(),
-				status: "complete",
+				completedAt: isTaskCompleted ? undefined : DateTime.now().toISO(),
+				status: isTaskCompleted ? "idle" : "complete",
 			}),
 		);
 	};
@@ -500,10 +500,10 @@ export default function TaskPage() {
 					<div className="flex flex-row items-center">
 						<button
 							type="button"
-							onClick={markTaskComplete}
-							disabled={isTaskCompleted}
+							onClick={toggleTaskCompletion}
 							className={cn(
-								"bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-green-3 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-grayscale-3",
+								isTaskCompleted ? "hover:bg-blue-3" : "hover:bg-green-3",
+								"bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative",
 							)}
 						>
 							<CornerBrackets
@@ -511,17 +511,29 @@ export default function TaskPage() {
 								spacing={1}
 								translate={1.5}
 								size={6}
-								color="var(--color-green-9)"
+								color={
+									isTaskCompleted
+										? "var(--color-blue-9)"
+										: "var(--color-green-9)"
+								}
 							/>
-							<CheckCircleIcon
-								weight="bold"
-								className="size-4 text-green-9 group-hover:hidden"
-							/>
-							<CheckCircleIcon
-								weight="fill"
-								className="size-4 text-green-9 group-hover:block hidden"
-							/>
-							<p className="text-xs text-grayscale-12">Mark as complete</p>
+							{isTaskCompleted ? (
+								<MinusCircleIcon weight="bold" className="size-4 text-blue-9" />
+							) : (
+								<>
+									<CheckCircleIcon
+										weight="bold"
+										className="size-4 text-green-9 group-hover:hidden"
+									/>
+									<CheckCircleIcon
+										weight="fill"
+										className="size-4 text-green-9 group-hover:block hidden"
+									/>
+								</>
+							)}
+							<p className="text-xs text-grayscale-12">
+								{isTaskCompleted ? "Uncomplete task" : "Mark as complete"}
+							</p>
 						</button>
 						<AnimatePresence initial={false}>
 							{!isMobile && isRightCollapsed && (
@@ -561,7 +573,7 @@ export default function TaskPage() {
 								)}
 								<AnimatePresence initial={false}>
 									{timeline.map((node) => (
-										<Event key={node.key} node={node} />
+										<Event key={node.key} node={node} task={task} />
 									))}
 								</AnimatePresence>
 							</div>

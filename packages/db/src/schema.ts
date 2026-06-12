@@ -24,6 +24,9 @@ const _schema = i.schema({
 			createdAt: i.date().optional(),
 			githubAccessTokenEncrypted: i.string().optional(),
 			gitAuthorName: i.string().optional(),
+			environmentPackages: i.json().optional(),
+			newTaskSetupScript: i.string().optional(),
+			newTurnSetupScript: i.string().optional(),
 		}),
 		repositories: i.entity({
 			url: i.string().indexed(),
@@ -36,6 +39,7 @@ const _schema = i.schema({
 			name: i.string().indexed(),
 			auth: i.json().optional(),
 			createdAt: i.date().optional(),
+			provider: i.string().optional(),
 			settings: i.json().optional(),
 			status: i.string().optional(),
 			sandboxId: i.string().optional(),
@@ -227,6 +231,18 @@ const _schema = i.schema({
 			},
 			reverse: {
 				on: "members",
+				has: "one",
+				label: "organisation",
+			},
+		},
+		organisationAgents: {
+			forward: {
+				on: "organisations",
+				has: "many",
+				label: "agents",
+			},
+			reverse: {
+				on: "agents",
 				has: "one",
 				label: "organisation",
 			},

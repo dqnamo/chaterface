@@ -6,11 +6,17 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
+import { type LinkSafetyConfig, Streamdown } from "streamdown";
 import type { AppSchema } from "@/instant.schema";
 import Logo from "./Logo";
 
 type EventEntity = InstaQLEntity<AppSchema, "events">;
 type JsonRecord = Record<string, unknown>;
+type TaskSummary = {
+	id?: string;
+	name?: string;
+	instructions?: string;
+};
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 /** A resolved lifecycle state for a grouped (started -> finished) timeline row. */
@@ -34,6 +40,7 @@ type TimelineContext = {
 };
 
 const OUTPUT_PREVIEW_LIMIT = 6000;
+const MESSAGE_LINK_SAFETY = { enabled: false } satisfies LinkSafetyConfig;
 const previewsDomain =
 	process.env.NEXT_PUBLIC_FACTORYPLANE_PREVIEWS_DOMAIN ??
 	"previews.factoryplane.com";
@@ -258,23 +265,20 @@ function mergePhase(
 	return next;
 }
 
-export default function Event({ node }: { node: TimelineNode }) {
+export default function Event({
+	node,
+	task,
+}: {
+	node: TimelineNode;
+	task?: TaskSummary;
+}) {
 	const { event, phase } = node;
 	const type = event.type ?? "event";
 	const data = asRecord(event.data) ?? {};
 	const timestamp = formatTimestamp(event.createdAt);
 
 	if (type === "factoryplane.new_task") {
-		return (
-			<EventCard
-				glyph="FP"
-				logo
-				meta={timestamp}
-				subtitle={getString(data, "taskId")}
-				title="New task created"
-				tone="accent"
-			/>
-		);
+		return <NewTaskEvent data={data} task={task} timestamp={timestamp} />;
 	}
 
 	if (type === "factoryplane.new_user_message") {
@@ -285,9 +289,7 @@ export default function Event({ node }: { node: TimelineNode }) {
 				title="Message sent"
 				tone="neutral"
 			>
-				<MessageBubble>
-					{getString(data, "content") ?? "Empty message"}
-				</MessageBubble>
+				<MessageBubble text={getString(data, "content") ?? "Empty message"} />
 			</EventCard>
 		);
 	}
@@ -341,6 +343,34 @@ export default function Event({ node }: { node: TimelineNode }) {
 			tone={type.includes("failed") ? "danger" : "neutral"}
 		>
 			<RawPayload value={event.data} />
+		</EventCard>
+	);
+}
+
+function NewTaskEvent({
+	data,
+	task,
+	timestamp,
+}: {
+	data: JsonRecord;
+	task?: TaskSummary;
+	timestamp?: string;
+}) {
+	const taskId = getString(data, "taskId") ?? task?.id;
+	const name = getString(data, "name") ?? task?.name;
+	const instructions = getString(data, "instructions") ?? task?.instructions;
+
+	return (
+		<EventCard
+			glyph="FP"
+			logo
+			meta={timestamp}
+			subtitle={name ? "New task created" : taskId}
+			title={name ?? "New task created"}
+			tone="accent"
+		>
+			{instructions ? <MessageBubble text={instructions} /> : null}
+			{name ? <DetailGrid items={[["task", taskId]]} /> : null}
 		</EventCard>
 	);
 }
@@ -681,7 +711,7 @@ function AgentMessage({
 			title="Agent message"
 			tone="accent"
 		>
-			<MessageBubble>{text}</MessageBubble>
+			<MessageBubble text={text} />
 		</EventCard>
 	);
 }
@@ -805,11 +835,17 @@ function DetailGrid({
 	);
 }
 
-function MessageBubble({ children }: { children: ReactNode }) {
+function MessageBubble({ text }: { text: string }) {
 	return (
-		<div className="whitespace-pre-wrap text-sm leading-6 text-grayscale-12">
-			{children}
-		</div>
+		<Streamdown
+			className="text-sm leading-6 text-grayscale-12 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
+			dir="auto"
+			linkSafety={MESSAGE_LINK_SAFETY}
+			lineNumbers={false}
+			mode="static"
+		>
+			{text}
+		</Streamdown>
 	);
 }
 
@@ -926,6 +962,7 @@ function parseTimestamp(value: unknown) {
 function formatEventType(type: string) {
 	const label = type
 		.replace(/^codex\./, "")
+		.replace(/^cursor\./, "")
 		.replace(/^factoryplane\./, "")
 		.replace(/[._-]/g, " ");
 

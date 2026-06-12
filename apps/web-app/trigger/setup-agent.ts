@@ -15,6 +15,46 @@ function agentTx(agentId: string) {
 }
 
 const e2bPortPlaceholder = ["$", "{PORT}"].join("");
+const CODEX_AUTH_PATH = "~/.codex/auth.json";
+
+type AgentProvider = "codex" | "cursor";
+
+const getAgentProvider = (agent: {
+	provider?: string | null;
+}): AgentProvider => (agent.provider === "cursor" ? "cursor" : "codex");
+
+const getCursorApiKey = (auth: unknown) => {
+	if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
+		return undefined;
+	}
+
+	const value = (auth as { apiKey?: unknown }).apiKey;
+	return typeof value === "string" && value.trim().length > 0
+		? value.trim()
+		: undefined;
+};
+
+const getCursorPathPrefix = () =>
+	'export PATH="$HOME/.cursor/bin:$HOME/.local/bin:$PATH"';
+
+const getCursorInstallCommand = () =>
+	[
+		getCursorPathPrefix(),
+		"if ! command -v cursor-agent >/dev/null 2>&1; then",
+		"  curl https://cursor.com/install -fsS | bash",
+		"fi",
+		"cursor-agent --version",
+	].join("\n");
+
+const getCursorEnv = (auth: unknown) => {
+	const apiKey = getCursorApiKey(auth);
+
+	if (!apiKey) {
+		throw new Error("Cursor agents require auth.apiKey");
+	}
+
+	return { CURSOR_API_KEY: apiKey };
+};
 
 export const setupAgentTask = task({
 	id: "setup-agent",
@@ -49,6 +89,7 @@ export const setupAgentTask = task({
 				throw new Error(`Agent ${payload.agentId} is missing auth`);
 			}
 
+			const provider = getAgentProvider(agent);
 			const sandbox = await Sandbox.create("codex", {
 				timeoutMs: 10 * 60 * 1000,
 				lifecycle: {
@@ -61,25 +102,39 @@ export const setupAgentTask = task({
 				},
 			});
 
-			await sandbox.files.write(
-				"~/.codex/auth.json",
-				JSON.stringify(agent.auth),
-			);
+			if (provider === "cursor") {
+				const cursorInstall = await sandbox.commands.run(
+					getCursorInstallCommand(),
+					{ timeoutMs: 120_000 },
+				);
+				console.log(cursorInstall);
 
-			const codexUpdate = await sandbox.commands.run(
-				"npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
-				{ timeoutMs: 0 },
-			);
+				const result = await sandbox.commands.run(
+					[
+						getCursorPathPrefix(),
+						'cursor-agent -p --output-format text "Respond with PING and nothing else"',
+					].join("\n"),
+					{ envs: getCursorEnv(agent.auth) },
+				);
+				console.log(result);
+			} else {
+				await sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth));
 
-			console.log(codexUpdate);
+				const codexUpdate = await sandbox.commands.run(
+					"npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
+					{ timeoutMs: 0 },
+				);
+				console.log(codexUpdate);
 
-			const result = await sandbox.commands.run(
-				'codex exec --yolo --model gpt-5.5 --skip-git-repo-check "Respond with PING and nothing else"',
-			);
+				const result = await sandbox.commands.run(
+					'codex exec --yolo --model gpt-5.5 --skip-git-repo-check "Respond with PING and nothing else"',
+				);
+				console.log(result);
+			}
 
-			console.log(result);
-
-			await syncAgentAuthFromSandbox(sandbox, payload.agentId);
+			if (provider === "codex") {
+				await syncAgentAuthFromSandbox(sandbox, payload.agentId);
+			}
 
 			await db.transact(
 				agentTx(payload.agentId).update({
