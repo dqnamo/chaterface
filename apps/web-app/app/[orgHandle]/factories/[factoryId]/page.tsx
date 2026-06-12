@@ -206,7 +206,7 @@ export default function FactoryPage() {
 			<fieldset
 				aria-label="New task composer"
 				className={cn(
-					"flex flex-col max-w-xl w-full bg-white border border-grayscale-4 relative transition-colors",
+					"flex flex-col max-w-xl w-full bg-grayscale-1 border border-grayscale-4 relative transition-colors",
 					isDraggingImages && "border-accent-8 bg-accent-2",
 				)}
 				onDragLeave={handleComposerDragLeave}

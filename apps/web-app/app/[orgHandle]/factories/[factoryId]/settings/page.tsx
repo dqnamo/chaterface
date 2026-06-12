@@ -495,7 +495,7 @@ export default function FactorySettingsPage() {
 					</p>
 				</div>
 
-				<section className="relative border border-grayscale-4 bg-white">
+				<section className="relative border border-grayscale-4 bg-grayscale-1">
 					<CornerBrackets
 						placement="outside"
 						spacing={3}
@@ -557,7 +557,7 @@ export default function FactorySettingsPage() {
 					</div>
 				</section>
 
-				<section className="relative border border-grayscale-4 bg-white">
+				<section className="relative border border-grayscale-4 bg-grayscale-1">
 					<CornerBrackets
 						placement="outside"
 						spacing={3}
@@ -607,7 +607,7 @@ export default function FactorySettingsPage() {
 					</div>
 				</section>
 
-				<section className="relative border border-grayscale-4 bg-white">
+				<section className="relative border border-grayscale-4 bg-grayscale-1">
 					<CornerBrackets
 						placement="outside"
 						spacing={3}
@@ -672,7 +672,7 @@ export default function FactorySettingsPage() {
 					</div>
 				</section>
 
-				<section className="relative border border-grayscale-4 bg-white">
+				<section className="relative border border-grayscale-4 bg-grayscale-1">
 					<CornerBrackets
 						placement="outside"
 						spacing={3}
@@ -733,7 +733,7 @@ export default function FactorySettingsPage() {
 					</form>
 				</section>
 
-				<section className="relative border border-grayscale-4 bg-white">
+				<section className="relative border border-grayscale-4 bg-grayscale-1">
 					<CornerBrackets
 						placement="outside"
 						spacing={3}

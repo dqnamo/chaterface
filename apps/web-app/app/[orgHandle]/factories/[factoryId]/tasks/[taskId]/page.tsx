@@ -661,7 +661,7 @@ export default function TaskPage() {
 						<fieldset
 							aria-label="Task message composer"
 							className={cn(
-								"flex flex-col max-w-3xl mx-auto w-full bg-white border border-grayscale-4 relative transition-colors",
+								"flex flex-col max-w-3xl mx-auto w-full bg-grayscale-1 border border-grayscale-4 relative transition-colors",
 								isDraggingImages && "border-accent-8 bg-accent-2",
 							)}
 							onDragLeave={handleComposerDragLeave}

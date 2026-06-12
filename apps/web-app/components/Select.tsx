@@ -53,7 +53,7 @@ function Trigger({ className, children, ...props }: SelectTriggerProps) {
 	return (
 		<BaseSelect.Trigger
 			className={mergeClassName(
-				"group relative flex flex-row items-center justify-between gap-2 overflow-visible border border-grayscale-4 bg-white px-2 py-1.5 text-xs text-grayscale-11 outline-none transition-colors duration-150 hover:text-grayscale-12 data-[popup-open]:text-grayscale-12 data-[placeholder]:text-grayscale-10",
+				"group relative flex flex-row items-center justify-between gap-2 overflow-visible border border-grayscale-4 bg-grayscale-1 px-2 py-1.5 text-xs text-grayscale-11 outline-none transition-colors duration-150 hover:text-grayscale-12 data-[popup-open]:text-grayscale-12 data-[placeholder]:text-grayscale-10",
 				className,
 			)}
 			{...props}
@@ -85,7 +85,11 @@ function Icon({ className, children, ...props }: SelectIconProps) {
 	);
 }
 
-function Positioner({ className, sideOffset, ...props }: SelectPositionerProps) {
+function Positioner({
+	className,
+	sideOffset,
+	...props
+}: SelectPositionerProps) {
 	return (
 		<BaseSelect.Positioner
 			className={mergeClassName("z-50 outline-none", className)}
@@ -100,7 +104,7 @@ function Popup({ className, children, ...props }: SelectPopupProps) {
 	return (
 		<BaseSelect.Popup
 			className={mergeClassName(
-				"relative flex max-h-[var(--available-height)] min-w-[var(--anchor-width)] flex-col border border-grayscale-4 bg-white py-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"relative flex max-h-[var(--available-height)] min-w-[var(--anchor-width)] flex-col border border-grayscale-4 bg-grayscale-1 py-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
 				className,
 			)}
 			{...props}

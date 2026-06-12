@@ -858,7 +858,7 @@ function DetailGrid({
 function MessageBubble({ text }: { text: string }) {
 	return (
 		<Streamdown
-			className="min-w-0 max-w-full overflow-hidden break-words bg-white px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:max-w-full [&_[data-streamdown=code-block]]:overflow-x-auto [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
+			className="min-w-0 max-w-full overflow-hidden break-words bg-grayscale-1 px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:max-w-full [&_[data-streamdown=code-block]]:overflow-x-auto [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
 			dir="auto"
 			linkSafety={MESSAGE_LINK_SAFETY}
 			lineNumbers={false}
@@ -887,7 +887,7 @@ function ImageAttachmentGrid({ images }: { images: ImageAttachment[] }) {
 
 				return (
 					<a
-						className="group min-w-0 overflow-hidden border border-grayscale-4 bg-white transition-colors hover:border-accent-7"
+						className="group min-w-0 overflow-hidden border border-grayscale-4 bg-grayscale-1 transition-colors hover:border-accent-7"
 						href={image.url}
 						key={image.id}
 						rel="noreferrer"

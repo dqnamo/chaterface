@@ -110,7 +110,7 @@ export default function AuthGate({ children }: AuthGateProps) {
 				</p>
 			</div>
 			<form
-				className="relative flex w-full max-w-md flex-col border border-grayscale-4 bg-white"
+				className="relative flex w-full max-w-md flex-col border border-grayscale-4 bg-grayscale-1"
 				onSubmit={(event) => {
 					event.preventDefault();
 					submitAuth();

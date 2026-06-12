@@ -21,7 +21,7 @@ const mergeClassName = <TState,>(
 export type ButtonVariant = "primary";
 
 const baseClassName =
-	"group relative flex min-w-0 flex-row items-center justify-center gap-4 overflow-visible bg-black p-2 pr-2 pl-3 transition-transform duration-150 hover:scale-96";
+	"group relative flex min-w-0 flex-row items-center justify-center gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 transition-transform duration-150 hover:scale-96";
 
 const variantClassName: Record<ButtonVariant, string> = {
 	primary: "",
@@ -51,7 +51,7 @@ export function Button({
 				placement="outside"
 				spacing={4}
 				translate={6}
-				color="black"
+				color="grayscale-12"
 			/>
 			<span className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
 				{children}

@@ -174,7 +174,7 @@ export function ImageAttachments({
 							</div>
 							<button
 								aria-label={`Remove ${attachment.name}`}
-								className="absolute right-1 top-1 flex size-6 items-center justify-center bg-white/95 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:text-red-10"
+								className="absolute right-1 top-1 flex size-6 items-center justify-center bg-grayscale-1/95 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:text-red-10"
 								disabled={disabled}
 								onClick={() => onRemoveAttachment(attachment.id)}
 								type="button"

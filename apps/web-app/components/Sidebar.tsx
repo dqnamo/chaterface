@@ -8,6 +8,7 @@ import {
 	MinusCircleIcon,
 	ShapesIcon,
 	SidebarSimpleIcon,
+	UserCircleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import db from "@repo/db/client";
@@ -108,9 +109,11 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 		[tasks],
 	);
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
+	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
 	const newTaskHref = `/${currentOrgHandle}/factories/${currentFactoryId}`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
+	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
 	);
@@ -166,6 +169,23 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					<span className="min-w-0 flex-1 truncate">Factory Settings</span>
 				</Link>
 				<Link
+					href={personalSettingsHref}
+					onClick={closeAfterMobileNavigation}
+					className={cn(
+						"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+						isPersonalSettingsSelected ? "bg-grayscale-3" : "",
+					)}
+				>
+					<CornerBrackets
+						placement="inside"
+						color={isPersonalSettingsSelected ? "accent-9" : "grayscale-8"}
+						size={6}
+						active={isPersonalSettingsSelected}
+					/>
+					<UserCircleIcon weight="bold" className="size-4 shrink-0" />
+					<span className="min-w-0 flex-1 truncate">Personal Settings</span>
+				</Link>
+				<Link
 					href={organisationSettingsHref}
 					onClick={closeAfterMobileNavigation}
 					className={cn(
@@ -194,7 +214,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								placement="outside"
 								spacing={4}
 								translate={4}
-								color="black"
+								color="grayscale-12"
 							/>
 							<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1">
 								New Task

@@ -85,7 +85,7 @@ export default function OrganisationDetailsPage() {
 
 			{error ? <p className="text-sm text-red-11">{error.message}</p> : null}
 
-			<section className="relative border border-grayscale-4 bg-white">
+			<section className="relative border border-grayscale-4 bg-grayscale-1">
 				<CornerBrackets
 					placement="outside"
 					spacing={3}

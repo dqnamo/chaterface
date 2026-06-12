@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import AuthGate from "../components/AuthGate";
+import ThemeProvider from "../components/ThemeProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -28,7 +29,10 @@ export const viewport: Viewport = {
 	initialScale: 1,
 	maximumScale: 1,
 	viewportFit: "cover",
-	themeColor: "#ffffff",
+	themeColor: [
+		{ media: "(prefers-color-scheme: light)", color: "#ffffff" },
+		{ media: "(prefers-color-scheme: dark)", color: "#111113" },
+	],
 };
 
 export default function RootLayout({
@@ -37,9 +41,13 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en">
-			<body className={`${inter.variable} ${jetBrainsMono.variable} h-dvh w-full bg-grayscale-1`}>
-				<AuthGate>{children}</AuthGate>
+		<html lang="en" suppressHydrationWarning={true}>
+			<body
+				className={`${inter.variable} ${jetBrainsMono.variable} h-dvh w-full bg-grayscale-1`}
+			>
+				<ThemeProvider>
+					<AuthGate>{children}</AuthGate>
+				</ThemeProvider>
 			</body>
 		</html>
 	);
