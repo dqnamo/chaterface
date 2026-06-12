@@ -187,19 +187,16 @@ export function ImageAttachments({
 			) : null}
 			<div className="flex items-center gap-2">
 				<button
-					aria-label="Attach images"
-					className="flex h-7 shrink-0 items-center justify-center gap-1.5 bg-grayscale-2 px-2 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-50 sm:size-7 sm:px-0"
+					aria-label="Add images"
+					className="flex h-7 shrink-0 items-center justify-center gap-1.5 bg-grayscale-2 px-2 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-50"
 					disabled={disabled}
 					onClick={() => inputRef.current?.click()}
-					title="Attach images"
+					title="Add images"
 					type="button"
 				>
 					<ImageIcon className="size-4 shrink-0" weight="bold" />
-					<span className="text-xs sm:hidden">Add images</span>
+					<span className="text-xs">Add images</span>
 				</button>
-				<span className="hidden text-xs text-grayscale-10 sm:inline">
-					Drop images here
-				</span>
 				<input
 					accept="image/*"
 					className="hidden"
