@@ -35,6 +35,11 @@ const _schema = i.schema({
 			secrets: i.json().optional(),
 			createdAt: i.date().optional(),
 		}),
+		environmentFiles: i.entity({
+			path: i.string().indexed(),
+			content: i.string(),
+			createdAt: i.date().optional(),
+		}),
 		agents: i.entity({
 			name: i.string().indexed(),
 			auth: i.json().optional(),
@@ -206,6 +211,19 @@ const _schema = i.schema({
 			},
 			reverse: {
 				on: "repositories",
+				has: "one",
+				label: "factory",
+				onDelete: "cascade",
+			},
+		},
+		factoryEnvironmentFiles: {
+			forward: {
+				on: "factories",
+				has: "many",
+				label: "environmentFiles",
+			},
+			reverse: {
+				on: "environmentFiles",
 				has: "one",
 				label: "factory",
 				onDelete: "cascade",
