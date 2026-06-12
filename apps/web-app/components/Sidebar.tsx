@@ -5,8 +5,8 @@ import {
 	CaretRightIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
+	HeadCircuitIcon,
 	MinusCircleIcon,
-	RobotIcon,
 	ShapesIcon,
 	SidebarSimpleIcon,
 	XCircleIcon,
@@ -199,7 +199,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						size={6}
 						active={isAgentsSelected}
 					/>
-					<RobotIcon weight="bold" className="size-4 shrink-0" />
+					<HeadCircuitIcon weight="bold" className="size-4 shrink-0" />
 					<span className="min-w-0 flex-1 truncate">Agents</span>
 				</Link>
 				<div className="p-1.5 mt-2">
