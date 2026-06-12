@@ -54,17 +54,17 @@ const previewsDomain =
 	"previews.factoryplane.com";
 
 const toneClasses: Record<Tone, string> = {
-	neutral: "bg-grayscale-3 text-grayscale-11",
-	accent: "bg-accent-3 text-accent-11",
-	success: "bg-green-3 text-green-11",
-	warning: "bg-grayscale-3 text-grayscale-12",
-	danger: "bg-red-3 text-red-11",
+	neutral: "text-grayscale-11",
+	accent: "text-accent-11",
+	success: "text-green-11",
+	warning: "text-grayscale-12",
+	danger: "text-red-11",
 };
 
 const phaseClasses: Record<TimelinePhase, string> = {
-	running: "bg-accent-3 text-accent-11",
-	success: "bg-green-3 text-green-11",
-	failed: "bg-red-3 text-red-11",
+	running: "text-accent-11",
+	success: "text-green-11",
+	failed: "text-red-11",
 };
 
 /**
@@ -800,7 +800,7 @@ function StatusIcon({
 	return (
 		<div
 			className={cx(
-				"flex size-4 shrink-0 items-center justify-center font-mono text-[8px] font-semibold ring-1 ring-inset ring-current/10",
+				"flex size-4 shrink-0 items-center justify-center font-mono text-[8px] font-semibold",
 				phase ? phaseClasses[phase] : toneClasses[tone],
 			)}
 		>
