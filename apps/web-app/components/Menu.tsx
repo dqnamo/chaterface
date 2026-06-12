@@ -48,7 +48,7 @@ function Trigger({ className, ...props }: MenuTriggerProps) {
 	return (
 		<BaseMenu.Trigger
 			className={mergeClassName(
-				"group relative flex flex-row items-center justify-between gap-2 overflow-visible border border-grayscale-4 bg-white px-2 py-1.5 text-xs text-grayscale-11 outline-none transition-colors duration-150 hover:text-grayscale-12 data-[popup-open]:text-grayscale-12",
+				"group relative flex flex-row items-center justify-between gap-2 overflow-visible border border-grayscale-4 bg-grayscale-1 px-2 py-1.5 text-xs text-grayscale-11 outline-none transition-colors duration-150 hover:text-grayscale-12 data-[popup-open]:text-grayscale-12",
 				className,
 			)}
 			{...props}
@@ -90,7 +90,7 @@ function Popup({ className, ...props }: MenuPopupProps) {
 	return (
 		<BaseMenu.Popup
 			className={mergeClassName(
-				"flex min-w-[7rem] flex-col border border-grayscale-4 bg-white py-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"flex min-w-[7rem] flex-col border border-grayscale-4 bg-grayscale-1 py-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
 				className,
 			)}
 			{...props}

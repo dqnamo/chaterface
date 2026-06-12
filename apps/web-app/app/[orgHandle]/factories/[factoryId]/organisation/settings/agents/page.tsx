@@ -182,7 +182,7 @@ export default function AgentsPage() {
 				</p>
 			</div>
 
-			<section className="relative border border-grayscale-4 bg-white">
+			<section className="relative border border-grayscale-4 bg-grayscale-1">
 				<CornerBrackets
 					placement="outside"
 					spacing={3}
@@ -219,7 +219,7 @@ export default function AgentsPage() {
 				</div>
 			</section>
 
-			<section className="relative border border-grayscale-4 bg-white">
+			<section className="relative border border-grayscale-4 bg-grayscale-1">
 				<CornerBrackets
 					placement="outside"
 					spacing={3}

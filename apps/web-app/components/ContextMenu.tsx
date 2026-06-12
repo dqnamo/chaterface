@@ -120,7 +120,7 @@ function Popup({ className, ...props }: ContextMenuPopupProps) {
 	return (
 		<BaseContextMenu.Popup
 			className={mergeClassName(
-				"flex min-w-[8rem] flex-col border border-grayscale-4 bg-white p-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"flex min-w-[8rem] flex-col border border-grayscale-4 bg-grayscale-1 p-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
 				className,
 			)}
 			{...props}

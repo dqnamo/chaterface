@@ -43,7 +43,7 @@ export default function OrganisationSettingsLayout({
 		<div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden bg-grayscale-1">
 			<ExpandSidebarButton className="absolute top-2 left-2 z-20" />
 			<div className="flex min-h-0 flex-1 flex-col md:flex-row">
-				<aside className="w-full shrink-0 border-b border-grayscale-4 bg-white px-2 py-3 md:w-64 md:border-r md:border-b-0">
+				<aside className="w-full shrink-0 border-b border-grayscale-4 bg-grayscale-1 px-2 py-3 md:w-64 md:border-r md:border-b-0">
 					<div className="mb-3 flex items-center gap-2 px-3">
 						<BuildingsIcon weight="bold" className="size-4 text-grayscale-10" />
 						<p className="font-mono text-[11px] font-semibold text-grayscale-10 uppercase">

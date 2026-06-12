@@ -131,7 +131,7 @@ export default function FactoriesPage() {
 					<Link
 						key={factory.id}
 						href={`/${currentOrgHandle}/factories/${factory.id}`}
-						className="relative bg-white flex flex-row items-center gap-3 group border border-grayscale-4 p-3 transition-colors duration-150 hover:border-grayscale-6"
+						className="relative bg-grayscale-1 flex flex-row items-center gap-3 group border border-grayscale-4 p-3 transition-colors duration-150 hover:border-grayscale-6"
 					>
 						<CornerBrackets placement="inside" color="accent-9" />
 
@@ -155,7 +155,7 @@ export default function FactoriesPage() {
 					render={
 						<button
 							type="button"
-							className="flex flex-row items-center gap-2 relative group bg-black p-2 px-3 mt-8 overflow-visible"
+							className="flex flex-row items-center gap-2 relative group bg-grayscale-12 p-2 px-3 mt-8 overflow-visible"
 						/>
 					}
 				>
@@ -163,7 +163,7 @@ export default function FactoriesPage() {
 						placement="outside"
 						spacing={4}
 						translate={6}
-						color="black"
+						color="grayscale-12"
 					/>
 					<ShapesIcon
 						weight="bold"
