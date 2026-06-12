@@ -183,6 +183,8 @@ export default function FactorySettingsPage() {
 	const currentFactoryId = factoryId as string;
 	const { user } = db.useAuth();
 	const [githubAccessToken, setGithubAccessToken] = useState("");
+	const [gitAuthorName, setGitAuthorName] = useState("");
+	const [gitAuthorEmail, setGitAuthorEmail] = useState("");
 	const [githubTokenStatus, setGithubTokenStatus] = useState<string>();
 	const [isSavingGithubToken, setIsSavingGithubToken] = useState(false);
 	const [newTaskSetupScript, setNewTaskSetupScript] = useState("");
@@ -227,6 +229,11 @@ export default function FactorySettingsPage() {
 			parseEnvironmentPackages(factory?.environmentPackages).join("\n"),
 		);
 	}, [factory?.environmentPackages]);
+
+	useEffect(() => {
+		setGitAuthorName(factory?.gitAuthorName ?? "");
+		setGitAuthorEmail(factory?.gitAuthorEmail ?? "");
+	}, [factory?.gitAuthorName, factory?.gitAuthorEmail]);
 
 	const createRepository = async (form: HTMLFormElement) => {
 		const formData = new FormData(form);
@@ -376,16 +383,11 @@ export default function FactorySettingsPage() {
 		}
 	};
 
-	const saveGithubToken = async () => {
+	const saveGithubSettings = async () => {
 		setGithubTokenStatus(undefined);
 
-		if (!githubAccessToken.trim()) {
-			setGithubTokenStatus("Enter a token first.");
-			return;
-		}
-
 		if (!user?.refresh_token) {
-			setGithubTokenStatus("You must be signed in to save a token.");
+			setGithubTokenStatus("You must be signed in to save GitHub settings.");
 			return;
 		}
 
@@ -401,18 +403,22 @@ export default function FactorySettingsPage() {
 				body: JSON.stringify({
 					factoryId: currentFactoryId,
 					githubAccessToken: githubAccessToken.trim(),
+					gitAuthorName: gitAuthorName.trim(),
+					gitAuthorEmail: gitAuthorEmail.trim(),
 				}),
 			});
 
 			if (!response.ok) {
-				throw new Error("Failed to save GitHub token.");
+				throw new Error("Failed to save GitHub settings.");
 			}
 
 			setGithubAccessToken("");
-			setGithubTokenStatus("GitHub token saved.");
+			setGithubTokenStatus("GitHub settings saved.");
 		} catch (error) {
 			setGithubTokenStatus(
-				error instanceof Error ? error.message : "Failed to save GitHub token.",
+				error instanceof Error
+					? error.message
+					: "Failed to save GitHub settings.",
 			);
 		} finally {
 			setIsSavingGithubToken(false);
@@ -513,23 +519,36 @@ export default function FactorySettingsPage() {
 							</p>
 							<p className="text-xs text-grayscale-10">
 								Private repositories need a token with access to the repo.
+								Commit identity is written to each new sandbox.
 							</p>
 						</div>
-						<div className="grid gap-3 md:grid-cols-[1fr_auto]">
+						<div className="grid gap-3 md:grid-cols-2">
 							<Input
 								type="password"
 								placeholder="GitHub access token"
 								value={githubAccessToken}
 								onChange={(event) => setGithubAccessToken(event.target.value)}
 							/>
+							<Input
+								type="text"
+								placeholder="Git author name"
+								value={gitAuthorName}
+								onChange={(event) => setGitAuthorName(event.target.value)}
+							/>
+							<Input
+								type="email"
+								placeholder="Git author email"
+								value={gitAuthorEmail}
+								onChange={(event) => setGitAuthorEmail(event.target.value)}
+							/>
 							<Button
 								type="button"
 								disabled={isSavingGithubToken}
 								onClick={() => {
-									void saveGithubToken();
+									void saveGithubSettings();
 								}}
 							>
-								{isSavingGithubToken ? "Saving..." : "Save Token"}
+								{isSavingGithubToken ? "Saving..." : "Save Settings"}
 							</Button>
 						</div>
 						{githubTokenStatus ? (

@@ -361,6 +361,7 @@ const setupTaskSandbox = async (
 	}
 
 	await installTaskEnvironmentPackages(sandbox, task.id, factory);
+	await setupSandboxGitIdentity(sandbox, task.id, factory);
 
 	const repositoryGithubEnvs = await setupRepositoryGithubAuth(
 		sandbox,
@@ -396,6 +397,41 @@ const setupTaskSandbox = async (
 	);
 
 	return { sandbox, diffWorkspacePath };
+};
+
+const setupSandboxGitIdentity = async (
+	sandbox: Sandbox,
+	taskId: string,
+	factory: Factory,
+) => {
+	const commands: string[] = [];
+	const gitAuthorName = factory.gitAuthorName?.trim();
+	const gitAuthorEmail = factory.gitAuthorEmail?.trim();
+
+	if (gitAuthorName) {
+		commands.push(`git config --global user.name ${shellQuote(gitAuthorName)}`);
+	}
+
+	if (gitAuthorEmail) {
+		commands.push(
+			`git config --global user.email ${shellQuote(gitAuthorEmail)}`,
+		);
+	}
+
+	if (commands.length === 0) {
+		return;
+	}
+
+	await runSetupStep(
+		taskId,
+		"git_identity",
+		"Configure Git identity",
+		() =>
+			sandbox.commands.run(["set -e", ...commands].join("\n"), {
+				timeoutMs: 30_000,
+			}),
+		{ timeoutMs: 35_000 },
+	);
 };
 
 const installTaskEnvironmentPackages = async (
