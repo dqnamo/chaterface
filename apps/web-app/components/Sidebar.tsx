@@ -17,6 +17,7 @@ import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import { ContextMenu } from "./ContextMenu";
@@ -50,6 +51,7 @@ const taskTx = (taskId: string) => {
 };
 
 export default function Sidebar({ onToggleCollapse }: SidebarProps) {
+	const router = useRouter();
 	const { orgHandle, factoryId, taskId } = useParams();
 	const pathname = usePathname();
 	const { isMobile, collapse } = useSidebar();
@@ -108,11 +110,26 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	);
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
 	const agentsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/agents`;
+	const newTaskHref = `/${currentOrgHandle}/factories/${currentFactoryId}`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isAgentsSelected = pathname.startsWith(agentsHref);
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
+	);
+	const navigateToNewTask = useCallback(() => {
+		router.push(newTaskHref);
+		closeAfterMobileNavigation();
+	}, [closeAfterMobileNavigation, newTaskHref, router]);
+
+	useHotkeys(
+		"n",
+		navigateToNewTask,
+		{
+			description: "New task",
+			preventDefault: true,
+		},
+		[navigateToNewTask],
 	);
 
 	return (
@@ -187,8 +204,9 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 				</Link>
 				<div className="p-1.5 mt-2">
 					<Link
-						href={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+						href={newTaskHref}
 						onClick={closeAfterMobileNavigation}
+						aria-keyshortcuts="N"
 						className="group relative flex w-full min-w-0 overflow-visible"
 					>
 						<span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 ">
