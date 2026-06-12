@@ -32,6 +32,7 @@ const _schema = i.schema({
 			url: i.string().indexed(),
 			path: i.string().optional(),
 			branch: i.string().optional(),
+			secrets: i.json().optional(),
 			createdAt: i.date().optional(),
 		}),
 		agents: i.entity({

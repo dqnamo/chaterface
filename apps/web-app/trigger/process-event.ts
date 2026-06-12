@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { InstaQLEntity } from "@instantdb/react";
 import db from "@repo/db/admin";
 import { createEncryptionService } from "@repo/encryption";
@@ -25,6 +25,12 @@ type Factory = InstaQLEntity<AppSchema, "factories">;
 type Repository = InstaQLEntity<AppSchema, "repositories">;
 type FactoryWithRepositories = Factory & {
 	repositories?: Repository[];
+};
+type RepositorySecret = {
+	id: string;
+	name: string;
+	valueEncrypted: string;
+	createdAt?: string;
 };
 type TaskEnvironmentPackage = {
 	command: string;
@@ -54,6 +60,8 @@ const e2bPortPlaceholder = ["$", "{PORT}"].join("");
 const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
 const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
 const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
+const REPOSITORY_SECRETS_FINGERPRINT_PATH =
+	".factoryplane/repository-secrets-fingerprint";
 const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
 const FACTORY_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_TASK_ENVIRONMENT_PACKAGES: TaskEnvironmentPackage[] = [
@@ -190,13 +198,17 @@ export const processEventTask = task({
 
 		try {
 			if (event?.type === "factoryplane.new_task") {
-				await processNewTask(agent as Agent, task as Task, factory as Factory);
+				await processNewTask(
+					agent as Agent,
+					task as Task,
+					factory as FactoryWithRepositories,
+				);
 			} else if (event?.type === "factoryplane.new_user_message") {
 				await processNewUserMessage(
 					event as Event,
 					task as Task,
 					agent as Agent,
-					factory as Factory,
+					factory as FactoryWithRepositories,
 				);
 			}
 		} catch (error) {
@@ -206,7 +218,11 @@ export const processEventTask = task({
 	},
 });
 
-const processNewTask = async (agent: Agent, task: Task, factory: Factory) => {
+const processNewTask = async (
+	agent: Agent,
+	task: Task,
+	factory: FactoryWithRepositories,
+) => {
 	const { sandbox, diffWorkspacePath } = await setupTaskSandbox(
 		agent,
 		task,
@@ -228,7 +244,7 @@ const processNewUserMessage = async (
 	event: Event,
 	task: Task,
 	agent: Agent,
-	factory: Factory,
+	factory: FactoryWithRepositories,
 ) => {
 	const content = getStringDataValue(event.data, "content");
 
@@ -243,6 +259,7 @@ const processNewUserMessage = async (
 
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	await killTaskAgentProcess(sandbox, task);
+	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, factory);
 	await runAgentExec(sandbox, task, agent, factory, content, {
 		resumeLast: true,
 	});
@@ -492,6 +509,19 @@ const cloneFactoryRepositories = async (
 			),
 		{ timeoutMs: 11 * 60 * 1000 },
 	);
+
+	await runOptionalSetupStep(
+		taskId,
+		"repository_env_files",
+		"Write repository .env files",
+		() =>
+			writeRepositoryEnvFilesAndFingerprint(
+				sandbox,
+				repositories,
+				workspacePath,
+			),
+		{ timeoutMs: 60_000 },
+	);
 };
 
 const setupRepositoryGithubAuth = async (
@@ -601,9 +631,7 @@ const buildCloneRepositoryCommand = (
 	repository: Repository,
 	hasGithubAccessToken: boolean,
 ) => {
-	const path =
-		normalizeRepositoryPath(repository.path) ??
-		getRepositoryDefaultPath(repository.url);
+	const path = getRepositoryPath(repository);
 	const githubCloneUrl = getGithubHttpsCloneUrl(repository.url);
 	const cloneUrl = githubCloneUrl ?? repository.url.trim();
 	const args = ["git"];
@@ -623,6 +651,173 @@ const buildCloneRepositoryCommand = (
 
 	args.push(shellQuote(cloneUrl), shellQuote(path));
 	return args.join(" ");
+};
+
+const writeRepositoryEnvFiles = async (
+	sandbox: Sandbox,
+	repositories: Repository[],
+	workspacePath: string,
+) => {
+	const envFileOperations = await Promise.all(
+		repositories.map(async (repository) => {
+			const contents = await buildRepositoryEnvFileContents(repository);
+
+			return {
+				path: `${workspacePath}/${getRepositoryPath(repository)}/.env`,
+				contents,
+			};
+		}),
+	);
+
+	await Promise.all(
+		envFileOperations.map((envFile) =>
+			envFile.contents === undefined
+				? sandbox.commands.run(`rm -f ${shellQuote(envFile.path)}`, {
+						timeoutMs: 30_000,
+					})
+				: sandbox.files.write(envFile.path, envFile.contents),
+		),
+	);
+};
+
+const writeRepositoryEnvFilesAndFingerprint = async (
+	sandbox: Sandbox,
+	repositories: Repository[],
+	workspacePath: string,
+) => {
+	await writeRepositoryEnvFiles(sandbox, repositories, workspacePath);
+	await writeRepositorySecretsFingerprint(
+		sandbox,
+		workspacePath,
+		getRepositorySecretsFingerprint(repositories),
+	);
+};
+
+const syncRepositoryEnvFilesIfChanged = async (
+	sandbox: Sandbox,
+	taskId: string,
+	factory: FactoryWithRepositories,
+) => {
+	const repositories = factory.repositories ?? [];
+
+	if (repositories.length === 0) {
+		return;
+	}
+
+	const workspacePath = await getSandboxWorkspacePath(sandbox);
+
+	await runOptionalSetupStep(
+		taskId,
+		"repository_env_files",
+		"Refresh repository .env files",
+		async () => {
+			const nextFingerprint = getRepositorySecretsFingerprint(repositories);
+			const currentFingerprint = await readRepositorySecretsFingerprint(
+				sandbox,
+				workspacePath,
+			);
+
+			if (currentFingerprint === nextFingerprint) {
+				return;
+			}
+
+			await writeRepositoryEnvFilesAndFingerprint(
+				sandbox,
+				repositories,
+				workspacePath,
+			);
+		},
+		{ timeoutMs: 60_000 },
+	);
+};
+
+const readRepositorySecretsFingerprint = async (
+	sandbox: Sandbox,
+	workspacePath: string,
+) => {
+	try {
+		return (
+			await sandbox.files.read(
+				`${workspacePath}/${REPOSITORY_SECRETS_FINGERPRINT_PATH}`,
+			)
+		).trim();
+	} catch {
+		return undefined;
+	}
+};
+
+const writeRepositorySecretsFingerprint = async (
+	sandbox: Sandbox,
+	workspacePath: string,
+	fingerprint: string,
+) => {
+	await sandbox.commands.run(
+		`mkdir -p ${shellQuote(`${workspacePath}/.factoryplane`)}`,
+		{ timeoutMs: 30_000 },
+	);
+	await sandbox.files.write(
+		`${workspacePath}/${REPOSITORY_SECRETS_FINGERPRINT_PATH}`,
+		`${fingerprint}\n`,
+	);
+};
+
+const getRepositorySecretsFingerprint = (repositories: Repository[]) => {
+	const payload = repositories
+		.map((repository) => ({
+			id: repository.id,
+			path: getRepositoryPath(repository),
+			secrets: getRepositorySecrets(repository.secrets)
+				.map((secret) => ({
+					id: secret.id,
+					name: secret.name,
+					valueEncrypted: secret.valueEncrypted,
+				}))
+				.sort((a, b) => a.name.localeCompare(b.name)),
+		}))
+		.sort((a, b) => a.id.localeCompare(b.id));
+
+	return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+};
+
+const buildRepositoryEnvFileContents = async (repository: Repository) => {
+	const secrets = getRepositorySecrets(repository.secrets);
+
+	if (secrets.length === 0) {
+		return undefined;
+	}
+
+	const encryptionService = createEncryptionService(
+		process.env.SECRET_ENCRYPTION_KEY ?? "",
+	);
+	const lines = await Promise.all(
+		secrets.map(async (secret) => {
+			const value = await encryptionService.decrypt(secret.valueEncrypted);
+			return `${secret.name}=${JSON.stringify(value)}`;
+		}),
+	);
+
+	return `${lines.join("\n")}\n`;
+};
+
+const getRepositorySecrets = (value: unknown): RepositorySecret[] => {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	return value.filter(isRepositorySecret);
+};
+
+const isRepositorySecret = (value: unknown): value is RepositorySecret => {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return (
+		typeof value.id === "string" &&
+		typeof value.name === "string" &&
+		typeof value.valueEncrypted === "string" &&
+		/^[A-Za-z_][A-Za-z0-9_]*$/.test(value.name)
+	);
 };
 
 const getGithubHttpsCloneUrl = (url: string) => {
@@ -650,6 +845,13 @@ const getRepositoryDefaultPath = (url: string) => {
 	const lastSegment = url.split("/").pop()?.trim() || "repository";
 	return (
 		normalizeRepositoryPath(lastSegment.replace(/\.git$/i, "")) ?? "repository"
+	);
+};
+
+const getRepositoryPath = (repository: Repository) => {
+	return (
+		normalizeRepositoryPath(repository.path) ??
+		getRepositoryDefaultPath(repository.url)
 	);
 };
 
