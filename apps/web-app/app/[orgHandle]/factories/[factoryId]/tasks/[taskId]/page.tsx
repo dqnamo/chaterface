@@ -634,13 +634,10 @@ export default function TaskPage() {
 									animate={{ width: 24, marginLeft: 6, opacity: 1 }}
 									exit={{ width: 0, marginLeft: 0, opacity: 0 }}
 									transition={{ type: "spring", stiffness: 500, damping: 40 }}
-									className="flex h-6 shrink-0 cursor-pointer items-center justify-center overflow-hidden group bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
+									className="group flex h-6 shrink-0 cursor-pointer items-center justify-center overflow-hidden text-grayscale-11 transition-colors duration-150 hover:text-grayscale-12"
 								>
 									<span className="flex size-6 shrink-0 items-center justify-center">
-										<SidebarSimpleIcon
-											weight="bold"
-											className="-scale-x-100 text-grayscale-11 group-hover:text-grayscale-12"
-										/>
+										<SidebarSimpleIcon weight="bold" className="-scale-x-100" />
 									</span>
 								</motion.button>
 							)}
@@ -798,12 +795,9 @@ export default function TaskPage() {
 							type="button"
 							aria-label="Collapse preview panel"
 							onClick={collapseRight}
-							className="ml-auto flex size-6 shrink-0 cursor-pointer items-center justify-center group bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
+							className="group ml-auto flex size-6 shrink-0 cursor-pointer items-center justify-center text-grayscale-11 transition-colors duration-150 hover:text-grayscale-12"
 						>
-							<SidebarSimpleIcon
-								weight="bold"
-								className="-scale-x-100 text-grayscale-11 group-hover:text-grayscale-12"
-							/>
+							<SidebarSimpleIcon weight="bold" className="-scale-x-100" />
 						</button>
 					</div>
 					<Tabs.Panel value="services" className="flex min-h-0 flex-1 flex-col">

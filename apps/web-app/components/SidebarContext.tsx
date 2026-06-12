@@ -125,7 +125,7 @@ export function ExpandSidebarButton({ className }: { className?: string }) {
 					exit={{ width: 0, marginRight: 0, opacity: 0 }}
 					transition={{ type: "spring", stiffness: 500, damping: 40 }}
 					className={cn(
-						"flex h-6 shrink-0 cursor-pointer items-center justify-center overflow-hidden bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3",
+						"flex h-6 shrink-0 cursor-pointer items-center justify-center overflow-hidden text-grayscale-11 transition-colors duration-150 hover:text-grayscale-12",
 						className,
 					)}
 				>
