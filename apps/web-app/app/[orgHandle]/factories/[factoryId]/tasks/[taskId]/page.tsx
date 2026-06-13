@@ -828,58 +828,60 @@ export default function TaskPage() {
 						<ScrollArea.Thumb />
 					</ScrollArea.Scrollbar>
 				</ScrollArea.Root>
-				<div className="flex shrink-0 flex-col px-2 bg-grayscale-2 dark:bg-grayscale-1 border-t border-grayscale-4">
-					<div className="flex flex-col gap-2">
-						<fieldset
-							aria-label="Task message composer"
-							className={cn(
-								"flex flex-col max-w-3xl mx-auto w-full bg-grayscale-1 border-x border-grayscale-4 relative transition-colors",
-								isDraggingAttachments && "border-accent-8 bg-accent-2",
-							)}
-							onDragLeave={handleComposerDragLeave}
-							onDragOver={handleComposerDragOver}
-							onDrop={handleComposerDrop}
-							onPaste={handleComposerPaste}
-						>
-							<div className="flex flex-col p-3 gap-3">
-								<Textarea
-									className="text-sm"
-									placeholder="Task Instructions"
-									disabled={isSendingMessage}
-									value={message}
-									onChange={(e) => setMessage(e.target.value)}
-									onSubmit={sendMessage}
-								/>
-								<ImageAttachments
-									attachments={fileAttachments}
-									disabled={isSendingMessage}
-									onAddFiles={addAttachmentFiles}
-									onRemoveAttachment={removeFileAttachment}
-								/>
-							</div>
-							<div className="flex flex-row items-center justify-between p-3">
-								<div className="flex flex-row items-center justify-center gap-2">
-									<ModelConfigMenu
-										model={agentModel}
-										reasoningEffort={agentReasoningEffort}
-										speed={agentSpeed}
-										onModelChange={setAgentModel}
-										onReasoningEffortChange={setAgentReasoningEffort}
-										onSpeedChange={setAgentSpeed}
+				<div className="flex shrink-0 flex-col px-2">
+					<div className="bg-grayscale-2 dark:bg-grayscale-2 px-1.5 pt-1.5 border border-grayscale-3 rounded-t-xl max-w-3xl mx-auto w-full">
+						<div className="flex flex-col gap-2 bg-grayscale-1 dark:bg-grayscale-3 rounded-t-lg overflow-hidden border border-grayscale-3 dark:border-grayscale-5">
+							<fieldset
+								aria-label="Task message composer"
+								className={cn(
+									"flex flex-col max-w-3xl mx-auto w-full relative transition-colors",
+									isDraggingAttachments && "border-accent-8 bg-accent-2",
+								)}
+								onDragLeave={handleComposerDragLeave}
+								onDragOver={handleComposerDragOver}
+								onDrop={handleComposerDrop}
+								onPaste={handleComposerPaste}
+							>
+								<div className="flex flex-col p-2 gap-2">
+									<Textarea
+										className="text-sm bg-grayscale-1 border-grayscale-3 p-2 dark:bg-grayscale-4 focus:bg-grayscale-2 dark:hover:bg-grayscale-5 dark:focus:bg-grayscale-5"
+										placeholder="Task Instructions"
+										disabled={isSendingMessage}
+										value={message}
+										onChange={(e) => setMessage(e.target.value)}
+										onSubmit={sendMessage}
+									/>
+									<ImageAttachments
+										attachments={fileAttachments}
+										disabled={isSendingMessage}
+										onAddFiles={addAttachmentFiles}
+										onRemoveAttachment={removeFileAttachment}
 									/>
 								</div>
-								<div className="flex flex-row items-center justify-center gap-2 ml-auto">
-									<Button
-										type="button"
-										disabled={isSendingMessage}
-										onClick={sendMessage}
-										className="shrink-0"
-									>
-										{isSendingMessage ? "Sending..." : "Send Message"}
-									</Button>
+								<div className="flex flex-row items-center justify-between p-3">
+									<div className="flex flex-row items-center justify-center gap-2">
+										<ModelConfigMenu
+											model={agentModel}
+											reasoningEffort={agentReasoningEffort}
+											speed={agentSpeed}
+											onModelChange={setAgentModel}
+											onReasoningEffortChange={setAgentReasoningEffort}
+											onSpeedChange={setAgentSpeed}
+										/>
+									</div>
+									<div className="flex flex-row items-center justify-center gap-2 ml-auto">
+										<Button
+											type="button"
+											disabled={isSendingMessage}
+											onClick={sendMessage}
+											className="shrink-0"
+										>
+											{isSendingMessage ? "Sending..." : "Send Message"}
+										</Button>
+									</div>
 								</div>
-							</div>
-						</fieldset>
+							</fieldset>
+						</div>
 					</div>
 				</div>
 			</div>
