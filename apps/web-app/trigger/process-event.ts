@@ -84,6 +84,9 @@ const REPOSITORY_SECRETS_FINGERPRINT_PATH =
 	".factoryplane/repository-secrets-fingerprint";
 const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
 const FACTORY_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
+const GITHUB_AUTH_VALIDATION_TIMEOUT_MS = 120_000;
+const GITHUB_AUTH_SETUP_STEP_TIMEOUT_MS =
+	GITHUB_AUTH_VALIDATION_TIMEOUT_MS + 10_000;
 const DEFAULT_TASK_ENVIRONMENT_PACKAGES: TaskEnvironmentPackage[] = [
 	{
 		command: "rg",
@@ -917,7 +920,7 @@ const setupRepositoryGithubAuth = async (
 			await validateGithubToken(sandbox, envs);
 			return envs;
 		},
-		{ timeoutMs: 35_000 },
+		{ timeoutMs: GITHUB_AUTH_SETUP_STEP_TIMEOUT_MS },
 	);
 
 	return envs;
@@ -956,6 +959,7 @@ const getFactoryGithubAuthEnvs = async (
 	return {
 		GITHUB_ACCESS_TOKEN: githubAccessToken,
 		GH_TOKEN: githubAccessToken,
+		GH_PROMPT_DISABLED: "1",
 		GIT_TERMINAL_PROMPT: "0",
 	};
 };
@@ -979,7 +983,7 @@ const validateGithubToken = async (
 				'printf "Authenticated GitHub CLI as %s\\n" "$login"',
 			].join("\n"),
 			{
-				timeoutMs: 30_000,
+				timeoutMs: GITHUB_AUTH_VALIDATION_TIMEOUT_MS,
 				envs,
 				onStdout: (data) => {
 					console.log(data);
