@@ -22,6 +22,7 @@ export const getTaskForAgentToken = async (agentToken: string) => {
 				factory: {
 					repositories: {},
 					environmentFiles: {},
+					mcpServers: {},
 				},
 			},
 		})

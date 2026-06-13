@@ -6,6 +6,7 @@ import {
 	GitBranchIcon,
 	KeyIcon,
 	PackageIcon,
+	PlugsConnectedIcon,
 	PuzzlePieceIcon,
 	TerminalIcon,
 	TerminalWindowIcon,
@@ -41,6 +42,11 @@ const SETTINGS_ITEMS = [
 		label: "Repositories",
 		slug: "repositories",
 		Icon: GitBranchIcon,
+	},
+	{
+		label: "MCP Servers",
+		slug: "mcp-servers",
+		Icon: PlugsConnectedIcon,
 	},
 	{
 		label: "Skills",

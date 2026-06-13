@@ -3,6 +3,7 @@ import db from "@repo/db/client";
 import type { AppSchema } from "@repo/db/schema";
 
 export type Repository = InstaQLEntity<AppSchema, "repositories">;
+export type McpServer = InstaQLEntity<AppSchema, "mcpServers">;
 export type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
 export type SkillRepository = InstaQLEntity<AppSchema, "skillRepositories">;
 export type Skill = InstaQLEntity<AppSchema, "skills">;
@@ -25,6 +26,16 @@ export const repositoryTx = (repositoryId: string) => {
 
 	if (!tx) {
 		throw new Error(`Repository transaction builder ${repositoryId} not found`);
+	}
+
+	return tx;
+};
+
+export const mcpServerTx = (mcpServerId: string) => {
+	const tx = db.tx.mcpServers[mcpServerId];
+
+	if (!tx) {
+		throw new Error(`MCP server transaction builder ${mcpServerId} not found`);
 	}
 
 	return tx;

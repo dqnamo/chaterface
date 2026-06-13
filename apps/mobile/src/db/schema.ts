@@ -36,6 +36,16 @@ const _schema = i.schema({
 			secrets: i.json().optional(),
 			createdAt: i.date().optional(),
 		}),
+		mcpServers: i.entity({
+			name: i.string().indexed(),
+			url: i.string().indexed(),
+			transport: i.string().optional(),
+			auth: i.json().optional(),
+			enabled: i.boolean().optional(),
+			toolPolicy: i.json().optional(),
+			createdAt: i.date().optional(),
+			updatedAt: i.date().optional(),
+		}),
 		environmentFiles: i.entity({
 			path: i.string().indexed(),
 			content: i.string(),
@@ -261,6 +271,19 @@ const _schema = i.schema({
 			},
 			reverse: {
 				on: "repositories",
+				has: "one",
+				label: "factory",
+				onDelete: "cascade",
+			},
+		},
+		factoryMcpServers: {
+			forward: {
+				on: "factories",
+				has: "many",
+				label: "mcpServers",
+			},
+			reverse: {
+				on: "mcpServers",
 				has: "one",
 				label: "factory",
 				onDelete: "cascade",
