@@ -70,6 +70,7 @@ type RunCodexExecOptions = {
 
 type SetupStepOptions = {
 	timeoutMs?: number;
+	failureStatus?: "failed" | "warning";
 };
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
@@ -908,7 +909,7 @@ const setupRepositoryGithubAuth = async (
 		return envs;
 	}
 
-	const validatedEnvs = await runOptionalSetupStep(
+	await runOptionalSetupStep(
 		taskId,
 		"repository_auth",
 		"Validate repository GitHub token",
@@ -919,7 +920,7 @@ const setupRepositoryGithubAuth = async (
 		{ timeoutMs: 35_000 },
 	);
 
-	return validatedEnvs ?? { GIT_TERMINAL_PROMPT: "0" };
+	return envs;
 };
 
 const buildGithubAuthNoticeCommand = () =>
@@ -2006,18 +2007,26 @@ const runSetupStep = async <T>(
 		);
 		return result;
 	} catch (error) {
+		const failureStatus = options.failureStatus ?? "failed";
 		console.error("Setup step failed", {
 			taskId,
 			step,
 			title,
+			status: failureStatus,
 			error,
 		});
-		await persistFactoryplaneEvent(taskId, "factoryplane.setup_step_failed", {
-			step,
-			title,
-			status: "failed",
-			error: getErrorMessage(error),
-		});
+		await persistFactoryplaneEvent(
+			taskId,
+			failureStatus === "warning"
+				? "factoryplane.setup_step_warning"
+				: "factoryplane.setup_step_failed",
+			{
+				step,
+				title,
+				status: failureStatus,
+				error: getErrorMessage(error),
+			},
+		);
 		throw error;
 	}
 };
@@ -2055,7 +2064,10 @@ const runOptionalSetupStep = async <T>(
 	options: SetupStepOptions = {},
 ) => {
 	try {
-		return await runSetupStep(taskId, step, title, action, options);
+		return await runSetupStep(taskId, step, title, action, {
+			...options,
+			failureStatus: options.failureStatus ?? "warning",
+		});
 	} catch (error) {
 		console.warn("Optional setup step failed", {
 			taskId,

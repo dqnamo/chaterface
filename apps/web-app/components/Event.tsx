@@ -3,6 +3,7 @@ import {
 	CheckCircleIcon,
 	CircleNotchIcon,
 	FileIcon,
+	WarningCircleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
@@ -29,7 +30,7 @@ type Attachment = {
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 /** A resolved lifecycle state for a grouped (started -> finished) timeline row. */
-export type TimelinePhase = "running" | "success" | "failed";
+export type TimelinePhase = "running" | "success" | "warning" | "failed";
 
 /**
  * A single row in the timeline. Lifecycle events that share a key (e.g. a
@@ -65,6 +66,7 @@ const toneClasses: Record<Tone, string> = {
 const phaseClasses: Record<TimelinePhase, string> = {
 	running: "text-accent-11",
 	success: "text-green-11",
+	warning: "text-yellow-9",
 	failed: "text-red-11",
 };
 
@@ -160,9 +162,11 @@ function groupInfoFor(
 		const step = getString(data, "step") ?? "step";
 		const phase: TimelinePhase = type.endsWith("_failed")
 			? "failed"
-			: type.endsWith("_completed")
-				? "success"
-				: "running";
+			: type.endsWith("_warning")
+				? "warning"
+				: type.endsWith("_completed")
+					? "success"
+					: "running";
 
 		return { key: `${context.runKey}:setup:${step}`, phase };
 	}
@@ -252,7 +256,11 @@ function getEventSortRank(event: EventEntity) {
 		return 7;
 	}
 
-	if (type.endsWith("_completed") || type.endsWith("_failed")) {
+	if (
+		type.endsWith("_completed") ||
+		type.endsWith("_failed") ||
+		type.endsWith("_warning")
+	) {
 		return 8;
 	}
 
@@ -265,6 +273,10 @@ function mergePhase(
 ): TimelinePhase {
 	if (prev === "failed" || next === "failed") {
 		return "failed";
+	}
+
+	if (prev === "warning" || next === "warning") {
+		return "warning";
 	}
 
 	if (prev === "success" || next === "success") {
@@ -861,6 +873,8 @@ function StatusIcon({
 						<CircleNotchIcon className="size-3 animate-spin" weight="bold" />
 					) : phase === "success" ? (
 						<CheckCircleIcon className="size-3" weight="fill" />
+					) : phase === "warning" ? (
+						<WarningCircleIcon className="size-3" weight="fill" />
 					) : phase === "failed" ? (
 						<XCircleIcon className="size-3" weight="fill" />
 					) : logo ? (
