@@ -7,9 +7,15 @@ import {
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
-import { type LinkSafetyConfig, Streamdown } from "streamdown";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import {
+	type Components,
+	type ExtraProps,
+	type LinkSafetyConfig,
+	Streamdown,
+} from "streamdown";
 import type { AppSchema } from "@/instant.schema";
+import CodeBlock from "./CodeBlock";
 import Logo from "./Logo";
 
 type EventEntity = InstaQLEntity<AppSchema, "events">;
@@ -51,6 +57,10 @@ type TimelineContext = {
 
 const OUTPUT_PREVIEW_LIMIT = 6000;
 const MESSAGE_LINK_SAFETY = { enabled: false } satisfies LinkSafetyConfig;
+const MESSAGE_COMPONENTS = {
+	code: MarkdownCodeBlock,
+	inlineCode: InlineCode,
+} as Components;
 const previewsDomain =
 	process.env.NEXT_PUBLIC_FACTORYPLANE_PREVIEWS_DOMAIN ??
 	"previews.factoryplane.com";
@@ -69,6 +79,8 @@ const phaseClasses: Record<TimelinePhase, string> = {
 	warning: "text-yellow-9",
 	failed: "text-red-11",
 };
+
+type StreamdownCodeProps = ComponentPropsWithoutRef<"code"> & ExtraProps;
 
 /**
  * Folds a flat list of events into timeline nodes, merging lifecycle pairs
@@ -706,7 +718,7 @@ function CommandExecutionEvent({
 			title={title}
 			tone="accent"
 		>
-			{command ? <CodeBlock>{command}</CodeBlock> : null}
+			{command ? <PlainCodeBlock>{command}</PlainCodeBlock> : null}
 			{output ? <OutputPreview output={output} /> : null}
 		</EventCard>
 	);
@@ -916,7 +928,8 @@ function DetailGrid({
 function MessageBubble({ text }: { text: string }) {
 	return (
 		<Streamdown
-			className="min-w-0 max-w-full overflow-hidden break-words bg-grayscale-1 px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline [&_[data-streamdown=code-block]]:my-2 [&_[data-streamdown=code-block]]:max-w-full [&_[data-streamdown=code-block]]:overflow-x-auto [&_[data-streamdown=code-block]]:rounded-none [&_[data-streamdown=code-block]]:border-grayscale-4 [&_[data-streamdown=code-block]]:bg-grayscale-2 [&_[data-streamdown=code-block-body]]:rounded-none [&_[data-streamdown=inline-code]]:rounded-none [&_[data-streamdown=inline-code]]:bg-grayscale-3"
+			className="min-w-0 max-w-full overflow-hidden break-words bg-grayscale-1 px-3 py-2 text-sm leading-6 text-grayscale-12 ring-1 ring-grayscale-4 [&_a]:text-accent-11 [&_a]:underline-offset-2 [&_a:hover]:underline"
+			components={MESSAGE_COMPONENTS}
 			dir="auto"
 			linkSafety={MESSAGE_LINK_SAFETY}
 			lineNumbers={false}
@@ -925,6 +938,38 @@ function MessageBubble({ text }: { text: string }) {
 			{text}
 		</Streamdown>
 	);
+}
+
+function MarkdownCodeBlock({ children, className }: StreamdownCodeProps) {
+	const content = children as ReactNode;
+	const codeClassName = typeof className === "string" ? className : undefined;
+	const language = codeClassName?.match(/language-(\S+)/)?.[1] ?? "tsx";
+	const code = childrenToString(content).replace(/\n$/, "");
+
+	return <CodeBlock code={code} language={language} />;
+}
+
+function InlineCode({ children }: StreamdownCodeProps) {
+	return (
+		<code
+			className="rounded-none bg-grayscale-3 px-1.5 py-0.5 font-mono text-[0.85em]"
+			data-streamdown="inline-code"
+		>
+			{children}
+		</code>
+	);
+}
+
+function childrenToString(children: ReactNode): string {
+	if (typeof children === "string" || typeof children === "number") {
+		return String(children);
+	}
+
+	if (Array.isArray(children)) {
+		return children.map(childrenToString).join("");
+	}
+
+	return "";
 }
 
 function AttachmentGrid({ attachments }: { attachments: Attachment[] }) {
@@ -978,7 +1023,7 @@ function AttachmentGrid({ attachments }: { attachments: Attachment[] }) {
 	);
 }
 
-function CodeBlock({ children }: { children: string }) {
+function PlainCodeBlock({ children }: { children: string }) {
 	return (
 		<pre className="max-w-full overflow-x-auto bg-grayscale-2 p-2 text-[11px] leading-5 text-grayscale-12 ring-1 ring-grayscale-4">
 			<code>{children}</code>

@@ -6,6 +6,7 @@ import {
 	CheckIcon,
 	FadersHorizontalIcon,
 	MinusCircleIcon,
+	PlusCircleIcon,
 	ShapesIcon,
 	SidebarSimpleIcon,
 	UserCircleIcon,
@@ -181,7 +182,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						type="button"
 						aria-label="Collapse sidebar"
 						onClick={onToggleCollapse}
-						className="flex size-6 shrink-0 cursor-pointer items-center justify-center bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
+						className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
 					>
 						<SidebarSimpleIcon weight="bold" />
 					</button>
@@ -190,7 +191,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					href={settingsHref}
 					onClick={closeAfterMobileNavigation}
 					className={cn(
-						"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 						isSettingsSelected ? "bg-grayscale-3" : "",
 					)}
 				>
@@ -207,7 +208,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					href={personalSettingsHref}
 					onClick={closeAfterMobileNavigation}
 					className={cn(
-						"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 						isPersonalSettingsSelected ? "bg-grayscale-3" : "",
 					)}
 				>
@@ -224,7 +225,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					href={organisationSettingsHref}
 					onClick={closeAfterMobileNavigation}
 					className={cn(
-						"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 						isOrganisationSettingsSelected ? "bg-grayscale-3" : "",
 					)}
 				>
@@ -237,25 +238,16 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					<BuildingsIcon weight="bold" className="size-4 shrink-0" />
 					<span className="min-w-0 flex-1 truncate">Organisation Settings</span>
 				</Link>
-				<div className="p-1.5 mt-2">
+				<div className="mt-2">
 					<Link
 						href={newTaskHref}
 						onClick={closeAfterMobileNavigation}
 						aria-keyshortcuts="N"
-						className="group relative flex w-full min-w-0 overflow-visible"
+						className="group relative flex h-8 w-full min-w-0 flex-row items-center justify-center gap-2 rounded-md border border-grayscale-12 bg-grayscale-12 px-3 text-xs font-medium text-grayscale-1 transition-colors duration-150 hover:border-grayscale-11 hover:bg-grayscale-11"
 					>
-						<span className="relative flex h-7 w-full min-w-0 flex-row items-center justify-between gap-2 overflow-visible bg-grayscale-12 px-2 dark:bg-grayscale-6">
-							<CornerBrackets
-								placement="outside"
-								spacing={4}
-								translate={4}
-								color="grayscale-12"
-							/>
-							<p className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
-								New Task
-							</p>
-							<ShortcutKey>N</ShortcutKey>
-						</span>
+						<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
+						<p className="min-w-0 flex-1 truncate text-current">New Task</p>
+						<ShortcutKey>N</ShortcutKey>
 					</Link>
 				</div>
 			</div>
@@ -283,7 +275,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 				<button
 					type="button"
 					onClick={() => setIsCompletedExpanded((expanded) => !expanded)}
-					className="flex w-full items-center justify-between gap-2 px-3 py-1 text-left font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase transition-colors hover:text-grayscale-12"
+					className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-1 text-left font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
 				>
 					<span className="flex min-w-0 items-center gap-1.5">
 						<span className="truncate">Completed Tasks</span>
@@ -431,7 +423,7 @@ const FactorySwitcher = ({
 	return (
 		<>
 			<Menu.Root>
-				<Menu.Trigger className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
+				<Menu.Trigger className="min-w-0 flex-1 rounded-md border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
 					<Monogram
 						seed={triggerSeed}
 						letters={currentFactory ? 2 : 1}
@@ -717,7 +709,7 @@ const TaskSidebarItem = ({
 						href={href}
 						onClick={onNavigate}
 						className={cn(
-							"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+							"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 							selected ? "bg-grayscale-3" : "",
 							isCompleted ? "text-grayscale-9" : "",
 						)}

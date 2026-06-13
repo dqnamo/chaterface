@@ -42,7 +42,7 @@ export default function TaskStatusDots({
 					<div
 						key={`task-status-dot-${index}`}
 						className={cn(
-							"task-status-dot",
+							"task-status-dot rounded-[1px]",
 							isRunning && "task-status-dot--running",
 							isFilled
 								? status === "failed"

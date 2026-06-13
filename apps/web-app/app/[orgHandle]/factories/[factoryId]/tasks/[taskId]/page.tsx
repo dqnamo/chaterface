@@ -42,7 +42,6 @@ import {
 } from "@/codex-options";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
-import CornerCubes from "@/components/CornerCubes";
 import Event, { buildTimeline, type TimelineNode } from "@/components/Event";
 import {
 	getAttachmentFiles,
@@ -54,7 +53,6 @@ import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { ScrollArea } from "@/components/ScrollArea";
 import { ServicePreviewFrame } from "@/components/ServicePreviewFrame";
-import { ShortcutKey } from "@/components/ShortcutKey";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
 import TaskStatusDots from "@/components/TaskStatusDots";
@@ -739,45 +737,29 @@ export default function TaskPage() {
 								/>
 							</a>
 						) : null}
-						<button
+						<Button
 							type="button"
 							aria-keyshortcuts="D"
 							onClick={toggleTaskCompletion}
-							className={cn(
-								isTaskCompleted ? "hover:bg-blue-3" : "hover:bg-green-3",
-								"bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative",
-							)}
+							variant="secondary"
+							shortcut="D"
 						>
-							<CornerBrackets
-								placement="inside"
-								spacing={1}
-								translate={1.5}
-								size={6}
-								color={
-									isTaskCompleted
-										? "var(--color-blue-9)"
-										: "var(--color-green-9)"
-								}
-							/>
 							{isTaskCompleted ? (
-								<MinusCircleIcon weight="bold" className="size-4 text-blue-9" />
+								<MinusCircleIcon weight="bold" className="size-4 shrink-0" />
 							) : (
 								<>
 									<CheckCircleIcon
 										weight="bold"
-										className="size-4 text-green-9 group-hover:hidden"
+										className="size-4 shrink-0 group-hover:hidden"
 									/>
 									<CheckCircleIcon
 										weight="fill"
-										className="size-4 text-green-9 group-hover:block hidden"
+										className="hidden size-4 shrink-0 group-hover:block"
 									/>
 								</>
 							)}
-							<p className="text-xs text-grayscale-12">
-								{isTaskCompleted ? "Uncomplete task" : "Mark as complete"}
-							</p>
-							<ShortcutKey>D</ShortcutKey>
-						</button>
+							{isTaskCompleted ? "Uncomplete task" : "Mark as complete"}
+						</Button>
 						<AnimatePresence initial={false}>
 							{!isMobile && isRightCollapsed && (
 								<motion.button
@@ -846,12 +828,12 @@ export default function TaskPage() {
 						<ScrollArea.Thumb />
 					</ScrollArea.Scrollbar>
 				</ScrollArea.Root>
-				<div className="flex shrink-0 flex-col px-2 pb-2">
+				<div className="flex shrink-0 flex-col px-2 bg-grayscale-2 dark:bg-grayscale-1 border-t border-grayscale-4">
 					<div className="flex flex-col gap-2">
 						<fieldset
 							aria-label="Task message composer"
 							className={cn(
-								"flex flex-col max-w-3xl mx-auto w-full bg-grayscale-1 border border-grayscale-4 relative transition-colors",
+								"flex flex-col max-w-3xl mx-auto w-full bg-grayscale-1 border-x border-grayscale-4 relative transition-colors",
 								isDraggingAttachments && "border-accent-8 bg-accent-2",
 							)}
 							onDragLeave={handleComposerDragLeave}
@@ -859,15 +841,6 @@ export default function TaskPage() {
 							onDrop={handleComposerDrop}
 							onPaste={handleComposerPaste}
 						>
-							<CornerCubes
-								placement="outside"
-								spacing={3}
-								translate={12}
-								size={6}
-								color="var(--color-grayscale-6)"
-								active={true}
-							/>
-
 							<div className="flex flex-col p-3 gap-3">
 								<Textarea
 									className="text-sm"

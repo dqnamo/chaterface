@@ -17,77 +17,8 @@ const mergeClassName = <TState,>(
 	return cn(defaultClassName, className);
 };
 
-type Corner = {
-	key: "tl" | "tr" | "bl" | "br";
-	anchor: string;
-	border: string;
-	inside: string;
-	outside: string;
-};
-
-// Brackets sit just inside each corner of the input box and animate outward
-// (past the edges) when the input gains focus.
-const CORNERS: Corner[] = [
-	{
-		key: "tl",
-		anchor: "top-0 left-0",
-		border: "border-t-2 border-l-2",
-		inside: "translate-x-[3px] translate-y-[3px]",
-		outside:
-			"group-focus-within:translate-x-[-4px] group-focus-within:translate-y-[-4px]",
-	},
-	{
-		key: "tr",
-		anchor: "top-0 right-0",
-		border: "border-t-2 border-r-2",
-		inside: "translate-x-[-3px] translate-y-[3px]",
-		outside:
-			"group-focus-within:translate-x-[4px] group-focus-within:translate-y-[-4px]",
-	},
-	{
-		key: "bl",
-		anchor: "bottom-0 left-0",
-		border: "border-b-2 border-l-2",
-		inside: "translate-x-[3px] translate-y-[-3px]",
-		outside:
-			"group-focus-within:translate-x-[-4px] group-focus-within:translate-y-[4px]",
-	},
-	{
-		key: "br",
-		anchor: "bottom-0 right-0",
-		border: "border-b-2 border-r-2",
-		inside: "translate-x-[-3px] translate-y-[-3px]",
-		outside:
-			"group-focus-within:translate-x-[4px] group-focus-within:translate-y-[4px]",
-	},
-];
-
-function InputBrackets() {
-	return (
-		<span className="pointer-events-none absolute inset-0 overflow-visible">
-			{CORNERS.map((corner) => (
-				<span
-					key={corner.key}
-					className={cn(
-						"absolute h-1.5 w-1.5 border-grayscale-8 opacity-0",
-						// Exit order (leaving focus): un-elongate first, then retract inward.
-						"[transition:height_200ms_ease-out,translate_200ms_ease-out_200ms,opacity_150ms_ease-out,border-color_200ms_ease-out]",
-						// Enter order (on focus): expand outward first, then elongate to connect.
-						"group-focus-within:[transition:translate_200ms_ease-out,height_200ms_ease-out_200ms,opacity_150ms_ease-out,border-color_200ms_ease-out]",
-						"group-hover:opacity-100 group-focus-within:h-[calc(50%+4px)] group-focus-within:border-accent-9 group-focus-within:opacity-100",
-						corner.anchor,
-						corner.border,
-						corner.inside,
-						corner.outside,
-					)}
-				/>
-			))}
-		</span>
-	);
-}
-
 const fieldClassName =
-	"w-full bg-grayscale-2 px-2 py-1.5 text-xs text-grayscale-12 outline-none transition-colors duration-150 placeholder:text-grayscale-10 focus:bg-grayscale-3";
+	"w-full rounded-md border border-grayscale-6 bg-grayscale-1 px-2 py-1.5 text-xs text-grayscale-12 outline-none transition-colors duration-150 placeholder:text-grayscale-10 hover:bg-grayscale-2 focus:border-grayscale-8 focus:bg-grayscale-1 focus:ring-2 focus:ring-grayscale-4/60";
 
 function handleSubmitKeyDown(
 	event: KeyboardEvent,
@@ -119,7 +50,7 @@ export function Input({
 	...props
 }: InputProps) {
 	return (
-		<div className={cn("group relative flex w-full", containerClassName)}>
+		<div className={cn("relative flex w-full", containerClassName)}>
 			<BaseInput
 				className={mergeClassName(fieldClassName, className)}
 				onKeyDown={(event) => {
@@ -128,7 +59,6 @@ export function Input({
 				}}
 				{...props}
 			/>
-			<InputBrackets />
 		</div>
 	);
 }
@@ -146,7 +76,7 @@ export function Textarea({
 	...props
 }: TextareaProps) {
 	return (
-		<div className={cn("group relative flex w-full", containerClassName)}>
+		<div className={cn("relative flex w-full", containerClassName)}>
 			<BaseInput
 				render={<textarea />}
 				className={mergeClassName(
@@ -159,7 +89,6 @@ export function Textarea({
 				}}
 				{...props}
 			/>
-			<InputBrackets />
 		</div>
 	);
 }

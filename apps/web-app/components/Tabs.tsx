@@ -2,7 +2,6 @@
 
 import { Tabs as BaseTabs } from "@base-ui/react/tabs";
 import type { ComponentProps } from "react";
-import CornerBrackets from "@/components/CornerBrackets";
 import { cn } from "@/helpers/classname-helper";
 
 type ClassName<TState> = string | ((state: TState) => string | undefined);
@@ -37,7 +36,7 @@ function List({ className, ...props }: TabsListProps) {
 	return (
 		<BaseTabs.List
 			className={mergeClassName(
-				"relative flex flex-row items-center gap-1.5 overflow-x-auto",
+				"relative flex flex-row items-center gap-1.5 overflow-x-auto rounded-md",
 				className,
 			)}
 			{...props}
@@ -47,17 +46,13 @@ function List({ className, ...props }: TabsListProps) {
 
 function Tab({ className, render, children, ...props }: TabsTabProps) {
 	const resolvedClassName = mergeClassName(
-		"group relative z-10 shrink-0 cursor-pointer overflow-visible p-1.5 px-3 text-xs text-grayscale-10 transition-colors duration-150 hover:text-grayscale-12 data-[active]:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-50",
+		"group relative z-10 shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-xs text-grayscale-10 transition-colors duration-150 hover:text-grayscale-12 data-[active]:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-50",
 		className,
 	);
 
 	if (render) {
 		return (
-			<BaseTabs.Tab
-				className={resolvedClassName}
-				render={render}
-				{...props}
-			>
+			<BaseTabs.Tab className={resolvedClassName} render={render} {...props}>
 				{children}
 			</BaseTabs.Tab>
 		);
@@ -66,21 +61,8 @@ function Tab({ className, render, children, ...props }: TabsTabProps) {
 	return (
 		<BaseTabs.Tab
 			className={resolvedClassName}
-			render={(tabProps, state) => (
+			render={(tabProps) => (
 				<button {...tabProps}>
-					<CornerBrackets
-						placement="inside"
-						spacing={1}
-						translate={1.5}
-						size={6}
-						color={
-							state.active
-								? "var(--color-accent-9)"
-								: "var(--color-grayscale-9)"
-						}
-						active={state.active}
-						className="z-10"
-					/>
 					<span className="relative z-10">{tabProps.children}</span>
 				</button>
 			)}
@@ -95,7 +77,7 @@ function Indicator({ className, ...props }: TabsIndicatorProps) {
 	return (
 		<BaseTabs.Indicator
 			className={mergeClassName(
-				"absolute top-[var(--active-tab-top)] left-[var(--active-tab-left)] z-0 h-[var(--active-tab-height)] w-[var(--active-tab-width)] bg-grayscale-3 transition-[top,left,width,height] duration-200 ease-out",
+				"absolute top-[var(--active-tab-top)] left-[var(--active-tab-left)] z-0 h-[var(--active-tab-height)] w-[var(--active-tab-width)] rounded-md bg-grayscale-3 transition-[top,left,width,height] duration-200 ease-out",
 				className,
 			)}
 			{...props}

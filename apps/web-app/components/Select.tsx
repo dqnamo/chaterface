@@ -3,7 +3,6 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
 import { CaretUpDownIcon } from "@phosphor-icons/react";
 import type { ComponentProps } from "react";
-import CornerBrackets from "@/components/CornerBrackets";
 import { cn } from "@/helpers/classname-helper";
 
 type ClassName<TState> = string | ((state: TState) => string | undefined);
@@ -53,19 +52,11 @@ function Trigger({ className, children, ...props }: SelectTriggerProps) {
 	return (
 		<BaseSelect.Trigger
 			className={mergeClassName(
-				"group relative flex flex-row items-center justify-between gap-2 overflow-visible border border-grayscale-4 bg-grayscale-1 px-2 py-1.5 text-xs text-grayscale-11 outline-none transition-colors duration-150 hover:text-grayscale-12 data-[popup-open]:text-grayscale-12 data-[placeholder]:text-grayscale-10",
+				"group relative flex flex-row items-center justify-between gap-2 rounded-md border border-grayscale-6 bg-grayscale-1 px-2 py-1.5 text-xs text-grayscale-11 outline-none transition-colors duration-150 hover:border-grayscale-7 hover:bg-grayscale-2 hover:text-grayscale-12 data-[popup-open]:border-grayscale-8 data-[popup-open]:text-grayscale-12 data-[placeholder]:text-grayscale-10",
 				className,
 			)}
 			{...props}
 		>
-			<CornerBrackets
-				placement="outside"
-				spacing={4}
-				translate={6}
-				size={6}
-				color="grayscale-6"
-				active={false}
-			/>
 			{children}
 		</BaseSelect.Trigger>
 	);
@@ -104,7 +95,7 @@ function Popup({ className, children, ...props }: SelectPopupProps) {
 	return (
 		<BaseSelect.Popup
 			className={mergeClassName(
-				"relative flex max-h-[var(--available-height)] min-w-[var(--anchor-width)] flex-col border border-grayscale-4 bg-grayscale-1 py-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"relative flex max-h-[var(--available-height)] min-w-[var(--anchor-width)] flex-col rounded-md border border-grayscale-4 bg-grayscale-1 py-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
 				className,
 			)}
 			{...props}
@@ -118,18 +109,11 @@ function Item({ className, children, ...props }: SelectItemProps) {
 	return (
 		<BaseSelect.Item
 			className={mergeClassName(
-				"group relative flex cursor-default flex-row items-center gap-2 overflow-visible px-3 py-1.5 text-xs text-grayscale-11 outline-none select-none transition-colors duration-100 data-[highlighted]:text-grayscale-12 data-[selected]:bg-grayscale-2 data-[selected]:text-grayscale-12",
+				"group relative mx-1 flex cursor-default flex-row items-center gap-2 rounded px-2 py-1.5 text-xs text-grayscale-11 outline-none select-none transition-colors duration-100 data-[highlighted]:bg-grayscale-2 data-[highlighted]:text-grayscale-12 data-[selected]:bg-grayscale-2 data-[selected]:text-grayscale-12",
 				className,
 			)}
 			{...props}
 		>
-			<CornerBrackets
-				placement="inside"
-				size={6}
-				color="grayscale-6"
-				active={false}
-				className="group-data-[selected]:hidden"
-			/>
 			{children}
 		</BaseSelect.Item>
 	);
@@ -143,18 +127,11 @@ function ItemIndicator({ className, ...props }: SelectItemIndicatorProps) {
 	return (
 		<BaseSelect.ItemIndicator
 			className={mergeClassName(
-				"pointer-events-none absolute inset-0",
+				"pointer-events-none absolute inset-y-1 left-1 w-0.5 rounded-full bg-accent-9",
 				className,
 			)}
 			{...props}
-		>
-			<CornerBrackets
-				placement="inside"
-				size={6}
-				color="accent-9"
-				active={true}
-			/>
-		</BaseSelect.ItemIndicator>
+		/>
 	);
 }
 

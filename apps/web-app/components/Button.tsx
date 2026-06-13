@@ -2,7 +2,6 @@
 
 import { Button as BaseButton } from "@base-ui/react/button";
 import type { ComponentProps } from "react";
-import CornerBrackets from "@/components/CornerBrackets";
 import { ShortcutKey } from "@/components/ShortcutKey";
 import { cn } from "@/helpers/classname-helper";
 
@@ -19,13 +18,16 @@ const mergeClassName = <TState,>(
 	return cn(defaultClassName, className);
 };
 
-export type ButtonVariant = "primary";
+export type ButtonVariant = "primary" | "secondary";
 
 const baseClassName =
-	"group relative flex h-7 min-w-0 flex-row items-center justify-center gap-2 overflow-visible bg-grayscale-12 px-2 transition-transform duration-150 hover:scale-96 dark:bg-grayscale-6";
+	"group relative flex h-8 min-w-0 flex-row items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium whitespace-nowrap transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 [&>svg]:shrink-0";
 
 const variantClassName: Record<ButtonVariant, string> = {
-	primary: "",
+	primary:
+		"border-grayscale-12 bg-grayscale-12 text-grayscale-1 hover:bg-grayscale-11 hover:border-grayscale-11",
+	secondary:
+		"border-grayscale-6 bg-grayscale-1 text-grayscale-12 hover:bg-grayscale-2 hover:border-grayscale-7",
 };
 
 export type ButtonProps = ComponentProps<typeof BaseButton> & {
@@ -48,15 +50,7 @@ export function Button({
 			)}
 			{...props}
 		>
-			<CornerBrackets
-				placement="outside"
-				spacing={4}
-				translate={6}
-				color="grayscale-12"
-			/>
-			<span className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
-				{children}
-			</span>
+			{children}
 			{shortcut ? <ShortcutKey>{shortcut}</ShortcutKey> : null}
 		</BaseButton>
 	);
