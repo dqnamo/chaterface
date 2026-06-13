@@ -43,8 +43,8 @@ import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
 import Event, { buildTimeline, type TimelineNode } from "@/components/Event";
 import {
-	getImageFiles,
-	hasImageFiles,
+	getAttachmentFiles,
+	hasAttachmentFiles,
 	ImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
@@ -276,7 +276,7 @@ export default function TaskPage() {
 	} = useSidebar();
 	const [message, setMessage] = useState("");
 	const [isSendingMessage, setIsSendingMessage] = useState(false);
-	const [isDraggingImages, setIsDraggingImages] = useState(false);
+	const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
 	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
 		DEFAULT_CODEX_REASONING_EFFORT,
@@ -308,11 +308,11 @@ export default function TaskPage() {
 	const [isPatchLoading, setIsPatchLoading] = useState(false);
 	const [patchError, setPatchError] = useState<string | null>(null);
 	const {
-		attachments: imageAttachments,
-		addFiles: addImageFiles,
-		removeAttachment: removeImageAttachment,
-		clearAttachments: clearImageAttachments,
-		uploadAttachments: uploadImageAttachments,
+		attachments: fileAttachments,
+		addFiles: addAttachmentFiles,
+		removeAttachment: removeFileAttachment,
+		clearAttachments: clearFileAttachments,
+		uploadAttachments: uploadFileAttachments,
 	} = useImageAttachments({
 		taskId: taskId as string,
 		uploadImmediately: true,
@@ -613,7 +613,7 @@ export default function TaskPage() {
 		}
 		const content = message.trim();
 
-		if (!content && imageAttachments.length === 0) {
+		if (!content && fileAttachments.length === 0) {
 			return;
 		}
 
@@ -621,10 +621,10 @@ export default function TaskPage() {
 		setIsSendingMessage(true);
 
 		try {
-			const images = await uploadImageAttachments(task.id);
+			const attachments = await uploadFileAttachments(task.id);
 
 			setMessage("");
-			clearImageAttachments();
+			clearFileAttachments();
 
 			await db.transact(
 				taskTx(task.id).update({
@@ -641,7 +641,7 @@ export default function TaskPage() {
 				eventTx(eventId)
 					.create({
 						type: "factoryplane.new_user_message",
-						data: { content, images },
+						data: { content, attachments },
 						createdAt: DateTime.now().toISO(),
 					})
 					.link({ task: taskId as string }),
@@ -654,13 +654,13 @@ export default function TaskPage() {
 	const handleComposerDragOver = (
 		event: ReactDragEvent<HTMLFieldSetElement>,
 	) => {
-		if (!hasImageFiles(event.dataTransfer)) {
+		if (!hasAttachmentFiles(event.dataTransfer)) {
 			return;
 		}
 
 		event.preventDefault();
 		event.dataTransfer.dropEffect = "copy";
-		setIsDraggingImages(true);
+		setIsDraggingAttachments(true);
 	};
 
 	const handleComposerDragLeave = (
@@ -669,29 +669,29 @@ export default function TaskPage() {
 		const nextTarget = event.relatedTarget as Node | null;
 
 		if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
-			setIsDraggingImages(false);
+			setIsDraggingAttachments(false);
 		}
 	};
 
 	const handleComposerDrop = (event: ReactDragEvent<HTMLFieldSetElement>) => {
-		if (!hasImageFiles(event.dataTransfer)) {
+		if (!hasAttachmentFiles(event.dataTransfer)) {
 			return;
 		}
 
 		event.preventDefault();
-		setIsDraggingImages(false);
-		addImageFiles(getImageFiles(event.dataTransfer));
+		setIsDraggingAttachments(false);
+		addAttachmentFiles(getAttachmentFiles(event.dataTransfer));
 	};
 
 	const handleComposerPaste = (
 		event: ReactClipboardEvent<HTMLFieldSetElement>,
 	) => {
-		if (!hasImageFiles(event.clipboardData)) {
+		if (!hasAttachmentFiles(event.clipboardData)) {
 			return;
 		}
 
 		event.preventDefault();
-		addImageFiles(getImageFiles(event.clipboardData));
+		addAttachmentFiles(getAttachmentFiles(event.clipboardData));
 	};
 
 	if (isLoading) {
@@ -849,7 +849,7 @@ export default function TaskPage() {
 							aria-label="Task message composer"
 							className={cn(
 								"flex flex-col max-w-3xl mx-auto w-full bg-grayscale-1 border border-grayscale-4 relative transition-colors",
-								isDraggingImages && "border-accent-8 bg-accent-2",
+								isDraggingAttachments && "border-accent-8 bg-accent-2",
 							)}
 							onDragLeave={handleComposerDragLeave}
 							onDragOver={handleComposerDragOver}
@@ -875,10 +875,10 @@ export default function TaskPage() {
 									onSubmit={sendMessage}
 								/>
 								<ImageAttachments
-									attachments={imageAttachments}
+									attachments={fileAttachments}
 									disabled={isSendingMessage}
-									onAddFiles={addImageFiles}
-									onRemoveAttachment={removeImageAttachment}
+									onAddFiles={addAttachmentFiles}
+									onRemoveAttachment={removeFileAttachment}
 								/>
 							</div>
 							<div className="flex flex-row items-center justify-between p-3">

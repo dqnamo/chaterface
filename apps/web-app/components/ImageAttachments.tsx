@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, XIcon } from "@phosphor-icons/react";
+import { FileIcon, ImageIcon, XIcon } from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
@@ -8,7 +8,7 @@ import { cn } from "@/helpers/classname-helper";
 export type ImageAttachmentDraft = {
 	id: string;
 	file: File;
-	previewUrl: string;
+	previewUrl?: string;
 	name: string;
 	contentType: string;
 	size: number;
@@ -108,15 +108,13 @@ export function useImageAttachments({
 
 	const addFiles = useCallback(
 		(files: FileList | File[]) => {
-			const images = Array.from(files).filter((file) =>
-				file.type.startsWith("image/"),
-			);
+			const selectedFiles = Array.from(files);
 
-			if (images.length === 0) {
+			if (selectedFiles.length === 0) {
 				return;
 			}
 
-			const nextAttachments = images.map((file) => {
+			const nextAttachments = selectedFiles.map((file) => {
 				const attachmentId =
 					typeof crypto.randomUUID === "function"
 						? crypto.randomUUID()
@@ -125,8 +123,10 @@ export function useImageAttachments({
 				return {
 					id: attachmentId,
 					file,
-					previewUrl: URL.createObjectURL(file),
-					name: file.name || getDefaultImageName(file.type),
+					previewUrl: file.type.startsWith("image/")
+						? URL.createObjectURL(file)
+						: undefined,
+					name: file.name || getDefaultFileName(file.type),
 					contentType: file.type || "application/octet-stream",
 					size: file.size,
 					status:
@@ -151,7 +151,7 @@ export function useImageAttachments({
 		setAttachments((current) => {
 			const attachment = current.find((item) => item.id === attachmentId);
 
-			if (attachment) {
+			if (attachment?.previewUrl) {
 				URL.revokeObjectURL(attachment.previewUrl);
 			}
 
@@ -164,7 +164,9 @@ export function useImageAttachments({
 	const clearAttachments = useCallback(() => {
 		setAttachments((current) => {
 			for (const attachment of current) {
-				URL.revokeObjectURL(attachment.previewUrl);
+				if (attachment.previewUrl) {
+					URL.revokeObjectURL(attachment.previewUrl);
+				}
 			}
 
 			return [];
@@ -178,7 +180,7 @@ export function useImageAttachments({
 			const uploadTaskId = fallbackTaskId ?? taskId;
 
 			if (!uploadTaskId) {
-				throw new Error("Cannot upload images without a task id");
+				throw new Error("Cannot upload files without a task id");
 			}
 
 			const currentAttachments = attachmentsRef.current;
@@ -261,7 +263,9 @@ export function useImageAttachments({
 	useEffect(
 		() => () => {
 			for (const attachment of attachmentsRef.current) {
-				URL.revokeObjectURL(attachment.previewUrl);
+				if (attachment.previewUrl) {
+					URL.revokeObjectURL(attachment.previewUrl);
+				}
 			}
 		},
 		[],
@@ -277,22 +281,34 @@ export function useImageAttachments({
 }
 
 export function hasImageFiles(dataTransfer: DataTransfer | null) {
+	return hasAttachmentFiles(dataTransfer);
+}
+
+export function hasAttachmentFiles(dataTransfer: DataTransfer | null) {
 	if (!dataTransfer) {
 		return false;
 	}
 
-	return Array.from(dataTransfer.items).some(
-		(item) => item.kind === "file" && item.type.startsWith("image/"),
-	);
+	const items = Array.from(dataTransfer.items);
+
+	if (items.length > 0) {
+		return items.some((item) => item.kind === "file");
+	}
+
+	return dataTransfer.files.length > 0;
 }
 
 export function getImageFiles(dataTransfer: DataTransfer | null) {
+	return getAttachmentFiles(dataTransfer);
+}
+
+export function getAttachmentFiles(dataTransfer: DataTransfer | null) {
 	if (!dataTransfer) {
 		return [];
 	}
 
 	const filesFromItems = Array.from(dataTransfer.items).flatMap((item) => {
-		if (item.kind !== "file" || !item.type.startsWith("image/")) {
+		if (item.kind !== "file") {
 			return [];
 		}
 
@@ -304,9 +320,7 @@ export function getImageFiles(dataTransfer: DataTransfer | null) {
 		return filesFromItems;
 	}
 
-	return Array.from(dataTransfer.files).filter((file) =>
-		file.type.startsWith("image/"),
-	);
+	return Array.from(dataTransfer.files);
 }
 
 export async function uploadImageAttachments(
@@ -327,10 +341,13 @@ async function uploadImageAttachment(
 	attachment: ImageAttachmentDraft,
 ): Promise<UploadedImageAttachment> {
 	const filename = sanitizeStorageFileName(attachment.name);
-	const path = `tasks/${taskId}/images/${attachment.id}/${filename}`;
+	const path = `tasks/${taskId}/attachments/${attachment.id}/${filename}`;
+	const dispositionType = attachment.contentType.startsWith("image/")
+		? "inline"
+		: "attachment";
 	const result = await db.storage.uploadFile(path, attachment.file, {
 		contentType: attachment.contentType,
-		contentDisposition: `inline; filename="${filename.replaceAll('"', "")}"`,
+		contentDisposition: `${dispositionType}; filename="${filename.replaceAll('"', "")}"`,
 	});
 	const data = result.data as UploadResultData;
 
@@ -368,12 +385,18 @@ export function ImageAttachments({
 							className="group flex min-w-0 items-center gap-2 overflow-hidden border border-grayscale-4 bg-grayscale-2 p-1"
 							key={attachment.id}
 						>
-							{/* biome-ignore lint/performance/noImgElement: previews use browser object URLs from local File objects. */}
-							<img
-								alt={attachment.name}
-								className="size-10 shrink-0 object-cover"
-								src={attachment.previewUrl}
-							/>
+							{attachment.previewUrl ? (
+								/* biome-ignore lint/performance/noImgElement: previews use browser object URLs from local File objects. */
+								<img
+									alt={attachment.name}
+									className="size-10 shrink-0 object-cover"
+									src={attachment.previewUrl}
+								/>
+							) : (
+								<div className="flex size-10 shrink-0 items-center justify-center bg-grayscale-1 text-grayscale-10 ring-1 ring-grayscale-4">
+									<FileIcon className="size-5" weight="bold" />
+								</div>
+							)}
 							<div className="min-w-0 flex-1">
 								<p className="truncate text-xs text-grayscale-12">
 									{attachment.name}
@@ -397,18 +420,17 @@ export function ImageAttachments({
 			) : null}
 			<div className="flex items-center gap-2">
 				<button
-					aria-label="Add images"
+					aria-label="Add files"
 					className="flex h-7 shrink-0 items-center justify-center gap-1.5 bg-grayscale-2 px-2 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-50"
 					disabled={disabled}
 					onClick={() => inputRef.current?.click()}
-					title="Add images"
+					title="Add files"
 					type="button"
 				>
 					<ImageIcon className="size-4 shrink-0" weight="bold" />
-					<span className="text-xs">Add images</span>
+					<span className="text-xs">Add files</span>
 				</button>
 				<input
-					accept="image/*"
 					className="hidden"
 					disabled={disabled}
 					multiple
@@ -434,12 +456,17 @@ function sanitizeStorageFileName(value: string) {
 		.replace(/[^a-zA-Z0-9._-]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 
-	return normalized || "image";
+	return normalized || "file";
 }
 
-function getDefaultImageName(contentType: string) {
-	const extension = contentType.split("/")[1]?.split("+")[0] || "png";
-	return `image.${extension}`;
+function getDefaultFileName(contentType: string) {
+	const extension = contentType.split("/")[1]?.split("+")[0];
+
+	if (!extension) {
+		return "file";
+	}
+
+	return `file.${extension}`;
 }
 
 function getAttachmentStatusLabel(attachment: ImageAttachmentDraft) {

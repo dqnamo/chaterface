@@ -2,6 +2,7 @@ import type { InstaQLEntity } from "@instantdb/react";
 import {
 	CheckCircleIcon,
 	CircleNotchIcon,
+	FileIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
@@ -17,7 +18,7 @@ type TaskSummary = {
 	name?: string;
 	instructions?: string;
 };
-type ImageAttachment = {
+type Attachment = {
 	id: string;
 	path: string;
 	url?: string;
@@ -291,7 +292,7 @@ export default function Event({
 
 	if (type === "factoryplane.new_user_message") {
 		const content = getString(data, "content");
-		const images = getImageAttachments(data);
+		const attachments = getAttachments(data);
 
 		return (
 			<EventCard
@@ -301,7 +302,7 @@ export default function Event({
 				tone="neutral"
 			>
 				{content ? <MessageBubble text={content} /> : null}
-				<ImageAttachmentGrid images={images} />
+				<AttachmentGrid attachments={attachments} />
 			</EventCard>
 		);
 	}
@@ -375,7 +376,7 @@ function NewTaskEvent({
 	const taskId = getString(data, "taskId") ?? task?.id;
 	const name = getString(data, "name") ?? task?.name;
 	const instructions = getString(data, "instructions") ?? task?.instructions;
-	const images = getImageAttachments(data);
+	const attachments = getAttachments(data);
 
 	return (
 		<EventCard
@@ -387,7 +388,7 @@ function NewTaskEvent({
 			tone="accent"
 		>
 			{instructions ? <MessageBubble text={instructions} /> : null}
-			<ImageAttachmentGrid images={images} />
+			<AttachmentGrid attachments={attachments} />
 			{name ? <DetailGrid items={[["task", taskId]]} /> : null}
 		</EventCard>
 	);
@@ -912,18 +913,20 @@ function MessageBubble({ text }: { text: string }) {
 	);
 }
 
-function ImageAttachmentGrid({ images }: { images: ImageAttachment[] }) {
-	if (images.length === 0) {
+function AttachmentGrid({ attachments }: { attachments: Attachment[] }) {
+	if (attachments.length === 0) {
 		return null;
 	}
 
 	return (
 		<div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2">
-			{images.map((image) => {
-				const contentType = image.contentType || "image";
+			{attachments.map((attachment) => {
+				const contentType =
+					attachment.contentType || "application/octet-stream";
+				const isImage = contentType.startsWith("image/");
 				const subtitle = [
-					contentType.replace(/^image\//, "").toUpperCase(),
-					formatFileSize(image.size),
+					formatContentType(contentType),
+					formatFileSize(attachment.size),
 				]
 					.filter(Boolean)
 					.join(" · ");
@@ -931,26 +934,26 @@ function ImageAttachmentGrid({ images }: { images: ImageAttachment[] }) {
 				return (
 					<a
 						className="group min-w-0 overflow-hidden border border-grayscale-4 bg-grayscale-1 transition-colors hover:border-accent-7"
-						href={image.url}
-						key={image.id}
+						href={attachment.url}
+						key={attachment.id}
 						rel="noreferrer"
 						target="_blank"
 					>
-						{image.url ? (
+						{isImage && attachment.url ? (
 							/* biome-ignore lint/performance/noImgElement: Instant Storage signed URLs are user uploads outside Next image config. */
 							<img
-								alt={image.name}
+								alt={attachment.name}
 								className="aspect-square w-full object-cover"
-								src={image.url}
+								src={attachment.url}
 							/>
 						) : (
 							<div className="flex aspect-square w-full items-center justify-center bg-grayscale-2 text-xs text-grayscale-10">
-								Image
+								<FileIcon className="size-8" weight="bold" />
 							</div>
 						)}
 						<div className="min-w-0 px-2 py-1">
 							<p className="truncate text-xs text-grayscale-12">
-								{image.name || "image"}
+								{attachment.name || "file"}
 							</p>
 							<p className="text-[11px] text-grayscale-10">{subtitle}</p>
 						</div>
@@ -1036,12 +1039,18 @@ function getRecordArray(record: JsonRecord, key: string): JsonRecord[] {
 	});
 }
 
-function getImageAttachments(record: JsonRecord): ImageAttachment[] {
-	return getRecordArray(record, "images").flatMap((item) => {
+function getAttachments(record: JsonRecord): Attachment[] {
+	const items = [
+		...getRecordArray(record, "attachments"),
+		...getRecordArray(record, "images"),
+	];
+
+	return items.flatMap((item) => {
 		const id = getString(item, "id") ?? getString(item, "path");
 		const path = getString(item, "path");
-		const name = getString(item, "name") ?? "image";
-		const contentType = getString(item, "contentType") ?? "image";
+		const name = getString(item, "name") ?? "file";
+		const contentType =
+			getString(item, "contentType") ?? "application/octet-stream";
 
 		if (!id || !path) {
 			return [];
@@ -1058,6 +1067,14 @@ function getImageAttachments(record: JsonRecord): ImageAttachment[] {
 			},
 		];
 	});
+}
+
+function formatContentType(value: string) {
+	if (value === "application/octet-stream") {
+		return "FILE";
+	}
+
+	return value.replace(/^image\//, "").toUpperCase();
 }
 
 function formatTimestamp(value: unknown): string | undefined {
