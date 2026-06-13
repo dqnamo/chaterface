@@ -17,6 +17,8 @@ export type RepositorySecret = {
 export const SECRET_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const APT_PACKAGE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9+._:-]*$/;
+const GITHUB_REPOSITORY_SHORTHAND_PATTERN =
+	/^([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/;
 
 export const repositoryTx = (repositoryId: string) => {
 	const tx = db.tx.repositories[repositoryId];
@@ -77,6 +79,17 @@ export const getFormString = (formData: FormData, key: string) => {
 
 export const optionalString = (value: string) =>
 	value.length > 0 ? value : undefined;
+
+export const normalizeGitRepositoryUrl = (value: string) => {
+	const trimmed = value.trim();
+	const shorthandMatch = trimmed.match(GITHUB_REPOSITORY_SHORTHAND_PATTERN);
+
+	if (!shorthandMatch?.[1] || !shorthandMatch[2]) {
+		return trimmed;
+	}
+
+	return `https://github.com/${shorthandMatch[1]}/${shorthandMatch[2].replace(/\.git$/i, "")}.git`;
+};
 
 export const parsePackageText = (value: string) => {
 	const seen = new Set<string>();
