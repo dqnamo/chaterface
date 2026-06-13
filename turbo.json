@@ -4,13 +4,18 @@
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],
+			"env": [
+				"E2B_API_KEY",
+				"FACTORYPLANE_PREVIEW_COOKIE_DOMAIN",
+				"FACTORYPLANE_PREVIEW_SESSION_SECRET",
+				"FACTORYPLANE_PREVIEWS_DOMAIN",
+				"INSTANT_APP_ADMIN_TOKEN",
+				"SECRET_ENCRYPTION_KEY",
+				"TRIGGER_PROJECT_REF",
+				"TRIGGER_SECRET_KEY"
+			],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": [
-				".next/**",
-				"!.next/cache/**",
-				"!.next/dev/**",
-				"dist/**"
-			]
+			"outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
 		},
 		"lint": {
 			"dependsOn": ["^lint"]

@@ -1,5 +1,5 @@
 import db, { id } from "@repo/db/admin";
-import { getBearerToken, getTaskForAgentToken } from "../../lib/agent-auth.js";
+import { getBearerToken } from "../../lib/agent-auth.js";
 import type { RouteHandler } from "../../lib/file-router.js";
 
 type UpdateSetupScriptsBody = {
@@ -27,6 +27,25 @@ const eventTx = (eventId: string) => {
 	return tx;
 };
 
+const getTaskForSetupScripts = async (agentToken: string) => {
+	return db
+		.query({
+			tasks: {
+				$: {
+					where: {
+						agentToken,
+					},
+				},
+				factory: {
+					$: {
+						fields: ["newTaskSetupScript", "newTurnSetupScript"],
+					},
+				},
+			},
+		})
+		.then((data) => data.tasks[0]);
+};
+
 export const GET: RouteHandler = async (c) => {
 	const token = getBearerToken(c.req.header("Authorization"));
 
@@ -34,7 +53,7 @@ export const GET: RouteHandler = async (c) => {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
-	const task = await getTaskForAgentToken(token);
+	const task = await getTaskForSetupScripts(token);
 
 	if (!task?.factory) {
 		return c.json({ error: "Unauthorized" }, 401);
@@ -65,7 +84,7 @@ export const PUT: RouteHandler = async (c) => {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
-	const task = await getTaskForAgentToken(token);
+	const task = await getTaskForSetupScripts(token);
 
 	if (!task?.factory) {
 		return c.json({ error: "Unauthorized" }, 401);
