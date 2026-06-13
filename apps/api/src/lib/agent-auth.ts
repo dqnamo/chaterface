@@ -28,14 +28,39 @@ export const getTaskForAgentToken = async (agentToken: string) => {
 							"newTurnSetupScript",
 						],
 					},
-					repositories: {},
-					environmentFiles: {},
-					mcpServers: {},
+					repositories: {
+						$: {
+							fields: ["url", "path", "branch", "secrets", "createdAt"],
+						},
+					},
+					environmentFiles: {
+						$: {
+							fields: ["path", "content", "createdAt"],
+						},
+					},
+					mcpServers: {
+						$: {
+							fields: [
+								"name",
+								"url",
+								"transport",
+								"auth",
+								"enabled",
+								"toolPolicy",
+								"createdAt",
+								"updatedAt",
+							],
+						},
+					},
 					floorChangeProposals: {
 						$: {
 							fields: ["title", "summary", "status", "createdAt"],
 						},
-						task: {},
+						task: {
+							$: {
+								fields: ["name", "status", "createdAt"],
+							},
+						},
 					},
 				},
 			},
