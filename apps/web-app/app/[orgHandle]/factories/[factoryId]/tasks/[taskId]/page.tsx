@@ -743,6 +743,7 @@ export default function TaskPage() {
 							onClick={toggleTaskCompletion}
 							variant="secondary"
 							shortcut="D"
+							className="h-7"
 						>
 							{isTaskCompleted ? (
 								<MinusCircleIcon weight="bold" className="size-4 shrink-0" />
