@@ -21,6 +21,7 @@ import {
 	type CSSProperties,
 	type ClipboardEvent as ReactClipboardEvent,
 	type DragEvent as ReactDragEvent,
+	type ReactNode,
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
 	useEffect,
@@ -214,10 +215,13 @@ export default function TaskPage() {
 
 		return () => setHasRightPanel(false);
 	}, [setHasRightPanel]);
-	const [rightPanelTab, setRightPanelTab] = useState("services");
+	const [rightPanelTab, setRightPanelTab] = useState("previews");
 	const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
 		null,
 	);
+	const [selectedTerminalSessionId, setSelectedTerminalSessionId] = useState<
+		string | null
+	>(null);
 	const [patchText, setPatchText] = useState<string | null>(null);
 	const [isPatchLoading, setIsPatchLoading] = useState(false);
 	const [patchError, setPatchError] = useState<string | null>(null);
@@ -278,7 +282,12 @@ export default function TaskPage() {
 					id: taskId as string,
 				},
 			},
-			services: {},
+			services: {
+				terminalSession: {},
+			},
+			terminalSessions: {
+				services: {},
+			},
 		},
 	});
 
@@ -304,9 +313,14 @@ export default function TaskPage() {
 	const events = eventsData?.events;
 	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
 	const services = task?.services ?? [];
+	const terminalSessions = task?.terminalSessions ?? [];
 	const isTaskCompleted = Boolean(task?.completedAt);
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
+	const selectedTerminalSession =
+		terminalSessions.find(
+			(terminalSession) => terminalSession.id === selectedTerminalSessionId,
+		) ?? terminalSessions[0];
 
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const isPinnedToBottomRef = useRef(true);
@@ -420,6 +434,24 @@ export default function TaskPage() {
 			setSelectedServiceId(firstService.id);
 		}
 	}, [services, selectedServiceId]);
+
+	useEffect(() => {
+		const firstTerminalSession = terminalSessions[0];
+
+		if (!firstTerminalSession) {
+			setSelectedTerminalSessionId(null);
+			return;
+		}
+
+		if (
+			!selectedTerminalSessionId ||
+			!terminalSessions.some(
+				(terminalSession) => terminalSession.id === selectedTerminalSessionId,
+			)
+		) {
+			setSelectedTerminalSessionId(firstTerminalSession.id);
+		}
+	}, [terminalSessions, selectedTerminalSessionId]);
 
 	useEffect(() => {
 		if (!task?.latestDiffPath || !taskId || !user?.refresh_token) {
@@ -786,8 +818,9 @@ export default function TaskPage() {
 				>
 					<div className="flex flex-row items-center gap-1.5 p-1.5 border-b border-grayscale-4">
 						<Tabs.List>
-							<Tabs.Tab value="services">Services</Tabs.Tab>
+							<Tabs.Tab value="previews">Previews</Tabs.Tab>
 							<Tabs.Tab value="changes">Changes</Tabs.Tab>
+							<Tabs.Tab value="terminal">Terminal</Tabs.Tab>
 							<Tabs.Indicator />
 						</Tabs.List>
 						<button
@@ -799,7 +832,7 @@ export default function TaskPage() {
 							<SidebarSimpleIcon weight="bold" className="-scale-x-100" />
 						</button>
 					</div>
-					<Tabs.Panel value="services" className="flex min-h-0 flex-1 flex-col">
+					<Tabs.Panel value="previews" className="flex min-h-0 flex-1 flex-col">
 						{services.length > 0 ? (
 							<Tabs.Root
 								value={selectedService?.id ?? null}
@@ -818,7 +851,9 @@ export default function TaskPage() {
 								</Tabs.List>
 								<div className="p-2 border-b border-grayscale-4 flex flex-row items-center justify-between">
 									<p className="text-xs text-grayscale-10 truncate">
-										{selectedService?.command ?? "No command"}
+										{selectedService?.terminalSession?.command ??
+											selectedService?.command ??
+											"No command"}
 									</p>
 									<button
 										type="button"
@@ -873,10 +908,57 @@ export default function TaskPage() {
 							<div className="flex h-full items-center justify-center text-xs text-grayscale-10">
 								<div className="flex flex-col items-center justify-center gap-px p-8">
 									<p className="text-sm text-grayscale-12">
-										No services running
+										No previews running
 									</p>
 									<p className="text-xs text-grayscale-10 max-w-sm text-center">
 										The agent can start dev servers for you to preview here.
+									</p>
+								</div>
+							</div>
+						)}
+					</Tabs.Panel>
+					<Tabs.Panel
+						value="terminal"
+						className="flex min-h-0 flex-1 flex-col bg-grayscale-1"
+					>
+						{terminalSessions.length > 0 ? (
+							<Tabs.Root
+								value={selectedTerminalSession?.id ?? null}
+								onValueChange={(value) => {
+									setSelectedTerminalSessionId(
+										value == null ? null : String(value),
+									);
+								}}
+								className="flex-1"
+							>
+								<Tabs.List className="border-b border-grayscale-4 p-1.5">
+									{terminalSessions.map((terminalSession) => (
+										<Tabs.Tab
+											key={terminalSession.id}
+											value={terminalSession.id}
+										>
+											{terminalSession.name}
+										</Tabs.Tab>
+									))}
+									<Tabs.Indicator />
+								</Tabs.List>
+								<div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
+									{selectedTerminalSession ? (
+										<TerminalSessionSummary
+											terminalSession={selectedTerminalSession}
+										/>
+									) : null}
+								</div>
+							</Tabs.Root>
+						) : (
+							<div className="flex h-full flex-1 items-center justify-center text-xs text-grayscale-10">
+								<div className="flex flex-col items-center justify-center gap-px p-8">
+									<p className="text-sm text-grayscale-12">
+										No terminal sessions
+									</p>
+									<p className="text-xs text-grayscale-10 max-w-sm text-center">
+										Terminal sessions will appear here when the agent starts
+										long-running commands.
 									</p>
 								</div>
 							</div>
@@ -1012,6 +1094,153 @@ function ServicePreviewFrame({
 			className="h-full w-full"
 		/>
 	);
+}
+
+type TerminalSessionSummaryProps = {
+	terminalSession: {
+		name: string;
+		command?: string | null;
+		cwd?: string | null;
+		pid?: number | null;
+		status?: string | null;
+		startedBy?: string | null;
+		startedAt?: string | number | Date | null;
+		stoppedAt?: string | number | Date | null;
+		lastActivityAt?: string | number | Date | null;
+		error?: string | null;
+		services?: Array<{
+			id: string;
+			name: string;
+			portNumber?: number | null;
+			url?: string | null;
+			status?: string | null;
+		}> | null;
+	};
+};
+
+function TerminalSessionSummary({
+	terminalSession,
+}: TerminalSessionSummaryProps) {
+	const services = terminalSession.services ?? [];
+
+	return (
+		<div className="flex min-h-full flex-col gap-3">
+			<div className="flex flex-row items-center justify-between gap-3 border-b border-grayscale-4 pb-3">
+				<div className="min-w-0">
+					<p className="truncate text-sm text-grayscale-12">
+						{terminalSession.name}
+					</p>
+					<p className="truncate text-xs text-grayscale-10">
+						{terminalSession.cwd ?? "No working directory"}
+					</p>
+				</div>
+				<span className="shrink-0 bg-grayscale-3 px-2 py-1 text-xs text-grayscale-11">
+					{terminalSession.status ?? "unknown"}
+				</span>
+			</div>
+			<div className="flex flex-col gap-1.5">
+				<TerminalSessionField label="Command">
+					<code className="block whitespace-pre-wrap break-words font-mono text-xs text-grayscale-12">
+						{terminalSession.command ?? "No command"}
+					</code>
+				</TerminalSessionField>
+				<TerminalSessionField label="PID">
+					{typeof terminalSession.pid === "number"
+						? String(terminalSession.pid)
+						: "Unknown"}
+				</TerminalSessionField>
+				<TerminalSessionField label="Started by">
+					{terminalSession.startedBy ?? "Unknown"}
+				</TerminalSessionField>
+				<TerminalSessionField label="Started">
+					{formatTerminalTimestamp(terminalSession.startedAt)}
+				</TerminalSessionField>
+				<TerminalSessionField label="Last activity">
+					{formatTerminalTimestamp(terminalSession.lastActivityAt)}
+				</TerminalSessionField>
+				{terminalSession.stoppedAt ? (
+					<TerminalSessionField label="Stopped">
+						{formatTerminalTimestamp(terminalSession.stoppedAt)}
+					</TerminalSessionField>
+				) : null}
+			</div>
+			{terminalSession.error ? (
+				<div className="border border-red-6 bg-red-2 p-2 text-xs text-red-10">
+					{terminalSession.error}
+				</div>
+			) : null}
+			<div className="flex flex-col gap-2 border-t border-grayscale-4 pt-3">
+				<p className="text-xs text-grayscale-10">Linked previews</p>
+				{services.length > 0 ? (
+					<div className="flex flex-col gap-1.5">
+						{services.map((service) => (
+							<div
+								key={service.id}
+								className="flex flex-row items-center justify-between gap-3 bg-grayscale-2 px-2 py-1.5"
+							>
+								<div className="min-w-0">
+									<p className="truncate text-xs text-grayscale-12">
+										{service.name}
+									</p>
+									<p className="truncate text-xs text-grayscale-10">
+										:{service.portNumber ?? "?"} · {service.status ?? "unknown"}
+									</p>
+								</div>
+								{service.url ? (
+									<a
+										href={service.url}
+										target="_blank"
+										rel="noreferrer"
+										className="shrink-0 text-xs text-accent-11 hover:text-accent-12"
+									>
+										Open
+									</a>
+								) : null}
+							</div>
+						))}
+					</div>
+				) : (
+					<p className="text-xs text-grayscale-10">
+						This terminal session is not linked to an active preview.
+					</p>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function TerminalSessionField({
+	label,
+	children,
+}: {
+	label: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-xs">
+			<p className="text-grayscale-10">{label}</p>
+			<div className="min-w-0 text-grayscale-12">{children}</div>
+		</div>
+	);
+}
+
+function formatTerminalTimestamp(
+	value: string | number | Date | null | undefined,
+) {
+	if (!value) {
+		return "Unknown";
+	}
+
+	const dateTime =
+		value instanceof Date
+			? DateTime.fromJSDate(value)
+			: typeof value === "number"
+				? DateTime.fromMillis(value)
+				: DateTime.fromISO(value);
+
+	return dateTime.isValid
+		? dateTime.toLocaleString(DateTime.DATETIME_MED)
+		: "Unknown";
 }
 
 async function getPreviewSessionError(response: Response) {

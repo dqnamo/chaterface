@@ -21,6 +21,18 @@ const serviceTx = (serviceId: string) => {
 	return tx;
 };
 
+const terminalSessionTx = (terminalSessionId: string) => {
+	const tx = db.tx.terminalSessions[terminalSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Terminal session transaction builder ${terminalSessionId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 const eventTx = (eventId: string) => {
 	const tx = db.tx.events[eventId];
 
@@ -83,11 +95,24 @@ export const POST: RouteHandler = async (c) => {
 
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	const serviceId = id();
+	const terminalSessionId = id();
 	const host = sandbox.getHost(body.portNumber);
 	const e2bUrl = `https://${host}`;
 	const url = getPreviewUrl(serviceId);
+	const now = new Date().toISOString();
 
-	await db.transact(
+	await db.transact([
+		terminalSessionTx(terminalSessionId)
+			.create({
+				name: body.name,
+				command: body.command,
+				cwd: body.cwd,
+				status: "starting",
+				startedBy: "agent",
+				startedAt: now,
+				lastActivityAt: now,
+			})
+			.link({ task: task.id }),
 		serviceTx(serviceId)
 			.create({
 				name: body.name,
@@ -100,8 +125,8 @@ export const POST: RouteHandler = async (c) => {
 				e2bUrl,
 				url,
 			})
-			.link({ task: task.id }),
-	);
+			.link({ task: task.id, terminalSession: terminalSessionId }),
+	]);
 
 	let process: CommandHandle;
 
@@ -114,7 +139,7 @@ export const POST: RouteHandler = async (c) => {
 			},
 		);
 	} catch (error) {
-		await markServiceFailed(serviceId, task.id, {
+		await markServiceFailed(serviceId, terminalSessionId, task.id, {
 			name: body.name,
 			portNumber: body.portNumber,
 			url,
@@ -125,17 +150,22 @@ export const POST: RouteHandler = async (c) => {
 			{
 				error: "Failed to start service command",
 				serviceId,
+				terminalSessionId,
 				url,
 			},
 			500,
 		);
 	}
 
-	await db.transact(
+	await db.transact([
+		terminalSessionTx(terminalSessionId).update({
+			pid: process.pid,
+			lastActivityAt: new Date().toISOString(),
+		}),
 		serviceTx(serviceId).update({
 			pid: process.pid,
 		}),
-	);
+	]);
 
 	const isReady = await waitForService(
 		sandbox,
@@ -144,7 +174,7 @@ export const POST: RouteHandler = async (c) => {
 	);
 
 	if (!isReady) {
-		await markServiceFailed(serviceId, task.id, {
+		await markServiceFailed(serviceId, terminalSessionId, task.id, {
 			name: body.name,
 			portNumber: body.portNumber,
 			url,
@@ -156,6 +186,7 @@ export const POST: RouteHandler = async (c) => {
 			{
 				error: "Service command started, but the port did not become ready",
 				serviceId,
+				terminalSessionId,
 				url,
 				pid: process.pid,
 			},
@@ -164,6 +195,10 @@ export const POST: RouteHandler = async (c) => {
 	}
 
 	await db.transact([
+		terminalSessionTx(terminalSessionId).update({
+			status: "running",
+			lastActivityAt: new Date().toISOString(),
+		}),
 		serviceTx(serviceId).update({
 			status: "running",
 		}),
@@ -172,6 +207,7 @@ export const POST: RouteHandler = async (c) => {
 				type: "factoryplane.service_started",
 				data: {
 					serviceId,
+					terminalSessionId,
 					name: body.name,
 					portNumber: body.portNumber,
 					url,
@@ -186,7 +222,7 @@ export const POST: RouteHandler = async (c) => {
 	const persistedService = await getPersistedPreviewService(serviceId);
 
 	if (persistedService?.e2bHost !== host || persistedService.url !== url) {
-		await markServiceFailed(serviceId, task.id, {
+		await markServiceFailed(serviceId, terminalSessionId, task.id, {
 			name: body.name,
 			portNumber: body.portNumber,
 			url,
@@ -199,6 +235,7 @@ export const POST: RouteHandler = async (c) => {
 			{
 				error: "Preview service metadata did not persist correctly",
 				serviceId,
+				terminalSessionId,
 				url,
 			},
 			500,
@@ -207,6 +244,7 @@ export const POST: RouteHandler = async (c) => {
 
 	return c.json({
 		serviceId,
+		terminalSessionId,
 		url,
 		status: "running",
 		pid: process.pid,
@@ -246,10 +284,20 @@ const parseStartServiceBody = (
 
 const markServiceFailed = async (
 	serviceId: string,
+	terminalSessionId: string,
 	taskId: string,
 	data: Record<string, unknown>,
 ) => {
+	const now = new Date().toISOString();
+	const error = typeof data.error === "string" ? data.error : undefined;
+
 	await db.transact([
+		terminalSessionTx(terminalSessionId).update({
+			status: "failed",
+			error,
+			stoppedAt: now,
+			lastActivityAt: now,
+		}),
 		serviceTx(serviceId).update({
 			status: "failed",
 		}),
@@ -258,9 +306,10 @@ const markServiceFailed = async (
 				type: "factoryplane.service_failed",
 				data: {
 					serviceId,
+					terminalSessionId,
 					...data,
 				},
-				createdAt: new Date().toISOString(),
+				createdAt: now,
 			})
 			.link({ task: taskId }),
 	]);

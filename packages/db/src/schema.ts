@@ -131,6 +131,22 @@ const _schema = i.schema({
 			pid: i.number().optional(),
 			status: i.string().optional(),
 		}),
+		terminalSessions: i.entity({
+			name: i.string().indexed(),
+			command: i.string().optional(),
+			cwd: i.string().optional(),
+			pid: i.number().indexed().optional(),
+			status: i.string().indexed().optional(),
+			startedBy: i.string().optional(),
+			startedAt: i.date().optional(),
+			stoppedAt: i.date().optional(),
+			lastActivityAt: i.date().optional(),
+			exitCode: i.number().optional(),
+			cols: i.number().optional(),
+			rows: i.number().optional(),
+			transcriptPath: i.string().optional(),
+			error: i.string().optional(),
+		}),
 		events: i.entity({
 			type: i.string().optional(),
 			data: i.json().optional(),
@@ -210,6 +226,30 @@ const _schema = i.schema({
 				on: "services",
 				has: "one",
 				label: "task",
+			},
+		},
+		taskTerminalSessions: {
+			forward: {
+				on: "tasks",
+				has: "many",
+				label: "terminalSessions",
+			},
+			reverse: {
+				on: "terminalSessions",
+				has: "one",
+				label: "task",
+			},
+		},
+		terminalSessionServices: {
+			forward: {
+				on: "terminalSessions",
+				has: "many",
+				label: "services",
+			},
+			reverse: {
+				on: "services",
+				has: "one",
+				label: "terminalSession",
 			},
 		},
 		taskLatestDiffFile: {
