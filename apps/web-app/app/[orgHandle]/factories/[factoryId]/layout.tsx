@@ -1,8 +1,11 @@
 "use client";
 
+import db from "@repo/db/client";
 import { AnimatePresence, motion } from "motion/react";
+import { useParams } from "next/navigation";
 import {
 	type PointerEvent as ReactPointerEvent,
+	useEffect,
 	useRef,
 	useState,
 } from "react";
@@ -10,6 +13,7 @@ import MobileDrawer from "@/components/MobileDrawer";
 import MobileHeader from "@/components/MobileHeader";
 import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
+import { rememberLastFactory } from "@/helpers/last-factory-helper";
 
 const MIN_SIDEBAR_SIZE = 160;
 const MAX_SIDEBAR_SIZE = 480;
@@ -28,9 +32,27 @@ export default function FactoryLayout({
 }
 
 function FactoryLayoutChrome({ children }: { children: React.ReactNode }) {
+	const { orgHandle, factoryId } = useParams();
+	const { user } = db.useAuth();
 	const { isMobile, isCollapsed, collapse } = useSidebar();
 	const [sidebarSize, setSidebarSize] = useState(DEFAULT_SIDEBAR_SIZE);
 	const isResizing = useRef(false);
+
+	useEffect(() => {
+		if (
+			!user?.id ||
+			typeof orgHandle !== "string" ||
+			typeof factoryId !== "string"
+		) {
+			return;
+		}
+
+		rememberLastFactory({
+			factoryId,
+			orgHandle,
+			userId: user.id,
+		});
+	}, [factoryId, orgHandle, user?.id]);
 
 	const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
 		if (isCollapsed) {

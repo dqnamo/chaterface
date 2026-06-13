@@ -5,14 +5,18 @@ import { ShapesIcon } from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import CornerBrackets from "@/components/CornerBrackets";
 import { Dialog } from "@/components/Dialog";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
 import Monogram from "@/components/Monogram";
 import SignOutButton from "@/components/SignOutButton";
+import {
+	getRememberedFactory,
+	rememberLastFactory,
+} from "@/helpers/last-factory-helper";
 
 const factoryTx = (factoryId: string) => {
 	const tx = db.tx.factories[factoryId];
@@ -25,6 +29,7 @@ const factoryTx = (factoryId: string) => {
 };
 
 export default function FactoriesPage() {
+	const router = useRouter();
 	const { orgHandle } = useParams();
 	const currentOrgHandle = orgHandle as string;
 	const [createOpen, setCreateOpen] = useState(false);
@@ -49,9 +54,35 @@ export default function FactoriesPage() {
 
 	const organisation = data?.organisations?.[0];
 	const factories = organisation?.factories;
+	const rememberedFactoryHref = useMemo(() => {
+		if (!user?.id || !factories) {
+			return;
+		}
+
+		const rememberedFactory = getRememberedFactory(user.id);
+		const targetFactory =
+			factories.find(
+				(factory) =>
+					rememberedFactory &&
+					factory.id === rememberedFactory.factoryId &&
+					rememberedFactory.orgHandle === currentOrgHandle,
+			) ?? factories.at(0);
+
+		if (!targetFactory) {
+			return;
+		}
+
+		return `/${currentOrgHandle}/factories/${targetFactory.id}`;
+	}, [currentOrgHandle, factories, user?.id]);
+
+	useEffect(() => {
+		if (rememberedFactoryHref) {
+			router.replace(rememberedFactoryHref);
+		}
+	}, [rememberedFactoryHref, router]);
 
 	const createFactory = async () => {
-		if (!organisation) {
+		if (!organisation || !user?.id) {
 			return;
 		}
 
@@ -114,6 +145,12 @@ export default function FactoriesPage() {
 		setGitAuthorName("");
 		setGitAuthorEmail("");
 		setCreateOpen(false);
+		rememberLastFactory({
+			factoryId,
+			orgHandle: currentOrgHandle,
+			userId: user.id,
+		});
+		router.push(`/${currentOrgHandle}/factories/${factoryId}`);
 	};
 
 	return (
