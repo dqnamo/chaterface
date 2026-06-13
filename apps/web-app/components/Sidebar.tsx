@@ -210,14 +210,14 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						aria-keyshortcuts="N"
 						className="group relative flex w-full min-w-0 overflow-visible"
 					>
-						<span className="relative flex w-full min-w-0 flex-row items-center justify-between gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 dark:bg-grayscale-6">
+						<span className="relative flex h-7 w-full min-w-0 flex-row items-center justify-between gap-2 overflow-visible bg-grayscale-12 px-2 dark:bg-grayscale-6">
 							<CornerBrackets
 								placement="outside"
 								spacing={4}
 								translate={4}
 								color="grayscale-12"
 							/>
-							<p className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
+							<p className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
 								New Task
 							</p>
 							<ShortcutKey>N</ShortcutKey>
