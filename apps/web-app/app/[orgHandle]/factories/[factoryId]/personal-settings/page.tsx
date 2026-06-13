@@ -12,6 +12,13 @@ import { useEffect, useState } from "react";
 import CornerBrackets from "@/components/CornerBrackets";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 import SignOutButton from "@/components/SignOutButton";
+import {
+	CHAT_VIEW_MODES,
+	type ChatViewMode,
+	DEFAULT_CHAT_VIEW_MODE,
+	getStoredDefaultChatViewMode,
+	setStoredDefaultChatViewMode,
+} from "@/helpers/chat-view-helper";
 import { cn } from "@/helpers/classname-helper";
 
 const THEME_OPTIONS = [
@@ -26,6 +33,11 @@ const THEME_OPTIONS = [
 		Icon: MoonIcon,
 	},
 ] as const;
+
+const CHAT_VIEW_LABELS: Record<ChatViewMode, string> = {
+	minified: "Minified",
+	full: "Full",
+};
 
 export default function PersonalSettingsPage() {
 	return (
@@ -62,6 +74,9 @@ export default function PersonalSettingsPage() {
 					<div className="flex flex-col gap-3 p-3">
 						<Field label="Theme">
 							<ThemeSetting />
+						</Field>
+						<Field label="Default chat view">
+							<DefaultChatViewSetting />
 						</Field>
 					</div>
 				</section>
@@ -130,6 +145,58 @@ function ThemeSetting() {
 							<span className="truncate text-sm font-medium text-grayscale-12">
 								{label}
 							</span>
+						</span>
+						{selected ? (
+							<CheckIcon
+								weight="bold"
+								className="size-4 shrink-0 text-accent-9"
+							/>
+						) : null}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
+function DefaultChatViewSetting() {
+	const [selectedView, setSelectedView] = useState<ChatViewMode>(
+		DEFAULT_CHAT_VIEW_MODE,
+	);
+
+	useEffect(() => {
+		setSelectedView(getStoredDefaultChatViewMode());
+	}, []);
+
+	const selectView = (value: ChatViewMode) => {
+		setSelectedView(value);
+		setStoredDefaultChatViewMode(value);
+	};
+
+	return (
+		<div className="grid w-full gap-2 sm:grid-cols-2">
+			{CHAT_VIEW_MODES.map((value) => {
+				const selected = selectedView === value;
+
+				return (
+					<button
+						key={value}
+						type="button"
+						aria-pressed={selected}
+						onClick={() => selectView(value)}
+						className={cn(
+							"group relative flex min-h-12 items-center justify-between gap-3 border border-grayscale-4 bg-grayscale-2 px-3 py-2 text-left transition-colors hover:border-grayscale-6 hover:bg-grayscale-3",
+							selected ? "border-accent-8 bg-accent-2" : "",
+						)}
+					>
+						<CornerBrackets
+							placement="inside"
+							color={selected ? "accent-9" : "grayscale-8"}
+							size={6}
+							active={selected}
+						/>
+						<span className="truncate text-sm font-medium text-grayscale-12">
+							{CHAT_VIEW_LABELS[value]}
 						</span>
 						{selected ? (
 							<CheckIcon

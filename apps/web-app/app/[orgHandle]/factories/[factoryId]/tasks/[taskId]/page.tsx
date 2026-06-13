@@ -55,6 +55,11 @@ import { ShortcutKey } from "@/components/ShortcutKey";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
 import TaskStatusDots from "@/components/TaskStatusDots";
+import {
+	type ChatViewMode,
+	DEFAULT_CHAT_VIEW_MODE,
+	getStoredDefaultChatViewMode,
+} from "@/helpers/chat-view-helper";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 
@@ -74,7 +79,6 @@ const DIFF_VIEW_OPTIONS = {
 	stickyHeader: true,
 	theme: "pierre-light",
 } as const;
-type ChatViewMode = "minified" | "full";
 type JsonRecord = Record<string, unknown>;
 
 const FileDiff = dynamic(
@@ -279,13 +283,20 @@ export default function TaskPage() {
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 	const [previewSize, setPreviewSize] = useState(DEFAULT_PREVIEW_SIZE);
-	const [chatViewMode, setChatViewMode] = useState<ChatViewMode>("full");
+	const [chatViewMode, setChatViewMode] = useState<ChatViewMode>(
+		DEFAULT_CHAT_VIEW_MODE,
+	);
 
 	useEffect(() => {
 		setHasRightPanel(true);
 
 		return () => setHasRightPanel(false);
 	}, [setHasRightPanel]);
+
+	useEffect(() => {
+		setChatViewMode(getStoredDefaultChatViewMode());
+	}, []);
+
 	const [rightPanelTab, setRightPanelTab] = useState("previews");
 	const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
 		null,
