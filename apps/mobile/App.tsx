@@ -1,6 +1,7 @@
 import "react-native-get-random-values";
 
-import { type InstaQLEntity, id } from "@instantdb/react-native";
+import type { InstaQLEntity } from "@instantdb/react";
+import { id } from "@instantdb/react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
 	NavigationContainer,
@@ -58,7 +59,7 @@ import {
 	textStyles,
 } from "./src/components/primitives";
 import db from "./src/db/client";
-import type { AppSchema } from "./src/db/schema";
+import type { AppSchema } from "../web-app/instant.schema";
 import { colors, spacing } from "./src/theme";
 import { nowIso } from "./src/utils/date";
 import {

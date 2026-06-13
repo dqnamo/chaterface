@@ -1,7 +1,7 @@
 "use client";
 
 import { FileIcon, ImageIcon, XIcon } from "@phosphor-icons/react";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/helpers/classname-helper";
 

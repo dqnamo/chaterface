@@ -2,7 +2,7 @@
 
 import { id } from "@instantdb/react";
 import { BuildingsIcon } from "@phosphor-icons/react";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import { DateTime } from "luxon";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";

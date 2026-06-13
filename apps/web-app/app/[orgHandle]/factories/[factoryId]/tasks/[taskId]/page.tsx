@@ -15,7 +15,7 @@ import {
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import { type FileDiffMetadata, parsePatchFiles } from "@pierre/diffs";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import { DateTime } from "luxon";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";

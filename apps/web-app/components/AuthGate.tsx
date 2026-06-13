@@ -1,6 +1,6 @@
 "use client";
 
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Button } from "@/components/Button";

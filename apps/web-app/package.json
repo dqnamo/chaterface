@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "next dev --port 3001",
 		"trigger:dev": "trigger dev --env-file .env.local",
-		"instant:push-schema": "pnpm --filter @repo/db build && pnpx instant-cli@latest push schema",
+		"instant:push-schema": "pnpx instant-cli@latest push schema",
 		"build": "next build",
 		"start": "next start --port 3001",
 		"lint": "biome check .",

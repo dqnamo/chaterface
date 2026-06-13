@@ -1,7 +1,7 @@
 "use client";
 
 import { id } from "@instantdb/react";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import { useParams, useRouter } from "next/navigation";
 import {
 	type ClipboardEvent as ReactClipboardEvent,

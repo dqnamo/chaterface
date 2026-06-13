@@ -16,7 +16,7 @@ import {
 	WebhooksLogoIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import {
 	addEdge,
 	Background,

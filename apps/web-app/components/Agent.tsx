@@ -1,6 +1,6 @@
 import { AppSchema } from '@/instant.schema';
 import { InstaQLEntity } from '@instantdb/react';
-import db from '@repo/db/client';
+import db from '@/instant.client';
 
 type Agent = InstaQLEntity<AppSchema, 'agents'>;
 

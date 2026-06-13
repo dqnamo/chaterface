@@ -1,7 +1,7 @@
 "use client";
 
 import { BuildingsIcon } from "@phosphor-icons/react";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";

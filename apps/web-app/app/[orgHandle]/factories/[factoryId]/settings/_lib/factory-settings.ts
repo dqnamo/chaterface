@@ -1,6 +1,6 @@
 import type { InstaQLEntity } from "@instantdb/react";
-import db from "@repo/db/client";
-import type { AppSchema } from "@repo/db/schema";
+import db from "@/instant.client";
+import type { AppSchema } from "@/instant.schema";
 
 export type Repository = InstaQLEntity<AppSchema, "repositories">;
 export type McpServer = InstaQLEntity<AppSchema, "mcpServers">;

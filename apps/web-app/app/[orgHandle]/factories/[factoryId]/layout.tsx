@@ -1,6 +1,6 @@
 "use client";
 
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import { AnimatePresence, motion } from "motion/react";
 import { useParams } from "next/navigation";
 import {

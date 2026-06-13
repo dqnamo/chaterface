@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftIcon } from "@phosphor-icons/react";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import CornerBrackets from "@/components/CornerBrackets";

@@ -7,8 +7,8 @@ import {
 	TrashIcon,
 	UsersIcon,
 } from "@phosphor-icons/react";
-import db from "@repo/db/client";
-import type { AppSchema } from "@repo/db/schema";
+import db from "@/instant.client";
+import type { AppSchema } from "@/instant.schema";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/Button";

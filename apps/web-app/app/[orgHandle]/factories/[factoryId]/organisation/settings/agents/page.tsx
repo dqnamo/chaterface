@@ -7,8 +7,8 @@ import {
 	TrashIcon,
 	WarningCircleIcon,
 } from "@phosphor-icons/react";
-import db from "@repo/db/client";
-import type { AppSchema } from "@repo/db/schema";
+import db from "@/instant.client";
+import type { AppSchema } from "@/instant.schema";
 import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";

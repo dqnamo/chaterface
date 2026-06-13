@@ -1,7 +1,7 @@
 "use client";
 
 import { SignOutIcon } from "@phosphor-icons/react";
-import db from "@repo/db/client";
+import db from "@/instant.client";
 import { useState } from "react";
 import { cn } from "@/helpers/classname-helper";
 
