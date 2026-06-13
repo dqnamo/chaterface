@@ -23,7 +23,10 @@ const _schema = i.schema({
 		factories: i.entity({
 			name: i.string().indexed(),
 			createdAt: i.date().optional(),
-			githubAccessTokenEncrypted: i.string().optional(),
+			githubAppInstallationAccountLogin: i.string().optional(),
+			githubAppInstallationAccountType: i.string().optional(),
+			githubAppInstallationId: i.string().optional(),
+			githubAppInstalledAt: i.date().optional(),
 			gitAuthorName: i.string().optional(),
 			gitAuthorEmail: i.string().optional(),
 			environmentPackages: i.json().optional(),

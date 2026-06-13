@@ -2,7 +2,6 @@
 
 import { id } from "@instantdb/react";
 import { ShapesIcon } from "@phosphor-icons/react";
-import db from "@/instant.client";
 import { DateTime } from "luxon";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -14,6 +13,7 @@ import {
 	getRememberedFactory,
 	rememberLastFactory,
 } from "@/helpers/last-factory-helper";
+import db from "@/instant.client";
 
 const factoryTx = (factoryId: string) => {
 	const tx = db.tx.factories[factoryId];
@@ -30,7 +30,6 @@ export default function FactoriesPage() {
 	const { orgHandle } = useParams();
 	const currentOrgHandle = orgHandle as string;
 	const [factoryName, setFactoryName] = useState("");
-	const [githubAccessToken, setGithubAccessToken] = useState("");
 	const [gitAuthorName, setGitAuthorName] = useState("");
 	const [gitAuthorEmail, setGitAuthorEmail] = useState("");
 	const { user } = db.useAuth();
@@ -86,9 +85,7 @@ export default function FactoriesPage() {
 		console.info("Creating factory", {
 			factoryId,
 			organisationId: organisation.id,
-			hasGithubAccessToken: Boolean(githubAccessToken),
 		});
-		const trimmedGithubAccessToken = githubAccessToken.trim();
 
 		await db.transact(
 			factoryTx(factoryId)
@@ -101,43 +98,7 @@ export default function FactoriesPage() {
 				.link({ organisation: organisation.id }),
 		);
 
-		if (trimmedGithubAccessToken) {
-			const response = await fetch("/api/factories/saveGithub", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${user?.refresh_token}`,
-				},
-				body: JSON.stringify({
-					factoryId,
-					githubAccessToken: trimmedGithubAccessToken,
-					gitAuthorName: gitAuthorName.trim(),
-					gitAuthorEmail: gitAuthorEmail.trim(),
-				}),
-			});
-
-			const responseBody = await response.json().catch(() => null);
-
-			if (!response.ok) {
-				console.error("Failed to save GitHub credentials", {
-					factoryId,
-					status: response.status,
-					responseBody,
-				});
-				throw new Error(
-					`Failed to save GitHub credentials: ${response.status}`,
-				);
-			}
-
-			console.info("Saved GitHub credentials", {
-				factoryId,
-				status: response.status,
-				responseBody,
-			});
-		}
-
 		setFactoryName("");
-		setGithubAccessToken("");
 		setGitAuthorName("");
 		setGitAuthorEmail("");
 		rememberLastFactory({
@@ -186,15 +147,6 @@ export default function FactoriesPage() {
 						placeholder="Factory Name"
 						value={factoryName}
 						onChange={(e) => setFactoryName(e.target.value)}
-					/>
-				</div>
-				<div className="flex flex-col gap-1">
-					<p className="text-xs text-grayscale-11">GitHub Access Token</p>
-					<Input
-						type="text"
-						placeholder="GitHub Access Token"
-						value={githubAccessToken}
-						onChange={(e) => setGithubAccessToken(e.target.value)}
 					/>
 				</div>
 				<div className="flex flex-col gap-1">

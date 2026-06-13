@@ -394,4 +394,4 @@ curl -X DELETE {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id \
 
 
 # Git & Github
-There could be a GITHUB_ACCESS_TOKEN env variable in your environment which could give you access to a github personal access token that you can do stuff with on github. 
+There could be a GITHUB_ACCESS_TOKEN env variable in your environment containing a short-lived GitHub App installation token for repositories connected to this factory.

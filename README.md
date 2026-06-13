@@ -43,6 +43,22 @@ ngrok exposes:
 
 Set `NEXT_PUBLIC_API_URL` in `apps/web-app/.env.local` to the API URL (see `.env.example`). Both Next.js apps allow ngrok origins in dev via `allowedDevOrigins` in each `next.config.js`.
 
+To enable Vercel-style GitHub repository selection, create a GitHub App with
+setup URL `https://app.interface.ngrok.pro/api/github/app/install/callback` in
+dev and set these variables in `apps/web-app/.env.local`:
+
+```sh
+GITHUB_APP_ID=
+GITHUB_APP_SLUG=
+GITHUB_APP_PRIVATE_KEY=
+```
+
+Set the GitHub App repository permissions to at least Contents: read-only and
+Metadata: read-only. `GITHUB_APP_STATE_SECRET` can override the install state
+signing secret; otherwise `SECRET_ENCRYPTION_KEY` is used. The API and task
+worker environments also need `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` so
+they can mint installation tokens for setup scripts and repository clones.
+
 If either tunnel fails to start, reserve `*.interface.ngrok.pro` in the [ngrok dashboard](https://dashboard.ngrok.com/domains).
 
 Or run via Turborepo (no ngrok):
