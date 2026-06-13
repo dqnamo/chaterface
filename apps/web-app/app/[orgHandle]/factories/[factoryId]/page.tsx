@@ -17,7 +17,6 @@ import {
 	getAgentDefaultOptions,
 } from "@/codex-options";
 import { Button } from "@/components/Button";
-import CornerCubes from "@/components/CornerCubes";
 import {
 	getAttachmentFiles,
 	hasAttachmentFiles,
@@ -208,101 +207,91 @@ export default function FactoryPage() {
 					What do you want to build?
 				</h1>
 			</div>
-			<fieldset
-				aria-label="New task composer"
-				className={cn(
-					"flex flex-col max-w-xl w-full bg-grayscale-1 border border-grayscale-4 relative transition-colors",
-					isDraggingAttachments && "border-accent-8 bg-accent-2",
-				)}
-				onDragLeave={handleComposerDragLeave}
-				onDragOver={handleComposerDragOver}
-				onDrop={handleComposerDrop}
-				onPaste={handleComposerPaste}
-			>
-				<CornerCubes
-					placement="outside"
-					spacing={3}
-					translate={12}
-					size={6}
-					color="var(--color-grayscale-6)"
-					active={true}
-				/>
-				<div className="flex flex-col p-3 gap-3">
-					<div className="flex flex-col">
-						<p className="text-xs text-grayscale-11">Instructions</p>
-						<p className="text-xs text-grayscale-10">
-							The task will be named automatically.
-						</p>
-					</div>
-					<Textarea
-						className="text-sm"
-						placeholder="Task Instructions"
-						disabled={isCreating}
-						value={taskInstructions}
-						onChange={(e) => setTaskInstructions(e.target.value)}
-						onSubmit={createTask}
-					/>
-					<ImageAttachments
-						attachments={fileAttachments}
-						disabled={isCreating}
-						onAddFiles={addAttachmentFiles}
-						onRemoveAttachment={removeFileAttachment}
-					/>
-					{createError ? (
-						<p className="border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">
-							{createError}
-						</p>
-					) : null}
-				</div>
-				<div className="flex flex-row items-center justify-between p-3">
-					<div className="flex flex-row items-center justify-center gap-2">
-						<Select.Root
-							items={agentItems}
-							value={resolvedAgentId ?? null}
-							onValueChange={(value) => setAgentId(value ?? "")}
-						>
-							<Select.Trigger>
-								<Select.Value placeholder="Select an agent" />
-								<Select.Icon />
-							</Select.Trigger>
-							<Select.Portal>
-								<Select.Positioner>
-									<Select.Popup>
-										<Select.List>
-											{agents?.map((agent) => (
-												<Select.Item value={agent.id} key={agent.id}>
-													<Select.ItemText>{agent.name}</Select.ItemText>
-													<Select.ItemIndicator />
-												</Select.Item>
-											))}
-										</Select.List>
-									</Select.Popup>
-								</Select.Positioner>
-							</Select.Portal>
-						</Select.Root>
+			<div className="mx-auto w-full max-w-3xl rounded-xl border border-grayscale-3 bg-grayscale-2 p-1.5 dark:bg-grayscale-2">
+				<div className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-5 dark:bg-grayscale-3">
+					<fieldset
+						aria-label="New task composer"
+						className={cn(
+							"relative mx-auto flex w-full max-w-3xl flex-col transition-colors",
+							isDraggingAttachments && "border-accent-8 bg-accent-2",
+						)}
+						onDragLeave={handleComposerDragLeave}
+						onDragOver={handleComposerDragOver}
+						onDrop={handleComposerDrop}
+						onPaste={handleComposerPaste}
+					>
+						<div className="flex flex-col gap-2 p-2">
+							<Textarea
+								className="bg-grayscale-1 p-2 text-sm border-grayscale-3 dark:bg-grayscale-4 focus:bg-grayscale-2 dark:hover:bg-grayscale-5 dark:focus:bg-grayscale-5"
+								placeholder="Task Instructions"
+								disabled={isCreating}
+								value={taskInstructions}
+								onChange={(e) => setTaskInstructions(e.target.value)}
+								onSubmit={createTask}
+							/>
+							<ImageAttachments
+								attachments={fileAttachments}
+								disabled={isCreating}
+								onAddFiles={addAttachmentFiles}
+								onRemoveAttachment={removeFileAttachment}
+							/>
+							{createError ? (
+								<p className="rounded-md border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">
+									{createError}
+								</p>
+							) : null}
+						</div>
+						<div className="flex flex-row items-center justify-between p-3">
+							<div className="flex flex-row items-center justify-center gap-2">
+								<Select.Root
+									items={agentItems}
+									value={resolvedAgentId ?? null}
+									onValueChange={(value) => setAgentId(value ?? "")}
+								>
+									<Select.Trigger>
+										<Select.Value placeholder="Select an agent" />
+										<Select.Icon />
+									</Select.Trigger>
+									<Select.Portal>
+										<Select.Positioner>
+											<Select.Popup>
+												<Select.List>
+													{agents?.map((agent) => (
+														<Select.Item value={agent.id} key={agent.id}>
+															<Select.ItemText>{agent.name}</Select.ItemText>
+															<Select.ItemIndicator />
+														</Select.Item>
+													))}
+												</Select.List>
+											</Select.Popup>
+										</Select.Positioner>
+									</Select.Portal>
+								</Select.Root>
 
-						<ModelConfigMenu
-							model={agentModel}
-							reasoningEffort={agentReasoningEffort}
-							speed={agentSpeed}
-							onModelChange={setAgentModel}
-							onReasoningEffortChange={setAgentReasoningEffort}
-							onSpeedChange={setAgentSpeed}
-						/>
-					</div>
-					<div className="flex flex-row items-center justify-center gap-2 ml-auto">
-						<Button
-							type="button"
-							disabled={
-								isCreating || !resolvedAgentId || !taskInstructions.trim()
-							}
-							onClick={createTask}
-						>
-							{isCreating ? "Creating..." : "Create Task"}
-						</Button>
-					</div>
+								<ModelConfigMenu
+									model={agentModel}
+									reasoningEffort={agentReasoningEffort}
+									speed={agentSpeed}
+									onModelChange={setAgentModel}
+									onReasoningEffortChange={setAgentReasoningEffort}
+									onSpeedChange={setAgentSpeed}
+								/>
+							</div>
+							<div className="ml-auto flex flex-row items-center justify-center gap-2">
+								<Button
+									type="button"
+									disabled={
+										isCreating || !resolvedAgentId || !taskInstructions.trim()
+									}
+									onClick={createTask}
+								>
+									{isCreating ? "Creating..." : "Create Task"}
+								</Button>
+							</div>
+						</div>
+					</fieldset>
 				</div>
-			</fieldset>
+			</div>
 		</div>
 	);
 }
