@@ -16,7 +16,9 @@ export const GET: RouteHandler = async (c) => {
 						agentToken: token,
 					},
 				},
-				services: {},
+				services: {
+					terminalSession: {},
+				},
 			},
 		})
 		.then((data) => data.tasks[0]);

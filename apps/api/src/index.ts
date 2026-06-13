@@ -1,9 +1,11 @@
+import type { Server } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { serve } from "@hono/node-server";
+import { createAdaptorServer } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { registerFileRoutes } from "./lib/file-router.js";
+import { attachTerminalSessionWebSocket } from "./lib/terminal-session-websocket.js";
 
 const app = new Hono();
 
@@ -24,7 +26,10 @@ const routesDir = path.join(
 await registerFileRoutes(app, routesDir);
 
 const port = Number(process.env.PORT ?? 3002);
+const server = createAdaptorServer({ fetch: app.fetch });
 
-serve({ fetch: app.fetch, port }, (info) => {
-	console.log(`api listening on http://localhost:${info.port}`);
+attachTerminalSessionWebSocket(server as Server);
+
+server.listen(port, () => {
+	console.log(`api listening on http://localhost:${port}`);
 });

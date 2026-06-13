@@ -12,6 +12,18 @@ const serviceTx = (serviceId: string) => {
 	return tx;
 };
 
+const terminalSessionTx = (terminalSessionId: string) => {
+	const tx = db.tx.terminalSessions[terminalSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Terminal session transaction builder ${terminalSessionId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 const eventTx = (eventId: string) => {
 	const tx = db.tx.events[eventId];
 
@@ -47,6 +59,11 @@ export const POST: RouteHandler = async (c) => {
 					$: {
 						fields: ["name", "pid"],
 					},
+					terminalSession: {
+						$: {
+							fields: ["name", "pid"],
+						},
+					},
 				},
 			},
 		})
@@ -67,12 +84,32 @@ export const POST: RouteHandler = async (c) => {
 	}
 
 	let killed: boolean | undefined;
+	const terminalSessionId = service.terminalSession?.id;
+	const pid = service.terminalSession?.pid ?? service.pid;
 
-	if (typeof service.pid === "number") {
+	if (typeof pid === "number") {
 		try {
 			const sandbox = await Sandbox.connect(task.sandboxId);
-			killed = await sandbox.commands.kill(service.pid);
+			killed = terminalSessionId
+				? await sandbox.pty.kill(pid)
+				: await sandbox.commands.kill(pid);
+
+			if (!killed && typeof service.pid === "number") {
+				killed = await sandbox.commands.kill(service.pid);
+			}
 		} catch (error) {
+			const now = new Date().toISOString();
+
+			if (terminalSessionId) {
+				await db.transact(
+					terminalSessionTx(terminalSessionId).update({
+						status: "stop_failed",
+						error: serializeError(error),
+						lastActivityAt: now,
+					}),
+				);
+			}
+
 			await db.transact([
 				serviceTx(serviceId).update({
 					status: "stop_failed",
@@ -82,11 +119,12 @@ export const POST: RouteHandler = async (c) => {
 						type: "factoryplane.service_stop_failed",
 						data: {
 							serviceId,
+							terminalSessionId,
 							name: service.name,
-							pid: service.pid,
+							pid,
 							error: serializeError(error),
 						},
-						createdAt: new Date().toISOString(),
+						createdAt: now,
 					})
 					.link({ task: task.id }),
 			]);
@@ -95,11 +133,24 @@ export const POST: RouteHandler = async (c) => {
 				{
 					error: "Failed to stop service",
 					serviceId,
-					pid: service.pid,
+					terminalSessionId,
+					pid,
 				},
 				500,
 			);
 		}
+	}
+
+	const now = new Date().toISOString();
+
+	if (terminalSessionId) {
+		await db.transact(
+			terminalSessionTx(terminalSessionId).update({
+				status: "stopped",
+				stoppedAt: now,
+				lastActivityAt: now,
+			}),
+		);
 	}
 
 	await db.transact([
@@ -109,17 +160,19 @@ export const POST: RouteHandler = async (c) => {
 				type: "factoryplane.service_stopped",
 				data: {
 					serviceId,
+					terminalSessionId,
 					name: service.name,
-					pid: service.pid,
+					pid,
 					killed,
 				},
-				createdAt: new Date().toISOString(),
+				createdAt: now,
 			})
 			.link({ task: task.id }),
 	]);
 
 	return c.json({
 		serviceId,
+		terminalSessionId,
 		status: "stopped",
 		killed,
 		deleted: true,

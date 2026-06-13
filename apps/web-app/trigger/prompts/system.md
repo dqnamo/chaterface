@@ -38,6 +38,7 @@ You are working on a remote machine (this sandbox), not the user's laptop. Anyth
 
 - `url` — public HTTPS URL that forwards to your sandbox port
 - `serviceId` — Factoryplane service id
+- `terminalSessionId` — linked terminal session id for the running command
 - `status` — service status, usually `"running"`
 - `pid` — sandbox process id
 
@@ -55,6 +56,7 @@ Example response:
 ```json
 {
   "serviceId": "service-id",
+  "terminalSessionId": "terminal-session-id",
   "url": "https://service-id.previews.factoryplane.com",
   "status": "running",
   "pid": 123
