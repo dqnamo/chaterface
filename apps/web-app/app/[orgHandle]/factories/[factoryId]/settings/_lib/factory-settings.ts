@@ -4,6 +4,8 @@ import type { AppSchema } from "@repo/db/schema";
 
 export type Repository = InstaQLEntity<AppSchema, "repositories">;
 export type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
+export type SkillRepository = InstaQLEntity<AppSchema, "skillRepositories">;
+export type Skill = InstaQLEntity<AppSchema, "skills">;
 
 export type RepositorySecret = {
 	id: string;
@@ -31,6 +33,28 @@ export const environmentFileTx = (fileId: string) => {
 
 	if (!tx) {
 		throw new Error(`Environment file transaction builder ${fileId} not found`);
+	}
+
+	return tx;
+};
+
+export const skillRepositoryTx = (skillRepositoryId: string) => {
+	const tx = db.tx.skillRepositories[skillRepositoryId];
+
+	if (!tx) {
+		throw new Error(
+			`Skill repository transaction builder ${skillRepositoryId} not found`,
+		);
+	}
+
+	return tx;
+};
+
+export const skillTx = (skillId: string) => {
+	const tx = db.tx.skills[skillId];
+
+	if (!tx) {
+		throw new Error(`Skill transaction builder ${skillId} not found`);
 	}
 
 	return tx;

@@ -6,6 +6,7 @@ import {
 	GitBranchIcon,
 	KeyIcon,
 	PackageIcon,
+	PuzzlePieceIcon,
 	TerminalIcon,
 	TerminalWindowIcon,
 } from "@phosphor-icons/react";
@@ -40,6 +41,11 @@ const SETTINGS_ITEMS = [
 		label: "Repositories",
 		slug: "repositories",
 		Icon: GitBranchIcon,
+	},
+	{
+		label: "Skills",
+		slug: "skills",
+		Icon: PuzzlePieceIcon,
 	},
 	{
 		label: "Environment Files",
