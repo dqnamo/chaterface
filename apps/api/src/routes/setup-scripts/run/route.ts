@@ -108,11 +108,20 @@ const getTaskForSetupScriptRun = async (agentToken: string) => {
 		.query({
 			tasks: {
 				$: {
+					fields: ["sandboxId"],
 					where: {
 						agentToken,
 					},
 				},
-				factory: {},
+				factory: {
+					$: {
+						fields: [
+							"githubAccessTokenEncrypted",
+							"newTaskSetupScript",
+							"newTurnSetupScript",
+						],
+					},
+				},
 			},
 		})
 		.then((data) => data.tasks[0]);

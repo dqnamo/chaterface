@@ -106,6 +106,7 @@ const getTaskForPullRequest = async (agentToken: string) => {
 		.query({
 			tasks: {
 				$: {
+					fields: ["pullRequestUrl"],
 					where: {
 						agentToken,
 					},
