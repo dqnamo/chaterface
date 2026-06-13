@@ -21,6 +21,7 @@ import {
 import {
 	getApiErrorMessage,
 	getFormString,
+	normalizeGitRepositoryUrl,
 	optionalRepositoryPath,
 	optionalString,
 	type Skill,
@@ -108,7 +109,7 @@ export default function FactorySkillsSettingsPage() {
 		const skillRepositoryId = id();
 		const skillRepository = {
 			id: skillRepositoryId,
-			url,
+			url: normalizeGitRepositoryUrl(url),
 			path: optionalRepositoryPath(path),
 			branch: optionalString(branch),
 			status: "idle",
@@ -140,7 +141,7 @@ export default function FactorySkillsSettingsPage() {
 
 		await db.transact(
 			skillRepositoryTx(skillRepository.id).update({
-				url,
+				url: normalizeGitRepositoryUrl(url),
 				path: optionalRepositoryPath(path),
 				branch: optionalString(branch),
 			}),
@@ -199,11 +200,7 @@ export default function FactorySkillsSettingsPage() {
 						Add Skill Repository
 					</div>
 					<div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,0.8fr)]">
-						<Field
-							label="URL"
-							name="url"
-							placeholder="git@github.com:org/agent-skills.git"
-						/>
+						<Field label="URL" name="url" placeholder="mattpocock/skills" />
 						<Field label="Path" name="path" placeholder="skills" />
 						<Field label="Branch" name="branch" placeholder="main" />
 					</div>
@@ -262,7 +259,7 @@ function SkillRepositoryForm({
 				<Field
 					label="URL"
 					name="url"
-					placeholder="git@github.com:org/agent-skills.git"
+					placeholder="mattpocock/skills"
 					defaultValue={skillRepository.url}
 				/>
 				<Field

@@ -550,6 +550,12 @@ const hasFactoryAccess = (
 
 const getGithubHttpsCloneUrl = (url: string) => {
 	const trimmed = url.trim();
+	const shorthandMatch = trimmed.match(/^([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/i);
+
+	if (shorthandMatch?.[1] && shorthandMatch[2]) {
+		return `https://github.com/${shorthandMatch[1]}/${shorthandMatch[2].replace(/\.git$/i, "")}.git`;
+	}
+
 	const httpsMatch = trimmed.match(
 		/^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/i,
 	);
