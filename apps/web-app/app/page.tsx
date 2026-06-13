@@ -5,12 +5,14 @@ import { BuildingsIcon } from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
 import Monogram from "@/components/Monogram";
 import SignOutButton from "@/components/SignOutButton";
+import { getRememberedFactory } from "@/helpers/last-factory-helper";
 import CornerBrackets from "../components/CornerBrackets";
 
 const organisationTx = (organisationId: string) => {
@@ -36,6 +38,7 @@ const memberTx = (memberId: string) => {
 };
 
 export default function HomePage() {
+	const router = useRouter();
 	const { user } = db.useAuth();
 	const currentUserId = user?.id ?? "__unauthenticated__";
 	const { data } = db.useQuery({
@@ -45,6 +48,7 @@ export default function HomePage() {
 					"members.user.id": currentUserId,
 				},
 			},
+			factories: {},
 		},
 	});
 	const [createOpen, setCreateOpen] = useState(false);
@@ -78,6 +82,38 @@ export default function HomePage() {
 	};
 
 	const organisations = data?.organisations;
+	const rememberedFactoryHref = useMemo(() => {
+		if (!user?.id || !organisations) {
+			return;
+		}
+
+		const rememberedFactory = getRememberedFactory(user.id);
+		const accessibleFactories = organisations.flatMap((organisation) =>
+			(organisation.factories ?? []).map((factory) => ({
+				factoryId: factory.id,
+				orgHandle: organisation.handle,
+			})),
+		);
+		const targetFactory =
+			accessibleFactories.find(
+				(factory) =>
+					rememberedFactory &&
+					factory.factoryId === rememberedFactory.factoryId &&
+					factory.orgHandle === rememberedFactory.orgHandle,
+			) ?? accessibleFactories.at(0);
+
+		if (!targetFactory) {
+			return;
+		}
+
+		return `/${targetFactory.orgHandle}/factories/${targetFactory.factoryId}`;
+	}, [organisations, user?.id]);
+
+	useEffect(() => {
+		if (rememberedFactoryHref) {
+			router.replace(rememberedFactoryHref);
+		}
+	}, [rememberedFactoryHref, router]);
 
 	return (
 		<div className="h-full w-full flex flex-col items-center justify-center">
