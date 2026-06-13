@@ -14,6 +14,7 @@ const execFileAsync = promisify(execFile);
 
 const MAX_SKILL_FILE_BYTES = 256 * 1024;
 const MAX_SKILL_PACKAGE_BYTES = 2 * 1024 * 1024;
+const SKILL_SYNC_TRANSACTION_BATCH_SIZE = 5;
 const SKILL_FILE_IGNORES = new Set([
 	".git",
 	"node_modules",
@@ -154,16 +155,21 @@ export async function POST(
 				}),
 			);
 
-		await db.transact([
-			...skillTransactions,
-			...removedSkillTransactions,
+		for (const transactionBatch of chunkArray(
+			[...skillTransactions, ...removedSkillTransactions],
+			SKILL_SYNC_TRANSACTION_BATCH_SIZE,
+		)) {
+			await db.transact(transactionBatch);
+		}
+
+		await db.transact(
 			repositoryTx.update({
 				status: "idle",
 				syncError: undefined,
 				lastSyncedAt: startedAt,
 				lastSyncedCommit: cloneResult.commit,
 			}),
-		]);
+		);
 
 		return NextResponse.json({
 			skillRepositoryId: repository.id,
@@ -529,6 +535,16 @@ const getSkillTx = (skillId: string) => {
 	}
 
 	return tx;
+};
+
+const chunkArray = <TValue>(values: TValue[], size: number) => {
+	const chunks: TValue[][] = [];
+
+	for (let index = 0; index < values.length; index += size) {
+		chunks.push(values.slice(index, index + size));
+	}
+
+	return chunks;
 };
 
 const getBearerToken = (authorizationHeader: string | null) => {
