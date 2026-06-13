@@ -18,6 +18,50 @@ Authenticate Factoryplane API requests with a bearer token. The token is availab
 
 Base URL: `{{FACTORYPLANE_API_URL}}`
 
+### Read factory floor
+
+Use this before proposing a factory floor change. Factory floor changes are not applied directly from the sandbox.
+
+**Endpoint:** `GET /floor`
+
+**Example:**
+
+```bash
+curl {{FACTORYPLANE_API_URL}}/floor \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
+```
+
+**Response (JSON):**
+
+- `workflow` — current floor workflow with `nodes` and `edges`
+- `pendingProposals` — floor proposals waiting for user review
+
+### Propose a factory floor change
+
+Use this when the user asks you to adjust the factory floor. This creates a proposal only; the user must manually accept it in Factoryplane before the floor changes.
+
+**Endpoint:** `POST /floor/proposals`
+
+**Body (JSON):**
+
+- `workflow` — required full replacement workflow with `nodes` and `edges`
+- `title` — optional short title for the proposal
+- `summary` — optional explanation of the change
+
+**Example:**
+
+```bash
+curl -X POST {{FACTORYPLANE_API_URL}}/floor/proposals \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Add review step","summary":"Routes agent output through a manual review block.","workflow":{"nodes":[],"edges":[]}}'
+```
+
+**Response (JSON):**
+
+- `proposalId` — proposal id shown in Factoryplane
+- `status` — `pending` until a user accepts or rejects it
+
 ### Start a service
 
 Use this when you need to run a long-lived dev server, web app, API, preview, etc. that the **user** should be able to open in their browser.

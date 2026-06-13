@@ -8,6 +8,7 @@ import {
 	CODEX_REASONING_EFFORT_OPTIONS,
 	DEFAULT_CODEX_MODEL,
 	DEFAULT_CODEX_REASONING_EFFORT,
+	getAgentDefaultOptions,
 	getCodexSpeedConfigOverrides,
 	getTaskAgentSpeed,
 } from "@/codex-options";
@@ -31,6 +32,29 @@ type FactoryWithRepositories = Factory & {
 	environmentFiles?: EnvironmentFile[];
 	skills?: Skill[];
 	mcpServers?: McpServer[];
+	organisation?: {
+		agents?: Agent[];
+	};
+};
+type WorkflowNode = {
+	id: string;
+	data?: {
+		blockType?: string;
+		label?: string;
+		prompt?: string;
+		agentId?: string;
+		completionMessage?: string;
+	};
+};
+type WorkflowEdge = {
+	source?: string;
+	sourceHandle?: string | null;
+	target?: string;
+	targetHandle?: string | null;
+};
+type FloorWorkflow = {
+	nodes?: WorkflowNode[];
+	edges?: WorkflowEdge[];
 };
 type RepositorySecret = {
 	id: string;
@@ -207,6 +231,9 @@ export const processEventTask = task({
 							environmentFiles: {},
 							skills: {},
 							mcpServers: {},
+							organisation: {
+								agents: {},
+							},
 						},
 					},
 				},
@@ -258,7 +285,7 @@ const processNewTask = async (
 	);
 	const message = `${task.name}. ${task.instructions ?? ""}.`;
 
-	await runAgentExec(
+	const completed = await runAgentExec(
 		sandbox,
 		{ ...task, diffWorkspacePath },
 		agent,
@@ -266,6 +293,10 @@ const processNewTask = async (
 		message,
 		{ attachments: getAttachments(event.data, task.id) },
 	);
+
+	if (completed) {
+		await enqueueWorkflowContinuation({ ...task, diffWorkspacePath }, factory);
+	}
 };
 
 const processNewUserMessage = async (
@@ -292,7 +323,7 @@ const processNewUserMessage = async (
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	await killTaskAgentProcess(sandbox, task);
 	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, factory);
-	await runAgentExec(
+	const completed = await runAgentExec(
 		sandbox,
 		task,
 		agent,
@@ -303,7 +334,189 @@ const processNewUserMessage = async (
 			resumeLast: true,
 		},
 	);
+
+	if (completed) {
+		await enqueueWorkflowContinuation(task, factory);
+	}
 };
+
+const enqueueWorkflowContinuation = async (
+	task: Task,
+	factory: FactoryWithRepositories,
+) => {
+	const nextNode = findNextWorkflowNode(
+		factory.floorWorkflow,
+		task.workflowNodeId,
+	);
+
+	if (!nextNode) {
+		return;
+	}
+
+	if (nextNode.data?.blockType === "completeTask") {
+		const now = new Date().toISOString();
+		await db.transact(
+			taskTx(task.id).update({
+				status: "complete",
+				completedAt: now,
+				workflowState: "complete",
+				workflowNodeId: nextNode.id,
+			}),
+		);
+		await persistFactoryplaneEvent(task.id, "factoryplane.workflow.completed", {
+			taskId: task.id,
+			workflowNodeId: nextNode.id,
+			message: nextNode.data.completionMessage,
+		});
+		return;
+	}
+
+	if (nextNode.data?.blockType !== "agentRun") {
+		return;
+	}
+
+	const requestedAgentId = getOptionalDataString(nextNode.data.agentId);
+	const agent = resolveWorkflowAgent(factory, requestedAgentId);
+
+	if (!agent) {
+		throw new Error(
+			requestedAgentId
+				? `Workflow agent ${requestedAgentId} not found`
+				: "Workflow has an Agent Run block but no agents are configured",
+		);
+	}
+
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const content =
+		renderWorkflowTemplate(
+			nextNode.data.prompt || "Use the workflow input:\n\n{{input.message}}",
+			workflowInput,
+		) || "Continue this workflow task.";
+	const agentDefaults = getAgentDefaultOptions(agent.settings);
+	const eventId = randomUUID();
+
+	await db.transact([
+		taskTx(task.id)
+			.update({
+				status: "in_progress",
+				agentModel: agentDefaults.agentModel,
+				agentReasoningEffort: agentDefaults.agentReasoningEffort,
+				agentSpeed: agentDefaults.agentSpeed,
+				workflowState: "agent_running",
+				workflowNodeId: nextNode.id,
+			})
+			.link({ agent: agent.id }),
+		eventTx(eventId)
+			.create({
+				type: "factoryplane.new_user_message",
+				data: {
+					taskId: task.id,
+					content,
+					images: getWorkflowImages(workflowInput),
+					workflow: {
+						state: "agent_running",
+						input: workflowInput,
+						agentRunNodeId: nextNode.id,
+						agentId: agent.id,
+					},
+				},
+				createdAt: new Date().toISOString(),
+			})
+			.link({ task: task.id }),
+	]);
+};
+
+const findNextWorkflowNode = (
+	workflowValue: unknown,
+	currentNodeId: string | undefined,
+) => {
+	if (!currentNodeId) {
+		return undefined;
+	}
+
+	const workflow = parseFloorWorkflow(workflowValue);
+	const edge = workflow.edges.find(
+		(currentEdge) =>
+			currentEdge.source === currentNodeId &&
+			(currentEdge.sourceHandle === undefined ||
+				currentEdge.sourceHandle === null ||
+				currentEdge.sourceHandle === "output") &&
+			(currentEdge.targetHandle === undefined ||
+				currentEdge.targetHandle === null ||
+				currentEdge.targetHandle === "input"),
+	);
+
+	if (!edge?.target) {
+		return undefined;
+	}
+
+	return workflow.nodes.find((node) => node.id === edge.target);
+};
+
+const parseFloorWorkflow = (value: unknown): Required<FloorWorkflow> => {
+	if (!isRecord(value)) {
+		return { nodes: [], edges: [] };
+	}
+
+	return {
+		nodes: Array.isArray(value.nodes) ? value.nodes.filter(isWorkflowNode) : [],
+		edges: Array.isArray(value.edges) ? value.edges.filter(isWorkflowEdge) : [],
+	};
+};
+
+const isWorkflowNode = (value: unknown): value is WorkflowNode =>
+	isRecord(value) && typeof value.id === "string";
+
+const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
+	isRecord(value) &&
+	(typeof value.source === "string" || value.source === undefined) &&
+	(typeof value.target === "string" || value.target === undefined);
+
+const resolveWorkflowAgent = (
+	factory: FactoryWithRepositories,
+	agentId: string | undefined,
+) => {
+	const agents = factory.organisation?.agents ?? [];
+	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
+};
+
+const getWorkflowInput = (value: unknown): Record<string, unknown> =>
+	isRecord(value) ? value : {};
+
+const getWorkflowImages = (input: Record<string, unknown>) =>
+	Array.isArray(input.images) ? input.images : [];
+
+const renderWorkflowTemplate = (
+	template: string,
+	input: Record<string, unknown>,
+) =>
+	template
+		.replace(/\{\{\s*input(?:\.([a-zA-Z0-9_-]+))?\s*\}\}/g, (_, key) => {
+			const value = typeof key === "string" ? input[key] : input;
+			return stringifyTemplateValue(value);
+		})
+		.trim();
+
+const stringifyTemplateValue = (value: unknown) => {
+	if (value === undefined || value === null) {
+		return "";
+	}
+
+	if (typeof value === "string") {
+		return value;
+	}
+
+	if (typeof value === "number" || typeof value === "boolean") {
+		return String(value);
+	}
+
+	return JSON.stringify(value, null, 2) ?? "";
+};
+
+const getOptionalDataString = (value: unknown) =>
+	typeof value === "string" && value.trim().length > 0
+		? value.trim()
+		: undefined;
 
 const setupTaskSandbox = async (
 	agent: Agent,
@@ -1348,7 +1561,7 @@ const runAgentExec = async (
 	factory: Factory,
 	prompt: string,
 	options: RunCodexExecOptions = {},
-) => {
+): Promise<boolean> => {
 	const provider = getAgentProvider(agent);
 	const attachmentPaths = options.attachments?.length
 		? await materializeAttachments(sandbox, task.id, options.attachments)
@@ -1391,6 +1604,7 @@ const runAgentExec = async (
 	await updateTaskAgentPid(task.id, command.pid);
 
 	let wasInterrupted = false;
+	let completed = false;
 
 	try {
 		const result = await command.wait();
@@ -1398,6 +1612,7 @@ const runAgentExec = async (
 
 		if (!wasInterrupted) {
 			await updateTaskStatus(task.id, "idle");
+			completed = true;
 		}
 	} catch (error) {
 		const currentPid = await getTaskAgentPid(task.id);
@@ -1409,7 +1624,7 @@ const runAgentExec = async (
 				error,
 			});
 			wasInterrupted = true;
-			return;
+			return false;
 		}
 
 		throw error;
@@ -1429,6 +1644,8 @@ const runAgentExec = async (
 			await syncAgentAuthFromSandbox(sandbox, agent.id);
 		}
 	}
+
+	return completed;
 };
 
 const materializeAttachments = async (
