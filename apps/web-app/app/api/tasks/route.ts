@@ -12,6 +12,7 @@ type CreateTaskBody = {
 	factoryId?: string;
 	agentId?: string;
 	instructions?: string;
+	attachments?: unknown;
 	images?: unknown;
 	agentModel: string;
 	agentReasoningEffort: string;
@@ -110,6 +111,7 @@ export async function POST(req: NextRequest) {
 					taskId,
 					name,
 					instructions: body.instructions,
+					attachments: body.attachments,
 					images: body.images,
 				},
 				createdAt,
@@ -311,6 +313,7 @@ const parseCreateTaskBody = (
 	factoryId: getOptionalString(value.factoryId),
 	agentId: getOptionalString(value.agentId),
 	instructions: getOptionalString(value.instructions),
+	attachments: Array.isArray(value.attachments) ? value.attachments : undefined,
 	images: Array.isArray(value.images) ? value.images : undefined,
 	agentModel: getOptionalString(value.agentModel) ?? DEFAULT_CODEX_MODEL,
 	agentReasoningEffort:

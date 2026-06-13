@@ -19,8 +19,8 @@ import {
 import { Button } from "@/components/Button";
 import CornerCubes from "@/components/CornerCubes";
 import {
-	getImageFiles,
-	hasImageFiles,
+	getAttachmentFiles,
+	hasAttachmentFiles,
 	ImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
@@ -48,13 +48,13 @@ export default function FactoryPage() {
 	const [pendingTaskId, setPendingTaskId] = useState(() => id());
 	const [isCreating, setIsCreating] = useState(false);
 	const [createError, setCreateError] = useState<string>();
-	const [isDraggingImages, setIsDraggingImages] = useState(false);
+	const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
 	const {
-		attachments: imageAttachments,
-		addFiles: addImageFiles,
-		removeAttachment: removeImageAttachment,
-		clearAttachments: clearImageAttachments,
-		uploadAttachments: uploadImageAttachments,
+		attachments: fileAttachments,
+		addFiles: addAttachmentFiles,
+		removeAttachment: removeFileAttachment,
+		clearAttachments: clearFileAttachments,
+		uploadAttachments: uploadFileAttachments,
 	} = useImageAttachments({
 		taskId: pendingTaskId,
 		uploadImmediately: true,
@@ -115,7 +115,7 @@ export default function FactoryPage() {
 		setCreateError(undefined);
 
 		try {
-			const images = await uploadImageAttachments(taskId);
+			const attachments = await uploadFileAttachments(taskId);
 			const response = await fetch("/api/tasks", {
 				method: "POST",
 				headers: {
@@ -127,7 +127,7 @@ export default function FactoryPage() {
 					factoryId: currentFactoryId,
 					agentId: resolvedAgentId,
 					instructions,
-					images,
+					attachments,
 					agentModel,
 					agentReasoningEffort,
 					agentSpeed,
@@ -141,7 +141,7 @@ export default function FactoryPage() {
 				throw new Error(result?.message ?? "Failed to create task.");
 			}
 
-			clearImageAttachments();
+			clearFileAttachments();
 			setPendingTaskId(id());
 			setTaskInstructions("");
 			router.push(
@@ -159,13 +159,13 @@ export default function FactoryPage() {
 	const handleComposerDragOver = (
 		event: ReactDragEvent<HTMLFieldSetElement>,
 	) => {
-		if (!hasImageFiles(event.dataTransfer)) {
+		if (!hasAttachmentFiles(event.dataTransfer)) {
 			return;
 		}
 
 		event.preventDefault();
 		event.dataTransfer.dropEffect = "copy";
-		setIsDraggingImages(true);
+		setIsDraggingAttachments(true);
 	};
 
 	const handleComposerDragLeave = (
@@ -174,29 +174,29 @@ export default function FactoryPage() {
 		const nextTarget = event.relatedTarget as Node | null;
 
 		if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
-			setIsDraggingImages(false);
+			setIsDraggingAttachments(false);
 		}
 	};
 
 	const handleComposerDrop = (event: ReactDragEvent<HTMLFieldSetElement>) => {
-		if (!hasImageFiles(event.dataTransfer)) {
+		if (!hasAttachmentFiles(event.dataTransfer)) {
 			return;
 		}
 
 		event.preventDefault();
-		setIsDraggingImages(false);
-		addImageFiles(getImageFiles(event.dataTransfer));
+		setIsDraggingAttachments(false);
+		addAttachmentFiles(getAttachmentFiles(event.dataTransfer));
 	};
 
 	const handleComposerPaste = (
 		event: ReactClipboardEvent<HTMLFieldSetElement>,
 	) => {
-		if (!hasImageFiles(event.clipboardData)) {
+		if (!hasAttachmentFiles(event.clipboardData)) {
 			return;
 		}
 
 		event.preventDefault();
-		addImageFiles(getImageFiles(event.clipboardData));
+		addAttachmentFiles(getAttachmentFiles(event.clipboardData));
 	};
 
 	return (
@@ -212,7 +212,7 @@ export default function FactoryPage() {
 				aria-label="New task composer"
 				className={cn(
 					"flex flex-col max-w-xl w-full bg-grayscale-1 border border-grayscale-4 relative transition-colors",
-					isDraggingImages && "border-accent-8 bg-accent-2",
+					isDraggingAttachments && "border-accent-8 bg-accent-2",
 				)}
 				onDragLeave={handleComposerDragLeave}
 				onDragOver={handleComposerDragOver}
@@ -243,10 +243,10 @@ export default function FactoryPage() {
 						onSubmit={createTask}
 					/>
 					<ImageAttachments
-						attachments={imageAttachments}
+						attachments={fileAttachments}
 						disabled={isCreating}
-						onAddFiles={addImageFiles}
-						onRemoveAttachment={removeImageAttachment}
+						onAddFiles={addAttachmentFiles}
+						onRemoveAttachment={removeFileAttachment}
 					/>
 					{createError ? (
 						<p className="border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">

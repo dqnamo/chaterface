@@ -52,7 +52,7 @@ type CodexEvent = {
 };
 type AgentProvider = "codex" | "cursor";
 type FactorySetupScriptKind = "new_task" | "new_turn";
-type ImageAttachment = {
+type Attachment = {
 	id: string;
 	path: string;
 	url?: string;
@@ -62,8 +62,9 @@ type ImageAttachment = {
 };
 
 type RunCodexExecOptions = {
-	images?: ImageAttachment[];
+	attachments?: Attachment[];
 	imagePaths?: string[];
+	attachmentPaths?: string[];
 	resumeLast?: boolean;
 };
 
@@ -259,7 +260,7 @@ const processNewTask = async (
 		agent,
 		factory,
 		message,
-		{ images: getImageAttachments(event.data, task.id) },
+		{ attachments: getAttachments(event.data, task.id) },
 	);
 };
 
@@ -270,11 +271,11 @@ const processNewUserMessage = async (
 	factory: FactoryWithRepositories,
 ) => {
 	const content = getStringDataValue(event.data, "content");
-	const images = getImageAttachments(event.data, task.id);
+	const attachments = getAttachments(event.data, task.id);
 
-	if (!content && images.length === 0) {
+	if (!content && attachments.length === 0) {
 		console.log(
-			"Skipping user message event without content or images",
+			"Skipping user message event without content or attachments",
 			event.id,
 		);
 		return;
@@ -292,9 +293,9 @@ const processNewUserMessage = async (
 		task,
 		agent,
 		factory,
-		content ?? "Please use the attached image input.",
+		content ?? "Please use the attached file input.",
 		{
-			images,
+			attachments,
 			resumeLast: true,
 		},
 	);
@@ -1344,9 +1345,14 @@ const runAgentExec = async (
 	options: RunCodexExecOptions = {},
 ) => {
 	const provider = getAgentProvider(agent);
+	const attachmentPaths = options.attachments?.length
+		? await materializeAttachments(sandbox, task.id, options.attachments)
+		: [];
 	const imagePaths =
-		provider === "codex" && options.images?.length
-			? await materializeImageAttachments(sandbox, task.id, options.images)
+		provider === "codex"
+			? attachmentPaths
+					.filter((attachment) => attachment.contentType.startsWith("image/"))
+					.map((attachment) => attachment.filePath)
 			: [];
 	const { envs, agentToken } = await setupRun(sandbox, task, agent, factory);
 	const output = createAgentOutputHandler(task.id, provider);
@@ -1360,6 +1366,9 @@ const runAgentExec = async (
 			sandbox.commands.run(
 				buildAgentExecCommand(provider, task, prompt, {
 					...options,
+					attachmentPaths: attachmentPaths.map(
+						(attachment) => attachment.filePath,
+					),
 					imagePaths,
 				}),
 				{
@@ -1417,38 +1426,42 @@ const runAgentExec = async (
 	}
 };
 
-const materializeImageAttachments = async (
+const materializeAttachments = async (
 	sandbox: Sandbox,
 	taskId: string,
-	images: ImageAttachment[],
+	attachments: Attachment[],
 ) => {
-	const validImages = images.filter((image) =>
-		image.path.startsWith(`tasks/${taskId}/images/`),
+	const validAttachments = attachments.filter((attachment) =>
+		isValidTaskAttachmentPath(taskId, attachment.path),
 	);
 
-	if (validImages.length === 0) {
+	if (validAttachments.length === 0) {
 		return [];
 	}
 
-	const imageDir = `/tmp/factoryplane-images/${taskId}`;
+	const attachmentDir = `/tmp/factoryplane-attachments/${taskId}`;
 	const downloads = await Promise.all(
-		validImages.map(async (image, index) => {
-			const downloadUrl = await db.storage.getDownloadUrl(image.path);
-			const filePath = `${imageDir}/${String(index + 1).padStart(2, "0")}-${sanitizeSandboxFileName(image.name)}`;
+		validAttachments.map(async (attachment, index) => {
+			const downloadUrl = await db.storage.getDownloadUrl(attachment.path);
+			const filePath = `${attachmentDir}/${String(index + 1).padStart(2, "0")}-${sanitizeSandboxFileName(attachment.name)}`;
 
-			return { downloadUrl, filePath };
+			return {
+				contentType: attachment.contentType,
+				downloadUrl,
+				filePath,
+			};
 		}),
 	);
 
 	await runSetupStep(
 		taskId,
-		"image_attachments",
-		"Download image attachments",
+		"file_attachments",
+		"Download file attachments",
 		() =>
 			sandbox.commands.run(
 				[
 					"set -e",
-					`mkdir -p ${shellQuote(imageDir)}`,
+					`mkdir -p ${shellQuote(attachmentDir)}`,
 					...downloads.map(
 						(download) =>
 							`curl -fL --retry 3 --retry-delay 1 -o ${shellQuote(download.filePath)} ${shellQuote(download.downloadUrl)}`,
@@ -1458,7 +1471,10 @@ const materializeImageAttachments = async (
 			),
 	);
 
-	return downloads.map((download) => download.filePath);
+	return downloads.map((download) => ({
+		contentType: download.contentType,
+		filePath: download.filePath,
+	}));
 };
 
 const createTaskWorkspaceBaseline = async (
@@ -1669,11 +1685,34 @@ const buildAgentExecCommand = (
 	prompt: string,
 	options: RunCodexExecOptions = {},
 ) => {
+	const promptWithAttachments = appendAttachmentReferences(
+		prompt,
+		options.attachmentPaths,
+	);
+
 	if (provider === "cursor") {
-		return buildCursorExecCommand(task, prompt, options);
+		return buildCursorExecCommand(task, promptWithAttachments, options);
 	}
 
-	return buildCodexExecCommand(task, prompt, options);
+	return buildCodexExecCommand(task, promptWithAttachments, options);
+};
+
+const appendAttachmentReferences = (
+	prompt: string,
+	attachmentPaths: string[] | undefined,
+) => {
+	if (!attachmentPaths?.length) {
+		return prompt;
+	}
+
+	return [
+		prompt,
+		"",
+		"Attached files have been downloaded into the sandbox at:",
+		...attachmentPaths.map((filePath) => `- ${filePath}`),
+		"",
+		"Use these local paths when you need to inspect or reference the uploaded files.",
+	].join("\n");
 };
 
 const buildCodexExecCommand = (
@@ -2056,30 +2095,29 @@ const getStringDataValue = (data: unknown, key: string) => {
 	return typeof value === "string" ? value : undefined;
 };
 
-const getImageAttachments = (
-	data: unknown,
-	taskId: string,
-): ImageAttachment[] => {
-	if (!isRecord(data) || !Array.isArray(data.images)) {
+const getAttachments = (data: unknown, taskId: string): Attachment[] => {
+	if (!isRecord(data)) {
 		return [];
 	}
 
-	return data.images.flatMap((item) => {
+	const items = [
+		...(Array.isArray(data.attachments) ? data.attachments : []),
+		...(Array.isArray(data.images) ? data.images : []),
+	];
+
+	return items.flatMap((item) => {
 		if (!isRecord(item)) {
 			return [];
 		}
 
 		const path = getStringRecordValue(item, "path");
 		const id = getStringRecordValue(item, "id") ?? path;
-		const name = getStringRecordValue(item, "name") ?? "image";
-		const contentType = getStringRecordValue(item, "contentType") ?? "image";
+		const name = getStringRecordValue(item, "name") ?? "file";
+		const contentType =
+			getStringRecordValue(item, "contentType") ?? "application/octet-stream";
 		const size = item.size;
 
-		if (
-			!id ||
-			!path?.startsWith(`tasks/${taskId}/images/`) ||
-			!contentType.startsWith("image")
-		) {
+		if (!id || !path || !isValidTaskAttachmentPath(taskId, path)) {
 			return [];
 		}
 
@@ -2095,6 +2133,10 @@ const getImageAttachments = (
 		];
 	});
 };
+
+const isValidTaskAttachmentPath = (taskId: string, path: string) =>
+	path.startsWith(`tasks/${taskId}/attachments/`) ||
+	path.startsWith(`tasks/${taskId}/images/`);
 
 const getStringRecordValue = (record: Record<string, unknown>, key: string) => {
 	const value = record[key];
