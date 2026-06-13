@@ -25,10 +25,12 @@ type Factory = InstaQLEntity<AppSchema, "factories">;
 type Repository = InstaQLEntity<AppSchema, "repositories">;
 type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
 type Skill = InstaQLEntity<AppSchema, "skills">;
+type McpServer = InstaQLEntity<AppSchema, "mcpServers">;
 type FactoryWithRepositories = Factory & {
 	repositories?: Repository[];
 	environmentFiles?: EnvironmentFile[];
 	skills?: Skill[];
+	mcpServers?: McpServer[];
 };
 type RepositorySecret = {
 	id: string;
@@ -70,7 +72,9 @@ type SetupStepOptions = {
 };
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
+const CODEX_CONFIG_PATH = "~/.codex/config.toml";
 const e2bPortPlaceholder = ["$", "{PORT}"].join("");
+const DEFAULT_API_URL = "https://api.factoryplane.com";
 const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
 const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
 const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
@@ -197,6 +201,7 @@ export const processEventTask = task({
 							repositories: {},
 							environmentFiles: {},
 							skills: {},
+							mcpServers: {},
 						},
 					},
 				},
@@ -379,6 +384,7 @@ const setupTaskSandbox = async (
 	);
 	await writeFactoryEnvironmentFiles(sandbox, task.id, factory);
 	await installFactorySkills(sandbox, task.id, provider, factory);
+	await writeCodexMcpConfig(sandbox, task.id, provider, factory);
 	await runFactorySetupScript(
 		sandbox,
 		task.id,
@@ -738,6 +744,96 @@ const getFactorySkills = (
 			instructions: skill.instructions,
 			files: getSkillFiles(skill.files),
 		}));
+};
+
+const writeCodexMcpConfig = async (
+	sandbox: Sandbox,
+	taskId: string,
+	provider: AgentProvider,
+	factory: FactoryWithRepositories,
+) => {
+	if (provider !== "codex") {
+		return;
+	}
+
+	const mcpServers = getFactoryMcpServers(factory.mcpServers);
+
+	if (mcpServers.length === 0) {
+		return;
+	}
+
+	const config = buildCodexMcpConfig(mcpServers);
+
+	await runSetupStep(
+		taskId,
+		"codex_mcp_config",
+		"Configure MCP servers",
+		async () => {
+			await sandbox.commands.run("mkdir -p ~/.codex", { timeoutMs: 30_000 });
+			await sandbox.files.write(CODEX_CONFIG_PATH, `${config}\n`);
+		},
+		{ timeoutMs: 60_000 },
+	);
+};
+
+const getFactoryMcpServers = (
+	mcpServers: McpServer[] | undefined,
+): Array<{ id: string; name: string; proxyUrl: string }> => {
+	if (!mcpServers) {
+		return [];
+	}
+
+	const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+
+	return [...mcpServers]
+		.filter(
+			(mcpServer) =>
+				mcpServer.enabled !== false &&
+				(mcpServer.transport ?? "streamable_http") === "streamable_http" &&
+				typeof mcpServer.name === "string" &&
+				typeof mcpServer.url === "string",
+		)
+		.sort(
+			(a, b) =>
+				new Date(a.createdAt ?? 0).getTime() -
+				new Date(b.createdAt ?? 0).getTime(),
+		)
+		.map((mcpServer) => ({
+			id: mcpServer.id,
+			name: normalizeMcpServerName(mcpServer.name) ?? mcpServer.id,
+			proxyUrl: `${apiUrl}/mcp-proxy/${mcpServer.id}`,
+		}));
+};
+
+const buildCodexMcpConfig = (
+	mcpServers: Array<{ id: string; name: string; proxyUrl: string }>,
+) =>
+	mcpServers
+		.map((mcpServer) =>
+			[
+				`[mcp_servers.${formatTomlString(mcpServer.name)}]`,
+				`url = ${formatTomlString(mcpServer.proxyUrl)}`,
+				`bearer_token_env_var = ${formatTomlString("FACTORYPLANE_AUTH_TOKEN")}`,
+				"enabled = true",
+			].join("\n"),
+		)
+		.join("\n\n");
+
+const normalizeMcpServerName = (value: string) => {
+	const trimmed = value.trim();
+	return /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(trimmed) ? trimmed : undefined;
+};
+
+const formatTomlString = (value: string) => JSON.stringify(value);
+
+const normalizeApiUrl = (value: string | undefined) => {
+	const trimmed = value?.trim();
+
+	if (!trimmed) {
+		return DEFAULT_API_URL;
+	}
+
+	return trimmed.replace(/\/+$/, "");
 };
 
 const getSkillFiles = (
