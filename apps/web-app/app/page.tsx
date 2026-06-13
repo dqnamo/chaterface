@@ -4,13 +4,10 @@ import { id } from "@instantdb/react";
 import { BuildingsIcon } from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Dialog } from "@/components/Dialog";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
-import Monogram from "@/components/Monogram";
 import SignOutButton from "@/components/SignOutButton";
 import { getRememberedFactory } from "@/helpers/last-factory-helper";
 import CornerBrackets from "../components/CornerBrackets";
@@ -51,7 +48,6 @@ export default function HomePage() {
 			factories: {},
 		},
 	});
-	const [createOpen, setCreateOpen] = useState(false);
 	const [organisationName, setOrganisationName] = useState("");
 	const [organisationHandle, setOrganisationHandle] = useState("");
 
@@ -76,13 +72,14 @@ export default function HomePage() {
 				.link({ organisation: organisationId, user: user.id }),
 		]);
 
+		const nextHandle = organisationHandle;
 		setOrganisationName("");
 		setOrganisationHandle("");
-		setCreateOpen(false);
+		router.push(`/${nextHandle}/factories`);
 	};
 
 	const organisations = data?.organisations;
-	const rememberedFactoryHref = useMemo(() => {
+	const redirectHref = useMemo(() => {
 		if (!user?.id || !organisations) {
 			return;
 		}
@@ -103,141 +100,88 @@ export default function HomePage() {
 			) ?? accessibleFactories.at(0);
 
 		if (!targetFactory) {
-			return;
+			const targetOrganisation = organisations.at(0);
+
+			if (!targetOrganisation) {
+				return;
+			}
+
+			return `/${targetOrganisation.handle}/factories`;
 		}
 
 		return `/${targetFactory.orgHandle}/factories/${targetFactory.factoryId}`;
 	}, [organisations, user?.id]);
 
 	useEffect(() => {
-		if (rememberedFactoryHref) {
-			router.replace(rememberedFactoryHref);
+		if (redirectHref) {
+			router.replace(redirectHref);
 		}
-	}, [rememberedFactoryHref, router]);
+	}, [redirectHref, router]);
+
+	if (!organisations || organisations.length > 0) {
+		return (
+			<div className="h-full w-full flex flex-col items-center justify-center">
+				<Logo size={8} />
+			</div>
+		);
+	}
 
 	return (
 		<div className="h-full w-full flex flex-col items-center justify-center">
 			<Logo size={8} />
 			<div className="flex flex-col gap-px items-center justify-center mt-8">
 				<h1 className="text-md font-medium text-grayscale-12">
-					Your Organisations
+					Create Organisation
 				</h1>
 				<p className="text-sm text-grayscale-11">
-					Select your organisation to manage your factories
+					Create an organisation to manage your factories
 				</p>
 				<SignOutButton className="mt-3" />
 			</div>
-			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-xl w-full mt-8 gap-2 px-4">
-				{organisations?.map((organisation) => (
-					<Link
-						key={organisation.id}
-						href={`/${organisation.handle}/factories`}
-						className="relative bg-grayscale-1 flex flex-row items-center gap-3 group border border-grayscale-4 p-3 transition-colors duration-150 hover:border-grayscale-6"
-					>
-						<CornerBrackets placement="inside" color="accent-9" />
-
-						<Monogram seed={organisation.name} letters={1} />
-						<div className="flex flex-col gap-1">
-							<h2 className="text-sm font-medium leading-none text-grayscale-11 group-hover:text-grayscale-12 transition-colors">
-								{organisation.name}
-							</h2>
-							<p className="text-xs leading-none text-grayscale-10 group-hover:text-grayscale-11 transition-colors">
-								{organisation.handle}
-							</p>
-						</div>
-					</Link>
-				))}
-			</div>
-
-			<Dialog.Root open={createOpen} onOpenChange={setCreateOpen}>
-				<Dialog.Trigger
-					render={
-						<button
-							type="button"
-							className="flex flex-row items-center gap-2 relative group bg-grayscale-12 p-2 px-3 mt-8 overflow-visible"
-						/>
-					}
+			<form
+				className="mt-8 flex w-full max-w-md flex-col gap-3 px-4"
+				onSubmit={(event) => {
+					event.preventDefault();
+					void createOrganisation().catch((error) => {
+						console.error("Failed to create organisation", {
+							error: error instanceof Error ? error.message : String(error),
+						});
+					});
+				}}
+			>
+				<div className="flex flex-col gap-1">
+					<p className="text-xs text-grayscale-11">Name</p>
+					<Input
+						type="text"
+						placeholder="Organisation Name"
+						value={organisationName}
+						onChange={(e) => setOrganisationName(e.target.value)}
+					/>
+				</div>
+				<div className="flex flex-col gap-1">
+					<p className="text-xs text-grayscale-11">Handle</p>
+					<Input
+						type="text"
+						placeholder="Organisation Handle"
+						value={organisationHandle}
+						onChange={(e) => setOrganisationHandle(e.target.value)}
+					/>
+				</div>
+				<button
+					type="submit"
+					className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-2 mt-2 overflow-visible"
 				>
 					<CornerBrackets
 						placement="outside"
 						spacing={4}
 						translate={6}
+						size={6}
 						color="grayscale-12"
 					/>
-					<BuildingsIcon
-						weight="bold"
-						className="size-4 text-grayscale-2 group-hover:text-grayscale-1 transition-colors"
-					/>
-					<p className="text-sm text-grayscale-2 group-hover:text-grayscale-1 transition-colors">
-						New Organisation
-					</p>
-				</Dialog.Trigger>
-				<Dialog.Portal>
-					<Dialog.Backdrop />
-					<Dialog.Popup>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<Dialog.Title>Create Organisation</Dialog.Title>
-								<Dialog.Description>
-									Create a new organisation to manage your factories.
-								</Dialog.Description>
-							</div>
-						</div>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<p className="text-xs text-grayscale-11">Name</p>
-								<p className="text-xs text-grayscale-10">
-									The name of the organisation.
-								</p>
-							</div>
-							<Input
-								type="text"
-								placeholder="Organisation Name"
-								value={organisationName}
-								onChange={(e) => setOrganisationName(e.target.value)}
-							/>
-						</div>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<p className="text-xs text-grayscale-11">Handle</p>
-								<p className="text-xs text-grayscale-10">
-									A unique handle used in the organisation's URL.
-								</p>
-							</div>
-							<Input
-								type="text"
-								placeholder="Organisation Handle"
-								value={organisationHandle}
-								onChange={(e) => setOrganisationHandle(e.target.value)}
-							/>
-						</div>
-						<div className="flex flex-row items-center justify-end gap-2 p-3">
-							<Dialog.Close>Cancel</Dialog.Close>
-							<button
-								type="button"
-								onClick={() => {
-									void createOrganisation().catch((error) => {
-										console.error("Failed to create organisation", {
-											error:
-												error instanceof Error ? error.message : String(error),
-										});
-									});
-								}}
-								className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
-							>
-								<CornerBrackets
-									placement="outside"
-									spacing={4}
-									translate={6}
-									size={6}
-									color="grayscale-12"
-								/>
-								Create
-							</button>
-						</div>
-					</Dialog.Popup>
-				</Dialog.Portal>
-			</Dialog.Root>
+					<BuildingsIcon weight="bold" className="size-4" />
+					Create Organisation
+				</button>
+			</form>
 		</div>
 	);
 }
