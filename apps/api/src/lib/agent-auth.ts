@@ -20,10 +20,21 @@ export const getTaskForAgentToken = async (agentToken: string) => {
 					},
 				},
 				factory: {
+					$: {
+						fields: [
+							"environmentPackages",
+							"floorWorkflow",
+							"newTaskSetupScript",
+							"newTurnSetupScript",
+						],
+					},
 					repositories: {},
 					environmentFiles: {},
 					mcpServers: {},
 					floorChangeProposals: {
+						$: {
+							fields: ["title", "summary", "status", "createdAt"],
+						},
 						task: {},
 					},
 				},
