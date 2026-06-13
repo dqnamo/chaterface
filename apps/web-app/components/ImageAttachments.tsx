@@ -362,19 +362,19 @@ export function ImageAttachments({
 	return (
 		<div className={cn("flex flex-col gap-2", className)}>
 			{attachments.length > 0 ? (
-				<div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2">
+				<div className="flex flex-col gap-1.5">
 					{attachments.map((attachment) => (
 						<div
-							className="group relative min-w-0 overflow-hidden border border-grayscale-4 bg-grayscale-2"
+							className="group flex min-w-0 items-center gap-2 overflow-hidden border border-grayscale-4 bg-grayscale-2 p-1"
 							key={attachment.id}
 						>
 							{/* biome-ignore lint/performance/noImgElement: previews use browser object URLs from local File objects. */}
 							<img
 								alt={attachment.name}
-								className="aspect-square w-full object-cover"
+								className="size-10 shrink-0 object-cover"
 								src={attachment.previewUrl}
 							/>
-							<div className="min-w-0 px-2 py-1">
+							<div className="min-w-0 flex-1">
 								<p className="truncate text-xs text-grayscale-12">
 									{attachment.name}
 								</p>
@@ -384,7 +384,7 @@ export function ImageAttachments({
 							</div>
 							<button
 								aria-label={`Remove ${attachment.name}`}
-								className="absolute right-1 top-1 flex size-6 items-center justify-center bg-grayscale-1/95 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:text-red-10"
+								className="flex size-7 shrink-0 items-center justify-center bg-grayscale-1 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:text-red-10 disabled:cursor-not-allowed disabled:opacity-50"
 								disabled={disabled}
 								onClick={() => onRemoveAttachment(attachment.id)}
 								type="button"
