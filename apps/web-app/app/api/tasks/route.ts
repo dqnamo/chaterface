@@ -1,7 +1,5 @@
 import db, { id } from "@repo/db/admin";
-import { getBearerToken } from "../../lib/agent-auth.js";
-import { getFactoryForApiKey } from "../../lib/factory-api-key-auth.js";
-import type { RouteHandler } from "../../lib/file-router.js";
+import { type NextRequest, NextResponse } from "next/server";
 
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
 const DEFAULT_CODEX_REASONING_EFFORT = "medium";
@@ -10,10 +8,11 @@ const DEFAULT_TASK_NAMING_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const DEFAULT_TASK_NAME = "New task";
 
 type CreateTaskBody = {
-	name?: string;
-	instructions?: string;
+	taskId?: string;
 	factoryId?: string;
 	agentId?: string;
+	instructions?: string;
+	images?: unknown;
 	agentModel: string;
 	agentReasoningEffort: string;
 	agentSpeed: string;
@@ -23,9 +22,15 @@ type Agent = {
 	id: string;
 };
 
-type FactoryWithAgents = {
+type AuthenticatedFactory = {
+	id: string;
 	organisation?: {
 		agents?: Agent[];
+		members?: Array<{
+			user?: {
+				id: string;
+			};
+		}>;
 	};
 };
 
@@ -49,52 +54,42 @@ const eventTx = (eventId: string) => {
 	return tx;
 };
 
-export const POST: RouteHandler = async (c) => {
-	const token = getBearerToken(c.req.header("Authorization"));
+export async function POST(req: NextRequest) {
+	const body = parseCreateTaskBody(await readJson(req));
 
-	if (!token) {
-		return c.json({ error: "Unauthorized" }, 401);
-	}
-
-	const authResult = await getFactoryForApiKey(token);
-
-	if (!authResult) {
-		return c.json({ error: "Unauthorized" }, 401);
-	}
-
-	const body = parseCreateTaskBody(await readJson(c.req.json()));
-
-	if (!body) {
-		return c.json(
-			{
-				error:
-					"Expected name or instructions when creating a task. Optional fields: factoryId, agentId, agentModel, agentReasoningEffort, agentSpeed.",
-			},
-			400,
+	if (!body?.factoryId || !body.instructions) {
+		return NextResponse.json(
+			{ message: "factoryId and instructions are required" },
+			{ status: 400 },
 		);
 	}
 
-	if (body.factoryId && body.factoryId !== authResult.factoryId) {
-		return c.json({ error: "API key is not scoped to this factory" }, 403);
+	const authResult = await authenticateFactoryRequest(req, body.factoryId);
+
+	if (!authResult.ok) {
+		return NextResponse.json(
+			{ message: authResult.message },
+			{ status: authResult.status },
+		);
 	}
 
-	const agent = await resolveAgent(authResult.factoryId, body.agentId);
+	const agent = resolveAgent(authResult.factory, body.agentId);
 
 	if (!agent) {
-		return c.json(
+		return NextResponse.json(
 			{
-				error: body.agentId
+				message: body.agentId
 					? "Agent not found"
 					: "No agent is configured for task creation",
 			},
-			body.agentId ? 400 : 409,
+			{ status: body.agentId ? 400 : 409 },
 		);
 	}
 
-	const taskId = id();
+	const taskId = body.taskId ?? id();
 	const eventId = id();
 	const createdAt = new Date().toISOString();
-	const name = body.name ?? (await generateTaskName(body.instructions));
+	const name = await generateTaskName(body.instructions);
 
 	await db.transact([
 		taskTx(taskId)
@@ -107,60 +102,58 @@ export const POST: RouteHandler = async (c) => {
 				agentReasoningEffort: body.agentReasoningEffort,
 				agentSpeed: body.agentSpeed,
 			})
-			.link({ factory: authResult.factoryId, agent: agent.id }),
+			.link({ factory: authResult.factory.id, agent: agent.id }),
 		eventTx(eventId)
 			.create({
 				type: "factoryplane.new_task",
 				data: {
 					taskId,
-					apiKeyId: authResult.apiKeyId,
 					name,
 					instructions: body.instructions,
+					images: body.images,
 				},
 				createdAt,
 			})
 			.link({ task: taskId }),
 	]);
 
-	return c.json(
+	return NextResponse.json(
 		{
 			taskId,
-			factoryId: authResult.factoryId,
+			factoryId: authResult.factory.id,
 			agentId: agent.id,
 			name,
 			status: "in_progress",
 		},
-		201,
+		{ status: 201 },
 	);
-};
+}
 
-const parseCreateTaskBody = (value: unknown): CreateTaskBody | undefined => {
-	if (!isRecord(value)) {
-		return undefined;
+const authenticateFactoryRequest = async (
+	req: NextRequest,
+	factoryId: string,
+) => {
+	const refreshToken = getBearerToken(req.headers.get("Authorization"));
+
+	if (!refreshToken) {
+		return {
+			ok: false as const,
+			status: 401,
+			message: "Unauthorized",
+		};
 	}
 
-	const instructions = getOptionalString(value.instructions);
-	const providedName = getOptionalString(value.name);
+	const user = await db.auth.verifyToken(refreshToken).catch(() => undefined);
 
-	if (!providedName && !instructions) {
-		return undefined;
+	if (!user) {
+		return {
+			ok: false as const,
+			status: 401,
+			message: "Unauthorized",
+		};
 	}
 
-	return {
-		name: providedName,
-		instructions,
-		factoryId: getOptionalString(value.factoryId),
-		agentId: getOptionalString(value.agentId),
-		agentModel: getOptionalString(value.agentModel) ?? DEFAULT_CODEX_MODEL,
-		agentReasoningEffort:
-			getOptionalString(value.agentReasoningEffort) ??
-			DEFAULT_CODEX_REASONING_EFFORT,
-		agentSpeed: getOptionalString(value.agentSpeed) ?? DEFAULT_CODEX_SPEED,
-	};
-};
-
-const resolveAgent = async (factoryId: string, agentId: string | undefined) => {
-	const agents = await db
+	const factory = await db
 		.query({
 			factories: {
 				$: {
@@ -170,23 +163,47 @@ const resolveAgent = async (factoryId: string, agentId: string | undefined) => {
 				},
 				organisation: {
 					agents: {},
+					members: {
+						user: {},
+					},
 				},
 			},
 		})
-		.then((result) => {
-			const factory = result.factories[0] as FactoryWithAgents | undefined;
-			return factory?.organisation?.agents ?? [];
-		});
+		.then((result) => result.factories[0] as AuthenticatedFactory | undefined);
 
+	if (!factory) {
+		return {
+			ok: false as const,
+			status: 404,
+			message: "Factory not found",
+		};
+	}
+
+	if (!hasFactoryAccess(factory, user.id)) {
+		return {
+			ok: false as const,
+			status: 403,
+			message: "Forbidden",
+		};
+	}
+
+	return { ok: true as const, factory };
+};
+
+const resolveAgent = (
+	factory: AuthenticatedFactory,
+	agentId: string | undefined,
+) => {
+	const agents = factory.organisation?.agents ?? [];
 	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
 };
 
-const generateTaskName = async (instructions: string | undefined) => {
+const generateTaskName = async (instructions: string) => {
 	const fallback = getFallbackTaskName(instructions) ?? DEFAULT_TASK_NAME;
 	const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 	const apiToken = process.env.CLOUDFLARE_API_TOKEN ?? process.env.CF_API_TOKEN;
 
-	if (!accountId || !apiToken || !instructions) {
+	if (!accountId || !apiToken) {
 		return fallback;
 	}
 
@@ -287,6 +304,44 @@ const getFallbackTaskName = (instructions: string | undefined) => {
 	return cleanTaskName(firstLine);
 };
 
+const parseCreateTaskBody = (
+	value: Record<string, unknown>,
+): CreateTaskBody => ({
+	taskId: getOptionalString(value.taskId),
+	factoryId: getOptionalString(value.factoryId),
+	agentId: getOptionalString(value.agentId),
+	instructions: getOptionalString(value.instructions),
+	images: Array.isArray(value.images) ? value.images : undefined,
+	agentModel: getOptionalString(value.agentModel) ?? DEFAULT_CODEX_MODEL,
+	agentReasoningEffort:
+		getOptionalString(value.agentReasoningEffort) ??
+		DEFAULT_CODEX_REASONING_EFFORT,
+	agentSpeed: getOptionalString(value.agentSpeed) ?? DEFAULT_CODEX_SPEED,
+});
+
+const getBearerToken = (authorizationHeader: string | null) => {
+	const [scheme, token] = authorizationHeader?.split(" ") ?? [];
+
+	if (scheme !== "Bearer" || !token) {
+		return undefined;
+	}
+
+	return token;
+};
+
+const hasFactoryAccess = (factory: AuthenticatedFactory, userId: string) =>
+	factory.organisation?.members?.some((member) => member.user?.id === userId) ??
+	false;
+
+const readJson = async (req: NextRequest) => {
+	try {
+		const value = (await req.json()) as unknown;
+		return isRecord(value) ? value : {};
+	} catch {
+		return {};
+	}
+};
+
 const getOptionalString = (value: unknown) => {
 	if (typeof value !== "string") {
 		return undefined;
@@ -298,12 +353,4 @@ const getOptionalString = (value: unknown) => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
-};
-
-const readJson = async (value: Promise<unknown>) => {
-	try {
-		return await value;
-	} catch {
-		return undefined;
-	}
 };

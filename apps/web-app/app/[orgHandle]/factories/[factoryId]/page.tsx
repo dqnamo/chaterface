@@ -2,7 +2,6 @@
 
 import { id } from "@instantdb/react";
 import db from "@repo/db/client";
-import { DateTime } from "luxon";
 import { useParams, useRouter } from "next/navigation";
 import {
 	type ClipboardEvent as ReactClipboardEvent,
@@ -25,40 +24,20 @@ import {
 	ImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
-import { Input, Textarea } from "@/components/Input";
+import { Textarea } from "@/components/Input";
 import Logo from "@/components/Logo";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 import { cn } from "@/helpers/classname-helper";
 
-const taskTx = (taskId: string) => {
-	const tx = db.tx.tasks[taskId];
-
-	if (!tx) {
-		throw new Error(`Task transaction builder ${taskId} not found`);
-	}
-
-	return tx;
-};
-
-const eventTx = (eventId: string) => {
-	const tx = db.tx.events[eventId];
-
-	if (!tx) {
-		throw new Error(`Event transaction builder ${eventId} not found`);
-	}
-
-	return tx;
-};
-
 export default function FactoryPage() {
 	const router = useRouter();
 	const { orgHandle, factoryId } = useParams();
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
+	const { user } = db.useAuth();
 
-	const [taskName, setTaskName] = useState("");
 	const [taskInstructions, setTaskInstructions] = useState("");
 	const [agentId, setAgentId] = useState("");
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
@@ -68,6 +47,7 @@ export default function FactoryPage() {
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 	const [pendingTaskId, setPendingTaskId] = useState(() => id());
 	const [isCreating, setIsCreating] = useState(false);
+	const [createError, setCreateError] = useState<string>();
 	const [isDraggingImages, setIsDraggingImages] = useState(false);
 	const {
 		attachments: imageAttachments,
@@ -119,50 +99,57 @@ export default function FactoryPage() {
 	}, [selectedAgent]);
 
 	const createTask = async () => {
-		if (!resolvedAgentId || isCreating) {
+		const instructions = taskInstructions.trim();
+
+		if (!resolvedAgentId || isCreating || !instructions) {
+			return;
+		}
+
+		if (!user?.refresh_token) {
+			setCreateError("You must be signed in to create a task.");
 			return;
 		}
 
 		const taskId = pendingTaskId;
 		setIsCreating(true);
+		setCreateError(undefined);
 
 		try {
 			const images = await uploadImageAttachments(taskId);
+			const response = await fetch("/api/tasks", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${user.refresh_token}`,
+				},
+				body: JSON.stringify({
+					taskId,
+					factoryId: currentFactoryId,
+					agentId: resolvedAgentId,
+					instructions,
+					images,
+					agentModel,
+					agentReasoningEffort,
+					agentSpeed,
+				}),
+			});
 
-			await db.transact(
-				taskTx(taskId)
-					.create({
-						name: taskName,
-						status: "in_progress",
-						instructions: taskInstructions,
-						createdAt: DateTime.now().toISO(),
-						agentModel,
-						agentReasoningEffort,
-						agentSpeed,
-					})
-					.link({ factory: currentFactoryId, agent: resolvedAgentId }),
-			);
-
-			const eventId = id();
-			await db.transact(
-				eventTx(eventId)
-					.create({
-						type: "factoryplane.new_task",
-						data: {
-							taskId: taskId,
-							name: taskName,
-							instructions: taskInstructions,
-							images,
-						},
-						createdAt: DateTime.now().toISO(),
-					})
-					.link({ task: taskId }),
-			);
+			if (!response.ok) {
+				const result = (await response.json().catch(() => null)) as {
+					message?: string;
+				} | null;
+				throw new Error(result?.message ?? "Failed to create task.");
+			}
 
 			clearImageAttachments();
 			setPendingTaskId(id());
+			setTaskInstructions("");
 			router.push(
 				`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${taskId}`,
+			);
+		} catch (error) {
+			setCreateError(
+				error instanceof Error ? error.message : "Failed to create task.",
 			);
 		} finally {
 			setIsCreating(false);
@@ -242,23 +229,9 @@ export default function FactoryPage() {
 				/>
 				<div className="flex flex-col p-3 gap-3">
 					<div className="flex flex-col">
-						<p className="text-xs text-grayscale-11">Name</p>
-						<p className="text-xs text-grayscale-10">The name of the task.</p>
-					</div>
-					<Input
-						type="text"
-						className="text-sm"
-						placeholder="Task Name"
-						value={taskName}
-						onChange={(e) => setTaskName(e.target.value)}
-						onSubmit={createTask}
-					/>
-				</div>
-				<div className="flex flex-col p-3 gap-3">
-					<div className="flex flex-col">
 						<p className="text-xs text-grayscale-11">Instructions</p>
 						<p className="text-xs text-grayscale-10">
-							The instructions for the task.
+							The task will be named automatically.
 						</p>
 					</div>
 					<Textarea
@@ -275,6 +248,11 @@ export default function FactoryPage() {
 						onAddFiles={addImageFiles}
 						onRemoveAttachment={removeImageAttachment}
 					/>
+					{createError ? (
+						<p className="border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">
+							{createError}
+						</p>
+					) : null}
 				</div>
 				<div className="flex flex-row items-center justify-between p-3">
 					<div className="flex flex-row items-center justify-center gap-2">
@@ -313,84 +291,18 @@ export default function FactoryPage() {
 						/>
 					</div>
 					<div className="flex flex-row items-center justify-center gap-2 ml-auto">
-						<Button type="button" disabled={isCreating} onClick={createTask}>
+						<Button
+							type="button"
+							disabled={
+								isCreating || !resolvedAgentId || !taskInstructions.trim()
+							}
+							onClick={createTask}
+						>
 							{isCreating ? "Creating..." : "Create Task"}
 						</Button>
 					</div>
 				</div>
 			</fieldset>
-
-			{/* <input
-				type="text"
-				placeholder="Task Name"
-				value={taskName}
-				onChange={(e) => setTaskName(e.target.value)}
-			/>
-			<input
-				type="text"
-				placeholder="Task Instructions"
-				value={taskInstructions}
-				onChange={(e) => setTaskInstructions(e.target.value)}
-			/>
-			<select
-				value={resolvedAgentId ?? ""}
-				onChange={(e) => setAgentId(e.target.value)}
-			>
-				{agents?.map((agent) => (
-					<option value={agent.id} key={agent.id}>
-						{agent.name}
-					</option>
-				))}
-			</select>
-			<select
-				value={agentModel}
-				onChange={(e) => setAgentModel(e.target.value)}
-			>
-				{CODEX_MODEL_OPTIONS.map((option) => (
-					<option value={option.value} key={option.value}>
-						{option.label}
-					</option>
-				))}
-			</select>
-			<select
-				value={agentReasoningEffort}
-				onChange={(e) => setAgentReasoningEffort(e.target.value)}
-			>
-				{CODEX_REASONING_EFFORT_OPTIONS.map((option) => (
-					<option value={option.value} key={option.value}>
-						{option.label}
-					</option>
-				))}
-			</select>
-			<select
-				value={agentSpeed}
-				onChange={(e) => setAgentSpeed(e.target.value)}
-			>
-				{CODEX_SPEED_OPTIONS.map((option) => (
-					<option value={option.value} key={option.value}>
-						{option.label}
-					</option>
-				))}
-			</select>
-			<button
-				type="button"
-				disabled={!resolvedAgentId}
-				onClick={() => {
-					createTask();
-				}}
-			>
-				Create Task
-			</button>
-			<div className="flex flex-col gap-4">
-				{tasks?.map((task) => (
-					<Link
-						href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
-						key={task.id}
-					>
-						{task.name}
-					</Link>
-				))}
-			</div> */}
 		</div>
 	);
 }
