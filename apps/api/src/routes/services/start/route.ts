@@ -131,13 +131,18 @@ export const POST: RouteHandler = async (c) => {
 	let process: CommandHandle;
 
 	try {
-		process = await sandbox.commands.run(
-			buildServiceCommand(body.cwd, body.command),
-			{
-				background: true,
-				timeoutMs: 0,
-			},
+		process = await sandbox.pty.create({
+			cols: 80,
+			rows: 24,
+			cwd: body.cwd,
+			timeoutMs: 0,
+			onData: () => {},
+		});
+		await sandbox.pty.sendInput(
+			process.pid,
+			new TextEncoder().encode(`exec ${body.command}\n`),
 		);
+		await process.disconnect();
 	} catch (error) {
 		await markServiceFailed(serviceId, terminalSessionId, task.id, {
 			name: body.name,
@@ -354,11 +359,6 @@ const waitForService = async (
 	} catch {
 		return false;
 	}
-};
-
-const buildServiceCommand = (cwd: string, command: string) => {
-	const script = `cd ${shellQuote(cwd)} && exec ${command}`;
-	return `/bin/bash -lc ${shellQuote(script)}`;
 };
 
 const getPreviewUrl = (serviceId: string) => {

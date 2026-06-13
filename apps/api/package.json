@@ -15,11 +15,13 @@
 		"@repo/db": "workspace:*",
 		"@repo/encryption": "workspace:*",
 		"e2b": "^2.27.1",
-		"hono": "^4.7.11"
+		"hono": "^4.7.11",
+		"ws": "^8.21.0"
 	},
 	"devDependencies": {
 		"@repo/typescript-config": "workspace:*",
 		"@types/node": "^22.15.3",
+		"@types/ws": "^8.18.1",
 		"tsx": "^4.19.4",
 		"typescript": "5.9.2"
 	}

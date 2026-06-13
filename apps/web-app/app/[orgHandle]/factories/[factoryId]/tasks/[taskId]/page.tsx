@@ -82,6 +82,20 @@ const FileDiff = dynamic(
 		),
 	},
 );
+const TerminalSessionLive = dynamic(
+	() =>
+		import("@/components/TerminalSessionLive").then(
+			(module) => module.TerminalSessionLive,
+		),
+	{
+		ssr: false,
+		loading: () => (
+			<div className="flex h-full items-center justify-center text-xs text-grayscale-10">
+				Loading terminal...
+			</div>
+		),
+	},
+);
 
 const taskTx = (taskId: string) => {
 	const tx = db.tx.tasks[taskId];
@@ -946,6 +960,7 @@ export default function TaskPage() {
 									{selectedTerminalSession ? (
 										<TerminalSessionSummary
 											terminalSession={selectedTerminalSession}
+											userToken={user?.refresh_token}
 										/>
 									) : null}
 								</div>
@@ -1098,6 +1113,7 @@ function ServicePreviewFrame({
 
 type TerminalSessionSummaryProps = {
 	terminalSession: {
+		id: string;
 		name: string;
 		command?: string | null;
 		cwd?: string | null;
@@ -1116,15 +1132,23 @@ type TerminalSessionSummaryProps = {
 			status?: string | null;
 		}> | null;
 	};
+	userToken: string | undefined;
 };
 
 function TerminalSessionSummary({
 	terminalSession,
+	userToken,
 }: TerminalSessionSummaryProps) {
 	const services = terminalSession.services ?? [];
 
 	return (
 		<div className="flex min-h-full flex-col gap-3">
+			<div className="min-h-[280px] overflow-hidden border border-grayscale-4 bg-grayscale-12">
+				<TerminalSessionLive
+					terminalSessionId={terminalSession.id}
+					userToken={userToken}
+				/>
+			</div>
 			<div className="flex flex-row items-center justify-between gap-3 border-b border-grayscale-4 pb-3">
 				<div className="min-w-0">
 					<p className="truncate text-sm text-grayscale-12">

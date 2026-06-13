@@ -1,14 +1,12 @@
 @import "tailwindcss";
 @import "streamdown/styles.css";
-
-@custom-variant dark (&:where(.dark, .dark *));
+@import "@xterm/xterm/css/xterm.css";
 
 @import "@radix-ui/colors/slate.css";
 @import "@radix-ui/colors/slate-dark.css";
 
 @import "@radix-ui/colors/indigo.css";
 @import "@radix-ui/colors/indigo-dark.css";
-
 
 @import "@radix-ui/colors/red.css";
 @import "@radix-ui/colors/red-dark.css";
@@ -19,13 +17,13 @@
 @import "@radix-ui/colors/blue.css";
 @import "@radix-ui/colors/blue-dark.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
 
 @source "../../../node_modules/streamdown/dist/*.js";
 
 @theme inline {
 	--font-sans: var(--font-inter);
 	--font-mono: var(--font-jetbrains-mono);
-
 
 	--color-grayscale-1: var(--slate-1);
 	--color-grayscale-2: var(--slate-2);
@@ -61,7 +59,7 @@
 	--color-red-6: var(--red-6);
 	--color-red-7: var(--red-7);
 	--color-red-8: var(--red-8);
-	--color-red-9: var(--red-9);	
+	--color-red-9: var(--red-9);
 	--color-red-10: var(--red-10);
 	--color-red-11: var(--red-11);
 	--color-red-12: var(--red-12);
@@ -90,7 +88,7 @@
 	--color-blue-9: var(--blue-9);
 	--color-blue-10: var(--blue-10);
 	--color-blue-11: var(--blue-11);
-	--color-blue-12: var(--blue-12);	
+	--color-blue-12: var(--blue-12);
 
 	--color-background: var(--slate-1);
 	--color-foreground: var(--slate-12);

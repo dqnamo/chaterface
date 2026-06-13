@@ -90,7 +90,13 @@ export const POST: RouteHandler = async (c) => {
 	if (typeof pid === "number") {
 		try {
 			const sandbox = await Sandbox.connect(task.sandboxId);
-			killed = await sandbox.commands.kill(pid);
+			killed = terminalSessionId
+				? await sandbox.pty.kill(pid)
+				: await sandbox.commands.kill(pid);
+
+			if (!killed && typeof service.pid === "number") {
+				killed = await sandbox.commands.kill(service.pid);
+			}
 		} catch (error) {
 			const now = new Date().toISOString();
 
