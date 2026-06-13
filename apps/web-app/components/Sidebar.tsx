@@ -21,13 +21,13 @@ import { useCallback, useMemo, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
+import { Button } from "./Button";
 import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
 import { Dialog } from "./Dialog";
 import { Input } from "./Input";
 import { Menu } from "./Menu";
 import Monogram from "./Monogram";
-import { ShortcutKey } from "./ShortcutKey";
 import { useSidebar } from "./SidebarContext";
 import TaskStatusDots from "./TaskStatusDots";
 
@@ -239,16 +239,18 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					<span className="min-w-0 flex-1 truncate">Organisation Settings</span>
 				</Link>
 				<div className="mt-2">
-					<Link
-						href={newTaskHref}
-						onClick={closeAfterMobileNavigation}
+					<Button
+						render={
+							<Link href={newTaskHref} onClick={closeAfterMobileNavigation} />
+						}
+						nativeButton={false}
 						aria-keyshortcuts="N"
-						className="group relative flex h-8 w-full min-w-0 flex-row items-center justify-center gap-2 rounded-md border border-grayscale-12 bg-grayscale-12 px-3 text-xs font-medium text-grayscale-1 transition-colors duration-150 hover:border-grayscale-11 hover:bg-grayscale-11"
+						className="w-full"
+						shortcut="N"
 					>
 						<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
 						<p className="min-w-0 flex-1 truncate text-current">New Task</p>
-						<ShortcutKey>N</ShortcutKey>
-					</Link>
+					</Button>
 				</div>
 			</div>
 			<div className="mt-2 flex flex-row items-center justify-between px-3">

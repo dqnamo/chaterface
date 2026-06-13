@@ -1,8 +1,8 @@
 "use client";
 
 import { Button as BaseButton } from "@base-ui/react/button";
-import type { ComponentProps } from "react";
-import { ShortcutKey } from "@/components/ShortcutKey";
+import { type ComponentProps, isValidElement, type ReactNode } from "react";
+import { ShortcutKey, type ShortcutKeyTone } from "@/components/ShortcutKey";
 import { cn } from "@/helpers/classname-helper";
 
 type ClassName<TState> = string | ((state: TState) => string | undefined);
@@ -31,7 +31,9 @@ const variantClassName: Record<ButtonVariant, string> = {
 };
 
 export type ButtonProps = ComponentProps<typeof BaseButton> & {
-	shortcut?: string;
+	shortcut?: ReactNode;
+	shortcutClassName?: string;
+	shortcutTone?: ShortcutKeyTone;
 	variant?: ButtonVariant;
 };
 
@@ -40,18 +42,40 @@ export function Button({
 	className,
 	children,
 	shortcut,
+	shortcutClassName,
+	shortcutTone,
 	...props
 }: ButtonProps) {
+	const shortcutBadge = isValidElement(shortcut) ? (
+		shortcut
+	) : shortcut ? (
+		<ShortcutKey
+			tone={shortcutTone}
+			className={cn(
+				variant === "primary"
+					? "border-grayscale-11 bg-grayscale-11 text-grayscale-1 hover:bg-grayscale-11 hover:text-grayscale-1 group-hover:bg-grayscale-11 group-hover:text-grayscale-1"
+					: "",
+				shortcutClassName,
+			)}
+		>
+			{shortcut}
+		</ShortcutKey>
+	) : null;
+
 	return (
 		<BaseButton
 			className={mergeClassName(
-				cn(baseClassName, variantClassName[variant]),
+				cn(
+					baseClassName,
+					variantClassName[variant],
+					shortcutBadge ? "pr-1.5" : "",
+				),
 				className,
 			)}
 			{...props}
 		>
 			{children}
-			{shortcut ? <ShortcutKey>{shortcut}</ShortcutKey> : null}
+			{shortcutBadge}
 		</BaseButton>
 	);
 }

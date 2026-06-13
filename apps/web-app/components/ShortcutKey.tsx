@@ -3,7 +3,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/helpers/classname-helper";
 
-type ShortcutKeyTone = "neutral" | "accent" | "green" | "blue";
+export type ShortcutKeyTone = "neutral" | "accent" | "green" | "blue";
 
 type ShortcutKeyProps = ComponentProps<"kbd"> & {
 	tone?: ShortcutKeyTone;
