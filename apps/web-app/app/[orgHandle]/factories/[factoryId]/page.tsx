@@ -207,12 +207,12 @@ export default function FactoryPage() {
 					What do you want to build?
 				</h1>
 			</div>
-			<div className="mx-auto w-full max-w-3xl rounded-xl border border-grayscale-3 bg-grayscale-2 p-1.5 dark:bg-grayscale-2">
+			<div className="mx-auto w-full max-w-xl rounded-xl border border-grayscale-3 bg-grayscale-2 p-1.5 dark:bg-grayscale-2">
 				<div className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-5 dark:bg-grayscale-3">
 					<fieldset
 						aria-label="New task composer"
 						className={cn(
-							"relative mx-auto flex w-full max-w-3xl flex-col transition-colors",
+							"relative mx-auto flex w-full max-w-xl flex-col transition-colors",
 							isDraggingAttachments && "border-accent-8 bg-accent-2",
 						)}
 						onDragLeave={handleComposerDragLeave}
