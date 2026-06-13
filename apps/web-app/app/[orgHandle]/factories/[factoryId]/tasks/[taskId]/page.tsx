@@ -40,7 +40,7 @@ import {
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
-import Event, { buildTimeline } from "@/components/Event";
+import Event, { buildTimeline, type TimelineNode } from "@/components/Event";
 import {
 	getImageFiles,
 	hasImageFiles,
@@ -53,7 +53,9 @@ import { ScrollArea } from "@/components/ScrollArea";
 import { ShortcutKey } from "@/components/ShortcutKey";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
+import TaskStatusDots from "@/components/TaskStatusDots";
 import { cn } from "@/helpers/classname-helper";
+import { toTaskDotStatus } from "@/helpers/task-status-helper";
 
 const MIN_PREVIEW_SIZE = 320;
 const MAX_PREVIEW_SIZE = 720;
@@ -71,6 +73,8 @@ const DIFF_VIEW_OPTIONS = {
 	stickyHeader: true,
 	theme: "pierre-light",
 } as const;
+type ChatViewMode = "minified" | "full";
+type JsonRecord = Record<string, unknown>;
 
 const FileDiff = dynamic(
 	() => import("@pierre/diffs/react").then((module) => module.FileDiff),
@@ -191,6 +195,56 @@ const getDiffHeaderIconClassName = (type: FileDiffMetadata["type"]) => {
 	}
 };
 
+const isMinifiedTimelineNode = (node: TimelineNode) => {
+	const type = node.event.type ?? "";
+
+	if (
+		type === "factoryplane.new_task" ||
+		type === "factoryplane.new_user_message"
+	) {
+		return true;
+	}
+
+	if (!type.startsWith("codex.item.")) {
+		return false;
+	}
+
+	const data = asJsonRecord(node.event.data);
+	const item = asJsonRecord(data?.item);
+
+	return item?.type === "agent_message";
+};
+
+const asJsonRecord = (value: unknown): JsonRecord | null => {
+	if (value && typeof value === "object" && !Array.isArray(value)) {
+		return value as JsonRecord;
+	}
+
+	return null;
+};
+
+const getTaskStatusLabel = ({
+	completedAt,
+	status,
+}: {
+	completedAt?: string | number | null;
+	status?: string;
+}) => {
+	if (completedAt || status === "complete") {
+		return "Complete";
+	}
+
+	if (status === "in_progress") {
+		return "Running";
+	}
+
+	if (status === "failed") {
+		return "Failed";
+	}
+
+	return "Idle";
+};
+
 export default function TaskPage() {
 	const { taskId } = useParams();
 	const { user } = db.useAuth();
@@ -210,6 +264,7 @@ export default function TaskPage() {
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 	const [previewSize, setPreviewSize] = useState(DEFAULT_PREVIEW_SIZE);
+	const [chatViewMode, setChatViewMode] = useState<ChatViewMode>("full");
 
 	useEffect(() => {
 		setHasRightPanel(true);
@@ -305,9 +360,21 @@ export default function TaskPage() {
 	const task = data?.tasks?.[0];
 	const events = eventsData?.events;
 	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
+	const visibleTimeline = useMemo(
+		() =>
+			chatViewMode === "minified"
+				? timeline.filter(isMinifiedTimelineNode)
+				: timeline,
+		[chatViewMode, timeline],
+	);
 	const services = task?.services ?? [];
 	const pullRequests = getTaskPullRequests(task);
 	const isTaskCompleted = Boolean(task?.completedAt);
+	const taskDotStatus = toTaskDotStatus(task?.status);
+	const taskStatusLabel = getTaskStatusLabel({
+		completedAt: task?.completedAt,
+		status: task?.status,
+	});
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
 
@@ -342,7 +409,7 @@ export default function TaskPage() {
 	useLayoutEffect(() => {
 		const container = scrollContainerRef.current;
 
-		if (!container || timeline.length === 0) {
+		if (!container || visibleTimeline.length === 0) {
 			return;
 		}
 
@@ -367,7 +434,7 @@ export default function TaskPage() {
 		if (isPinnedToBottomRef.current) {
 			container.scrollTop = container.scrollHeight;
 		}
-	}, [timeline]);
+	}, [visibleTimeline]);
 
 	const stopService = async (serviceId: string) => {
 		await db.transact(serviceTx(serviceId).delete());
@@ -671,6 +738,29 @@ export default function TaskPage() {
 						</AnimatePresence>
 					</div>
 				</div>
+				<div className="flex shrink-0 flex-row items-center justify-between gap-3 border-b border-grayscale-4 px-3 py-1.5">
+					<div className="flex min-w-0 items-center gap-2">
+						<TaskStatusDots status={taskDotStatus} size={3} gap={1} />
+						<span className="truncate text-xs font-medium text-grayscale-11">
+							{taskStatusLabel}
+						</span>
+					</div>
+					<Tabs.Root
+						value={chatViewMode}
+						onValueChange={(value) => {
+							if (value === "minified" || value === "full") {
+								setChatViewMode(value);
+							}
+						}}
+						className="min-h-0 shrink-0"
+					>
+						<Tabs.List>
+							<Tabs.Tab value="minified">Minified</Tabs.Tab>
+							<Tabs.Tab value="full">Full</Tabs.Tab>
+							<Tabs.Indicator />
+						</Tabs.List>
+					</Tabs.Root>
+				</div>
 				<ScrollArea.Root className="min-h-0 flex-1">
 					<ScrollArea.Viewport ref={scrollContainerRef} onScroll={handleScroll}>
 						<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-4">
@@ -685,7 +775,7 @@ export default function TaskPage() {
 									</button>
 								)}
 								<AnimatePresence initial={false}>
-									{timeline.map((node) => (
+									{visibleTimeline.map((node) => (
 										<Event key={node.key} node={node} task={task} />
 									))}
 								</AnimatePresence>
