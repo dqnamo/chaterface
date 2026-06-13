@@ -147,9 +147,11 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
 	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
 	const newTaskHref = `/${currentOrgHandle}/factories/${currentFactoryId}`;
+	const floorHref = `/${currentOrgHandle}/factories/${currentFactoryId}/floor`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
+	const isFloorSelected = pathname === floorHref;
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
 	);
@@ -220,6 +222,23 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					/>
 					<UserCircleIcon weight="bold" className="size-4 shrink-0" />
 					<span className="min-w-0 flex-1 truncate">Personal Settings</span>
+				</Link>
+				<Link
+					href={floorHref}
+					onClick={closeAfterMobileNavigation}
+					className={cn(
+						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+						isFloorSelected ? "bg-grayscale-3" : "",
+					)}
+				>
+					<CornerBrackets
+						placement="inside"
+						color={isFloorSelected ? "accent-9" : "grayscale-8"}
+						size={6}
+						active={isFloorSelected}
+					/>
+					<ShapesIcon weight="bold" className="size-4 shrink-0" />
+					<span className="min-w-0 flex-1 truncate">Factory</span>
 				</Link>
 				<Link
 					href={organisationSettingsHref}

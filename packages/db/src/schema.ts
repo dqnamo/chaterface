@@ -26,8 +26,18 @@ const _schema = i.schema({
 			gitAuthorName: i.string().optional(),
 			gitAuthorEmail: i.string().optional(),
 			environmentPackages: i.json().optional(),
+			floorWorkflow: i.json().optional(),
+			floorWorkflowUpdatedAt: i.date().optional(),
 			newTaskSetupScript: i.string().optional(),
 			newTurnSetupScript: i.string().optional(),
+		}),
+		floorChangeProposals: i.entity({
+			title: i.string().indexed(),
+			summary: i.string().optional(),
+			workflow: i.json(),
+			status: i.string().indexed(),
+			createdAt: i.date().optional(),
+			decidedAt: i.date().optional(),
 		}),
 		repositories: i.entity({
 			url: i.string().indexed(),
@@ -124,6 +134,9 @@ const _schema = i.schema({
 			latestDiffGeneratedAt: i.date().optional(),
 			latestDiffBytes: i.number().optional(),
 			pullRequestUrl: i.string().optional(),
+			workflowState: i.string().optional(),
+			workflowInput: i.json().optional(),
+			workflowNodeId: i.string().optional(),
 		}),
 		secrets: i.entity({
 			name: i.string().indexed(),
@@ -203,6 +216,19 @@ const _schema = i.schema({
 				label: "factory",
 			},
 		},
+		factoryFloorChangeProposals: {
+			forward: {
+				on: "factories",
+				has: "many",
+				label: "floorChangeProposals",
+			},
+			reverse: {
+				on: "floorChangeProposals",
+				has: "one",
+				label: "factory",
+				onDelete: "cascade",
+			},
+		},
 		taskEvents: {
 			forward: {
 				on: "tasks",
@@ -211,6 +237,18 @@ const _schema = i.schema({
 			},
 			reverse: {
 				on: "events",
+				has: "one",
+				label: "task",
+			},
+		},
+		taskFloorChangeProposals: {
+			forward: {
+				on: "tasks",
+				has: "many",
+				label: "floorChangeProposals",
+			},
+			reverse: {
+				on: "floorChangeProposals",
 				has: "one",
 				label: "task",
 			},
