@@ -22,7 +22,7 @@ const mergeClassName = <TState,>(
 export type ButtonVariant = "primary";
 
 const baseClassName =
-	"group relative flex min-w-0 flex-row items-center justify-center gap-4 overflow-visible bg-grayscale-12 p-2 pr-2 pl-3 transition-transform duration-150 hover:scale-96 dark:bg-grayscale-6";
+	"group relative flex h-7 min-w-0 flex-row items-center justify-center gap-2 overflow-visible bg-grayscale-12 px-2 transition-transform duration-150 hover:scale-96 dark:bg-grayscale-6";
 
 const variantClassName: Record<ButtonVariant, string> = {
 	primary: "",
@@ -54,7 +54,7 @@ export function Button({
 				translate={6}
 				color="grayscale-12"
 			/>
-			<span className="min-w-0 truncate text-sm text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
+			<span className="min-w-0 truncate text-xs text-grayscale-2 transition-colors group-hover:text-grayscale-1 dark:text-grayscale-12 dark:group-hover:text-grayscale-12">
 				{children}
 			</span>
 			{shortcut ? <ShortcutKey>{shortcut}</ShortcutKey> : null}
