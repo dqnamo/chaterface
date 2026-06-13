@@ -2,9 +2,11 @@
 
 import { id } from "@instantdb/react";
 import {
+	ArrowSquareOutIcon,
 	ArrowsLeftRightIcon,
 	CheckCircleIcon,
 	FileCodeIcon,
+	GitPullRequestIcon,
 	MinusCircleIcon,
 	PencilSimpleIcon,
 	PlusCircleIcon,
@@ -304,6 +306,7 @@ export default function TaskPage() {
 	const events = eventsData?.events;
 	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
 	const services = task?.services ?? [];
+	const pullRequests = getTaskPullRequests(task);
 	const isTaskCompleted = Boolean(task?.completedAt);
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
@@ -583,7 +586,32 @@ export default function TaskPage() {
 						<ExpandSidebarButton />
 						<p className="text-sm text-grayscale-11 p-1">{task?.name}</p>
 					</div>
-					<div className="flex flex-row items-center">
+					<div className="flex flex-row items-center gap-1.5">
+						{task?.pullRequestUrl ? (
+							<a
+								href={task.pullRequestUrl}
+								rel="noopener noreferrer"
+								target="_blank"
+								className="bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-green-3"
+							>
+								<CornerBrackets
+									placement="inside"
+									spacing={1}
+									translate={1.5}
+									size={6}
+									color="var(--color-green-9)"
+								/>
+								<GitPullRequestIcon
+									weight="bold"
+									className="size-4 text-green-9"
+								/>
+								<p className="text-xs text-grayscale-12">View PR</p>
+								<ArrowSquareOutIcon
+									weight="bold"
+									className="size-3 text-grayscale-10"
+								/>
+							</a>
+						) : null}
 						<button
 							type="button"
 							aria-keyshortcuts="D"
@@ -787,6 +815,7 @@ export default function TaskPage() {
 					<div className="flex flex-row items-center gap-1.5 p-1.5 border-b border-grayscale-4">
 						<Tabs.List>
 							<Tabs.Tab value="services">Services</Tabs.Tab>
+							<Tabs.Tab value="pull-requests">PRs</Tabs.Tab>
 							<Tabs.Tab value="changes">Changes</Tabs.Tab>
 							<Tabs.Indicator />
 						</Tabs.List>
@@ -883,6 +912,31 @@ export default function TaskPage() {
 						)}
 					</Tabs.Panel>
 					<Tabs.Panel
+						value="pull-requests"
+						className="flex min-h-0 flex-1 flex-col overflow-auto bg-grayscale-1"
+					>
+						{pullRequests.length > 0 ? (
+							<div className="flex flex-col divide-y divide-grayscale-4">
+								{pullRequests.map((pullRequest) => (
+									<PullRequestRow
+										key={pullRequest.id}
+										pullRequest={pullRequest}
+									/>
+								))}
+							</div>
+						) : (
+							<div className="flex h-full flex-1 items-center justify-center text-xs text-grayscale-10">
+								<div className="flex flex-col items-center justify-center gap-px p-8">
+									<p className="text-sm text-grayscale-12">No pull requests</p>
+									<p className="max-w-sm text-center text-xs text-grayscale-10">
+										The agent can attach a pull request link when work is ready
+										for review.
+									</p>
+								</div>
+							</div>
+						)}
+					</Tabs.Panel>
+					<Tabs.Panel
 						value="changes"
 						className="flex min-h-0 flex-1 overflow-auto bg-grayscale-1"
 					>
@@ -926,6 +980,71 @@ export default function TaskPage() {
 			</motion.div>
 		</div>
 	);
+}
+
+type PullRequestSummary = {
+	id: string;
+	url: string;
+};
+
+function getTaskPullRequests(
+	task:
+		| {
+				id: string;
+				pullRequestUrl?: string;
+		  }
+		| undefined,
+): PullRequestSummary[] {
+	if (!task?.pullRequestUrl) {
+		return [];
+	}
+
+	return [
+		{
+			id: task.id,
+			url: task.pullRequestUrl,
+		},
+	];
+}
+
+function PullRequestRow({ pullRequest }: { pullRequest: PullRequestSummary }) {
+	const title = getPullRequestFallbackTitle(pullRequest.url);
+
+	return (
+		<a
+			href={pullRequest.url}
+			rel="noopener noreferrer"
+			target="_blank"
+			className="group flex min-w-0 items-start gap-3 px-3 py-3 transition-colors hover:bg-accent-2"
+		>
+			<span className="flex size-7 shrink-0 items-center justify-center bg-grayscale-3 text-green-10 group-hover:bg-green-3">
+				<GitPullRequestIcon weight="bold" className="size-4" />
+			</span>
+			<span className="flex min-w-0 flex-1 flex-col gap-1">
+				<span className="line-clamp-2 text-sm font-medium leading-5 text-grayscale-12">
+					{title}
+				</span>
+				<span className="truncate font-mono text-[11px] text-grayscale-10">
+					{pullRequest.url}
+				</span>
+			</span>
+			<ArrowSquareOutIcon
+				weight="bold"
+				className="mt-1 size-4 shrink-0 text-grayscale-9 group-hover:text-accent-10"
+			/>
+		</a>
+	);
+}
+
+function getPullRequestFallbackTitle(url: string) {
+	try {
+		const parsed = new URL(url);
+		const path = parsed.pathname.replace(/^\/+/, "");
+
+		return path ? `${parsed.hostname}/${path}` : parsed.hostname;
+	} catch {
+		return url;
+	}
 }
 
 function ServicePreviewFrame({

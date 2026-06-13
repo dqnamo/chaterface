@@ -314,6 +314,10 @@ export default function Event({
 		return <RepositoryEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
+	if (type === "factoryplane.pull_request_attached") {
+		return <PullRequestEvent data={data} timestamp={timestamp} />;
+	}
+
 	if (type.startsWith("factoryplane.setup_step_")) {
 		return <SetupStepEvent data={data} phase={phase} timestamp={timestamp} />;
 	}
@@ -555,6 +559,45 @@ function RepositoryEvent({
 					["repository", getString(data, "repositoryId")],
 					["path", getString(data, "path")],
 					["branch", getString(data, "branch")],
+				]}
+			/>
+		</EventCard>
+	);
+}
+
+function PullRequestEvent({
+	data,
+	timestamp,
+}: {
+	data: JsonRecord;
+	timestamp?: string;
+}) {
+	const url = getString(data, "url");
+
+	return (
+		<EventCard
+			glyph="PR"
+			meta={timestamp}
+			phase="success"
+			title="Pull request attached"
+			tone="success"
+		>
+			<DetailGrid
+				items={[
+					[
+						"url",
+						url ? (
+							<a
+								className="text-accent-11 underline-offset-2 hover:underline"
+								href={url}
+								key="pull-request-url"
+								rel="noopener noreferrer"
+								target="_blank"
+							>
+								{url}
+							</a>
+						) : undefined,
+					],
 				]}
 			/>
 		</EventCard>
