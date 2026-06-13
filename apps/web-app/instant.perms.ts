@@ -47,6 +47,17 @@ const rules = {
 				"auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
 		},
 	},
+	webhooks: {
+		allow: {
+			view: "auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+			create:
+				"auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+			update:
+				"auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+			delete:
+				"auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+		},
+	},
 	members: {
 		allow: {
 			view: "auth.id != null && (auth.id in data.ref('user.id') || auth.id in data.ref('organisation.members.user.id'))",

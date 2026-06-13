@@ -34,13 +34,16 @@ import {
 	useReactFlow,
 } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
+	createContext,
 	type ClipboardEvent as ReactClipboardEvent,
 	type DragEvent as ReactDragEvent,
 	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
+	useContext,
 	useEffect,
 	useMemo,
 	useRef,
@@ -57,7 +60,9 @@ import {
 import { Textarea } from "@/components/Input";
 import { Select } from "@/components/Select";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
+import TaskStatusDots from "@/components/TaskStatusDots";
 import { cn } from "@/helpers/classname-helper";
+import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import type { AppSchema } from "@/instant.schema";
 
 type WorkflowBlockType =
@@ -79,6 +84,7 @@ type RouterCondition = {
 type WorkflowNodeData = {
 	blockType: WorkflowBlockType;
 	label: string;
+	webhookId?: string;
 	webhookSecret?: string;
 	prompt?: string;
 	agentId?: string;
@@ -120,6 +126,8 @@ type FloorChangeProposal = InstaQLEntity<AppSchema, "floorChangeProposals"> & {
 	};
 };
 type Agent = InstaQLEntity<AppSchema, "agents">;
+type FactoryWebhook = InstaQLEntity<AppSchema, "webhooks">;
+type WorkflowTask = InstaQLEntity<AppSchema, "tasks">;
 
 type ProposalActionState = {
 	proposalId: string;
@@ -138,6 +146,18 @@ const humanLoopHandleId = "human-loop";
 const MIN_INSPECTOR_SIZE = 320;
 const MAX_INSPECTOR_SIZE = 640;
 const DEFAULT_INSPECTOR_SIZE = 360;
+
+type WorkflowNodeTasksContextValue = {
+	factoryId: string;
+	orgHandle: string;
+	tasksByNodeId: Map<string, WorkflowTask[]>;
+};
+
+const WorkflowNodeTasksContext = createContext<WorkflowNodeTasksContextValue>({
+	factoryId: "",
+	orgHandle: "",
+	tasksByNodeId: new Map(),
+});
 
 const blockOptions: Array<{
 	type: WorkflowBlockType;
@@ -177,14 +197,14 @@ const blockOptions: Array<{
 ];
 
 const defaultWorkflow = (): FloorWorkflow => {
-	const webhookId = id();
+	const webhookNodeId = id();
 	const agentId = id();
 	const completeId = id();
 
 	return {
 		nodes: [
 			createWorkflowNode("manualStart", { x: 80, y: 280 }),
-			createWorkflowNode("webhook", { x: 80, y: 120 }, webhookId),
+			createWorkflowNode("webhook", { x: 80, y: 120 }, webhookNodeId),
 			createWorkflowNode("agentRun", { x: 420, y: 120 }, agentId),
 			createWorkflowNode("completeTask", { x: 760, y: 120 }, completeId),
 		],
@@ -194,7 +214,7 @@ const defaultWorkflow = (): FloorWorkflow => {
 				type: "smoothstep",
 				animated: true,
 				pathOptions: workflowEdgePathOptions,
-				source: webhookId,
+				source: webhookNodeId,
 				sourceHandle: "output",
 				target: agentId,
 				targetHandle: "input",
@@ -235,6 +255,7 @@ const getDefaultNodeData = (blockType: WorkflowBlockType): WorkflowNodeData => {
 			return {
 				blockType,
 				label: "Webhook",
+				webhookId: id(),
 				webhookSecret: createSecret(),
 			};
 		case "agentRun":
@@ -310,6 +331,16 @@ const floorChangeProposalTx = (proposalId: string) => {
 	return tx;
 };
 
+const webhookTx = (webhookId: string) => {
+	const tx = db.tx.webhooks[webhookId];
+
+	if (!tx) {
+		throw new Error(`Webhook transaction builder ${webhookId} not found`);
+	}
+
+	return tx;
+};
+
 export default function FactoryFloorPage() {
 	return (
 		<ReactFlowProvider>
@@ -342,6 +373,7 @@ function FactoryFloorEditor() {
 	const latestWorkflowRef = useRef<FloorWorkflow>({ nodes: [], edges: [] });
 	const savedWorkflowRef = useRef<FloorWorkflow | undefined>(undefined);
 	const unsavedChangeKeysRef = useRef(new Set<string>());
+	const syncedWebhookIdsRef = useRef(new Set<string>());
 	const draftProposalIdRef = useRef<string | undefined>(undefined);
 	const draftProposalCreatedRef = useRef(false);
 	const draftSaveVersionRef = useRef(0);
@@ -369,10 +401,45 @@ function FactoryFloorEditor() {
 			floorChangeProposals: {
 				task: {},
 			},
+			webhooks: {},
+		},
+		tasks: {
+			$: {
+				where: {
+					factory: currentFactoryId,
+				},
+			},
 		},
 	});
 	const factory = data?.factories?.[0];
 	const agents = (data?.organisations?.[0]?.agents ?? []) as Agent[];
+	const workflowTasks = useMemo(
+		() =>
+			((data?.tasks ?? []) as WorkflowTask[])
+				.filter((task) => task.workflowNodeId && !task.completedAt)
+				.sort(compareWorkflowTasks),
+		[data?.tasks],
+	);
+	const tasksByNodeId = useMemo(() => {
+		const grouped = new Map<string, WorkflowTask[]>();
+
+		for (const task of workflowTasks) {
+			if (!task.workflowNodeId) {
+				continue;
+			}
+
+			grouped.set(
+				task.workflowNodeId,
+				(grouped.get(task.workflowNodeId) ?? []).concat(task),
+			);
+		}
+
+		return grouped;
+	}, [workflowTasks]);
+	const webhooks = useMemo(
+		() => (factory?.webhooks ?? []) as FactoryWebhook[],
+		[factory?.webhooks],
+	);
 	const selectedNode = nodes.find((node) => node.id === selectedNodeId);
 	const pendingFloorProposals = useMemo(
 		() =>
@@ -456,14 +523,25 @@ function FactoryFloorEditor() {
 
 	const persistFloorLayout = useCallback(
 		async (workflow: FloorWorkflow) => {
-			await db.transact(
+			const synced = withSyncedWebhookEntities(
+				workflow,
+				webhooks,
+				currentFactoryId,
+				syncedWebhookIdsRef.current,
+			);
+
+			await db.transact([
 				factoryTx(currentFactoryId).update({
-					floorWorkflow: workflow,
+					floorWorkflow: synced.workflow,
 					floorWorkflowUpdatedAt: new Date().toISOString(),
 				}),
-			);
+				...synced.transactions,
+			]);
+			for (const webhookId of synced.webhookIds) {
+				syncedWebhookIdsRef.current.add(webhookId);
+			}
 		},
-		[currentFactoryId],
+		[currentFactoryId, webhooks],
 	);
 
 	useEffect(() => {
@@ -495,6 +573,12 @@ function FactoryFloorEditor() {
 	useEffect(() => {
 		savedWorkflowRef.current = savedWorkflow;
 	}, [savedWorkflow]);
+
+	useEffect(() => {
+		for (const webhook of webhooks) {
+			syncedWebhookIdsRef.current.add(webhook.id);
+		}
+	}, [webhooks]);
 
 	useEffect(() => {
 		if (draftSaveVersion === 0 || unsavedChanges === 0 || !user) {
@@ -699,23 +783,34 @@ function FactoryFloorEditor() {
 						savedWorkflowRef.current,
 					),
 				);
+				const synced = withSyncedWebhookEntities(
+					workflow,
+					webhooks,
+					currentFactoryId,
+					syncedWebhookIdsRef.current,
+					now,
+				);
 
 				await db.transact([
 					factoryTx(currentFactoryId).update({
-						floorWorkflow: workflow,
+						floorWorkflow: synced.workflow,
 						floorWorkflowUpdatedAt: now,
 					}),
 					floorChangeProposalTx(proposal.id).update({
 						status: "accepted",
 						decidedAt: now,
-						workflow,
+						workflow: synced.workflow,
 					}),
+					...synced.transactions,
 				]);
+				for (const webhookId of synced.webhookIds) {
+					syncedWebhookIdsRef.current.add(webhookId);
+				}
 
-				setNodes(workflow.nodes);
-				setEdges(workflow.edges);
+				setNodes(synced.workflow.nodes);
+				setEdges(synced.workflow.edges);
 				setSelectedNodeId(undefined);
-				setSavedWorkflow(cloneWorkflow(workflow));
+				setSavedWorkflow(cloneWorkflow(synced.workflow));
 				unsavedChangeKeysRef.current = new Set();
 				setUnsavedChanges(0);
 				draftProposalIdRef.current = undefined;
@@ -781,115 +876,124 @@ function FactoryFloorEditor() {
 	};
 
 	return (
-		<div className="relative flex h-full w-full bg-grayscale-1">
-			<div className="absolute left-4 top-4 z-30">
-				<FloorDock
-					isAddBlockOpen={isAddBlockOpen}
-					isProposalDropdownOpen={isProposalDropdownOpen}
-					proposalAction={proposalAction}
-					proposalError={proposalError}
-					proposals={pendingFloorProposals}
-					previewedProposalId={previewedProposalId}
-					onAddBlockToggle={() => {
-						setIsProposalDropdownOpen(false);
-						setIsAddBlockOpen((isOpen) => !isOpen);
-					}}
-					onAcceptProposal={(proposal) => {
-						void decideFloorProposal(proposal, "accept");
-					}}
-					onFitView={fitFloorToView}
-					onPreviewProposal={(proposal) => {
-						void previewFloorProposal(proposal);
-					}}
-					onProposalDropdownToggle={() => {
-						setIsAddBlockOpen(false);
-						setIsProposalDropdownOpen((isOpen) => !isOpen);
-					}}
-					onRejectProposal={(proposal) => {
-						void decideFloorProposal(proposal, "reject");
-					}}
-					onZoomIn={zoomIntoFloor}
-					onZoomOut={zoomOutOfFloor}
-				/>
-				{isAddBlockOpen ? (
-					<AddBlockDropdown
-						onAdd={addBlock}
-						onClose={() => setIsAddBlockOpen(false)}
+		<WorkflowNodeTasksContext.Provider
+			value={{
+				factoryId: currentFactoryId,
+				orgHandle: currentOrgHandle,
+				tasksByNodeId,
+			}}
+		>
+			<div className="relative flex h-full w-full bg-grayscale-1">
+				<div className="absolute left-4 top-4 z-30">
+					<FloorDock
+						isAddBlockOpen={isAddBlockOpen}
+						isProposalDropdownOpen={isProposalDropdownOpen}
+						proposalAction={proposalAction}
+						proposalError={proposalError}
+						proposals={pendingFloorProposals}
+						previewedProposalId={previewedProposalId}
+						onAddBlockToggle={() => {
+							setIsProposalDropdownOpen(false);
+							setIsAddBlockOpen((isOpen) => !isOpen);
+						}}
+						onAcceptProposal={(proposal) => {
+							void decideFloorProposal(proposal, "accept");
+						}}
+						onFitView={fitFloorToView}
+						onPreviewProposal={(proposal) => {
+							void previewFloorProposal(proposal);
+						}}
+						onProposalDropdownToggle={() => {
+							setIsAddBlockOpen(false);
+							setIsProposalDropdownOpen((isOpen) => !isOpen);
+						}}
+						onRejectProposal={(proposal) => {
+							void decideFloorProposal(proposal, "reject");
+						}}
+						onZoomIn={zoomIntoFloor}
+						onZoomOut={zoomOutOfFloor}
 					/>
-				) : null}
-			</div>
-			<ContextMenu.Root>
-				<ContextMenu.Trigger
-					render={
-						<div
-							className="relative min-h-0 flex-1"
-							onContextMenu={captureAddBlockPosition}
-							role="application"
+					{isAddBlockOpen ? (
+						<AddBlockDropdown
+							onAdd={addBlock}
+							onClose={() => setIsAddBlockOpen(false)}
 						/>
-					}
-				>
-					<ReactFlow<WorkflowNode, WorkflowEdge>
-						nodes={nodes}
-						edges={edges}
-						nodeTypes={nodeTypes}
-						defaultEdgeOptions={{
-							type: "smoothstep",
-							animated: true,
-						}}
-						onNodesChange={(changes) => {
-							onNodesChange(changes);
-							markWorkflowChanged(getActualFlowChangeKeys(changes, "node"));
-							if (hasCompletedPositionChange(changes)) {
-								setLayoutSaveVersion((version) => version + 1);
-							}
-						}}
-						onEdgesChange={(changes) => {
-							onEdgesChange(changes);
-							markWorkflowChanged(getActualFlowChangeKeys(changes, "edge"));
-						}}
-						onConnect={onConnect}
-						onPaneClick={() => {
-							setIsAddBlockOpen(false);
-							setIsProposalDropdownOpen(false);
-							setSelectedNodeId(undefined);
-						}}
-						onNodeClick={(_, node) => {
-							setSelectedNodeId(node.id);
-							setIsAddBlockOpen(false);
-							setIsProposalDropdownOpen(false);
-						}}
-						fitView
-						minZoom={0.25}
-						maxZoom={1.6}
-						proOptions={{ hideAttribution: true }}
-						className="bg-grayscale-1"
+					) : null}
+				</div>
+				<ContextMenu.Root>
+					<ContextMenu.Trigger
+						render={
+							<div
+								className="relative min-h-0 flex-1"
+								onContextMenu={captureAddBlockPosition}
+								role="application"
+							/>
+						}
 					>
-						<Background color="var(--slate-6)" gap={18} size={1} />
-					</ReactFlow>
-				</ContextMenu.Trigger>
-				<ContextMenu.Portal>
-					<ContextMenu.Positioner>
-						<ContextMenu.Popup className="w-72">
-							<AddBlockMenuItems onAdd={addBlockFromContextMenu} />
-						</ContextMenu.Popup>
-					</ContextMenu.Positioner>
-				</ContextMenu.Portal>
-			</ContextMenu.Root>
-			<AnimatePresence initial={false}>
-				{selectedNode ? (
-					<Inspector
-						agents={agents}
-						factoryId={currentFactoryId}
-						orgHandle={currentOrgHandle}
-						node={selectedNode}
-						onChange={updateSelectedNode}
-						onClose={() => setSelectedNodeId(undefined)}
-						onResizeStart={startInspectorResize}
-						size={inspectorSize}
-					/>
-				) : null}
-			</AnimatePresence>
-		</div>
+						<ReactFlow<WorkflowNode, WorkflowEdge>
+							nodes={nodes}
+							edges={edges}
+							nodeTypes={nodeTypes}
+							defaultEdgeOptions={{
+								type: "smoothstep",
+								animated: true,
+							}}
+							onNodesChange={(changes) => {
+								onNodesChange(changes);
+								markWorkflowChanged(getActualFlowChangeKeys(changes, "node"));
+								if (hasCompletedPositionChange(changes)) {
+									setLayoutSaveVersion((version) => version + 1);
+								}
+							}}
+							onEdgesChange={(changes) => {
+								onEdgesChange(changes);
+								markWorkflowChanged(getActualFlowChangeKeys(changes, "edge"));
+							}}
+							onConnect={onConnect}
+							onPaneClick={() => {
+								setIsAddBlockOpen(false);
+								setIsProposalDropdownOpen(false);
+								setSelectedNodeId(undefined);
+							}}
+							onNodeClick={(_, node) => {
+								setSelectedNodeId(node.id);
+								setIsAddBlockOpen(false);
+								setIsProposalDropdownOpen(false);
+							}}
+							fitView
+							minZoom={0.25}
+							maxZoom={1.6}
+							proOptions={{ hideAttribution: true }}
+							className="bg-grayscale-1"
+						>
+							<Background color="var(--slate-6)" gap={18} size={1} />
+						</ReactFlow>
+					</ContextMenu.Trigger>
+					<ContextMenu.Portal>
+						<ContextMenu.Positioner>
+							<ContextMenu.Popup className="w-72">
+								<AddBlockMenuItems onAdd={addBlockFromContextMenu} />
+							</ContextMenu.Popup>
+						</ContextMenu.Positioner>
+					</ContextMenu.Portal>
+				</ContextMenu.Root>
+				<AnimatePresence initial={false}>
+					{selectedNode ? (
+						<Inspector
+							agents={agents}
+							factoryId={currentFactoryId}
+							orgHandle={currentOrgHandle}
+							node={selectedNode}
+							webhooks={webhooks}
+							onChange={updateSelectedNode}
+							onClose={() => setSelectedNodeId(undefined)}
+							onResizeStart={startInspectorResize}
+							size={inspectorSize}
+						/>
+					) : null}
+				</AnimatePresence>
+			</div>
+		</WorkflowNodeTasksContext.Provider>
 	);
 }
 
@@ -1221,6 +1325,7 @@ function WorkflowCard({ data, selected, id: nodeId }: NodeProps<WorkflowNode>) {
 					/>
 				) : null}
 			</div>
+			<WorkflowTaskStrip nodeId={nodeId} />
 		</div>
 	);
 }
@@ -1295,6 +1400,7 @@ function ManualStartNodeCard({
 							<span>Start</span>
 						</div>
 					</div>
+					<WorkflowTaskStrip nodeId={nodeId} />
 				</div>
 			</div>
 			<Handle
@@ -1303,6 +1409,51 @@ function ManualStartNodeCard({
 				position={Position.Right}
 				className="!size-3 !border-2 !border-grayscale-1 !bg-green-9"
 			/>
+		</div>
+	);
+}
+
+function WorkflowTaskStrip({ nodeId }: { nodeId: string }) {
+	const { factoryId, orgHandle, tasksByNodeId } = useContext(
+		WorkflowNodeTasksContext,
+	);
+	const tasks = tasksByNodeId.get(nodeId) ?? [];
+
+	if (tasks.length === 0) {
+		return null;
+	}
+
+	return (
+		<div className="border-t border-grayscale-4 px-3 py-2">
+			<div className="flex min-h-4 flex-row items-center gap-1.5 overflow-hidden">
+				<AnimatePresence initial={false}>
+					{tasks.map((task) => (
+						<motion.div
+							key={task.id}
+							layout
+							initial={{ x: -14, opacity: 0, scale: 0.9 }}
+							animate={{ x: 0, opacity: 1, scale: 1 }}
+							exit={{ x: -10, opacity: 0, scale: 0.9 }}
+							transition={{ type: "spring", stiffness: 520, damping: 34 }}
+							className="shrink-0"
+						>
+							<Link
+								href={`/${orgHandle}/factories/${factoryId}/tasks/${task.id}`}
+								onClick={(event) => event.stopPropagation()}
+								title={task.name}
+								aria-label={`Open task ${task.name}`}
+								className="nodrag nopan flex size-5 items-center justify-center rounded-sm transition-colors hover:bg-grayscale-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-8"
+							>
+								<TaskStatusDots
+									status={toTaskDotStatus(task.status)}
+									size={3}
+									gap={1}
+								/>
+							</Link>
+						</motion.div>
+					))}
+				</AnimatePresence>
+			</div>
 		</div>
 	);
 }
@@ -1324,7 +1475,7 @@ function NodePreview({ data }: { data: WorkflowNodeData }) {
 			<>
 				<p>Entry point for external POST requests.</p>
 				<p className="truncate font-mono text-[10px]">
-					Secret: {data.webhookSecret}
+					Webhook: {data.webhookId}
 				</p>
 			</>
 		);
@@ -1439,6 +1590,7 @@ function Inspector({
 	factoryId,
 	orgHandle,
 	node,
+	webhooks,
 	onChange,
 	onClose,
 	onResizeStart,
@@ -1448,22 +1600,36 @@ function Inspector({
 	factoryId: string;
 	orgHandle: string;
 	node: WorkflowNode | undefined;
+	webhooks: FactoryWebhook[];
 	onChange: (data: Partial<WorkflowNodeData>) => void;
 	onClose: () => void;
 	onResizeStart: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 	size: number;
 }) {
+	const webhook = useMemo(
+		() =>
+			node?.data.blockType === "webhook"
+				? findWebhookForNode(node, webhooks)
+				: undefined,
+		[node, webhooks],
+	);
 	const webhookUrl = useMemo(() => {
 		if (node?.data.blockType !== "webhook") {
 			return "";
 		}
 
-		if (typeof window === "undefined") {
-			return `/api/factories/${factoryId}/floor/webhooks/${node.id}`;
+		const publicId = webhook?.publicId ?? node.data.webhookId;
+
+		if (!publicId) {
+			return "";
 		}
 
-		return `${window.location.origin}/api/factories/${factoryId}/floor/webhooks/${node.id}`;
-	}, [factoryId, node]);
+		if (typeof window === "undefined") {
+			return `/api/webhooks/${publicId}`;
+		}
+
+		return `${window.location.origin}/api/webhooks/${publicId}`;
+	}, [node, webhook]);
 
 	if (!node) {
 		return null;
@@ -1505,11 +1671,7 @@ function Inspector({
 				</button>
 			</div>
 			{node.data.blockType === "manualStart" ? (
-				<ManualStartComposer
-					factoryId={factoryId}
-					node={node}
-					orgHandle={orgHandle}
-				/>
+				<ManualStartComposer factoryId={factoryId} node={node} />
 			) : null}
 			{node.data.blockType === "webhook" ? (
 				<InspectorSection title="Webhook">
@@ -1524,7 +1686,7 @@ function Inspector({
 					<label className="flex flex-col gap-1 text-xs text-grayscale-11">
 						Secret
 						<input
-							value={node.data.webhookSecret ?? ""}
+							value={webhook?.secret ?? node.data.webhookSecret ?? ""}
 							onChange={(event) =>
 								onChange({ webhookSecret: event.target.value })
 							}
@@ -1678,14 +1840,11 @@ function AgentRunInspector({
 
 function ManualStartComposer({
 	factoryId,
-	orgHandle,
 	node,
 }: {
 	factoryId: string;
-	orgHandle: string;
 	node: WorkflowNode;
 }) {
-	const router = useRouter();
 	const { user } = db.useAuth();
 	const [message, setMessage] = useState("");
 	const [pendingTaskId, setPendingTaskId] = useState(() => id());
@@ -1750,7 +1909,6 @@ function ManualStartComposer({
 			clearAttachments();
 			setPendingTaskId(id());
 			setMessage("");
-			router.push(`/${orgHandle}/factories/${factoryId}/tasks/${taskId}`);
 		} catch (startError) {
 			setError(
 				startError instanceof Error
@@ -1980,6 +2138,20 @@ const compareFloorChangeProposals = (
 	second: FloorChangeProposal,
 ) => getProposalTime(second) - getProposalTime(first);
 
+const compareWorkflowTasks = (first: WorkflowTask, second: WorkflowTask) =>
+	getTaskTime(second) - getTaskTime(first);
+
+const getTaskTime = (task: WorkflowTask) => {
+	const timestamp = task.createdAt;
+
+	if (!timestamp) {
+		return 0;
+	}
+
+	const time = new Date(timestamp).getTime();
+	return Number.isNaN(time) ? 0 : time;
+};
+
 const getProposalTime = (proposal: FloorChangeProposal) => {
 	const timestamp = proposal.createdAt;
 
@@ -2146,6 +2318,93 @@ const withAcceptedLayoutPositions = (
 	acceptedWorkflow
 		? withCurrentNodePositions(workflow, acceptedWorkflow.nodes)
 		: workflow;
+
+const withSyncedWebhookEntities = (
+	workflow: FloorWorkflow,
+	webhooks: FactoryWebhook[],
+	factoryId: string,
+	knownWebhookIds: Set<string>,
+	timestamp = new Date().toISOString(),
+) => {
+	const activeWebhookIds = new Set<string>();
+	const existingById = new Map(
+		webhooks.map((webhook) => [webhook.id, webhook]),
+	);
+	const transactions = [];
+	const nodes = workflow.nodes.map((node) => {
+		if (node.data.blockType !== "webhook") {
+			return node;
+		}
+
+		const webhookId = node.data.webhookId ?? id();
+		const existingWebhook = existingById.get(webhookId);
+		const shouldUpdateWebhook =
+			existingWebhook !== undefined || knownWebhookIds.has(webhookId);
+		const name = node.data.label || "Webhook";
+		const publicId = existingWebhook?.publicId ?? webhookId;
+		const secret = node.data.webhookSecret ?? existingWebhook?.secret;
+		activeWebhookIds.add(webhookId);
+
+		const webhookData = {
+			name,
+			publicId,
+			nodeId: node.id,
+			enabled: true,
+			updatedAt: timestamp,
+			...(secret !== undefined ? { secret } : {}),
+		};
+
+		transactions.push(
+			shouldUpdateWebhook
+				? webhookTx(webhookId).update(webhookData).link({ factory: factoryId })
+				: webhookTx(webhookId)
+						.create({
+							...webhookData,
+							secret: secret ?? createSecret(),
+							createdAt: timestamp,
+						})
+						.link({ factory: factoryId }),
+		);
+
+		const { webhookSecret: _webhookSecret, ...data } = node.data;
+
+		return {
+			...node,
+			data: {
+				...data,
+				webhookId,
+			},
+		};
+	});
+
+	for (const webhook of webhooks) {
+		if (!activeWebhookIds.has(webhook.id) && webhook.enabled !== false) {
+			transactions.push(
+				webhookTx(webhook.id).update({
+					enabled: false,
+					updatedAt: timestamp,
+				}),
+			);
+		}
+	}
+
+	return {
+		workflow: {
+			nodes,
+			edges: workflow.edges,
+		},
+		transactions,
+		webhookIds: activeWebhookIds,
+	};
+};
+
+const findWebhookForNode = (
+	node: WorkflowNode,
+	webhooks: FactoryWebhook[],
+): FactoryWebhook | undefined =>
+	node.data.webhookId
+		? webhooks.find((webhook) => webhook.id === node.data.webhookId)
+		: undefined;
 
 const getActualFlowChangeKeys = (
 	changes: Array<{ id?: string; type: string; dragging?: boolean }>,

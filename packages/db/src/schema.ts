@@ -93,6 +93,16 @@ const _schema = i.schema({
 			lastUsedAt: i.date().optional(),
 			revokedAt: i.date().optional(),
 		}),
+		webhooks: i.entity({
+			name: i.string().indexed(),
+			publicId: i.string().unique().indexed(),
+			nodeId: i.string().indexed(),
+			secret: i.string().optional(),
+			enabled: i.boolean().optional(),
+			createdAt: i.date().optional(),
+			updatedAt: i.date().optional(),
+			lastTriggeredAt: i.date().optional(),
+		}),
 		agents: i.entity({
 			name: i.string().indexed(),
 			auth: i.json().optional(),
@@ -411,6 +421,19 @@ const _schema = i.schema({
 			},
 			reverse: {
 				on: "apiKeys",
+				has: "one",
+				label: "factory",
+				onDelete: "cascade",
+			},
+		},
+		factoryWebhooks: {
+			forward: {
+				on: "factories",
+				has: "many",
+				label: "webhooks",
+			},
+			reverse: {
+				on: "webhooks",
 				has: "one",
 				label: "factory",
 				onDelete: "cascade",

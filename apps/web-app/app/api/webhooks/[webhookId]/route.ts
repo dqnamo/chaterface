@@ -3,8 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 type RouteContext = {
 	params: Promise<{
-		factoryId: string;
-		webhookNodeId: string;
+		webhookId: string;
 	}>;
 };
 
@@ -13,7 +12,7 @@ type WorkflowNode = {
 	data?: {
 		blockType?: string;
 		label?: string;
-		webhookSecret?: string;
+		webhookId?: string;
 	};
 };
 
@@ -22,6 +21,16 @@ type FactoryWithWorkflow = {
 	floorWorkflow?: {
 		nodes?: WorkflowNode[];
 	};
+};
+
+type WorkflowWebhook = {
+	id: string;
+	name?: string;
+	publicId?: string;
+	nodeId?: string;
+	secret?: string;
+	enabled?: boolean;
+	factory?: FactoryWithWorkflow;
 };
 
 const taskTx = (taskId: string) => {
@@ -44,46 +53,57 @@ const eventTx = (eventId: string) => {
 	return tx;
 };
 
+const webhookTx = (webhookId: string) => {
+	const tx = db.tx.webhooks[webhookId];
+
+	if (!tx) {
+		throw new Error(`Webhook transaction builder ${webhookId} not found`);
+	}
+
+	return tx;
+};
+
 export async function POST(req: NextRequest, context: RouteContext) {
-	const { factoryId, webhookNodeId } = await context.params;
+	const { webhookId } = await context.params;
 	const input = await readJson(req);
 	const secret = getWebhookSecret(req, input);
 
-	const factory = await db
+	const webhook = await db
 		.query({
-			factories: {
+			webhooks: {
 				$: {
 					where: {
-						id: factoryId,
+						publicId: webhookId,
 					},
 				},
+				factory: {},
 			},
 		})
-		.then((result) => result.factories[0] as FactoryWithWorkflow | undefined);
+		.then((result) => result.webhooks[0] as WorkflowWebhook | undefined);
 
-	if (!factory) {
-		return NextResponse.json({ message: "Factory not found" }, { status: 404 });
+	if (!webhook?.factory || webhook.enabled === false) {
+		return NextResponse.json({ message: "Webhook not found" }, { status: 404 });
 	}
 
-	const webhookNode = factory.floorWorkflow?.nodes?.find(
-		(node) => node.id === webhookNodeId && node.data?.blockType === "webhook",
+	if (!webhook.secret || secret !== webhook.secret) {
+		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+	}
+
+	const webhookNode = webhook.factory.floorWorkflow?.nodes?.find(
+		(node) =>
+			node.id === webhook.nodeId &&
+			node.data?.blockType === "webhook" &&
+			node.data.webhookId === webhook.id,
 	);
 
-	if (!webhookNode?.data?.webhookSecret) {
-		return NextResponse.json(
-			{ message: "Webhook block not found" },
-			{ status: 404 },
-		);
-	}
-
-	if (secret !== webhookNode.data.webhookSecret) {
-		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+	if (!webhookNode) {
+		return NextResponse.json({ message: "Webhook not found" }, { status: 404 });
 	}
 
 	const taskId = id();
 	const eventId = id();
 	const createdAt = new Date().toISOString();
-	const name = `${webhookNode.data.label || "Workflow webhook"} received`;
+	const name = `${webhook.name || webhookNode.data?.label || "Workflow webhook"} received`;
 
 	await db.transact([
 		taskTx(taskId)
@@ -94,27 +114,33 @@ export async function POST(req: NextRequest, context: RouteContext) {
 				createdAt,
 				workflowState: "webhook_received",
 				workflowInput: input,
-				workflowNodeId: webhookNodeId,
+				workflowNodeId: webhookNode.id,
 			})
-			.link({ factory: factory.id }),
+			.link({ factory: webhook.factory.id }),
 		eventTx(eventId)
 			.create({
 				type: "factoryplane.workflow.webhook_received",
 				data: {
-					factoryId: factory.id,
+					factoryId: webhook.factory.id,
 					taskId,
-					webhookNodeId,
+					webhookId: webhook.id,
+					webhookNodeId: webhookNode.id,
 					input,
 				},
 				createdAt,
 			})
 			.link({ task: taskId }),
+		webhookTx(webhook.id).update({
+			lastTriggeredAt: createdAt,
+			updatedAt: createdAt,
+		}),
 	]);
 
 	return NextResponse.json(
 		{
 			taskId,
-			factoryId: factory.id,
+			factoryId: webhook.factory.id,
+			webhookId: webhook.id,
 			workflowState: "webhook_received",
 		},
 		{ status: 201 },
