@@ -24,9 +24,11 @@ type Agent = InstaQLEntity<AppSchema, "agents">;
 type Factory = InstaQLEntity<AppSchema, "factories">;
 type Repository = InstaQLEntity<AppSchema, "repositories">;
 type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
+type Skill = InstaQLEntity<AppSchema, "skills">;
 type FactoryWithRepositories = Factory & {
 	repositories?: Repository[];
 	environmentFiles?: EnvironmentFile[];
+	skills?: Skill[];
 };
 type RepositorySecret = {
 	id: string;
@@ -194,6 +196,7 @@ export const processEventTask = task({
 						factory: {
 							repositories: {},
 							environmentFiles: {},
+							skills: {},
 						},
 					},
 				},
@@ -375,6 +378,7 @@ const setupTaskSandbox = async (
 		repositoryGithubEnvs,
 	);
 	await writeFactoryEnvironmentFiles(sandbox, task.id, factory);
+	await installFactorySkills(sandbox, task.id, provider, factory);
 	await runFactorySetupScript(
 		sandbox,
 		task.id,
@@ -649,6 +653,151 @@ const getFactoryEnvironmentFiles = (
 	}
 
 	return [...environmentFiles.values()];
+};
+
+const installFactorySkills = async (
+	sandbox: Sandbox,
+	taskId: string,
+	provider: AgentProvider,
+	factory: FactoryWithRepositories,
+) => {
+	if (provider !== "codex") {
+		return;
+	}
+
+	const skills = getFactorySkills(factory.skills);
+
+	if (skills.length === 0) {
+		return;
+	}
+
+	await runSetupStep(
+		taskId,
+		"factory_skills",
+		"Install factory skills",
+		async () => {
+			await Promise.all(
+				skills.map(async (skill) => {
+					const skillPath = `~/.codex/skills/factoryplane/${skill.slug}`;
+					const files =
+						skill.files.length > 0
+							? skill.files
+							: [{ path: "SKILL.md", content: skill.instructions }];
+
+					await sandbox.commands.run(`mkdir -p ${shellQuote(skillPath)}`, {
+						timeoutMs: 30_000,
+					});
+
+					await Promise.all(
+						files.map(async (file) => {
+							const filePath = `${skillPath}/${file.path}`;
+							const parentPath = filePath.slice(0, filePath.lastIndexOf("/"));
+
+							await sandbox.commands.run(`mkdir -p ${shellQuote(parentPath)}`, {
+								timeoutMs: 30_000,
+							});
+							await sandbox.files.write(filePath, file.content);
+						}),
+					);
+				}),
+			);
+		},
+		{ timeoutMs: 60_000 },
+	);
+};
+
+const getFactorySkills = (
+	skills: Skill[] | undefined,
+): Array<{
+	slug: string;
+	instructions: string;
+	files: Array<{ path: string; content: string }>;
+}> => {
+	if (!skills) {
+		return [];
+	}
+
+	return [...skills]
+		.filter(
+			(skill) =>
+				Boolean(skill.enabled) &&
+				!skill.removedAt &&
+				typeof skill.instructions === "string" &&
+				skill.instructions.trim().length > 0,
+		)
+		.sort(
+			(a, b) =>
+				new Date(a.createdAt ?? 0).getTime() -
+				new Date(b.createdAt ?? 0).getTime(),
+		)
+		.map((skill) => ({
+			slug:
+				normalizeSkillSlug(skill.slug) ??
+				normalizeSkillSlug(skill.name) ??
+				skill.id,
+			instructions: skill.instructions,
+			files: getSkillFiles(skill.files),
+		}));
+};
+
+const getSkillFiles = (
+	value: unknown,
+): Array<{ path: string; content: string }> => {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	return value.flatMap((file) => {
+		if (!isRecord(file)) {
+			return [];
+		}
+
+		const filePath =
+			typeof file.path === "string"
+				? normalizeSkillFilePath(file.path)
+				: undefined;
+		const content = typeof file.content === "string" ? file.content : undefined;
+
+		if (!filePath || content === undefined) {
+			return [];
+		}
+
+		return [{ path: filePath, content }];
+	});
+};
+
+const normalizeSkillSlug = (value: string | undefined) => {
+	if (!value) {
+		return undefined;
+	}
+
+	const slug = value
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+
+	return slug || undefined;
+};
+
+const normalizeSkillFilePath = (value: string) => {
+	const normalized = value.trim().replaceAll("\\", "/");
+
+	if (!normalized || normalized.startsWith("/")) {
+		return undefined;
+	}
+
+	const segments = normalized.split("/");
+
+	if (
+		segments.some(
+			(segment) => segment.length === 0 || segment === "." || segment === "..",
+		)
+	) {
+		return undefined;
+	}
+
+	return segments.join("/");
 };
 
 const setupRepositoryGithubAuth = async (
