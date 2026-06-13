@@ -4,7 +4,7 @@ import type { Duplex } from "node:stream";
 import db from "@repo/db/admin";
 import type { CommandHandle } from "e2b/dist/index.mjs";
 import { Sandbox } from "e2b/dist/index.mjs";
-import { WebSocket, WebSocketServer } from "ws";
+import { type RawData, WebSocket, WebSocketServer } from "ws";
 
 type TerminalSessionTicket = {
 	terminalSessionId: string;
@@ -121,7 +121,7 @@ const handleClientMessage = async (
 	ws: WebSocket,
 	sandbox: Sandbox | undefined,
 	context: TerminalSessionContext,
-	message: WebSocket.RawData,
+	message: RawData,
 ) => {
 	if (!sandbox) {
 		return;
@@ -175,6 +175,7 @@ const getTerminalSessionContext = async (
 		.query({
 			terminalSessions: {
 				$: {
+					fields: ["pid"],
 					where: {
 						id: terminalSessionId,
 					},
@@ -261,9 +262,7 @@ const isTerminalSessionTicket = (
 	);
 };
 
-const parseClientMessage = (
-	message: WebSocket.RawData,
-): ClientMessage | null => {
+const parseClientMessage = (message: RawData): ClientMessage | null => {
 	if (!Buffer.isBuffer(message)) {
 		return null;
 	}
