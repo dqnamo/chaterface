@@ -4,14 +4,11 @@ import { id } from "@instantdb/react";
 import { ShapesIcon } from "@phosphor-icons/react";
 import db from "@repo/db/client";
 import { DateTime } from "luxon";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import CornerBrackets from "@/components/CornerBrackets";
-import { Dialog } from "@/components/Dialog";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
-import Monogram from "@/components/Monogram";
 import SignOutButton from "@/components/SignOutButton";
 import {
 	getRememberedFactory,
@@ -32,7 +29,6 @@ export default function FactoriesPage() {
 	const router = useRouter();
 	const { orgHandle } = useParams();
 	const currentOrgHandle = orgHandle as string;
-	const [createOpen, setCreateOpen] = useState(false);
 	const [factoryName, setFactoryName] = useState("");
 	const [githubAccessToken, setGithubAccessToken] = useState("");
 	const [gitAuthorName, setGitAuthorName] = useState("");
@@ -144,7 +140,6 @@ export default function FactoriesPage() {
 		setGithubAccessToken("");
 		setGitAuthorName("");
 		setGitAuthorEmail("");
-		setCreateOpen(false);
 		rememberLastFactory({
 			factoryId,
 			orgHandle: currentOrgHandle,
@@ -153,160 +148,88 @@ export default function FactoriesPage() {
 		router.push(`/${currentOrgHandle}/factories/${factoryId}`);
 	};
 
+	if (!organisation || !factories || factories.length > 0) {
+		return (
+			<div className="h-full w-full flex flex-col items-center justify-center">
+				<Logo size={8} />
+			</div>
+		);
+	}
+
 	return (
 		<div className="h-full w-full flex flex-col items-center justify-center">
 			<Logo size={8} />
 			<div className="flex flex-col gap-px items-center justify-center mt-8">
 				<h1 className="text-md font-medium text-grayscale-12">
-					{organisation?.name ?? currentOrgHandle}
+					Create Factory
 				</h1>
 				<p className="text-sm text-grayscale-11">
-					Select a factory to manage your tasks
+					Set up a new factory for {organisation.name}
 				</p>
 				<SignOutButton className="mt-3" />
 			</div>
-			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-xl w-full mt-8 gap-2 px-4">
-				{factories?.map((factory) => (
-					<Link
-						key={factory.id}
-						href={`/${currentOrgHandle}/factories/${factory.id}`}
-						className="relative bg-grayscale-1 flex flex-row items-center gap-3 group border border-grayscale-4 p-3 transition-colors duration-150 hover:border-grayscale-6"
-					>
-						<CornerBrackets placement="inside" color="accent-9" />
-
-						<Monogram seed={factory.name} letters={2} />
-						<div className="flex flex-col gap-1">
-							<h2 className="text-sm font-medium leading-none text-grayscale-11 group-hover:text-grayscale-12 transition-colors">
-								{factory.name}
-							</h2>
-							{factory.gitAuthorName ? (
-								<p className="text-xs leading-none text-grayscale-10 group-hover:text-grayscale-11 transition-colors">
-									{factory.gitAuthorName}
-								</p>
-							) : null}
-						</div>
-					</Link>
-				))}
-			</div>
-
-			<Dialog.Root open={createOpen} onOpenChange={setCreateOpen}>
-				<Dialog.Trigger
-					render={
-						<button
-							type="button"
-							className="flex flex-row items-center gap-2 relative group bg-grayscale-12 p-2 px-3 mt-8 overflow-visible"
-						/>
-					}
+			<form
+				className="mt-8 flex w-full max-w-md flex-col gap-3 px-4"
+				onSubmit={(event) => {
+					event.preventDefault();
+					void createFactory().catch((error) => {
+						console.error("Failed to create factory", {
+							error: error instanceof Error ? error.message : String(error),
+						});
+					});
+				}}
+			>
+				<div className="flex flex-col gap-1">
+					<p className="text-xs text-grayscale-11">Name</p>
+					<Input
+						type="text"
+						placeholder="Factory Name"
+						value={factoryName}
+						onChange={(e) => setFactoryName(e.target.value)}
+					/>
+				</div>
+				<div className="flex flex-col gap-1">
+					<p className="text-xs text-grayscale-11">GitHub Access Token</p>
+					<Input
+						type="text"
+						placeholder="GitHub Access Token"
+						value={githubAccessToken}
+						onChange={(e) => setGithubAccessToken(e.target.value)}
+					/>
+				</div>
+				<div className="flex flex-col gap-1">
+					<p className="text-xs text-grayscale-11">Git Author Name</p>
+					<Input
+						type="text"
+						placeholder="Git Author Name"
+						value={gitAuthorName}
+						onChange={(e) => setGitAuthorName(e.target.value)}
+					/>
+				</div>
+				<div className="flex flex-col gap-1">
+					<p className="text-xs text-grayscale-11">Git Author Email</p>
+					<Input
+						type="email"
+						placeholder="Git Author Email"
+						value={gitAuthorEmail}
+						onChange={(e) => setGitAuthorEmail(e.target.value)}
+					/>
+				</div>
+				<button
+					type="submit"
+					className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-2 mt-2 overflow-visible"
 				>
 					<CornerBrackets
 						placement="outside"
 						spacing={4}
 						translate={6}
+						size={6}
 						color="grayscale-12"
 					/>
-					<ShapesIcon
-						weight="bold"
-						className="size-4 text-grayscale-2 group-hover:text-grayscale-1 transition-colors"
-					/>
-					<p className="text-sm text-grayscale-2 group-hover:text-grayscale-1 transition-colors">
-						New Factory
-					</p>
-				</Dialog.Trigger>
-				<Dialog.Portal>
-					<Dialog.Backdrop />
-					<Dialog.Popup>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<Dialog.Title>Create Factory</Dialog.Title>
-								<Dialog.Description>
-									Set up a new factory for{" "}
-									{organisation?.name ?? currentOrgHandle}.
-								</Dialog.Description>
-							</div>
-						</div>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<p className="text-xs text-grayscale-11">Name</p>
-								<p className="text-xs text-grayscale-10">
-									The name of the factory.
-								</p>
-							</div>
-							<Input
-								type="text"
-								placeholder="Factory Name"
-								value={factoryName}
-								onChange={(e) => setFactoryName(e.target.value)}
-							/>
-						</div>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<p className="text-xs text-grayscale-11">GitHub Access Token</p>
-								<p className="text-xs text-grayscale-10">
-									Used to authenticate with your repositories.
-								</p>
-							</div>
-							<Input
-								type="text"
-								placeholder="GitHub Access Token"
-								value={githubAccessToken}
-								onChange={(e) => setGithubAccessToken(e.target.value)}
-							/>
-						</div>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<p className="text-xs text-grayscale-11">Git Author Name</p>
-								<p className="text-xs text-grayscale-10">
-									The name used for commits made by this factory.
-								</p>
-							</div>
-							<Input
-								type="text"
-								placeholder="Git Author Name"
-								value={gitAuthorName}
-								onChange={(e) => setGitAuthorName(e.target.value)}
-							/>
-						</div>
-						<div className="flex flex-col p-3 gap-3">
-							<div className="flex flex-col">
-								<p className="text-xs text-grayscale-11">Git Author Email</p>
-								<p className="text-xs text-grayscale-10">
-									The email used for commits made by this factory.
-								</p>
-							</div>
-							<Input
-								type="email"
-								placeholder="Git Author Email"
-								value={gitAuthorEmail}
-								onChange={(e) => setGitAuthorEmail(e.target.value)}
-							/>
-						</div>
-						<div className="flex flex-row items-center justify-end gap-2 p-3">
-							<Dialog.Close>Cancel</Dialog.Close>
-							<button
-								type="button"
-								onClick={() => {
-									void createFactory().catch((error) => {
-										console.error("Failed to create factory", {
-											error:
-												error instanceof Error ? error.message : String(error),
-										});
-									});
-								}}
-								className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
-							>
-								<CornerBrackets
-									placement="outside"
-									spacing={4}
-									translate={6}
-									size={6}
-									color="grayscale-12"
-								/>
-								Create
-							</button>
-						</div>
-					</Dialog.Popup>
-				</Dialog.Portal>
-			</Dialog.Root>
+					<ShapesIcon weight="bold" className="size-4" />
+					Create Factory
+				</button>
+			</form>
 		</div>
 	);
 }

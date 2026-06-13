@@ -1,4 +1,4 @@
-import type { InstaQLEntity } from "@instantdb/react";
+import { type InstaQLEntity, id } from "@instantdb/react";
 import {
 	BuildingsIcon,
 	CaretDownIcon,
@@ -22,6 +22,8 @@ import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
+import { Dialog } from "./Dialog";
+import { Input } from "./Input";
 import { Menu } from "./Menu";
 import Monogram from "./Monogram";
 import { ShortcutKey } from "./ShortcutKey";
@@ -46,6 +48,38 @@ const taskTx = (taskId: string) => {
 
 	if (!tx) {
 		throw new Error(`Task transaction builder ${taskId} not found`);
+	}
+
+	return tx;
+};
+
+const organisationTx = (organisationId: string) => {
+	const tx = db.tx.organisations[organisationId];
+
+	if (!tx) {
+		throw new Error(
+			`Organisation transaction builder ${organisationId} not found`,
+		);
+	}
+
+	return tx;
+};
+
+const memberTx = (memberId: string) => {
+	const tx = db.tx.members[memberId];
+
+	if (!tx) {
+		throw new Error(`Member transaction builder ${memberId} not found`);
+	}
+
+	return tx;
+};
+
+const factoryTx = (factoryId: string) => {
+	const tx = db.tx.factories[factoryId];
+
+	if (!tx) {
+		throw new Error(`Factory transaction builder ${factoryId} not found`);
 	}
 
 	return tx;
@@ -292,6 +326,16 @@ const FactorySwitcher = ({
 	onNavigate: () => void;
 }) => {
 	const router = useRouter();
+	const { user } = db.useAuth();
+	const [createOrganisationOpen, setCreateOrganisationOpen] = useState(false);
+	const [createFactoryOrganisation, setCreateFactoryOrganisation] =
+		useState<Organisation>();
+	const [organisationName, setOrganisationName] = useState("");
+	const [organisationHandle, setOrganisationHandle] = useState("");
+	const [factoryName, setFactoryName] = useState("");
+	const [githubAccessToken, setGithubAccessToken] = useState("");
+	const [gitAuthorName, setGitAuthorName] = useState("");
+	const [gitAuthorEmail, setGitAuthorEmail] = useState("");
 	const currentOrganisation = organisations.find(
 		(organisation) => organisation.handle === currentOrgHandle,
 	);
@@ -306,104 +350,327 @@ const FactorySwitcher = ({
 		onNavigate();
 	};
 
-	return (
-		<Menu.Root>
-			<Menu.Trigger className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
-				<Monogram
-					seed={triggerSeed}
-					letters={currentFactory ? 2 : 1}
-					className="size-7 shrink-0"
-				/>
-				<span className="flex min-w-0 flex-1 flex-col text-left">
-					<span className="truncate text-sm leading-tight text-grayscale-12">
-						{currentFactory?.name ?? currentOrganisation?.name ?? "Factories"}
-					</span>
-					<span className="truncate text-[11px] leading-tight text-grayscale-10">
-						{currentOrganisation?.name ?? currentOrgHandle}
-					</span>
-				</span>
-				<Menu.TriggerIcon />
-			</Menu.Trigger>
-			<Menu.Portal>
-				<Menu.Positioner align="start" sideOffset={8}>
-					<Menu.Popup className="w-72 max-w-[calc(100vw-1rem)]">
-						<Menu.Item onClick={() => navigateTo("/")}>
-							<BuildingsIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">All organisations</span>
-						</Menu.Item>
-						<Menu.Separator />
-						{organisations.map((organisation) => (
-							<Menu.Group key={organisation.id}>
-								<Menu.GroupLabel className="truncate">
-									{organisation.name}
-								</Menu.GroupLabel>
-								<Menu.Item
-									onClick={() =>
-										navigateTo(`/${organisation.handle}/factories`)
-									}
-									className={cn(
-										organisation.handle === currentOrgHandle && !currentFactory
-											? "bg-grayscale-2 text-grayscale-12"
-											: "",
-									)}
-								>
-									<BuildingsIcon weight="bold" className="size-4 shrink-0" />
-									<span className="min-w-0 flex-1 truncate">Factories</span>
-									{organisation.handle === currentOrgHandle &&
-									!currentFactory ? (
-										<CheckIcon
-											size={14}
-											weight="bold"
-											className="shrink-0 text-accent-9"
-										/>
-									) : null}
-								</Menu.Item>
-								{organisation.factories?.length ? (
-									organisation.factories.map((factory) => {
-										const selected =
-											organisation.handle === currentOrgHandle &&
-											factory.id === currentFactoryId;
+	const createOrganisation = async () => {
+		if (!user?.id) {
+			return;
+		}
 
-										return (
-											<Menu.Item
-												key={factory.id}
-												onClick={() =>
-													navigateTo(
-														`/${organisation.handle}/factories/${factory.id}`,
-													)
-												}
-												className={cn(
-													selected ? "bg-grayscale-2 text-grayscale-12" : "",
-												)}
-											>
-												<ShapesIcon weight="bold" className="size-4 shrink-0" />
-												<span className="min-w-0 flex-1 truncate">
-													{factory.name}
-												</span>
-												{selected ? (
-													<CheckIcon
-														size={14}
-														weight="bold"
-														className="shrink-0 text-accent-9"
-													/>
-												) : null}
-											</Menu.Item>
-										);
-									})
-								) : (
-									<Menu.Item disabled={true} className="text-grayscale-9">
-										<span className="min-w-0 flex-1 truncate">
-											No factories
-										</span>
+		const organisationId = id();
+		await db.transact([
+			organisationTx(organisationId).create({
+				name: organisationName,
+				handle: organisationHandle,
+				createdAt: DateTime.now().toISO(),
+			}),
+			memberTx(id())
+				.update({
+					createdAt: DateTime.now().toISO(),
+					joinedAt: DateTime.now().toISO(),
+					role: "owner",
+				})
+				.link({ organisation: organisationId, user: user.id }),
+		]);
+
+		const nextHandle = organisationHandle;
+		setOrganisationName("");
+		setOrganisationHandle("");
+		setCreateOrganisationOpen(false);
+		navigateTo(`/${nextHandle}/factories`);
+	};
+
+	const createFactory = async () => {
+		if (!createFactoryOrganisation || !user?.id) {
+			return;
+		}
+
+		const factoryId = id();
+		const trimmedGithubAccessToken = githubAccessToken.trim();
+
+		await db.transact(
+			factoryTx(factoryId)
+				.create({
+					name: factoryName,
+					createdAt: DateTime.now().toISO(),
+					gitAuthorName: gitAuthorName.trim() || undefined,
+					gitAuthorEmail: gitAuthorEmail.trim() || undefined,
+				})
+				.link({ organisation: createFactoryOrganisation.id }),
+		);
+
+		if (trimmedGithubAccessToken) {
+			const response = await fetch("/api/factories/saveGithub", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${user.refresh_token}`,
+				},
+				body: JSON.stringify({
+					factoryId,
+					githubAccessToken: trimmedGithubAccessToken,
+					gitAuthorName: gitAuthorName.trim(),
+					gitAuthorEmail: gitAuthorEmail.trim(),
+				}),
+			});
+
+			if (!response.ok) {
+				throw new Error(
+					`Failed to save GitHub credentials: ${response.status}`,
+				);
+			}
+		}
+
+		const nextOrgHandle = createFactoryOrganisation.handle;
+		setFactoryName("");
+		setGithubAccessToken("");
+		setGitAuthorName("");
+		setGitAuthorEmail("");
+		setCreateFactoryOrganisation(undefined);
+		navigateTo(`/${nextOrgHandle}/factories/${factoryId}`);
+	};
+
+	return (
+		<>
+			<Menu.Root>
+				<Menu.Trigger className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
+					<Monogram
+						seed={triggerSeed}
+						letters={currentFactory ? 2 : 1}
+						className="size-7 shrink-0"
+					/>
+					<span className="flex min-w-0 flex-1 flex-col text-left">
+						<span className="truncate text-sm leading-tight text-grayscale-12">
+							{currentFactory?.name ?? currentOrganisation?.name ?? "Factories"}
+						</span>
+						<span className="truncate text-[11px] leading-tight text-grayscale-10">
+							{currentOrganisation?.name ?? currentOrgHandle}
+						</span>
+					</span>
+					<Menu.TriggerIcon />
+				</Menu.Trigger>
+				<Menu.Portal>
+					<Menu.Positioner align="start" sideOffset={8}>
+						<Menu.Popup className="w-72 max-w-[calc(100vw-1rem)]">
+							<Menu.Item onClick={() => setCreateOrganisationOpen(true)}>
+								<BuildingsIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">
+									New organisation
+								</span>
+							</Menu.Item>
+							<Menu.Separator />
+							{organisations.map((organisation) => (
+								<Menu.Group key={organisation.id}>
+									<Menu.GroupLabel className="truncate">
+										{organisation.name}
+									</Menu.GroupLabel>
+									<Menu.Item
+										onClick={() => setCreateFactoryOrganisation(organisation)}
+									>
+										<ShapesIcon weight="bold" className="size-4 shrink-0" />
+										<span className="min-w-0 flex-1 truncate">New factory</span>
 									</Menu.Item>
-								)}
-								<Menu.Separator />
-							</Menu.Group>
-						))}
-					</Menu.Popup>
-				</Menu.Positioner>
-			</Menu.Portal>
-		</Menu.Root>
+									{organisation.factories?.length ? (
+										organisation.factories.map((factory) => {
+											const selected =
+												organisation.handle === currentOrgHandle &&
+												factory.id === currentFactoryId;
+
+											return (
+												<Menu.Item
+													key={factory.id}
+													onClick={() =>
+														navigateTo(
+															`/${organisation.handle}/factories/${factory.id}`,
+														)
+													}
+													className={cn(
+														selected ? "bg-grayscale-2 text-grayscale-12" : "",
+													)}
+												>
+													<ShapesIcon
+														weight="bold"
+														className="size-4 shrink-0"
+													/>
+													<span className="min-w-0 flex-1 truncate">
+														{factory.name}
+													</span>
+													{selected ? (
+														<CheckIcon
+															size={14}
+															weight="bold"
+															className="shrink-0 text-accent-9"
+														/>
+													) : null}
+												</Menu.Item>
+											);
+										})
+									) : (
+										<Menu.Item disabled={true} className="text-grayscale-9">
+											<span className="min-w-0 flex-1 truncate">
+												No factories
+											</span>
+										</Menu.Item>
+									)}
+									<Menu.Separator />
+								</Menu.Group>
+							))}
+						</Menu.Popup>
+					</Menu.Positioner>
+				</Menu.Portal>
+			</Menu.Root>
+			<Dialog.Root
+				open={createOrganisationOpen}
+				onOpenChange={setCreateOrganisationOpen}
+			>
+				<Dialog.Portal>
+					<Dialog.Backdrop />
+					<Dialog.Popup>
+						<form
+							onSubmit={(event) => {
+								event.preventDefault();
+								void createOrganisation().catch((error) => {
+									console.error("Failed to create organisation", {
+										error:
+											error instanceof Error ? error.message : String(error),
+									});
+								});
+							}}
+						>
+							<div className="flex flex-col p-3 gap-3">
+								<div className="flex flex-col">
+									<Dialog.Title>Create Organisation</Dialog.Title>
+									<Dialog.Description>
+										Create a new organisation to manage factories.
+									</Dialog.Description>
+								</div>
+							</div>
+							<div className="flex flex-col p-3 gap-3">
+								<p className="text-xs text-grayscale-11">Name</p>
+								<Input
+									type="text"
+									placeholder="Organisation Name"
+									value={organisationName}
+									onChange={(event) => setOrganisationName(event.target.value)}
+								/>
+							</div>
+							<div className="flex flex-col p-3 gap-3">
+								<p className="text-xs text-grayscale-11">Handle</p>
+								<Input
+									type="text"
+									placeholder="Organisation Handle"
+									value={organisationHandle}
+									onChange={(event) =>
+										setOrganisationHandle(event.target.value)
+									}
+								/>
+							</div>
+							<div className="flex flex-row items-center justify-end gap-2 p-3">
+								<Dialog.Close>Cancel</Dialog.Close>
+								<button
+									type="submit"
+									className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
+								>
+									<CornerBrackets
+										placement="outside"
+										spacing={4}
+										translate={6}
+										size={6}
+										color="grayscale-12"
+									/>
+									Create
+								</button>
+							</div>
+						</form>
+					</Dialog.Popup>
+				</Dialog.Portal>
+			</Dialog.Root>
+			<Dialog.Root
+				open={Boolean(createFactoryOrganisation)}
+				onOpenChange={(open) => {
+					if (!open) {
+						setCreateFactoryOrganisation(undefined);
+					}
+				}}
+			>
+				<Dialog.Portal>
+					<Dialog.Backdrop />
+					<Dialog.Popup>
+						<form
+							onSubmit={(event) => {
+								event.preventDefault();
+								void createFactory().catch((error) => {
+									console.error("Failed to create factory", {
+										error:
+											error instanceof Error ? error.message : String(error),
+									});
+								});
+							}}
+						>
+							<div className="flex flex-col p-3 gap-3">
+								<div className="flex flex-col">
+									<Dialog.Title>Create Factory</Dialog.Title>
+									<Dialog.Description>
+										Set up a new factory for{" "}
+										{createFactoryOrganisation?.name ?? "this organisation"}.
+									</Dialog.Description>
+								</div>
+							</div>
+							<div className="flex flex-col p-3 gap-3">
+								<p className="text-xs text-grayscale-11">Name</p>
+								<Input
+									type="text"
+									placeholder="Factory Name"
+									value={factoryName}
+									onChange={(event) => setFactoryName(event.target.value)}
+								/>
+							</div>
+							<div className="flex flex-col p-3 gap-3">
+								<p className="text-xs text-grayscale-11">GitHub Access Token</p>
+								<Input
+									type="text"
+									placeholder="GitHub Access Token"
+									value={githubAccessToken}
+									onChange={(event) => setGithubAccessToken(event.target.value)}
+								/>
+							</div>
+							<div className="flex flex-col p-3 gap-3">
+								<p className="text-xs text-grayscale-11">Git Author Name</p>
+								<Input
+									type="text"
+									placeholder="Git Author Name"
+									value={gitAuthorName}
+									onChange={(event) => setGitAuthorName(event.target.value)}
+								/>
+							</div>
+							<div className="flex flex-col p-3 gap-3">
+								<p className="text-xs text-grayscale-11">Git Author Email</p>
+								<Input
+									type="email"
+									placeholder="Git Author Email"
+									value={gitAuthorEmail}
+									onChange={(event) => setGitAuthorEmail(event.target.value)}
+								/>
+							</div>
+							<div className="flex flex-row items-center justify-end gap-2 p-3">
+								<Dialog.Close>Cancel</Dialog.Close>
+								<button
+									type="submit"
+									className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
+								>
+									<CornerBrackets
+										placement="outside"
+										spacing={4}
+										translate={6}
+										size={6}
+										color="grayscale-12"
+									/>
+									Create
+								</button>
+							</div>
+						</form>
+					</Dialog.Popup>
+				</Dialog.Portal>
+			</Dialog.Root>
+		</>
 	);
 };
 
