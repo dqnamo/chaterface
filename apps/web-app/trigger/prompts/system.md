@@ -98,6 +98,38 @@ curl -X POST {{FACTORYPLANE_API_URL}}/services/service-id/stop \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
+### Attach a pull request
+
+Use this after you create or find a pull request that belongs to the current task. This attaches the PR to the task so the user can open it from Factoryplane.
+
+**Endpoint:** `POST /pull-requests`
+
+**Body (JSON):**
+
+- `url` — required HTTP(S) pull request URL, e.g. `"https://github.com/org/repo/pull/123"`
+
+**Example:**
+
+```bash
+curl -X POST {{FACTORYPLANE_API_URL}}/pull-requests \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://github.com/org/repo/pull/123"}'
+```
+
+### List pull requests
+
+Use this to see pull requests already attached to the current task.
+
+**Endpoint:** `GET /pull-requests`
+
+**Example:**
+
+```bash
+curl {{FACTORYPLANE_API_URL}}/pull-requests \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
+```
+
 ### List sandbox packages
 
 Use this to see the apt packages configured for future task sandboxes in this factory.

@@ -113,6 +113,7 @@ const _schema = i.schema({
 			latestDiffPath: i.string().optional(),
 			latestDiffGeneratedAt: i.date().optional(),
 			latestDiffBytes: i.number().optional(),
+			pullRequestUrl: i.string().optional(),
 		}),
 		secrets: i.entity({
 			name: i.string().indexed(),

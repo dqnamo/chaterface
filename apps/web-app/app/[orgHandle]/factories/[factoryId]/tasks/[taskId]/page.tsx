@@ -2,9 +2,11 @@
 
 import { id } from "@instantdb/react";
 import {
+	ArrowSquareOutIcon,
 	ArrowsLeftRightIcon,
 	CheckCircleIcon,
 	FileCodeIcon,
+	GitPullRequestIcon,
 	MinusCircleIcon,
 	PencilSimpleIcon,
 	PlusCircleIcon,
@@ -39,7 +41,7 @@ import {
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
 import CornerCubes from "@/components/CornerCubes";
-import Event, { buildTimeline } from "@/components/Event";
+import Event, { buildTimeline, type TimelineNode } from "@/components/Event";
 import {
 	getImageFiles,
 	hasImageFiles,
@@ -52,7 +54,9 @@ import { ScrollArea } from "@/components/ScrollArea";
 import { ShortcutKey } from "@/components/ShortcutKey";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
+import TaskStatusDots from "@/components/TaskStatusDots";
 import { cn } from "@/helpers/classname-helper";
+import { toTaskDotStatus } from "@/helpers/task-status-helper";
 
 const MIN_PREVIEW_SIZE = 320;
 const MAX_PREVIEW_SIZE = 720;
@@ -70,6 +74,8 @@ const DIFF_VIEW_OPTIONS = {
 	stickyHeader: true,
 	theme: "pierre-light",
 } as const;
+type ChatViewMode = "minified" | "full";
+type JsonRecord = Record<string, unknown>;
 
 const FileDiff = dynamic(
 	() => import("@pierre/diffs/react").then((module) => module.FileDiff),
@@ -204,6 +210,56 @@ const getDiffHeaderIconClassName = (type: FileDiffMetadata["type"]) => {
 	}
 };
 
+const isMinifiedTimelineNode = (node: TimelineNode) => {
+	const type = node.event.type ?? "";
+
+	if (
+		type === "factoryplane.new_task" ||
+		type === "factoryplane.new_user_message"
+	) {
+		return true;
+	}
+
+	if (!type.startsWith("codex.item.")) {
+		return false;
+	}
+
+	const data = asJsonRecord(node.event.data);
+	const item = asJsonRecord(data?.item);
+
+	return item?.type === "agent_message";
+};
+
+const asJsonRecord = (value: unknown): JsonRecord | null => {
+	if (value && typeof value === "object" && !Array.isArray(value)) {
+		return value as JsonRecord;
+	}
+
+	return null;
+};
+
+const getTaskStatusLabel = ({
+	completedAt,
+	status,
+}: {
+	completedAt?: string | number | null;
+	status?: string;
+}) => {
+	if (completedAt || status === "complete") {
+		return "Complete";
+	}
+
+	if (status === "in_progress") {
+		return "Running";
+	}
+
+	if (status === "failed") {
+		return "Failed";
+	}
+
+	return "Idle";
+};
+
 export default function TaskPage() {
 	const { taskId } = useParams();
 	const { user } = db.useAuth();
@@ -223,6 +279,7 @@ export default function TaskPage() {
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 	const [previewSize, setPreviewSize] = useState(DEFAULT_PREVIEW_SIZE);
+	const [chatViewMode, setChatViewMode] = useState<ChatViewMode>("full");
 
 	useEffect(() => {
 		setHasRightPanel(true);
@@ -326,9 +383,22 @@ export default function TaskPage() {
 	const task = data?.tasks?.[0];
 	const events = eventsData?.events;
 	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
+	const visibleTimeline = useMemo(
+		() =>
+			chatViewMode === "minified"
+				? timeline.filter(isMinifiedTimelineNode)
+				: timeline,
+		[chatViewMode, timeline],
+	);
 	const services = task?.services ?? [];
 	const terminalSessions = task?.terminalSessions ?? [];
+	const pullRequests = getTaskPullRequests(task);
 	const isTaskCompleted = Boolean(task?.completedAt);
+	const taskDotStatus = toTaskDotStatus(task?.status);
+	const taskStatusLabel = getTaskStatusLabel({
+		completedAt: task?.completedAt,
+		status: task?.status,
+	});
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
 	const selectedTerminalSession =
@@ -367,7 +437,7 @@ export default function TaskPage() {
 	useLayoutEffect(() => {
 		const container = scrollContainerRef.current;
 
-		if (!container || timeline.length === 0) {
+		if (!container || visibleTimeline.length === 0) {
 			return;
 		}
 
@@ -392,7 +462,7 @@ export default function TaskPage() {
 		if (isPinnedToBottomRef.current) {
 			container.scrollTop = container.scrollHeight;
 		}
-	}, [timeline]);
+	}, [visibleTimeline]);
 
 	const stopService = async (serviceId: string) => {
 		await db.transact(serviceTx(serviceId).delete());
@@ -629,7 +699,32 @@ export default function TaskPage() {
 						<ExpandSidebarButton />
 						<p className="text-sm text-grayscale-11 p-1">{task?.name}</p>
 					</div>
-					<div className="flex flex-row items-center">
+					<div className="flex flex-row items-center gap-1.5">
+						{task?.pullRequestUrl ? (
+							<a
+								href={task.pullRequestUrl}
+								rel="noopener noreferrer"
+								target="_blank"
+								className="bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-green-3"
+							>
+								<CornerBrackets
+									placement="inside"
+									spacing={1}
+									translate={1.5}
+									size={6}
+									color="var(--color-green-9)"
+								/>
+								<GitPullRequestIcon
+									weight="bold"
+									className="size-4 text-green-9"
+								/>
+								<p className="text-xs text-grayscale-12">View PR</p>
+								<ArrowSquareOutIcon
+									weight="bold"
+									className="size-3 text-grayscale-10"
+								/>
+							</a>
+						) : null}
 						<button
 							type="button"
 							aria-keyshortcuts="D"
@@ -689,6 +784,29 @@ export default function TaskPage() {
 						</AnimatePresence>
 					</div>
 				</div>
+				<div className="flex shrink-0 flex-row items-center justify-between gap-3 border-b border-grayscale-4 px-3 py-1.5">
+					<div className="flex min-w-0 items-center gap-2">
+						<TaskStatusDots status={taskDotStatus} size={3} gap={1} />
+						<span className="truncate text-xs font-medium text-grayscale-11">
+							{taskStatusLabel}
+						</span>
+					</div>
+					<Tabs.Root
+						value={chatViewMode}
+						onValueChange={(value) => {
+							if (value === "minified" || value === "full") {
+								setChatViewMode(value);
+							}
+						}}
+						className="min-h-0 shrink-0"
+					>
+						<Tabs.List>
+							<Tabs.Tab value="minified">Minified</Tabs.Tab>
+							<Tabs.Tab value="full">Full</Tabs.Tab>
+							<Tabs.Indicator />
+						</Tabs.List>
+					</Tabs.Root>
+				</div>
 				<ScrollArea.Root className="min-h-0 flex-1">
 					<ScrollArea.Viewport ref={scrollContainerRef} onScroll={handleScroll}>
 						<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-4">
@@ -703,7 +821,7 @@ export default function TaskPage() {
 									</button>
 								)}
 								<AnimatePresence initial={false}>
-									{timeline.map((node) => (
+									{visibleTimeline.map((node) => (
 										<Event key={node.key} node={node} task={task} />
 									))}
 								</AnimatePresence>
@@ -833,6 +951,7 @@ export default function TaskPage() {
 					<div className="flex flex-row items-center gap-1.5 p-1.5 border-b border-grayscale-4">
 						<Tabs.List>
 							<Tabs.Tab value="previews">Previews</Tabs.Tab>
+							<Tabs.Tab value="pull-requests">PRs</Tabs.Tab>
 							<Tabs.Tab value="changes">Changes</Tabs.Tab>
 							<Tabs.Tab value="terminal">Terminal</Tabs.Tab>
 							<Tabs.Indicator />
@@ -932,6 +1051,31 @@ export default function TaskPage() {
 						)}
 					</Tabs.Panel>
 					<Tabs.Panel
+						value="pull-requests"
+						className="flex min-h-0 flex-1 flex-col overflow-auto bg-grayscale-1"
+					>
+						{pullRequests.length > 0 ? (
+							<div className="flex flex-col divide-y divide-grayscale-4">
+								{pullRequests.map((pullRequest) => (
+									<PullRequestRow
+										key={pullRequest.id}
+										pullRequest={pullRequest}
+									/>
+								))}
+							</div>
+						) : (
+							<div className="flex h-full flex-1 items-center justify-center text-xs text-grayscale-10">
+								<div className="flex flex-col items-center justify-center gap-px p-8">
+									<p className="text-sm text-grayscale-12">No pull requests</p>
+									<p className="max-w-sm text-center text-xs text-grayscale-10">
+										The agent can attach a pull request link when work is ready
+										for review.
+									</p>
+								</div>
+							</div>
+						)}
+					</Tabs.Panel>
+					<Tabs.Panel
 						value="terminal"
 						className="flex min-h-0 flex-1 flex-col bg-grayscale-1"
 					>
@@ -1023,6 +1167,71 @@ export default function TaskPage() {
 			</motion.div>
 		</div>
 	);
+}
+
+type PullRequestSummary = {
+	id: string;
+	url: string;
+};
+
+function getTaskPullRequests(
+	task:
+		| {
+				id: string;
+				pullRequestUrl?: string;
+		  }
+		| undefined,
+): PullRequestSummary[] {
+	if (!task?.pullRequestUrl) {
+		return [];
+	}
+
+	return [
+		{
+			id: task.id,
+			url: task.pullRequestUrl,
+		},
+	];
+}
+
+function PullRequestRow({ pullRequest }: { pullRequest: PullRequestSummary }) {
+	const title = getPullRequestFallbackTitle(pullRequest.url);
+
+	return (
+		<a
+			href={pullRequest.url}
+			rel="noopener noreferrer"
+			target="_blank"
+			className="group flex min-w-0 items-start gap-3 px-3 py-3 transition-colors hover:bg-accent-2"
+		>
+			<span className="flex size-7 shrink-0 items-center justify-center bg-grayscale-3 text-green-10 group-hover:bg-green-3">
+				<GitPullRequestIcon weight="bold" className="size-4" />
+			</span>
+			<span className="flex min-w-0 flex-1 flex-col gap-1">
+				<span className="line-clamp-2 text-sm font-medium leading-5 text-grayscale-12">
+					{title}
+				</span>
+				<span className="truncate font-mono text-[11px] text-grayscale-10">
+					{pullRequest.url}
+				</span>
+			</span>
+			<ArrowSquareOutIcon
+				weight="bold"
+				className="mt-1 size-4 shrink-0 text-grayscale-9 group-hover:text-accent-10"
+			/>
+		</a>
+	);
+}
+
+function getPullRequestFallbackTitle(url: string) {
+	try {
+		const parsed = new URL(url);
+		const path = parsed.pathname.replace(/^\/+/, "");
+
+		return path ? `${parsed.hostname}/${path}` : parsed.hostname;
+	} catch {
+		return url;
+	}
 }
 
 function ServicePreviewFrame({
