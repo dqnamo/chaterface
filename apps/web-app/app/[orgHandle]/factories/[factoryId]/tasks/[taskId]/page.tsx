@@ -5,6 +5,7 @@ import {
 	ArrowSquareOutIcon,
 	ArrowsLeftRightIcon,
 	CheckCircleIcon,
+	CornersOutIcon,
 	FileCodeIcon,
 	GitPullRequestIcon,
 	MinusCircleIcon,
@@ -18,6 +19,7 @@ import db from "@repo/db/client";
 import { DateTime } from "luxon";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
 	type CSSProperties,
@@ -51,6 +53,7 @@ import {
 import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { ScrollArea } from "@/components/ScrollArea";
+import { ServicePreviewFrame } from "@/components/ServicePreviewFrame";
 import { ShortcutKey } from "@/components/ShortcutKey";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
@@ -993,38 +996,60 @@ export default function TaskPage() {
 									))}
 									<Tabs.Indicator />
 								</Tabs.List>
-								<div className="p-2 border-b border-grayscale-4 flex flex-row items-center justify-between">
+								<div className="p-2 border-b border-grayscale-4 flex flex-row items-center justify-between gap-2">
 									<p className="text-xs text-grayscale-10 truncate">
 										{selectedService?.terminalSession?.command ??
 											selectedService?.command ??
 											"No command"}
 									</p>
-									<button
-										type="button"
-										className="bg-grayscale-3 shrink-0 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-red-3"
-										onClick={() => {
-											if (selectedService) {
-												stopService(selectedService.id);
-											}
-										}}
-									>
-										<CornerBrackets
-											placement="inside"
-											spacing={1}
-											translate={1.5}
-											size={6}
-											color="var(--color-red-9)"
-										/>
-										<XCircleIcon
-											weight="bold"
-											className="size-4 text-red-9 group-hover:hidden"
-										/>
-										<XCircleIcon
-											weight="fill"
-											className="size-4 text-red-9 group-hover:block hidden"
-										/>
-										<p className="text-xs text-grayscale-12">Stop service</p>
-									</button>
+									<div className="flex shrink-0 flex-row items-center gap-1.5">
+										{selectedService ? (
+											<Link
+												href={`/services/${selectedService.id}`}
+												aria-label="Open preview fullscreen"
+												className="bg-grayscale-3 shrink-0 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-accent-3"
+											>
+												<CornerBrackets
+													placement="inside"
+													spacing={1}
+													translate={1.5}
+													size={6}
+													color="var(--color-accent-9)"
+												/>
+												<CornersOutIcon
+													weight="bold"
+													className="size-4 text-accent-9"
+												/>
+												<p className="text-xs text-grayscale-12">Fullscreen</p>
+											</Link>
+										) : null}
+										<button
+											type="button"
+											className="bg-grayscale-3 shrink-0 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-red-3"
+											onClick={() => {
+												if (selectedService) {
+													stopService(selectedService.id);
+												}
+											}}
+										>
+											<CornerBrackets
+												placement="inside"
+												spacing={1}
+												translate={1.5}
+												size={6}
+												color="var(--color-red-9)"
+											/>
+											<XCircleIcon
+												weight="bold"
+												className="size-4 text-red-9 group-hover:hidden"
+											/>
+											<XCircleIcon
+												weight="fill"
+												className="size-4 text-red-9 group-hover:block hidden"
+											/>
+											<p className="text-xs text-grayscale-12">Stop service</p>
+										</button>
+									</div>
 								</div>
 								<div className="min-h-0 flex-1">
 									{services.map((service) => (
@@ -1245,92 +1270,6 @@ function getPullRequestFallbackTitle(url: string) {
 	}
 }
 
-function ServicePreviewFrame({
-	serviceId,
-	serviceName,
-	userToken,
-}: {
-	serviceId: string;
-	serviceName: string;
-	userToken: string | undefined;
-}) {
-	const [src, setSrc] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
-
-	useEffect(() => {
-		if (!userToken) {
-			setSrc(null);
-			return;
-		}
-
-		let cancelled = false;
-
-		const createPreviewSession = async () => {
-			setError(null);
-
-			try {
-				const response = await fetch("/api/previews/session", {
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${userToken}`,
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({ serviceId }),
-				});
-
-				if (!response.ok) {
-					const errorMessage = await getPreviewSessionError(response);
-					throw new Error(errorMessage);
-				}
-
-				const data = await response.json();
-
-				if (!cancelled) {
-					setSrc(typeof data.url === "string" ? data.url : null);
-				}
-			} catch (error) {
-				if (!cancelled) {
-					setError(
-						error instanceof Error
-							? error.message
-							: "Failed to create preview session",
-					);
-				}
-			}
-		};
-
-		createPreviewSession();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [serviceId, userToken]);
-
-	if (error) {
-		return (
-			<div className="flex h-full items-center justify-center text-xs text-red-10">
-				{error}
-			</div>
-		);
-	}
-
-	if (!src) {
-		return (
-			<div className="flex h-full items-center justify-center text-xs text-grayscale-10">
-				Loading preview...
-			</div>
-		);
-	}
-
-	return (
-		<iframe
-			src={src}
-			title={`${serviceName} preview`}
-			className="h-full w-full"
-		/>
-	);
-}
-
 type TerminalSessionSummaryProps = {
 	terminalSession: {
 		id: string;
@@ -1485,18 +1424,4 @@ function formatTerminalTimestamp(
 	return dateTime.isValid
 		? dateTime.toLocaleString(DateTime.DATETIME_MED)
 		: "Unknown";
-}
-
-async function getPreviewSessionError(response: Response) {
-	try {
-		const data = await response.json();
-
-		if (typeof data.message === "string") {
-			return data.message;
-		}
-	} catch {
-		return "Failed to create preview session";
-	}
-
-	return "Failed to create preview session";
 }
