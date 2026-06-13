@@ -43,8 +43,15 @@ type WorkflowNode = {
 		label?: string;
 		prompt?: string;
 		agentId?: string;
+		responseSchema?: string;
 		completionMessage?: string;
+		conditions?: RouterCondition[];
 	};
+};
+type RouterCondition = {
+	id: string;
+	label?: string;
+	expression?: string;
 };
 type WorkflowEdge = {
 	source?: string;
@@ -89,6 +96,8 @@ type RunCodexExecOptions = {
 	attachments?: Attachment[];
 	imagePaths?: string[];
 	attachmentPaths?: string[];
+	outputLastMessagePath?: string;
+	outputSchemaPath?: string;
 	resumeLast?: boolean;
 };
 
@@ -107,6 +116,8 @@ const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
 const REPOSITORY_SECRETS_FINGERPRINT_PATH =
 	".factoryplane/repository-secrets-fingerprint";
 const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
+const WORKFLOW_OUTPUT_SCHEMA_DIR = "/tmp/factoryplane-output-schemas";
+const WORKFLOW_OUTPUT_DIR = "/tmp/factoryplane-agent-outputs";
 const FACTORY_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
 const GITHUB_AUTH_VALIDATION_TIMEOUT_MS = 120_000;
 const GITHUB_AUTH_SETUP_STEP_TIMEOUT_MS =
@@ -344,15 +355,22 @@ const enqueueWorkflowContinuation = async (
 	task: Task,
 	factory: FactoryWithRepositories,
 ) => {
-	const nextNode = findNextWorkflowNode(
-		factory.floorWorkflow,
-		task.workflowNodeId,
-	);
+	const workflow = parseFloorWorkflow(factory.floorWorkflow);
+	const nextNode = findNextWorkflowNode(workflow, task.workflowNodeId);
 
 	if (!nextNode) {
 		return;
 	}
 
+	await continueWorkflowFromNode(task, factory, workflow, nextNode);
+};
+
+const continueWorkflowFromNode = async (
+	task: Task,
+	factory: FactoryWithRepositories,
+	workflow: Required<FloorWorkflow>,
+	nextNode: WorkflowNode,
+): Promise<void> => {
 	if (nextNode.data?.blockType === "completeTask") {
 		const now = new Date().toISOString();
 		await db.transact(
@@ -368,6 +386,11 @@ const enqueueWorkflowContinuation = async (
 			workflowNodeId: nextNode.id,
 			message: nextNode.data.completionMessage,
 		});
+		return;
+	}
+
+	if (nextNode.data?.blockType === "conditionalRouter") {
+		await routeConditionalWorkflowNode(task, factory, workflow, nextNode);
 		return;
 	}
 
@@ -426,25 +449,78 @@ const enqueueWorkflowContinuation = async (
 	]);
 };
 
+const routeConditionalWorkflowNode = async (
+	task: Task,
+	factory: FactoryWithRepositories,
+	workflow: Required<FloorWorkflow>,
+	routerNode: WorkflowNode,
+) => {
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const conditions = routerNode.data?.conditions ?? [];
+	const matchedCondition = conditions.find((condition) =>
+		evaluateRouterCondition(condition.expression, workflowInput),
+	);
+
+	await db.transact(
+		taskTx(task.id).update({
+			status: "idle",
+			workflowState: matchedCondition ? "router_matched" : "router_unmatched",
+			workflowNodeId: routerNode.id,
+		}),
+	);
+
+	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.router", {
+		taskId: task.id,
+		workflowNodeId: routerNode.id,
+		routerLabel: routerNode.data?.label,
+		matched: Boolean(matchedCondition),
+		conditionId: matchedCondition?.id,
+		conditionLabel: matchedCondition?.label,
+		expression: matchedCondition?.expression,
+	});
+
+	if (!matchedCondition) {
+		return;
+	}
+
+	const edge = findWorkflowEdgeFromHandle(
+		workflow,
+		routerNode.id,
+		matchedCondition.id,
+	);
+
+	if (!edge?.target) {
+		await persistFactoryplaneEvent(
+			task.id,
+			"factoryplane.workflow.router_unconnected",
+			{
+				taskId: task.id,
+				workflowNodeId: routerNode.id,
+				conditionId: matchedCondition.id,
+				conditionLabel: matchedCondition.label,
+			},
+		);
+		return;
+	}
+
+	const nextNode = workflow.nodes.find((node) => node.id === edge.target);
+
+	if (!nextNode) {
+		return;
+	}
+
+	await continueWorkflowFromNode(task, factory, workflow, nextNode);
+};
+
 const findNextWorkflowNode = (
-	workflowValue: unknown,
+	workflow: Required<FloorWorkflow>,
 	currentNodeId: string | undefined,
 ) => {
 	if (!currentNodeId) {
 		return undefined;
 	}
 
-	const workflow = parseFloorWorkflow(workflowValue);
-	const edge = workflow.edges.find(
-		(currentEdge) =>
-			currentEdge.source === currentNodeId &&
-			(currentEdge.sourceHandle === undefined ||
-				currentEdge.sourceHandle === null ||
-				currentEdge.sourceHandle === "output") &&
-			(currentEdge.targetHandle === undefined ||
-				currentEdge.targetHandle === null ||
-				currentEdge.targetHandle === "input"),
-	);
+	const edge = findWorkflowEdgeFromHandle(workflow, currentNodeId, "output");
 
 	if (!edge?.target) {
 		return undefined;
@@ -452,6 +528,22 @@ const findNextWorkflowNode = (
 
 	return workflow.nodes.find((node) => node.id === edge.target);
 };
+
+const findWorkflowEdgeFromHandle = (
+	workflow: Required<FloorWorkflow>,
+	sourceNodeId: string,
+	sourceHandle: string,
+) =>
+	workflow.edges.find(
+		(currentEdge) =>
+			currentEdge.source === sourceNodeId &&
+			(currentEdge.sourceHandle === undefined ||
+				currentEdge.sourceHandle === null ||
+				currentEdge.sourceHandle === sourceHandle) &&
+			(currentEdge.targetHandle === undefined ||
+				currentEdge.targetHandle === null ||
+				currentEdge.targetHandle === "input"),
+	);
 
 const parseFloorWorkflow = (value: unknown): Required<FloorWorkflow> => {
 	if (!isRecord(value)) {
@@ -511,6 +603,282 @@ const stringifyTemplateValue = (value: unknown) => {
 	}
 
 	return JSON.stringify(value, null, 2) ?? "";
+};
+
+const evaluateRouterCondition = (
+	expression: string | undefined,
+	input: Record<string, unknown>,
+) => {
+	const trimmed = expression?.trim();
+
+	if (!trimmed) {
+		return false;
+	}
+
+	try {
+		return Boolean(evaluateRouterExpression(trimmed, input));
+	} catch (error) {
+		console.warn("Failed to evaluate workflow router condition", {
+			expression,
+			error,
+		});
+		return false;
+	}
+};
+
+const evaluateRouterExpression = (
+	expression: string,
+	input: Record<string, unknown>,
+): unknown => {
+	const withoutOuterParens = stripOuterParens(expression.trim());
+	const orParts = splitTopLevelOperator(withoutOuterParens, "||");
+
+	if (orParts.length > 1) {
+		return orParts.some((part) =>
+			Boolean(evaluateRouterExpression(part, input)),
+		);
+	}
+
+	const andParts = splitTopLevelOperator(withoutOuterParens, "&&");
+
+	if (andParts.length > 1) {
+		return andParts.every((part) =>
+			Boolean(evaluateRouterExpression(part, input)),
+		);
+	}
+
+	const comparison = findTopLevelComparison(withoutOuterParens);
+
+	if (comparison) {
+		const left = evaluateRouterValue(comparison.left, input);
+		const right = evaluateRouterValue(comparison.right, input);
+		return compareRouterValues(left, right, comparison.operator);
+	}
+
+	if (withoutOuterParens.startsWith("!")) {
+		return !evaluateRouterExpression(withoutOuterParens.slice(1).trim(), input);
+	}
+
+	return evaluateRouterValue(withoutOuterParens, input);
+};
+
+const evaluateRouterValue = (
+	rawValue: string,
+	input: Record<string, unknown>,
+): unknown => {
+	const value = rawValue.trim();
+
+	if (
+		(value.startsWith("'") && value.endsWith("'")) ||
+		(value.startsWith('"') && value.endsWith('"'))
+	) {
+		return value.slice(1, -1);
+	}
+
+	if (value === "true") {
+		return true;
+	}
+
+	if (value === "false") {
+		return false;
+	}
+
+	if (value === "null") {
+		return null;
+	}
+
+	if (/^-?\d+(\.\d+)?$/.test(value)) {
+		return Number(value);
+	}
+
+	if (value === "input") {
+		return input;
+	}
+
+	if (value.startsWith("input.")) {
+		return getRouterInputPath(input, value.slice("input.".length));
+	}
+
+	return undefined;
+};
+
+const getRouterInputPath = (
+	input: Record<string, unknown>,
+	path: string,
+): unknown =>
+	path.split(".").reduce<unknown>((current, segment) => {
+		if (!isRecord(current)) {
+			return undefined;
+		}
+
+		return current[segment];
+	}, input);
+
+const compareRouterValues = (
+	left: unknown,
+	right: unknown,
+	operator: string,
+) => {
+	switch (operator) {
+		case "==":
+			return left === right;
+		case "!=":
+			return left !== right;
+		case ">":
+			return compareOrderedRouterValues(left, right, (a, b) => a > b);
+		case ">=":
+			return compareOrderedRouterValues(left, right, (a, b) => a >= b);
+		case "<":
+			return compareOrderedRouterValues(left, right, (a, b) => a < b);
+		case "<=":
+			return compareOrderedRouterValues(left, right, (a, b) => a <= b);
+		default:
+			return false;
+	}
+};
+
+const compareOrderedRouterValues = (
+	left: unknown,
+	right: unknown,
+	compare: (left: number, right: number) => boolean,
+) =>
+	typeof left === "number" && typeof right === "number"
+		? compare(left, right)
+		: false;
+
+const findTopLevelComparison = (expression: string) => {
+	const operators = ["==", "!=", ">=", "<=", ">", "<"];
+
+	for (const operator of operators) {
+		const index = findTopLevelOperatorIndex(expression, operator);
+
+		if (index >= 0) {
+			return {
+				left: expression.slice(0, index),
+				operator,
+				right: expression.slice(index + operator.length),
+			};
+		}
+	}
+
+	return undefined;
+};
+
+const splitTopLevelOperator = (expression: string, operator: string) => {
+	const parts: string[] = [];
+	let start = 0;
+	let index = findTopLevelOperatorIndex(expression, operator, start);
+
+	while (index >= 0) {
+		parts.push(expression.slice(start, index).trim());
+		start = index + operator.length;
+		index = findTopLevelOperatorIndex(expression, operator, start);
+	}
+
+	if (parts.length === 0) {
+		return [expression];
+	}
+
+	parts.push(expression.slice(start).trim());
+	return parts;
+};
+
+const findTopLevelOperatorIndex = (
+	expression: string,
+	operator: string,
+	startIndex = 0,
+) => {
+	let quote: string | undefined;
+	let depth = 0;
+
+	for (
+		let index = startIndex;
+		index <= expression.length - operator.length;
+		index++
+	) {
+		const char = expression[index];
+
+		if (quote) {
+			if (char === quote && expression[index - 1] !== "\\") {
+				quote = undefined;
+			}
+			continue;
+		}
+
+		if (char === '"' || char === "'") {
+			quote = char;
+			continue;
+		}
+
+		if (char === "(") {
+			depth++;
+			continue;
+		}
+
+		if (char === ")") {
+			depth = Math.max(0, depth - 1);
+			continue;
+		}
+
+		if (
+			depth === 0 &&
+			expression.slice(index, index + operator.length) === operator
+		) {
+			return index;
+		}
+	}
+
+	return -1;
+};
+
+const stripOuterParens = (expression: string) => {
+	let current = expression;
+
+	while (hasWrappingParens(current)) {
+		current = current.slice(1, -1).trim();
+	}
+
+	return current;
+};
+
+const hasWrappingParens = (expression: string) => {
+	if (!expression.startsWith("(") || !expression.endsWith(")")) {
+		return false;
+	}
+
+	let quote: string | undefined;
+	let depth = 0;
+
+	for (let index = 0; index < expression.length; index++) {
+		const char = expression[index];
+
+		if (quote) {
+			if (char === quote && expression[index - 1] !== "\\") {
+				quote = undefined;
+			}
+			continue;
+		}
+
+		if (char === '"' || char === "'") {
+			quote = char;
+			continue;
+		}
+
+		if (char === "(") {
+			depth++;
+			continue;
+		}
+
+		if (char === ")") {
+			depth--;
+
+			if (depth === 0 && index < expression.length - 1) {
+				return false;
+			}
+		}
+	}
+
+	return depth === 0;
 };
 
 const getOptionalDataString = (value: unknown) =>
@@ -1572,6 +1940,12 @@ const runAgentExec = async (
 					.filter((attachment) => attachment.contentType.startsWith("image/"))
 					.map((attachment) => attachment.filePath)
 			: [];
+	const workflowOutput = await prepareWorkflowOutputCapture(
+		sandbox,
+		task,
+		factory,
+		provider,
+	);
 	const { envs, agentToken } = await setupRun(sandbox, task, agent, factory);
 	const output = createAgentOutputHandler(task.id, provider);
 	const command = await runSetupStep(
@@ -1588,6 +1962,8 @@ const runAgentExec = async (
 						(attachment) => attachment.filePath,
 					),
 					imagePaths,
+					outputLastMessagePath: workflowOutput?.outputPath,
+					outputSchemaPath: workflowOutput?.schemaPath,
 				}),
 				{
 					background: true,
@@ -1645,7 +2021,130 @@ const runAgentExec = async (
 		}
 	}
 
+	if (completed && workflowOutput) {
+		await persistWorkflowStructuredOutput(
+			sandbox,
+			task,
+			workflowOutput.outputPath,
+			workflowOutput.nodeId,
+		);
+	}
+
 	return completed;
+};
+
+const prepareWorkflowOutputCapture = async (
+	sandbox: Sandbox,
+	task: Task,
+	factory: Factory,
+	provider: AgentProvider,
+) => {
+	if (provider !== "codex" || !task.workflowNodeId) {
+		return undefined;
+	}
+
+	const workflow = parseFloorWorkflow(factory.floorWorkflow);
+	const workflowNode = workflow.nodes.find(
+		(node) => node.id === task.workflowNodeId,
+	);
+	const responseSchema = getValidResponseSchema(
+		workflowNode?.data?.responseSchema,
+	);
+
+	if (!responseSchema) {
+		return undefined;
+	}
+
+	const runId = randomUUID();
+	const schemaPath = `${WORKFLOW_OUTPUT_SCHEMA_DIR}/${task.id}-${runId}.schema.json`;
+	const outputPath = `${WORKFLOW_OUTPUT_DIR}/${task.id}-${runId}.json`;
+
+	await runSetupStep(
+		task.id,
+		"workflow_output_schema",
+		"Prepare workflow output schema",
+		async () => {
+			await sandbox.commands.run(
+				`mkdir -p ${shellQuote(WORKFLOW_OUTPUT_SCHEMA_DIR)} ${shellQuote(WORKFLOW_OUTPUT_DIR)}`,
+				{ timeoutMs: 30_000 },
+			);
+			await sandbox.files.write(schemaPath, responseSchema);
+		},
+		{ timeoutMs: 30_000 },
+	);
+
+	return {
+		nodeId: workflowNode?.id,
+		outputPath,
+		schemaPath,
+	};
+};
+
+const getValidResponseSchema = (responseSchema: string | undefined) => {
+	const trimmed = responseSchema?.trim();
+
+	if (!trimmed || trimmed === "{}") {
+		return undefined;
+	}
+
+	try {
+		return `${JSON.stringify(JSON.parse(trimmed), null, 2)}\n`;
+	} catch {
+		return undefined;
+	}
+};
+
+const persistWorkflowStructuredOutput = async (
+	sandbox: Sandbox,
+	task: Task,
+	outputPath: string,
+	workflowNodeId: string | undefined,
+) => {
+	const rawOutput = await sandbox.files.read(outputPath).catch(() => undefined);
+	const structuredOutput = parseWorkflowStructuredOutput(rawOutput);
+
+	if (!structuredOutput) {
+		return;
+	}
+
+	const currentInput = getWorkflowInput(task.workflowInput);
+	const workflowInput = {
+		...currentInput,
+		...(isRecord(structuredOutput) ? structuredOutput : {}),
+		output: structuredOutput,
+	};
+
+	await db.transact(
+		taskTx(task.id).update({
+			workflowInput,
+		}),
+	);
+
+	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.output", {
+		taskId: task.id,
+		workflowNodeId,
+		output: structuredOutput,
+	});
+
+	task.workflowInput = workflowInput;
+};
+
+const parseWorkflowStructuredOutput = (rawOutput: string | undefined) => {
+	const trimmed = rawOutput?.trim();
+
+	if (!trimmed) {
+		return undefined;
+	}
+
+	try {
+		return JSON.parse(trimmed) as unknown;
+	} catch (error) {
+		console.warn("Failed to parse workflow structured output", {
+			error,
+			output: trimmed,
+		});
+		return undefined;
+	}
 };
 
 const materializeAttachments = async (
@@ -1959,6 +2458,16 @@ const buildCodexExecCommand = (
 	const imageArgs = (options.imagePaths ?? []).map(
 		(imagePath) => `--image ${shellQuote(imagePath)}`,
 	);
+
+	if (options.outputSchemaPath) {
+		args.push(`--output-schema ${shellQuote(options.outputSchemaPath)}`);
+	}
+
+	if (options.outputLastMessagePath) {
+		args.push(
+			`--output-last-message ${shellQuote(options.outputLastMessagePath)}`,
+		);
+	}
 
 	if (options.resumeLast) {
 		args.push("resume --last");
