@@ -18,6 +18,7 @@ export const getTaskForAgentToken = async (agentToken: string) => {
 					where: {
 						agentToken,
 					},
+					fields: ["workflowInput"],
 				},
 				factory: {
 					$: {
