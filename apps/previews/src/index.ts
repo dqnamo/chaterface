@@ -92,6 +92,7 @@ server.on("upgrade", async (req, socket, head) => {
 
 		proxy.ws(req, socket, head, {
 			headers: {
+				...getForwardedPreviewHeaders(req),
 				"e2b-traffic-access-token": resolution.trafficAccessToken,
 			},
 			target: `wss://${resolution.service.e2bHost}`,
@@ -128,6 +129,7 @@ const handleHttpRequest = async (req: IncomingMessage, res: ServerResponse) => {
 
 	proxy.web(req, res, {
 		headers: {
+			...getForwardedPreviewHeaders(req),
 			"e2b-traffic-access-token": resolution.trafficAccessToken,
 		},
 		target: `https://${resolution.service.e2bHost}`,
@@ -252,6 +254,23 @@ const getRequestUrl = (req: IncomingMessage) => {
 	return new URL(req.url ?? "/", `https://${host}`);
 };
 
+const getForwardedPreviewHeaders = (
+	req: IncomingMessage,
+): Record<string, string> => {
+	const host = req.headers.host?.split(":")[0]?.toLowerCase();
+
+	if (!host?.endsWith(`.${previewsDomain}`)) {
+		return {};
+	}
+
+	return {
+		"x-forwarded-host": host,
+		"x-forwarded-port": "443",
+		"x-forwarded-proto": "https",
+		"x-forwarded-ssl": "on",
+	};
+};
+
 const rewriteUpstreamLocation = (
 	location: string | string[] | undefined,
 	hostHeader: string | undefined,
@@ -265,7 +284,7 @@ const rewriteUpstreamLocation = (
 	let url: URL;
 
 	try {
-		url = new URL(location);
+		url = new URL(location, `https://${host}`);
 	} catch {
 		return undefined;
 	}
