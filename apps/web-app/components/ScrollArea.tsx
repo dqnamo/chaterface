@@ -86,7 +86,7 @@ function Thumb({ className, ...props }: ScrollAreaThumbProps) {
 	return (
 		<BaseScrollArea.Thumb
 			className={mergeClassName(
-				"bg-grayscale-8 transition-colors duration-150 hover:bg-grayscale-10 data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full",
+				"bg-grayscale-4 transition-colors duration-150 hover:bg-grayscale-10 data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full",
 				className,
 			)}
 			{...props}
