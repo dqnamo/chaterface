@@ -103,7 +103,7 @@ export default function FactoryPage() {
 	const createTask = async () => {
 		const instructions = taskInstructions.trim();
 
-		if (isCreating || !instructions) {
+		if (isCreating || (!instructions && fileAttachments.length === 0)) {
 			return;
 		}
 
@@ -133,7 +133,8 @@ export default function FactoryPage() {
 					taskId,
 					factoryId: currentFactoryId,
 					agentId: resolvedAgentId,
-					instructions,
+					instructions:
+						instructions || buildAttachmentOnlyInstructions(attachments),
 					attachments,
 					agentModel,
 					agentReasoningEffort,
@@ -300,7 +301,9 @@ export default function FactoryPage() {
 								<Button
 									type="button"
 									disabled={
-										isCreating || !resolvedAgentId || !taskInstructions.trim()
+										isCreating ||
+										!resolvedAgentId ||
+										(!taskInstructions.trim() && fileAttachments.length === 0)
 									}
 									onClick={createTask}
 								>
@@ -313,4 +316,16 @@ export default function FactoryPage() {
 			</div>
 		</div>
 	);
+}
+
+function buildAttachmentOnlyInstructions(attachments: { name: string }[]) {
+	if (attachments.length === 0) {
+		return "Use the attached file input.";
+	}
+
+	const fileList = attachments
+		.map((attachment) => `- ${attachment.name}`)
+		.join("\n");
+
+	return `Use the attached file input.\n\nAttached files:\n${fileList}`;
 }

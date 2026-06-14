@@ -1,6 +1,6 @@
-import db, { id } from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
 import { getAgentDefaultOptions } from "@/codex-options";
+import db, { id } from "@/instant.admin";
 
 type RouteContext = {
 	params: Promise<{
@@ -85,11 +85,13 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	const { factoryId, manualStartNodeId } = await context.params;
 	const body = await readJson(req);
 	const input = isRecord(body.input) ? body.input : {};
-	const message = getOptionalString(input.message);
+	const images = Array.isArray(body.images) ? body.images : [];
+	const message =
+		getOptionalString(input.message) || buildAttachmentOnlyMessage(images);
 
 	if (!message) {
 		return NextResponse.json(
-			{ message: "input.message is required" },
+			{ message: "input.message or attached files are required" },
 			{ status: 400 },
 		);
 	}
@@ -119,7 +121,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
 		);
 	}
 
-	const images = Array.isArray(body.images) ? body.images : [];
 	const workflowInput = {
 		...input,
 		message,
@@ -422,6 +423,32 @@ const buildManualStartFallbackInstructions = (
 	`Workflow manually started.\n\nInput:\n${message}${
 		images.length > 0 ? `\n\nImages attached: ${images.length}` : ""
 	}`;
+
+const buildAttachmentOnlyMessage = (attachments: unknown[]) => {
+	if (attachments.length === 0) {
+		return undefined;
+	}
+
+	const names = attachments.flatMap((attachment) => {
+		if (!isRecord(attachment)) {
+			return [];
+		}
+
+		const name = getOptionalString(attachment.name);
+		return name ? [name] : [];
+	});
+
+	if (names.length === 0) {
+		return "Use the attached file input.";
+	}
+
+	return [
+		"Use the attached file input.",
+		"",
+		"Attached files:",
+		...names.map((name) => `- ${name}`),
+	].join("\n");
+};
 
 const renderWorkflowTemplate = (
 	template: string,

@@ -1,5 +1,5 @@
-import db, { id } from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
+import db, { id } from "@/instant.admin";
 
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
 const DEFAULT_CODEX_REASONING_EFFORT = "medium";
@@ -69,10 +69,13 @@ const agentSessionTx = (agentSessionId: string) => {
 
 export async function POST(req: NextRequest) {
 	const body = parseCreateTaskBody(await readJson(req));
+	const instructions =
+		body?.instructions ||
+		buildAttachmentOnlyInstructions(body?.attachments, body?.images);
 
-	if (!body?.factoryId || !body.instructions) {
+	if (!body?.factoryId || !instructions) {
 		return NextResponse.json(
-			{ message: "factoryId and instructions are required" },
+			{ message: "factoryId and instructions or attachments are required" },
 			{ status: 400 },
 		);
 	}
@@ -103,14 +106,14 @@ export async function POST(req: NextRequest) {
 	const agentSessionId = id();
 	const eventId = id();
 	const createdAt = new Date().toISOString();
-	const name = await generateTaskName(body.instructions);
+	const name = await generateTaskName(instructions);
 
 	await db.transact([
 		taskTx(taskId)
 			.create({
 				name,
 				status: "in_progress",
-				instructions: body.instructions,
+				instructions,
 				createdAt,
 				agentModel: body.agentModel,
 				agentReasoningEffort: body.agentReasoningEffort,
@@ -131,7 +134,7 @@ export async function POST(req: NextRequest) {
 				data: {
 					taskId,
 					name,
-					instructions: body.instructions,
+					instructions,
 					attachments: body.attachments,
 					images: body.images,
 				},
@@ -326,6 +329,42 @@ const getFallbackTaskName = (instructions: string | undefined) => {
 
 	const firstLine = instructions.split("\n")[0] ?? "";
 	return cleanTaskName(firstLine);
+};
+
+const buildAttachmentOnlyInstructions = (
+	attachments: unknown,
+	images: unknown,
+) => {
+	const names = [
+		...getAttachmentNames(attachments),
+		...getAttachmentNames(images),
+	];
+
+	if (names.length === 0) {
+		return undefined;
+	}
+
+	return [
+		"Use the attached file input.",
+		"",
+		"Attached files:",
+		...names.map((name) => `- ${name}`),
+	].join("\n");
+};
+
+const getAttachmentNames = (value: unknown) => {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	return value.flatMap((attachment) => {
+		if (!isRecord(attachment)) {
+			return [];
+		}
+
+		const name = getOptionalString(attachment.name);
+		return name ? [name] : [];
+	});
 };
 
 const parseCreateTaskBody = (

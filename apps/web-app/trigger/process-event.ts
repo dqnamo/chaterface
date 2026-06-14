@@ -1,7 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { InstaQLEntity } from "@instantdb/react";
-import db from "@/instant.admin";
-import { createEncryptionService } from "@/encryption";
 import { task } from "@trigger.dev/sdk";
 import { Sandbox } from "e2b/dist/index.mjs";
 import {
@@ -12,6 +10,8 @@ import {
 	getCodexSpeedConfigOverrides,
 	getTaskAgentSpeed,
 } from "@/codex-options";
+import { createEncryptionService } from "@/encryption";
+import db from "@/instant.admin";
 import type { AppSchema } from "@/instant.schema";
 import {
 	formatCodexDeveloperInstructionsConfig,
@@ -341,7 +341,8 @@ const processNewTask = async (
 		factory,
 	);
 	const agentSession = await resolveAgentSession(event, task, agent, factory);
-	const message = `${task.name}. ${task.instructions ?? ""}.`;
+	const attachments = getAttachments(event.data, task.id);
+	const message = buildNewTaskPrompt(task, attachments);
 
 	const completed = await runAgentExec(
 		sandbox,
@@ -349,7 +350,7 @@ const processNewTask = async (
 		agent,
 		factory,
 		message,
-		{ agentSession, attachments: getAttachments(event.data, task.id) },
+		{ agentSession, attachments },
 	);
 
 	if (completed) {
@@ -3415,7 +3416,7 @@ const buildAgentExecCommand = (
 	options: RunCodexExecOptions = {},
 ) => {
 	const promptWithAttachments = appendAttachmentReferences(
-		prompt,
+		ensureAgentPrompt(prompt),
 		options.attachmentPaths,
 	);
 
@@ -3442,6 +3443,29 @@ const appendAttachmentReferences = (
 		"",
 		"Use these local paths when you need to inspect or reference the uploaded files.",
 	].join("\n");
+};
+
+const ensureAgentPrompt = (prompt: string | undefined) => {
+	const trimmed = prompt?.trim();
+	return trimmed && trimmed.length > 0 ? trimmed : "Continue this task.";
+};
+
+const buildNewTaskPrompt = (task: Task, attachments: Attachment[]) => {
+	const instructions = task.instructions?.trim();
+
+	if (instructions) {
+		return `${task.name}. ${instructions}`;
+	}
+
+	if (attachments.length === 0) {
+		return `${task.name}. Continue this task.`;
+	}
+
+	const attachmentList = attachments
+		.map((attachment) => `- ${attachment.name}`)
+		.join("\n");
+
+	return `${task.name}. Use the attached file input.\n\nAttached files:\n${attachmentList}`;
 };
 
 const buildCodexExecCommand = (

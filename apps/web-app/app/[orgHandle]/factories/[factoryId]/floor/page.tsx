@@ -1709,7 +1709,7 @@ function ManualStartComposer({
 	const startWorkflow = async () => {
 		const trimmedMessage = message.trim();
 
-		if (!trimmedMessage || isStarting) {
+		if ((!trimmedMessage && attachments.length === 0) || isStarting) {
 			return;
 		}
 
@@ -1724,6 +1724,7 @@ function ManualStartComposer({
 
 		try {
 			const images = await uploadAttachments(taskId);
+			const fallbackMessage = buildAttachmentOnlyWorkflowMessage(images);
 			const response = await fetch(
 				`/api/factories/${factoryId}/floor/manual-starts/${node.id}`,
 				{
@@ -1735,7 +1736,7 @@ function ManualStartComposer({
 					body: JSON.stringify({
 						taskId,
 						input: {
-							message: trimmedMessage,
+							message: trimmedMessage || fallbackMessage,
 							images,
 						},
 						images,
@@ -1842,7 +1843,9 @@ function ManualStartComposer({
 					<Button
 						type="button"
 						onClick={startWorkflow}
-						disabled={!message.trim() || isStarting}
+						disabled={
+							(!message.trim() && attachments.length === 0) || isStarting
+						}
 					>
 						<PlayCircleIcon weight="bold" className="size-4" />
 						{isStarting ? "Starting" : "Start"}
@@ -1851,6 +1854,18 @@ function ManualStartComposer({
 			</fieldset>
 		</InspectorSection>
 	);
+}
+
+function buildAttachmentOnlyWorkflowMessage(attachments: { name: string }[]) {
+	if (attachments.length === 0) {
+		return "Use the attached file input.";
+	}
+
+	const fileList = attachments
+		.map((attachment) => `- ${attachment.name}`)
+		.join("\n");
+
+	return `Use the attached file input.\n\nAttached files:\n${fileList}`;
 }
 
 function InstructionInspector({
