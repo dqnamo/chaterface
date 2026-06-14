@@ -1,7 +1,7 @@
 "use client";
 
 import { id } from "@instantdb/react";
-import db from "@/instant.client";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
 	type ClipboardEvent as ReactClipboardEvent,
@@ -29,6 +29,7 @@ import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 import { cn } from "@/helpers/classname-helper";
+import db from "@/instant.client";
 
 export default function FactoryPage() {
 	const router = useRouter();
@@ -83,6 +84,8 @@ export default function FactoryPage() {
 		() => agents?.find((agent) => agent.id === resolvedAgentId),
 		[agents, resolvedAgentId],
 	);
+	const noAgentsConfigured =
+		Boolean(data?.organisations?.[0]) && (agents?.length ?? 0) === 0;
 	const agentItems =
 		agents?.map((agent) => ({ value: agent.id, label: agent.name })) ?? [];
 
@@ -100,7 +103,12 @@ export default function FactoryPage() {
 	const createTask = async () => {
 		const instructions = taskInstructions.trim();
 
-		if (!resolvedAgentId || isCreating || !instructions) {
+		if (isCreating || !instructions) {
+			return;
+		}
+
+		if (!resolvedAgentId) {
+			setCreateError("Create an agent before starting a task.");
 			return;
 		}
 
@@ -238,6 +246,17 @@ export default function FactoryPage() {
 							{createError ? (
 								<p className="rounded-md border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">
 									{createError}
+								</p>
+							) : null}
+							{noAgentsConfigured ? (
+								<p className="rounded-md border border-amber-6 bg-amber-2 px-2 py-1.5 text-xs text-amber-11">
+									Create an agent before starting a task.{" "}
+									<Link
+										className="font-medium underline underline-offset-2"
+										href={`/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings/agents`}
+									>
+										Open agents
+									</Link>
 								</p>
 							) : null}
 						</div>
