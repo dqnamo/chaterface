@@ -26,6 +26,12 @@ const rules = {
 			delete: "auth.id != null",
 		},
 	},
+	$users: {
+		allow: {
+			update:
+				"auth.id != null && auth.id == data.id && request.modifiedFields.all(field, field in ['name'])",
+		},
+	},
 	organisations: {
 		allow: {
 			view: "auth.id != null && auth.id in data.ref('members.user.id')",
@@ -52,6 +58,8 @@ const rules = {
 	members: {
 		allow: {
 			view: "auth.id != null && (auth.id in data.ref('user.id') || auth.id in data.ref('organisation.members.user.id'))",
+			update:
+				"auth.id != null && auth.id in data.ref('user.id') && request.modifiedFields.all(field, field in ['name'])",
 		},
 	},
 } satisfies InstantRules;
