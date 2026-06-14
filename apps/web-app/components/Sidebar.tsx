@@ -28,6 +28,7 @@ import { Dialog } from "./Dialog";
 import { Input } from "./Input";
 import { Menu } from "./Menu";
 import Monogram from "./Monogram";
+import { ScrollArea } from "./ScrollArea";
 import { useSidebar } from "./SidebarContext";
 import TaskStatusDots from "./TaskStatusDots";
 
@@ -171,146 +172,126 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	);
 
 	return (
-		<div className="flex h-full w-full flex-col gap-2 overflow-y-auto px-2 py-2">
-			<div>
-				<div className="mb-4 flex flex-row items-center justify-between gap-2">
-					<FactorySwitcher
-						organisations={organisations}
-						currentOrgHandle={currentOrgHandle}
-						currentFactoryId={currentFactoryId}
-						onNavigate={closeAfterMobileNavigation}
-					/>
-					<button
-						type="button"
-						aria-label="Collapse sidebar"
-						onClick={onToggleCollapse}
-						className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
-					>
-						<SidebarSimpleIcon weight="bold" />
-					</button>
-				</div>
-				<Link
-					href={settingsHref}
-					onClick={closeAfterMobileNavigation}
-					className={cn(
-						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-						isSettingsSelected ? "bg-grayscale-3" : "",
-					)}
-				>
-					<CornerBrackets
-						placement="inside"
-						color={isSettingsSelected ? "accent-9" : "grayscale-8"}
-						size={6}
-						active={isSettingsSelected}
-					/>
-					<FadersHorizontalIcon weight="bold" className="size-4 shrink-0" />
-					<span className="min-w-0 flex-1 truncate">Factory Settings</span>
-				</Link>
-				<Link
-					href={personalSettingsHref}
-					onClick={closeAfterMobileNavigation}
-					className={cn(
-						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-						isPersonalSettingsSelected ? "bg-grayscale-3" : "",
-					)}
-				>
-					<CornerBrackets
-						placement="inside"
-						color={isPersonalSettingsSelected ? "accent-9" : "grayscale-8"}
-						size={6}
-						active={isPersonalSettingsSelected}
-					/>
-					<UserCircleIcon weight="bold" className="size-4 shrink-0" />
-					<span className="min-w-0 flex-1 truncate">Personal Settings</span>
-				</Link>
-				<Link
-					href={floorHref}
-					onClick={closeAfterMobileNavigation}
-					className={cn(
-						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-						isFloorSelected ? "bg-grayscale-3" : "",
-					)}
-				>
-					<CornerBrackets
-						placement="inside"
-						color={isFloorSelected ? "accent-9" : "grayscale-8"}
-						size={6}
-						active={isFloorSelected}
-					/>
-					<ShapesIcon weight="bold" className="size-4 shrink-0" />
-					<span className="min-w-0 flex-1 truncate">Factory</span>
-				</Link>
-				<Link
-					href={organisationSettingsHref}
-					onClick={closeAfterMobileNavigation}
-					className={cn(
-						"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-						isOrganisationSettingsSelected ? "bg-grayscale-3" : "",
-					)}
-				>
-					<CornerBrackets
-						placement="inside"
-						color={isOrganisationSettingsSelected ? "accent-9" : "grayscale-8"}
-						size={6}
-						active={isOrganisationSettingsSelected}
-					/>
-					<BuildingsIcon weight="bold" className="size-4 shrink-0" />
-					<span className="min-w-0 flex-1 truncate">Organisation Settings</span>
-				</Link>
-				<div className="mt-2">
-					<Button
-						render={
-							<Link href={newTaskHref} onClick={closeAfterMobileNavigation} />
-						}
-						nativeButton={false}
-						aria-keyshortcuts="N"
-						className="w-full"
-						shortcut="N"
-					>
-						<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
-						<p className="min-w-0 flex-1 truncate text-current">New Task</p>
-					</Button>
-				</div>
-			</div>
-			<div className="mt-2 flex flex-row items-center justify-between px-3">
-				<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-					Tasks
-				</p>
-				<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-					{activeTasks.length}
-				</p>
-			</div>
-			<div className="flex flex-col gap-px">
-				{activeTasks.map((task) => (
-					<TaskSidebarItem
-						key={task.id}
-						href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
-						fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-						task={task}
-						selected={task.id === currentTaskId}
-						onNavigate={closeAfterMobileNavigation}
-					/>
-				))}
-			</div>
-			<div className="mt-2 flex flex-col gap-px">
-				<button
-					type="button"
-					onClick={() => setIsCompletedExpanded((expanded) => !expanded)}
-					className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-1 text-left font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
-				>
-					<span className="flex min-w-0 items-center gap-1.5">
-						<span className="truncate">Completed Tasks</span>
-						{isCompletedExpanded ? (
-							<CaretDownIcon weight="bold" className="size-3 shrink-0" />
-						) : (
-							<CaretRightIcon weight="bold" className="size-3 shrink-0" />
-						)}
-					</span>
-					<span>{completedTasks.length}</span>
-				</button>
-				{isCompletedExpanded ? (
+		<ScrollArea.Root className="h-full w-full">
+			<ScrollArea.Viewport>
+				<ScrollArea.Content className="flex min-h-full w-full flex-col gap-2 px-2 py-2">
+					<div className="sticky top-0 z-20 mb-2 flex flex-row items-center justify-between gap-2 bg-grayscale-1 pb-2">
+						<FactorySwitcher
+							organisations={organisations}
+							currentOrgHandle={currentOrgHandle}
+							currentFactoryId={currentFactoryId}
+							onNavigate={closeAfterMobileNavigation}
+						/>
+						<button
+							type="button"
+							aria-label="Collapse sidebar"
+							onClick={onToggleCollapse}
+							className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
+						>
+							<SidebarSimpleIcon weight="bold" />
+						</button>
+					</div>
+					<div>
+						<Link
+							href={settingsHref}
+							onClick={closeAfterMobileNavigation}
+							className={cn(
+								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+								isSettingsSelected ? "bg-grayscale-3" : "",
+							)}
+						>
+							<CornerBrackets
+								placement="inside"
+								color={isSettingsSelected ? "accent-9" : "grayscale-8"}
+								size={6}
+								active={isSettingsSelected}
+							/>
+							<FadersHorizontalIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">Factory Settings</span>
+						</Link>
+						<Link
+							href={personalSettingsHref}
+							onClick={closeAfterMobileNavigation}
+							className={cn(
+								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+								isPersonalSettingsSelected ? "bg-grayscale-3" : "",
+							)}
+						>
+							<CornerBrackets
+								placement="inside"
+								color={isPersonalSettingsSelected ? "accent-9" : "grayscale-8"}
+								size={6}
+								active={isPersonalSettingsSelected}
+							/>
+							<UserCircleIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">Personal Settings</span>
+						</Link>
+						<Link
+							href={floorHref}
+							onClick={closeAfterMobileNavigation}
+							className={cn(
+								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+								isFloorSelected ? "bg-grayscale-3" : "",
+							)}
+						>
+							<CornerBrackets
+								placement="inside"
+								color={isFloorSelected ? "accent-9" : "grayscale-8"}
+								size={6}
+								active={isFloorSelected}
+							/>
+							<ShapesIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">Factory</span>
+						</Link>
+						<Link
+							href={organisationSettingsHref}
+							onClick={closeAfterMobileNavigation}
+							className={cn(
+								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+								isOrganisationSettingsSelected ? "bg-grayscale-3" : "",
+							)}
+						>
+							<CornerBrackets
+								placement="inside"
+								color={
+									isOrganisationSettingsSelected ? "accent-9" : "grayscale-8"
+								}
+								size={6}
+								active={isOrganisationSettingsSelected}
+							/>
+							<BuildingsIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">
+								Organisation Settings
+							</span>
+						</Link>
+						<div className="mt-2">
+							<Button
+								render={
+									<Link
+										href={newTaskHref}
+										onClick={closeAfterMobileNavigation}
+									/>
+								}
+								nativeButton={false}
+								aria-keyshortcuts="N"
+								className="w-full"
+								shortcut="N"
+							>
+								<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
+								<p className="min-w-0 flex-1 truncate text-current">New Task</p>
+							</Button>
+						</div>
+					</div>
+					<div className="mt-2 flex flex-row items-center justify-between px-3">
+						<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+							Tasks
+						</p>
+						<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+							{activeTasks.length}
+						</p>
+					</div>
 					<div className="flex flex-col gap-px">
-						{completedTasks.map((task) => (
+						{activeTasks.map((task) => (
 							<TaskSidebarItem
 								key={task.id}
 								href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
@@ -321,9 +302,43 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 							/>
 						))}
 					</div>
-				) : null}
-			</div>
-		</div>
+					<div className="mt-2 flex flex-col gap-px">
+						<button
+							type="button"
+							onClick={() => setIsCompletedExpanded((expanded) => !expanded)}
+							className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-1 text-left font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
+						>
+							<span className="flex min-w-0 items-center gap-1.5">
+								<span className="truncate">Completed Tasks</span>
+								{isCompletedExpanded ? (
+									<CaretDownIcon weight="bold" className="size-3 shrink-0" />
+								) : (
+									<CaretRightIcon weight="bold" className="size-3 shrink-0" />
+								)}
+							</span>
+							<span>{completedTasks.length}</span>
+						</button>
+						{isCompletedExpanded ? (
+							<div className="flex flex-col gap-px">
+								{completedTasks.map((task) => (
+									<TaskSidebarItem
+										key={task.id}
+										href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
+										fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+										task={task}
+										selected={task.id === currentTaskId}
+										onNavigate={closeAfterMobileNavigation}
+									/>
+								))}
+							</div>
+						) : null}
+					</div>
+				</ScrollArea.Content>
+			</ScrollArea.Viewport>
+			<ScrollArea.Scrollbar>
+				<ScrollArea.Thumb />
+			</ScrollArea.Scrollbar>
+		</ScrollArea.Root>
 	);
 }
 
