@@ -1,9 +1,10 @@
 "use client";
 
 import { FileIcon, ImageIcon, XIcon } from "@phosphor-icons/react";
-import db from "@/instant.client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/Button";
 import { cn } from "@/helpers/classname-helper";
+import db from "@/instant.client";
 
 export type ImageAttachmentDraft = {
 	id: string;
@@ -419,17 +420,18 @@ export function ImageAttachments({
 				</div>
 			) : null}
 			<div className="flex items-center gap-2">
-				<button
+				<Button
 					aria-label="Add files"
-					className="flex h-7 shrink-0 items-center justify-center gap-1.5 bg-grayscale-2 px-2 text-grayscale-11 ring-1 ring-grayscale-4 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12 disabled:cursor-not-allowed disabled:opacity-50"
+					className="h-7 shrink-0 px-2"
 					disabled={disabled}
 					onClick={() => inputRef.current?.click()}
 					title="Add files"
 					type="button"
+					variant="secondary"
 				>
 					<ImageIcon className="size-4 shrink-0" weight="bold" />
-					<span className="text-xs">Add files</span>
-				</button>
+					Add files
+				</Button>
 				<input
 					className="hidden"
 					disabled={disabled}
