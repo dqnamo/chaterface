@@ -3,6 +3,7 @@ import NumberFlow from "@number-flow/react";
 import {
 	BuildingsIcon,
 	CheckIcon,
+	CheckCircleIcon,
 	FadersHorizontalIcon,
 	MinusCircleIcon,
 	PlusCircleIcon,
@@ -295,7 +296,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								size={6}
 								active={isCompletedTasksSelected}
 							/>
-							<CheckIcon weight="bold" className="size-4 shrink-0" />
+							<CheckCircleIcon weight="bold" className="size-4 shrink-0" />
 							<span className="min-w-0 flex-1 truncate">Completed Tasks</span>
 							<NumberFlow
 								value={completedTasks.length}
