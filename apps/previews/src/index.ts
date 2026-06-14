@@ -40,7 +40,7 @@ const sessionSecret = process.env.FACTORYPLANE_PREVIEW_SESSION_SECRET;
 const sessionMaxAgeSeconds = 60 * 60 * 8;
 
 const proxy = httpProxy.createProxyServer({
-	changeOrigin: false,
+	changeOrigin: true,
 	secure: true,
 	ws: true,
 });
