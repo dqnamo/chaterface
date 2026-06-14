@@ -12,8 +12,6 @@ import {
 	UserCircleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
-import db from "@/instant.client";
-import type { AppSchema } from "@/instant.schema";
 import { DateTime } from "luxon";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -21,6 +19,8 @@ import { useCallback, useMemo, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
+import db from "@/instant.client";
+import type { AppSchema } from "@/instant.schema";
 import { Button } from "./Button";
 import { ContextMenu } from "./ContextMenu";
 import CornerBrackets from "./CornerBrackets";
@@ -462,70 +462,127 @@ const FactorySwitcher = ({
 				</Menu.Trigger>
 				<Menu.Portal>
 					<Menu.Positioner align="start" sideOffset={8}>
-						<Menu.Popup className="w-72 max-w-[calc(100vw-1rem)]">
+						<Menu.Popup className="max-h-[min(34rem,calc(100vh-1rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto">
+							<div className="flex flex-col gap-0.5 px-3 py-2">
+								<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+									Switch context
+								</p>
+								<p className="truncate text-xs text-grayscale-11">
+									Factories and organisations
+								</p>
+							</div>
+							<Menu.Separator />
+							{organisations.length ? (
+								organisations.map((organisation, organisationIndex) => {
+									const organisationSelected =
+										organisation.handle === currentOrgHandle;
+
+									return (
+										<Menu.Group key={organisation.id}>
+											<Menu.Item
+												onClick={() =>
+													navigateTo(`/${organisation.handle}/factories`)
+												}
+												className={cn(
+													"items-start py-2",
+													organisationSelected
+														? "bg-grayscale-2 text-grayscale-12"
+														: "",
+												)}
+											>
+												<BuildingsIcon
+													weight="bold"
+													className="mt-0.5 size-4 shrink-0"
+												/>
+												<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+													<span className="truncate text-xs font-medium">
+														{organisation.name}
+													</span>
+													<span className="truncate font-mono text-[11px] text-grayscale-10">
+														/{organisation.handle}
+														{organisationSelected ? " - current org" : ""}
+													</span>
+												</span>
+											</Menu.Item>
+											{organisation.factories?.length ? (
+												organisation.factories.map((factory) => {
+													const selected =
+														organisationSelected &&
+														factory.id === currentFactoryId;
+
+													return (
+														<Menu.Item
+															key={factory.id}
+															onClick={() =>
+																navigateTo(
+																	`/${organisation.handle}/factories/${factory.id}`,
+																)
+															}
+															className={cn(
+																"ml-6 mr-1",
+																selected
+																	? "bg-grayscale-2 text-grayscale-12"
+																	: "",
+															)}
+														>
+															<ShapesIcon
+																weight="bold"
+																className="size-4 shrink-0"
+															/>
+															<span className="min-w-0 flex-1 truncate">
+																{factory.name}
+															</span>
+															{selected ? (
+																<CheckIcon
+																	size={14}
+																	weight="bold"
+																	className="shrink-0 text-accent-9"
+																/>
+															) : null}
+														</Menu.Item>
+													);
+												})
+											) : (
+												<Menu.Item
+													disabled={true}
+													className="ml-6 mr-1 text-grayscale-9"
+												>
+													<span className="min-w-0 flex-1 truncate">
+														No factories
+													</span>
+												</Menu.Item>
+											)}
+											{organisationIndex < organisations.length - 1 ? (
+												<Menu.Separator />
+											) : null}
+										</Menu.Group>
+									);
+								})
+							) : (
+								<Menu.Item disabled={true} className="text-grayscale-9">
+									<span className="min-w-0 flex-1 truncate">
+										No organisations
+									</span>
+								</Menu.Item>
+							)}
+							<Menu.Separator />
+							<Menu.Item
+								disabled={!currentOrganisation}
+								onClick={() => {
+									if (currentOrganisation) {
+										setCreateFactoryOrganisation(currentOrganisation);
+									}
+								}}
+							>
+								<ShapesIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">New factory</span>
+							</Menu.Item>
 							<Menu.Item onClick={() => setCreateOrganisationOpen(true)}>
 								<BuildingsIcon weight="bold" className="size-4 shrink-0" />
 								<span className="min-w-0 flex-1 truncate">
 									New organisation
 								</span>
 							</Menu.Item>
-							<Menu.Separator />
-							{organisations.map((organisation) => (
-								<Menu.Group key={organisation.id}>
-									<Menu.GroupLabel className="truncate">
-										{organisation.name}
-									</Menu.GroupLabel>
-									<Menu.Item
-										onClick={() => setCreateFactoryOrganisation(organisation)}
-									>
-										<ShapesIcon weight="bold" className="size-4 shrink-0" />
-										<span className="min-w-0 flex-1 truncate">New factory</span>
-									</Menu.Item>
-									{organisation.factories?.length ? (
-										organisation.factories.map((factory) => {
-											const selected =
-												organisation.handle === currentOrgHandle &&
-												factory.id === currentFactoryId;
-
-											return (
-												<Menu.Item
-													key={factory.id}
-													onClick={() =>
-														navigateTo(
-															`/${organisation.handle}/factories/${factory.id}`,
-														)
-													}
-													className={cn(
-														selected ? "bg-grayscale-2 text-grayscale-12" : "",
-													)}
-												>
-													<ShapesIcon
-														weight="bold"
-														className="size-4 shrink-0"
-													/>
-													<span className="min-w-0 flex-1 truncate">
-														{factory.name}
-													</span>
-													{selected ? (
-														<CheckIcon
-															size={14}
-															weight="bold"
-															className="shrink-0 text-accent-9"
-														/>
-													) : null}
-												</Menu.Item>
-											);
-										})
-									) : (
-										<Menu.Item disabled={true} className="text-grayscale-9">
-											<span className="min-w-0 flex-1 truncate">
-												No factories
-											</span>
-										</Menu.Item>
-									)}
-									<Menu.Separator />
-								</Menu.Group>
-							))}
 						</Menu.Popup>
 					</Menu.Positioner>
 				</Menu.Portal>
