@@ -232,7 +232,11 @@ const isMinifiedTimelineNode = (node: TimelineNode) => {
 
 	if (
 		type === "factoryplane.new_task" ||
-		type === "factoryplane.new_user_message"
+		type === "factoryplane.new_user_message" ||
+		type === "codex.thread.started" ||
+		type === "codex.turn.started" ||
+		type === "codex.turn.completed" ||
+		type.startsWith("factoryplane.setup_step_")
 	) {
 		return true;
 	}
