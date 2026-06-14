@@ -1,7 +1,7 @@
 "use client";
 
-import { monogramColors } from "@/helpers/colors-helper";
 import { cn } from "@/helpers/classname-helper";
+import { monogramColors } from "@/helpers/colors-helper";
 
 function hashSeed(seed: string): number {
 	let hash = 0;
@@ -21,14 +21,18 @@ export default function Monogram({
 	seed?: string;
 	letters?: number;
 }) {
-	const color =
-		monogramColors[hashSeed(seed ?? "") % monogramColors.length];
+	const color = monogramColors[hashSeed(seed ?? "") % monogramColors.length];
 	return (
 		<div
-			className={cn("size-10 flex items-center justify-center", className)}
+			className={cn(
+				"flex size-10 items-center justify-center rounded-md",
+				className,
+			)}
 			style={{ backgroundColor: `var(--${color}-9)` }}
 		>
-      <p className="text-sm font-medium" style={{ color: `var(--${color}-1)` }}>{seed?.substring(0, letters).toUpperCase()}</p>
-    </div>
+			<p className="text-sm font-medium" style={{ color: `var(--${color}-1)` }}>
+				{seed?.substring(0, letters).toUpperCase()}
+			</p>
+		</div>
 	);
 }

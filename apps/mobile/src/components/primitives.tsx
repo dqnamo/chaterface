@@ -46,13 +46,21 @@ function hashSeed(seed: string): number {
 }
 
 export function Logo({ size = 8 }: { size?: number }) {
+	const cellGap = Math.max(1, size * 0.25);
+
 	return (
-		<View style={[styles.logo, { width: size * 3 }]}>
+		<View
+			style={[styles.logo, { gap: cellGap, width: size * 3 + cellGap * 2 }]}
+		>
 			{LOGO_PATTERN.map((isFilled, index) => (
 				<View
 					key={LOGO_KEYS[index]}
 					style={[
-						{ width: size, height: size },
+						{
+							width: size,
+							height: size,
+							borderRadius: Math.max(1, size * 0.2),
+						},
 						isFilled ? styles.logoCellFilled : styles.logoCellEmpty,
 					]}
 				/>
@@ -79,6 +87,7 @@ export function Monogram({
 				{
 					width: size,
 					height: size,
+					borderRadius: Math.max(6, size * 0.2),
 					backgroundColor: palette.background,
 				},
 			]}
