@@ -60,10 +60,11 @@ const Viewport = forwardRef<HTMLDivElement, ScrollAreaViewportProps>(
 );
 Viewport.displayName = "ScrollAreaViewport";
 
-function Content({ className, ...props }: ScrollAreaContentProps) {
+function Content({ className, style, ...props }: ScrollAreaContentProps) {
 	return (
 		<BaseScrollArea.Content
 			className={mergeClassName("min-w-0", className)}
+			style={{ minWidth: 0, maxWidth: "100%", ...style }}
 			{...props}
 		/>
 	);
