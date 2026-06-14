@@ -16,6 +16,7 @@
 		"@base-ui/react": "^1.5.0",
 		"@instantdb/admin": "^1.0.43",
 		"@instantdb/react": "^1.0.43",
+		"@number-flow/react": "^0.6.0",
 		"@phosphor-icons/react": "^2.1.10",
 		"@pierre/diffs": "^1.2.7",
 		"@radix-ui/colors": "^3.0.0",

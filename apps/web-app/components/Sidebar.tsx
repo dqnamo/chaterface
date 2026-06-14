@@ -1,8 +1,7 @@
 import { type InstaQLEntity, id } from "@instantdb/react";
+import NumberFlow from "@number-flow/react";
 import {
 	BuildingsIcon,
-	CaretDownIcon,
-	CaretRightIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
 	MinusCircleIcon,
@@ -95,7 +94,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
 	const currentTaskId = taskId as string;
-	const [isCompletedExpanded, setIsCompletedExpanded] = useState(false);
 	const closeAfterMobileNavigation = useCallback(() => {
 		if (isMobile) {
 			collapse();
@@ -149,10 +147,12 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
 	const newTaskHref = `/${currentOrgHandle}/factories/${currentFactoryId}`;
 	const floorHref = `/${currentOrgHandle}/factories/${currentFactoryId}/floor`;
+	const completedTasksHref = `/${currentOrgHandle}/factories/${currentFactoryId}/completed-tasks`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
 	const isFloorSelected = pathname === floorHref;
+	const isCompletedTasksSelected = pathname === completedTasksHref;
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
 	);
@@ -281,14 +281,36 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								<p className="min-w-0 flex-1 truncate text-current">New Task</p>
 							</Button>
 						</div>
+						<Link
+							href={completedTasksHref}
+							onClick={closeAfterMobileNavigation}
+							className={cn(
+								"group relative mt-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+								isCompletedTasksSelected ? "bg-grayscale-3" : "",
+							)}
+						>
+							<CornerBrackets
+								placement="inside"
+								color={isCompletedTasksSelected ? "accent-9" : "grayscale-8"}
+								size={6}
+								active={isCompletedTasksSelected}
+							/>
+							<CheckIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">Completed Tasks</span>
+							<NumberFlow
+								value={completedTasks.length}
+								className="shrink-0 font-mono text-[11px] leading-none font-semibold text-grayscale-10 tabular-nums"
+							/>
+						</Link>
 					</div>
 					<div className="mt-2 flex flex-row items-center justify-between px-3">
 						<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-							Tasks
+							Active Tasks
 						</p>
-						<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-							{activeTasks.length}
-						</p>
+						<NumberFlow
+							value={activeTasks.length}
+							className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase tabular-nums"
+						/>
 					</div>
 					<div className="flex min-w-0 max-w-full flex-col gap-px">
 						{activeTasks.map((task) => (
@@ -301,37 +323,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								onNavigate={closeAfterMobileNavigation}
 							/>
 						))}
-					</div>
-					<div className="mt-2 flex min-w-0 max-w-full flex-col gap-px">
-						<button
-							type="button"
-							onClick={() => setIsCompletedExpanded((expanded) => !expanded)}
-							className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-1 text-left font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase transition-colors hover:bg-grayscale-2 hover:text-grayscale-12"
-						>
-							<span className="flex min-w-0 items-center gap-1.5">
-								<span className="truncate">Completed Tasks</span>
-								{isCompletedExpanded ? (
-									<CaretDownIcon weight="bold" className="size-3 shrink-0" />
-								) : (
-									<CaretRightIcon weight="bold" className="size-3 shrink-0" />
-								)}
-							</span>
-							<span>{completedTasks.length}</span>
-						</button>
-						{isCompletedExpanded ? (
-							<div className="flex flex-col gap-px">
-								{completedTasks.map((task) => (
-									<TaskSidebarItem
-										key={task.id}
-										href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
-										fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-										task={task}
-										selected={task.id === currentTaskId}
-										onNavigate={closeAfterMobileNavigation}
-									/>
-								))}
-							</div>
-						) : null}
 					</div>
 				</ScrollArea.Content>
 			</ScrollArea.Viewport>
