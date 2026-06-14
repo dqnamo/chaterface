@@ -18,6 +18,7 @@ import { getPublicServiceUrl } from "@/helpers/service-preview-url-helper";
 import type { AppSchema } from "@/instant.schema";
 import CodeBlock from "./CodeBlock";
 import Logo from "./Logo";
+import Monogram from "./Monogram";
 
 type EventEntity = InstaQLEntity<AppSchema, "events">;
 type JsonRecord = Record<string, unknown>;
@@ -35,6 +36,12 @@ type Attachment = {
 	size: number;
 };
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
+export type UserDisplayProfile = {
+	id: string;
+	email?: string;
+	memberName?: string;
+	userName?: string;
+};
 
 /** A resolved lifecycle state for a grouped (started -> finished) timeline row. */
 export type TimelinePhase = "running" | "success" | "warning" | "failed";
@@ -297,11 +304,15 @@ function mergePhase(
 }
 
 export default function Event({
+	currentUserProfile,
 	node,
 	task,
+	userProfiles = {},
 }: {
+	currentUserProfile?: UserDisplayProfile;
 	node: TimelineNode;
 	task?: TaskSummary;
+	userProfiles?: Record<string, UserDisplayProfile>;
 }) {
 	const { event, phase } = node;
 	const type = event.type ?? "event";
@@ -315,17 +326,16 @@ export default function Event({
 	if (type === "factoryplane.new_user_message") {
 		const content = getString(data, "content");
 		const attachments = getAttachments(data);
+		const userId = getString(data, "userId");
+		const profile = userId ? userProfiles[userId] : currentUserProfile;
 
 		return (
-			<EventCard
-				glyph="ME"
-				meta={timestamp}
-				title="Message sent"
-				tone="neutral"
-			>
-				{content ? <MessageBubble text={content} /> : null}
-				<AttachmentGrid attachments={attachments} />
-			</EventCard>
+			<UserMessage
+				attachments={attachments}
+				name={getUserDisplayName(profile)}
+				text={content}
+				timestamp={timestamp}
+			/>
 		);
 	}
 
@@ -787,6 +797,50 @@ function AgentMessage({
 	);
 }
 
+function UserMessage({
+	attachments,
+	name,
+	text,
+	timestamp,
+}: {
+	attachments: Attachment[];
+	name: string;
+	text?: string;
+	timestamp?: string;
+}) {
+	return (
+		<motion.article
+			animate={{ opacity: 1, y: 0 }}
+			className="relative min-w-0 max-w-full overflow-hidden py-2"
+			initial={{ opacity: 0, y: 6 }}
+			layout="position"
+			transition={{ duration: 0.18, ease: "easeOut" }}
+		>
+			<div className="flex min-w-0 max-w-full gap-3 px-3 py-2.5">
+				<Monogram
+					className="size-8 shrink-0 rounded-full text-sm"
+					letters={1}
+					seed={name}
+				/>
+				<div className="flex min-w-0 flex-1 flex-col gap-2">
+					<div className="flex min-w-0 items-center justify-between gap-3">
+						<p className="min-w-0 truncate text-sm font-medium leading-5 text-grayscale-12">
+							{name}
+						</p>
+						{timestamp ? (
+							<time className="shrink-0 text-[11px] leading-5 text-grayscale-10">
+								{timestamp}
+							</time>
+						) : null}
+					</div>
+					{text ? <MessageBubble text={text} /> : null}
+					<AttachmentGrid attachments={attachments} />
+				</div>
+			</div>
+		</motion.article>
+	);
+}
+
 function EventCard({
 	children,
 	glyph,
@@ -1138,6 +1192,15 @@ function formatTimestamp(value: unknown): string | undefined {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
+}
+
+function getUserDisplayName(profile: UserDisplayProfile | undefined) {
+	return (
+		profile?.memberName?.trim() ||
+		profile?.userName?.trim() ||
+		profile?.email?.trim() ||
+		"You"
+	);
 }
 
 function parseTimestamp(value: unknown) {

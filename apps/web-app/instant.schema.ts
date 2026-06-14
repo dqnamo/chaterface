@@ -17,6 +17,7 @@ const _schema = i.schema({
 		$users: i.entity({
 			email: i.string().unique().indexed().optional(),
 			imageURL: i.string().optional(),
+			name: i.string().indexed().optional(),
 			type: i.string().optional(),
 		}),
 		factories: i.entity({
@@ -125,6 +126,7 @@ const _schema = i.schema({
 			inviteSentAt: i.date().optional(),
 			inviteToken: i.string().unique().optional(),
 			joinedAt: i.date().optional(),
+			name: i.string().indexed().optional(),
 			role: i.string().optional(),
 		}),
 		tasks: i.entity({
