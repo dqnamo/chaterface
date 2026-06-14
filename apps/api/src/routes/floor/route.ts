@@ -19,16 +19,6 @@ export const GET: RouteHandler = async (c) => {
 			nodes: [],
 			edges: [],
 		},
-		pendingProposals: (task.factory.floorChangeProposals ?? [])
-			.filter((proposal) => proposal.status === "pending")
-			.map((proposal) => ({
-				id: proposal.id,
-				title: proposal.title,
-				summary: proposal.summary,
-				status: proposal.status,
-				createdAt: proposal.createdAt,
-				taskId: proposal.task?.id,
-			})),
 	});
 };
 

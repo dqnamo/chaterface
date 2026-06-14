@@ -36,6 +36,27 @@ curl {{FACTORYPLANE_API_URL}}/floor \
 - `workflow` — current floor workflow with `nodes` and `edges`
 - `pendingProposals` — floor proposals waiting for user review
 
+### Answer a workflow decision
+
+Use this only when Factoryplane asks you to answer a workflow decision question.
+
+**Endpoint:** `POST /workflow-decisions/answers`
+
+**Body (JSON):**
+
+- `questionId` — required question id from the prompt
+- `answerId` — required answer option id from the prompt
+- `additionalInformation` — optional short reason or extra context for the next step
+
+**Example:**
+
+```bash
+curl -X POST {{FACTORYPLANE_API_URL}}/workflow-decisions/answers \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"questionId":"question-id","answerId":"answer-option-id","additionalInformation":"Short reason."}'
+```
+
 ### Propose a factory floor change
 
 Use this when the user asks you to adjust the factory floor. This creates a proposal only; the user must manually accept it in Factoryplane before the floor changes.

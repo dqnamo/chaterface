@@ -31,14 +31,6 @@ const _schema = i.schema({
 			newTaskSetupScript: i.string().optional(),
 			newTurnSetupScript: i.string().optional(),
 		}),
-		floorChangeProposals: i.entity({
-			title: i.string().indexed(),
-			summary: i.string().optional(),
-			workflow: i.json(),
-			status: i.string().indexed(),
-			createdAt: i.date().optional(),
-			decidedAt: i.date().optional(),
-		}),
 		repositories: i.entity({
 			url: i.string().indexed(),
 			path: i.string().optional(),
@@ -112,6 +104,16 @@ const _schema = i.schema({
 			status: i.string().optional(),
 			sandboxId: i.string().optional(),
 			sandboxTrafficAccessToken: i.string().optional(),
+		}),
+		agentSessions: i.entity({
+			name: i.string().indexed(),
+			status: i.string().optional(),
+			createdAt: i.date().optional(),
+			updatedAt: i.date().optional(),
+			agentThreadId: i.string().optional(),
+			agentPid: i.number().optional(),
+			workflowNodeId: i.string().optional(),
+			workflowSessionKey: i.string().optional(),
 		}),
 		organisations: i.entity({
 			name: i.string().indexed(),
@@ -226,19 +228,6 @@ const _schema = i.schema({
 				label: "factory",
 			},
 		},
-		factoryFloorChangeProposals: {
-			forward: {
-				on: "factories",
-				has: "many",
-				label: "floorChangeProposals",
-			},
-			reverse: {
-				on: "floorChangeProposals",
-				has: "one",
-				label: "factory",
-				onDelete: "cascade",
-			},
-		},
 		taskEvents: {
 			forward: {
 				on: "tasks",
@@ -251,16 +240,29 @@ const _schema = i.schema({
 				label: "task",
 			},
 		},
-		taskFloorChangeProposals: {
+		taskAgentSessions: {
 			forward: {
 				on: "tasks",
 				has: "many",
-				label: "floorChangeProposals",
+				label: "agentSessions",
 			},
 			reverse: {
-				on: "floorChangeProposals",
+				on: "agentSessions",
 				has: "one",
 				label: "task",
+				onDelete: "cascade",
+			},
+		},
+		agentSessionEvents: {
+			forward: {
+				on: "agentSessions",
+				has: "many",
+				label: "events",
+			},
+			reverse: {
+				on: "events",
+				has: "one",
+				label: "agentSession",
 			},
 		},
 		taskAgent: {
@@ -273,6 +275,18 @@ const _schema = i.schema({
 				on: "agents",
 				has: "many",
 				label: "tasks",
+			},
+		},
+		agentSessionAgent: {
+			forward: {
+				on: "agentSessions",
+				has: "one",
+				label: "agent",
+			},
+			reverse: {
+				on: "agents",
+				has: "many",
+				label: "agentSessions",
 			},
 		},
 		taskServices: {

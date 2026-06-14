@@ -52,16 +52,6 @@ export const getTaskForAgentToken = async (agentToken: string) => {
 							],
 						},
 					},
-					floorChangeProposals: {
-						$: {
-							fields: ["title", "summary", "status", "createdAt"],
-						},
-						task: {
-							$: {
-								fields: ["name", "status", "createdAt"],
-							},
-						},
-					},
 				},
 			},
 		})

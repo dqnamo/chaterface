@@ -22,6 +22,9 @@ import { syncAgentAuthFromSandbox } from "./sync-agent-auth";
 type Event = InstaQLEntity<AppSchema, "events">;
 type Task = InstaQLEntity<AppSchema, "tasks">;
 type Agent = InstaQLEntity<AppSchema, "agents">;
+type AgentSession = InstaQLEntity<AppSchema, "agentSessions"> & {
+	agent?: Agent;
+};
 type Factory = InstaQLEntity<AppSchema, "factories">;
 type Repository = InstaQLEntity<AppSchema, "repositories">;
 type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
@@ -43,10 +46,35 @@ type WorkflowNode = {
 		label?: string;
 		prompt?: string;
 		agentId?: string;
-		responseSchema?: string;
+		sessionKey?: string;
+		instruction?: string;
+		question?: string;
+		options?: DecisionOption[];
 		completionMessage?: string;
 		conditions?: RouterCondition[];
 	};
+};
+type DecisionOption = {
+	id: string;
+	label?: string;
+};
+type PendingAgentDecision = {
+	questionId: string;
+	workflowNodeId: string;
+	agentSessionId?: string;
+	question: string;
+	options: DecisionOption[];
+	askedAt: string;
+};
+type WorkflowDecisionAnswer = {
+	questionId?: string;
+	workflowNodeId?: string;
+	route?: string;
+	answerId?: string;
+	answerLabel?: string;
+	reason?: string;
+	additionalInformation?: unknown;
+	answeredAt?: string;
 };
 type RouterCondition = {
 	id: string;
@@ -96,9 +124,12 @@ type RunCodexExecOptions = {
 	attachments?: Attachment[];
 	imagePaths?: string[];
 	attachmentPaths?: string[];
+	agentSession?: AgentSession;
 	outputLastMessagePath?: string;
 	outputSchemaPath?: string;
+	persistEvents?: boolean;
 	resumeLast?: boolean;
+	ephemeral?: boolean;
 };
 
 type SetupStepOptions = {
@@ -116,8 +147,8 @@ const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
 const REPOSITORY_SECRETS_FINGERPRINT_PATH =
 	".factoryplane/repository-secrets-fingerprint";
 const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
-const WORKFLOW_OUTPUT_SCHEMA_DIR = "/tmp/factoryplane-output-schemas";
 const WORKFLOW_OUTPUT_DIR = "/tmp/factoryplane-agent-outputs";
+const HUMAN_LOOP_HANDLE_ID = "human-loop";
 const FACTORY_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
 const GITHUB_AUTH_VALIDATION_TIMEOUT_MS = 120_000;
 const GITHUB_AUTH_SETUP_STEP_TIMEOUT_MS =
@@ -198,6 +229,18 @@ const taskTx = (taskId: string) => {
 	return tx;
 };
 
+const agentSessionTx = (agentSessionId: string) => {
+	const tx = db.tx.agentSessions[agentSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Agent session transaction builder ${agentSessionId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 const updateTaskStatus = async (
 	taskId: string,
 	status: "idle" | "in_progress" | "failed",
@@ -234,6 +277,9 @@ export const processEventTask = task({
 						where: {
 							id: payload.eventId,
 						},
+					},
+					agentSession: {
+						agent: {},
 					},
 					task: {
 						agent: {},
@@ -294,6 +340,7 @@ const processNewTask = async (
 		task,
 		factory,
 	);
+	const agentSession = await resolveAgentSession(event, task, agent, factory);
 	const message = `${task.name}. ${task.instructions ?? ""}.`;
 
 	const completed = await runAgentExec(
@@ -302,11 +349,16 @@ const processNewTask = async (
 		agent,
 		factory,
 		message,
-		{ attachments: getAttachments(event.data, task.id) },
+		{ agentSession, attachments: getAttachments(event.data, task.id) },
 	);
 
 	if (completed) {
-		await enqueueWorkflowContinuation({ ...task, diffWorkspacePath }, factory);
+		await enqueueWorkflowContinuation(
+			sandbox,
+			{ ...task, diffWorkspacePath },
+			factory,
+			agentSession,
+		);
 	}
 };
 
@@ -332,7 +384,8 @@ const processNewUserMessage = async (
 	}
 
 	const sandbox = await Sandbox.connect(task.sandboxId);
-	await killTaskAgentProcess(sandbox, task);
+	const agentSession = await resolveAgentSession(event, task, agent, factory);
+	await killTaskAgentProcess(sandbox, task, agentSession);
 	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, factory);
 	const completed = await runAgentExec(
 		sandbox,
@@ -341,35 +394,331 @@ const processNewUserMessage = async (
 		factory,
 		content ?? "Please use the attached file input.",
 		{
+			agentSession,
 			attachments,
 			resumeLast: true,
 		},
 	);
 
 	if (completed) {
-		await enqueueWorkflowContinuation(task, factory);
+		await enqueueWorkflowContinuation(sandbox, task, factory, agentSession);
 	}
 };
 
-const enqueueWorkflowContinuation = async (
+const resolveAgentSession = async (
+	event: Event,
+	task: Task,
+	agent: Agent,
+	factory: FactoryWithRepositories,
+): Promise<AgentSession> => {
+	const linkedSession = (event as Event & { agentSession?: AgentSession })
+		.agentSession;
+
+	if (linkedSession) {
+		return linkedSession;
+	}
+
+	const sessionKey = getWorkflowSessionKeyForTask(task, factory);
+	const existingSession = await db
+		.query({
+			agentSessions: {
+				$: {
+					where: {
+						"task.id": task.id,
+						workflowSessionKey: sessionKey,
+					},
+				},
+				agent: {},
+			},
+		})
+		.then((result) => result.agentSessions[0] as AgentSession | undefined);
+
+	if (existingSession) {
+		await db.transact(
+			eventTx(event.id).link({ agentSession: existingSession.id }),
+		);
+		return existingSession;
+	}
+
+	const legacySession = await db
+		.query({
+			agentSessions: {
+				$: {
+					where: {
+						"task.id": task.id,
+						workflowNodeId: task.workflowNodeId,
+					},
+				},
+				agent: {},
+			},
+		})
+		.then((result) => result.agentSessions[0] as AgentSession | undefined);
+
+	if (legacySession) {
+		await db.transact([
+			agentSessionTx(legacySession.id).update({
+				workflowSessionKey: sessionKey,
+				updatedAt: new Date().toISOString(),
+			}),
+			eventTx(event.id).link({ agentSession: legacySession.id }),
+		]);
+		return {
+			...legacySession,
+			workflowSessionKey: sessionKey,
+		} as AgentSession;
+	}
+
+	const agentSessionId = randomUUID();
+	const now = new Date().toISOString();
+	const name = getAgentSessionName(sessionKey);
+
+	await db.transact([
+		agentSessionTx(agentSessionId)
+			.create({
+				name,
+				status: "idle",
+				createdAt: now,
+				updatedAt: now,
+				workflowNodeId: task.workflowNodeId,
+				workflowSessionKey: sessionKey,
+			})
+			.link({ task: task.id, agent: agent.id }),
+		eventTx(event.id).link({ agentSession: agentSessionId }),
+	]);
+
+	return {
+		id: agentSessionId,
+		name,
+		status: "idle",
+		createdAt: now,
+		updatedAt: now,
+		workflowNodeId: task.workflowNodeId,
+		workflowSessionKey: sessionKey,
+		agent,
+	} as AgentSession;
+};
+
+const getOrCreateAgentSessionForStep = async (
+	task: Task,
+	agent: Agent,
+	workflowNode: WorkflowNode,
+) => {
+	const workflowNodeId = workflowNode.id;
+	const sessionKey = getWorkflowSessionKey(workflowNode);
+	const existingSession = await db
+		.query({
+			agentSessions: {
+				$: {
+					where: {
+						"task.id": task.id,
+						workflowSessionKey: sessionKey,
+					},
+				},
+				agent: {},
+			},
+		})
+		.then((result) => result.agentSessions[0] as AgentSession | undefined);
+
+	if (existingSession) {
+		return existingSession;
+	}
+
+	const legacySession =
+		sessionKey === workflowNodeId
+			? undefined
+			: await db
+					.query({
+						agentSessions: {
+							$: {
+								where: {
+									"task.id": task.id,
+									workflowNodeId,
+								},
+							},
+							agent: {},
+						},
+					})
+					.then(
+						(result) => result.agentSessions[0] as AgentSession | undefined,
+					);
+
+	if (legacySession) {
+		await db.transact(
+			agentSessionTx(legacySession.id).update({
+				workflowSessionKey: sessionKey,
+				updatedAt: new Date().toISOString(),
+			}),
+		);
+		return {
+			...legacySession,
+			workflowSessionKey: sessionKey,
+		} as AgentSession;
+	}
+
+	const agentSessionId = randomUUID();
+	const now = new Date().toISOString();
+	const name = getAgentSessionName(sessionKey);
+
+	await db.transact(
+		agentSessionTx(agentSessionId)
+			.create({
+				name,
+				status: "idle",
+				createdAt: now,
+				updatedAt: now,
+				workflowNodeId,
+				workflowSessionKey: sessionKey,
+			})
+			.link({ task: task.id, agent: agent.id }),
+	);
+
+	return {
+		id: agentSessionId,
+		name,
+		status: "idle",
+		createdAt: now,
+		updatedAt: now,
+		workflowNodeId,
+		workflowSessionKey: sessionKey,
+		agent,
+	} as AgentSession;
+};
+
+const getWorkflowSessionKeyForTask = (
 	task: Task,
 	factory: FactoryWithRepositories,
 ) => {
-	const workflow = parseFloorWorkflow(factory.floorWorkflow);
-	const nextNode = findNextWorkflowNode(workflow, task.workflowNodeId);
+	const workflow = getTaskFloorWorkflow(task, factory);
+	const workflowNode = workflow.nodes.find(
+		(node) => node.id === task.workflowNodeId,
+	);
 
-	if (!nextNode) {
+	return workflowNode
+		? getWorkflowSessionKey(workflowNode)
+		: task.workflowNodeId;
+};
+
+const getWorkflowSessionKey = (workflowNode: WorkflowNode) => {
+	const rawKey = getOptionalDataString(workflowNode.data?.sessionKey);
+	return rawKey ?? workflowNode.id;
+};
+
+const getAgentSessionName = (sessionKey: string | undefined) =>
+	sessionKey ? `Agent conversation ${sessionKey}` : "Agent";
+
+const enqueueWorkflowContinuation = async (
+	sandbox: Sandbox,
+	task: Task,
+	factory: FactoryWithRepositories,
+	agentSession: AgentSession | undefined,
+) => {
+	const currentTask = await getLatestWorkflowTask(task.id).then(
+		(latestTask) => latestTask ?? task,
+	);
+	const workflow = getTaskFloorWorkflow(currentTask, factory);
+	const decisionNextNode = findAnsweredAgentDecisionNextNode(
+		workflow,
+		currentTask,
+	);
+
+	if (decisionNextNode) {
+		await continueWorkflowFromNode(
+			sandbox,
+			currentTask,
+			factory,
+			workflow,
+			decisionNextNode,
+			{
+				agentSession,
+			},
+		);
 		return;
 	}
 
-	await continueWorkflowFromNode(task, factory, workflow, nextNode);
+	const nextNode = findNextWorkflowNode(workflow, currentTask.workflowNodeId);
+
+	if (nextNode) {
+		await continueWorkflowFromNode(
+			sandbox,
+			currentTask,
+			factory,
+			workflow,
+			nextNode,
+			{
+				agentSession,
+			},
+		);
+		return;
+	}
+
+	const humanLoopEdge = findHumanLoopWaitEdge(
+		workflow,
+		currentTask.workflowNodeId,
+	);
+
+	if (humanLoopEdge) {
+		await waitForHumanInAgentSession(
+			currentTask,
+			humanLoopEdge.target,
+			agentSession,
+		);
+	}
+};
+
+const getLatestWorkflowTask = async (taskId: string) =>
+	db
+		.query({
+			tasks: {
+				$: {
+					where: {
+						id: taskId,
+					},
+				},
+			},
+		})
+		.then((result) => result.tasks[0] as Task | undefined);
+
+const getTaskFloorWorkflow = (
+	task: Task,
+	factory: FactoryWithRepositories,
+): Required<FloorWorkflow> => {
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const workflowSnapshot = workflowInput.workflowSnapshot;
+
+	return parseFloorWorkflow(workflowSnapshot ?? factory.floorWorkflow);
+};
+
+const waitForHumanInAgentSession = async (
+	task: Task,
+	workflowNodeId: string | undefined,
+	agentSession: AgentSession | undefined,
+) => {
+	await db.transact(
+		taskTx(task.id).update({
+			status: "idle",
+			workflowState: "waiting_for_human",
+			workflowNodeId: workflowNodeId ?? task.workflowNodeId,
+		}),
+	);
+
+	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.human_input", {
+		taskId: task.id,
+		workflowNodeId: workflowNodeId ?? task.workflowNodeId,
+		agentSessionId: agentSession?.id,
+		prompt: "Waiting for human input in the agent session.",
+	});
 };
 
 const continueWorkflowFromNode = async (
+	sandbox: Sandbox,
 	task: Task,
 	factory: FactoryWithRepositories,
 	workflow: Required<FloorWorkflow>,
 	nextNode: WorkflowNode,
+	options: {
+		agentSession?: AgentSession;
+		prompt?: string;
+	} = {},
 ): Promise<void> => {
 	if (nextNode.data?.blockType === "completeTask") {
 		const now = new Date().toISOString();
@@ -390,7 +739,50 @@ const continueWorkflowFromNode = async (
 	}
 
 	if (nextNode.data?.blockType === "conditionalRouter") {
-		await routeConditionalWorkflowNode(task, factory, workflow, nextNode);
+		await routeConditionalWorkflowNode(
+			sandbox,
+			task,
+			factory,
+			workflow,
+			nextNode,
+			options,
+		);
+		return;
+	}
+
+	if (nextNode.data?.blockType === "yesNoClassifier") {
+		await routeYesNoClassifierNode(
+			sandbox,
+			task,
+			factory,
+			workflow,
+			nextNode,
+			options,
+		);
+		return;
+	}
+
+	if (nextNode.data?.blockType === "instruction") {
+		await continueFromInstructionNode(
+			sandbox,
+			task,
+			factory,
+			workflow,
+			nextNode,
+			options,
+		);
+		return;
+	}
+
+	if (nextNode.data?.blockType === "agentDecision") {
+		await routeAgentDecisionNode(
+			sandbox,
+			task,
+			factory,
+			workflow,
+			nextNode,
+			options,
+		);
 		return;
 	}
 
@@ -405,18 +797,25 @@ const continueWorkflowFromNode = async (
 		throw new Error(
 			requestedAgentId
 				? `Workflow agent ${requestedAgentId} not found`
-				: "Workflow has an Agent Run block but no agents are configured",
+				: "Workflow has an Agent Session block but no agents are configured",
 		);
 	}
 
 	const workflowInput = getWorkflowInput(task.workflowInput);
 	const content =
-		renderWorkflowTemplate(
+		options.prompt ??
+		(renderWorkflowTemplate(
 			nextNode.data.prompt || "Use the workflow input:\n\n{{input.message}}",
 			workflowInput,
-		) || "Continue this workflow task.";
+		) ||
+			"Continue this workflow task.");
 	const agentDefaults = getAgentDefaultOptions(agent.settings);
 	const eventId = randomUUID();
+	const agentSession = await getOrCreateAgentSessionForStep(
+		task,
+		agent,
+		nextNode,
+	);
 
 	await db.transact([
 		taskTx(task.id)
@@ -441,19 +840,141 @@ const continueWorkflowFromNode = async (
 						input: workflowInput,
 						agentRunNodeId: nextNode.id,
 						agentId: agent.id,
+						sessionKey: getWorkflowSessionKey(nextNode),
 					},
 				},
 				createdAt: new Date().toISOString(),
 			})
-			.link({ task: task.id }),
+			.link({ task: task.id, agentSession: agentSession.id }),
 	]);
 };
 
+const routeYesNoClassifierNode = async (
+	sandbox: Sandbox,
+	task: Task,
+	factory: FactoryWithRepositories,
+	workflow: Required<FloorWorkflow>,
+	classifierNode: WorkflowNode,
+	options: {
+		agentSession?: AgentSession;
+		prompt?: string;
+	} = {},
+) => {
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const requestedAgentId = getOptionalDataString(classifierNode.data?.agentId);
+	const agent = resolveWorkflowAgent(factory, requestedAgentId);
+
+	if (!agent) {
+		throw new Error(
+			requestedAgentId
+				? `Workflow classifier agent ${requestedAgentId} not found`
+				: "Workflow has a Yes/No Classifier block but no agents are configured",
+		);
+	}
+
+	if (getAgentProvider(agent) !== "codex") {
+		throw new Error("Yes/No Classifier blocks require a Codex agent");
+	}
+
+	const renderedPrompt =
+		renderWorkflowTemplate(
+			classifierNode.data?.prompt ||
+				"Classify this workflow input as yes or no:\n\n{{input}}",
+			workflowInput,
+		) || "Classify the current workflow input as yes or no.";
+	const classification = await runYesNoClassifier(
+		sandbox,
+		task,
+		agent,
+		factory,
+		buildYesNoClassifierPrompt(renderedPrompt, workflowInput),
+		classifierNode.id,
+	);
+	const nextWorkflowInput = {
+		...getWorkflowInput(task.workflowInput),
+		classifier: {
+			workflowNodeId: classifierNode.id,
+			answer: classification?.answer,
+			reason: classification?.reason,
+			classifiedAt: new Date().toISOString(),
+		},
+	};
+
+	await db.transact(
+		taskTx(task.id)
+			.update({
+				status: "idle",
+				workflowState: classification
+					? "classifier_matched"
+					: "classifier_unmatched",
+				workflowNodeId: classifierNode.id,
+				workflowInput: nextWorkflowInput,
+			})
+			.link({ agent: agent.id }),
+	);
+
+	task.workflowInput = nextWorkflowInput;
+	task.workflowNodeId = classifierNode.id;
+
+	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.classifier", {
+		taskId: task.id,
+		workflowNodeId: classifierNode.id,
+		agentId: agent.id,
+		answer: classification?.answer,
+		reason: classification?.reason,
+		prompt: renderedPrompt,
+	});
+
+	if (!classification) {
+		return;
+	}
+
+	const edge = findWorkflowEdgeFromHandle(
+		workflow,
+		classifierNode.id,
+		classification.answer,
+	);
+
+	if (!edge?.target) {
+		await persistFactoryplaneEvent(
+			task.id,
+			"factoryplane.workflow.classifier_unconnected",
+			{
+				taskId: task.id,
+				workflowNodeId: classifierNode.id,
+				answer: classification.answer,
+				reason: classification.reason,
+			},
+		);
+		return;
+	}
+
+	const nextNode = workflow.nodes.find((node) => node.id === edge.target);
+
+	if (!nextNode) {
+		return;
+	}
+
+	await continueWorkflowFromNode(
+		sandbox,
+		task,
+		factory,
+		workflow,
+		nextNode,
+		options,
+	);
+};
+
 const routeConditionalWorkflowNode = async (
+	sandbox: Sandbox,
 	task: Task,
 	factory: FactoryWithRepositories,
 	workflow: Required<FloorWorkflow>,
 	routerNode: WorkflowNode,
+	options: {
+		agentSession?: AgentSession;
+		prompt?: string;
+	} = {},
 ) => {
 	const workflowInput = getWorkflowInput(task.workflowInput);
 	const conditions = routerNode.data?.conditions ?? [];
@@ -509,8 +1030,336 @@ const routeConditionalWorkflowNode = async (
 		return;
 	}
 
-	await continueWorkflowFromNode(task, factory, workflow, nextNode);
+	await continueWorkflowFromNode(
+		sandbox,
+		task,
+		factory,
+		workflow,
+		nextNode,
+		options,
+	);
 };
+
+const continueFromInstructionNode = async (
+	sandbox: Sandbox,
+	task: Task,
+	factory: FactoryWithRepositories,
+	workflow: Required<FloorWorkflow>,
+	instructionNode: WorkflowNode,
+	options: {
+		agentSession?: AgentSession;
+		prompt?: string;
+	} = {},
+) => {
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const prompt =
+		renderWorkflowTemplate(
+			instructionNode.data?.instruction ||
+				instructionNode.data?.prompt ||
+				"{{input.message}}",
+			workflowInput,
+		) || options.prompt;
+	const nextNode = findNextWorkflowNode(workflow, instructionNode.id);
+
+	await db.transact(
+		taskTx(task.id).update({
+			workflowState: "instruction_ready",
+			workflowNodeId: instructionNode.id,
+			workflowInput: {
+				...workflowInput,
+				prompt,
+			},
+		}),
+	);
+
+	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.instruction", {
+		taskId: task.id,
+		workflowNodeId: instructionNode.id,
+		agentSessionId: options.agentSession?.id,
+		prompt,
+	});
+
+	task.workflowInput = {
+		...workflowInput,
+		prompt,
+	};
+
+	if (!nextNode) {
+		return;
+	}
+
+	await continueWorkflowFromNode(sandbox, task, factory, workflow, nextNode, {
+		...options,
+		prompt,
+	});
+};
+
+const routeAgentDecisionNode = async (
+	_sandbox: Sandbox,
+	task: Task,
+	_factory: FactoryWithRepositories,
+	_workflow: Required<FloorWorkflow>,
+	decisionNode: WorkflowNode,
+	options: {
+		agentSession?: AgentSession;
+		prompt?: string;
+	} = {},
+) => {
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const optionIds = getDecisionOptionIds(decisionNode);
+
+	if (optionIds.length === 0 || !options.agentSession) {
+		await db.transact(
+			taskTx(task.id).update({
+				status: "idle",
+				workflowState: "decision_unmatched",
+				workflowNodeId: decisionNode.id,
+				workflowInput: {
+					...workflowInput,
+					decision: undefined,
+				},
+			}),
+		);
+
+		await persistFactoryplaneEvent(task.id, "factoryplane.workflow.decision", {
+			taskId: task.id,
+			workflowNodeId: decisionNode.id,
+			agentSessionId: options.agentSession?.id,
+			decision: undefined,
+			reason: options.agentSession
+				? "Decision block has no answer options."
+				: "Decision block has no originating agent session.",
+		});
+		return;
+	}
+
+	const pendingDecision = getPendingAgentDecision(workflowInput);
+
+	if (pendingDecision?.workflowNodeId === decisionNode.id) {
+		return;
+	}
+
+	const questionId = randomUUID();
+	const question =
+		decisionNode.data?.question ||
+		"Based on the previous agent response, choose the next workflow route.";
+	const pendingAgentDecision: PendingAgentDecision = {
+		questionId,
+		workflowNodeId: decisionNode.id,
+		agentSessionId: options.agentSession.id,
+		question,
+		options: decisionNode.data?.options ?? [],
+		askedAt: new Date().toISOString(),
+	};
+	const content = buildAgentDecisionQuestionPrompt(
+		pendingAgentDecision,
+		workflowInput,
+	);
+	const eventId = randomUUID();
+
+	await db.transact([
+		taskTx(task.id).update({
+			status: "in_progress",
+			workflowState: "decision_waiting_for_agent",
+			workflowNodeId: decisionNode.id,
+			workflowInput: {
+				...workflowInput,
+				pendingAgentDecision,
+				decision: undefined,
+			},
+		}),
+		eventTx(eventId)
+			.create({
+				type: "factoryplane.new_user_message",
+				data: {
+					taskId: task.id,
+					content,
+					workflow: {
+						state: "decision_waiting_for_agent",
+						input: workflowInput,
+						decisionNodeId: decisionNode.id,
+						questionId,
+					},
+				},
+				createdAt: new Date().toISOString(),
+			})
+			.link({ task: task.id, agentSession: options.agentSession.id }),
+	]);
+
+	await persistFactoryplaneEvent(
+		task.id,
+		"factoryplane.workflow.decision_question",
+		{
+			taskId: task.id,
+			workflowNodeId: decisionNode.id,
+			agentSessionId: options.agentSession.id,
+			questionId,
+			question,
+			options: pendingAgentDecision.options,
+		},
+	);
+};
+
+const getDecisionOptionIds = (decisionNode: WorkflowNode) =>
+	(decisionNode.data?.options ?? [])
+		.map((option) => option.id)
+		.filter((value) => value.trim().length > 0);
+
+const buildAgentDecisionQuestionPrompt = (
+	decision: PendingAgentDecision,
+	workflowInput: Record<string, unknown>,
+) => {
+	const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+
+	return [
+		"Answer this question for the workflow.",
+		"",
+		decision.question,
+		"",
+		`Question id: ${decision.questionId}`,
+		"",
+		"Answer options:",
+		...decision.options.map(
+			(option) => `- ${option.id}: ${option.label ?? option.id}`,
+		),
+		"",
+		"Choose exactly one answer option id. Then call this API with curl:",
+		"",
+		"```bash",
+		`curl -X POST ${apiUrl}/workflow-decisions/answers \\`,
+		'  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \\',
+		"  -H 'Content-Type: application/json' \\",
+		`  -d '{"questionId":"${decision.questionId}","answerId":"OPTION_ID","additionalInformation":"optional context"}'`,
+		"```",
+		"",
+		"Use `additionalInformation` for a short reason or any details needed by the next workflow step.",
+		"",
+		"Workflow input:",
+		JSON.stringify(workflowInput, null, 2),
+		"",
+		"After the curl call succeeds, briefly say which answer id you chose.",
+	].join("\n");
+};
+
+const buildYesNoClassifierPrompt = (
+	prompt: string,
+	workflowInput: Record<string, unknown>,
+) =>
+	[
+		"Classify the following workflow question.",
+		"",
+		prompt,
+		"",
+		"Return only JSON that matches the required schema.",
+		"Use answer `yes` when the condition is true. Use answer `no` when it is false.",
+		"Include a concise reason.",
+		"",
+		"Workflow input:",
+		JSON.stringify(workflowInput, null, 2),
+	].join("\n");
+
+const findAnsweredAgentDecisionNextNode = (
+	workflow: Required<FloorWorkflow>,
+	task: Task,
+) => {
+	if (!task.workflowNodeId) {
+		return undefined;
+	}
+
+	const decisionNode = workflow.nodes.find(
+		(node) => node.id === task.workflowNodeId,
+	);
+
+	if (decisionNode?.data?.blockType !== "agentDecision") {
+		return undefined;
+	}
+
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const decision = getWorkflowDecisionAnswer(workflowInput);
+
+	if (
+		decision?.workflowNodeId !== decisionNode.id ||
+		typeof decision.route !== "string"
+	) {
+		return undefined;
+	}
+
+	const edge = findWorkflowEdgeFromHandle(
+		workflow,
+		decisionNode.id,
+		decision.route,
+	);
+
+	if (!edge?.target) {
+		return undefined;
+	}
+
+	return workflow.nodes.find((node) => node.id === edge.target);
+};
+
+const getPendingAgentDecision = (
+	input: Record<string, unknown>,
+): PendingAgentDecision | undefined => {
+	const value = input.pendingAgentDecision;
+
+	if (!isRecord(value)) {
+		return undefined;
+	}
+
+	if (
+		typeof value.questionId !== "string" ||
+		typeof value.workflowNodeId !== "string" ||
+		typeof value.question !== "string" ||
+		!Array.isArray(value.options)
+	) {
+		return undefined;
+	}
+
+	return {
+		questionId: value.questionId,
+		workflowNodeId: value.workflowNodeId,
+		agentSessionId:
+			typeof value.agentSessionId === "string"
+				? value.agentSessionId
+				: undefined,
+		question: value.question,
+		options: value.options.filter(isDecisionOption),
+		askedAt:
+			typeof value.askedAt === "string"
+				? value.askedAt
+				: new Date().toISOString(),
+	};
+};
+
+const getWorkflowDecisionAnswer = (
+	input: Record<string, unknown>,
+): WorkflowDecisionAnswer | undefined => {
+	const value = input.decision;
+
+	if (!isRecord(value)) {
+		return undefined;
+	}
+
+	return {
+		questionId:
+			typeof value.questionId === "string" ? value.questionId : undefined,
+		workflowNodeId:
+			typeof value.workflowNodeId === "string"
+				? value.workflowNodeId
+				: undefined,
+		route: typeof value.route === "string" ? value.route : undefined,
+		answerId: typeof value.answerId === "string" ? value.answerId : undefined,
+		answerLabel:
+			typeof value.answerLabel === "string" ? value.answerLabel : undefined,
+		reason: typeof value.reason === "string" ? value.reason : undefined,
+		additionalInformation: value.additionalInformation,
+		answeredAt:
+			typeof value.answeredAt === "string" ? value.answeredAt : undefined,
+	};
+};
+
+const isDecisionOption = (value: unknown): value is DecisionOption =>
+	isRecord(value) && typeof value.id === "string";
 
 const findNextWorkflowNode = (
 	workflow: Required<FloorWorkflow>,
@@ -527,6 +1376,24 @@ const findNextWorkflowNode = (
 	}
 
 	return workflow.nodes.find((node) => node.id === edge.target);
+};
+
+const findHumanLoopWaitEdge = (
+	workflow: Required<FloorWorkflow>,
+	currentNodeId: string | undefined,
+) => {
+	if (!currentNodeId) {
+		return undefined;
+	}
+
+	return workflow.edges.find(
+		(currentEdge) =>
+			currentEdge.source === currentNodeId &&
+			(currentEdge.sourceHandle === undefined ||
+				currentEdge.sourceHandle === null ||
+				currentEdge.sourceHandle === "output") &&
+			currentEdge.targetHandle === HUMAN_LOOP_HANDLE_ID,
+	);
 };
 
 const findWorkflowEdgeFromHandle = (
@@ -1943,11 +2810,12 @@ const runAgentExec = async (
 	const workflowOutput = await prepareWorkflowOutputCapture(
 		sandbox,
 		task,
-		factory,
 		provider,
 	);
+	await prepareAgentAuthForRun(sandbox, task.id, agent);
 	const { envs, agentToken } = await setupRun(sandbox, task, agent, factory);
-	const output = createAgentOutputHandler(task.id, provider);
+	const agentSession = options.agentSession;
+	const output = createAgentOutputHandler(task.id, provider, agentSession?.id);
 	const command = await runSetupStep(
 		task.id,
 		provider === "cursor" ? "cursor_launch" : "codex_launch",
@@ -1963,7 +2831,6 @@ const runAgentExec = async (
 					),
 					imagePaths,
 					outputLastMessagePath: workflowOutput?.outputPath,
-					outputSchemaPath: workflowOutput?.schemaPath,
 				}),
 				{
 					background: true,
@@ -1978,6 +2845,12 @@ const runAgentExec = async (
 	);
 
 	await updateTaskAgentPid(task.id, command.pid);
+	if (agentSession) {
+		await updateAgentSessionRunState(agentSession.id, {
+			agentPid: command.pid,
+			status: "running",
+		});
+	}
 
 	let wasInterrupted = false;
 	let completed = false;
@@ -1988,10 +2861,18 @@ const runAgentExec = async (
 
 		if (!wasInterrupted) {
 			await updateTaskStatus(task.id, "idle");
+			if (agentSession) {
+				await updateAgentSessionRunState(agentSession.id, {
+					agentPid: undefined,
+					status: "idle",
+				});
+			}
 			completed = true;
 		}
 	} catch (error) {
-		const currentPid = await getTaskAgentPid(task.id);
+		const currentPid = agentSession
+			? await getAgentSessionPid(agentSession.id)
+			: await getTaskAgentPid(task.id);
 
 		if (currentPid !== command.pid) {
 			console.log("Agent process was interrupted", {
@@ -2015,6 +2896,9 @@ const runAgentExec = async (
 			});
 		}
 		await clearTaskAgentPid(task.id, command.pid);
+		if (agentSession) {
+			await clearAgentSessionPid(agentSession.id, command.pid);
+		}
 		await postRun(task.id, agentToken);
 		if (provider === "codex") {
 			await syncAgentAuthFromSandbox(sandbox, agent.id);
@@ -2027,71 +2911,185 @@ const runAgentExec = async (
 			task,
 			workflowOutput.outputPath,
 			workflowOutput.nodeId,
+			agentSession?.id,
 		);
 	}
 
 	return completed;
 };
 
-const prepareWorkflowOutputCapture = async (
+const runYesNoClassifier = async (
 	sandbox: Sandbox,
 	task: Task,
+	agent: Agent,
 	factory: Factory,
-	provider: AgentProvider,
-) => {
-	if (provider !== "codex" || !task.workflowNodeId) {
+	prompt: string,
+	workflowNodeId: string,
+): Promise<{ answer: "yes" | "no"; reason?: string } | undefined> => {
+	const agentDefaults = getAgentDefaultOptions(agent.settings);
+	const taskForClassifier = {
+		...task,
+		agentModel: agentDefaults.agentModel,
+		agentReasoningEffort: agentDefaults.agentReasoningEffort,
+		agentSpeed: agentDefaults.agentSpeed,
+		workflowNodeId,
+	};
+	const runId = randomUUID();
+	const outputPath = `${WORKFLOW_OUTPUT_DIR}/${task.id}-${runId}-classifier.json`;
+	const outputSchemaPath = `${WORKFLOW_OUTPUT_DIR}/${task.id}-${runId}-classifier-schema.json`;
+
+	await db.transact(
+		taskTx(task.id)
+			.update({
+				status: "in_progress",
+				agentModel: agentDefaults.agentModel,
+				agentReasoningEffort: agentDefaults.agentReasoningEffort,
+				agentSpeed: agentDefaults.agentSpeed,
+				workflowState: "classifier_running",
+				workflowNodeId,
+			})
+			.link({ agent: agent.id }),
+	);
+
+	await prepareAgentAuthForRun(sandbox, task.id, agent);
+	await runSetupStep(
+		task.id,
+		"classifier_output_schema",
+		"Prepare classifier output schema",
+		async () => {
+			await sandbox.commands.run(
+				`mkdir -p ${shellQuote(WORKFLOW_OUTPUT_DIR)}`,
+				{
+					timeoutMs: 30_000,
+				},
+			);
+			await sandbox.files.write(
+				outputSchemaPath,
+				JSON.stringify(YES_NO_CLASSIFIER_OUTPUT_SCHEMA, null, 2),
+			);
+		},
+		{ timeoutMs: 30_000 },
+	);
+
+	const { envs, agentToken } = await setupRun(
+		sandbox,
+		taskForClassifier,
+		agent,
+		factory,
+	);
+	const output = createAgentOutputHandler(task.id, "codex", undefined);
+
+	try {
+		const result = await runSetupStep(
+			task.id,
+			"yes_no_classifier",
+			"Run yes/no classifier",
+			() =>
+				sandbox.commands.run(
+					buildCodexExecCommand(taskForClassifier, prompt, {
+						ephemeral: true,
+						outputLastMessagePath: outputPath,
+						outputSchemaPath,
+					}),
+					{
+						timeoutMs: 10 * 60 * 1000,
+						envs,
+						onStdout: output.append,
+						onStderr: (data) => {
+							console.error(data);
+						},
+					},
+				),
+			{ timeoutMs: 11 * 60 * 1000 },
+		);
+		console.log(result);
+	} finally {
+		await output.flush();
+		await postRun(task.id, agentToken);
+		await syncAgentAuthFromSandbox(sandbox, agent.id);
+	}
+
+	const rawOutput = await sandbox.files.read(outputPath).catch(() => undefined);
+	const parsed = parseWorkflowStructuredOutput(rawOutput);
+
+	if (!isRecord(parsed)) {
 		return undefined;
 	}
 
-	const workflow = parseFloorWorkflow(factory.floorWorkflow);
-	const workflowNode = workflow.nodes.find(
-		(node) => node.id === task.workflowNodeId,
-	);
-	const responseSchema = getValidResponseSchema(
-		workflowNode?.data?.responseSchema,
-	);
+	const answer = parsed.answer;
 
-	if (!responseSchema) {
+	if (answer !== "yes" && answer !== "no") {
+		return undefined;
+	}
+
+	return {
+		answer,
+		reason: typeof parsed.reason === "string" ? parsed.reason : undefined,
+	};
+};
+
+const YES_NO_CLASSIFIER_OUTPUT_SCHEMA = {
+	type: "object",
+	additionalProperties: false,
+	required: ["answer"],
+	properties: {
+		answer: {
+			type: "string",
+			enum: ["yes", "no"],
+		},
+		reason: {
+			type: "string",
+		},
+	},
+};
+
+const prepareAgentAuthForRun = async (
+	sandbox: Sandbox,
+	taskId: string,
+	agent: Agent,
+) => {
+	if (getAgentProvider(agent) !== "codex") {
+		return;
+	}
+
+	if (!agent.auth) {
+		throw new Error(`Codex agent ${agent.id} is missing auth`);
+	}
+
+	await runSetupStep(taskId, "codex_auth", "Write Codex auth", () =>
+		sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth)),
+	);
+};
+
+const prepareWorkflowOutputCapture = async (
+	sandbox: Sandbox,
+	task: Task,
+	provider: AgentProvider,
+) => {
+	if (provider !== "codex") {
 		return undefined;
 	}
 
 	const runId = randomUUID();
-	const schemaPath = `${WORKFLOW_OUTPUT_SCHEMA_DIR}/${task.id}-${runId}.schema.json`;
 	const outputPath = `${WORKFLOW_OUTPUT_DIR}/${task.id}-${runId}.json`;
 
 	await runSetupStep(
 		task.id,
-		"workflow_output_schema",
-		"Prepare workflow output schema",
+		"workflow_output_capture",
+		"Prepare workflow output capture",
 		async () => {
 			await sandbox.commands.run(
-				`mkdir -p ${shellQuote(WORKFLOW_OUTPUT_SCHEMA_DIR)} ${shellQuote(WORKFLOW_OUTPUT_DIR)}`,
+				`mkdir -p ${shellQuote(WORKFLOW_OUTPUT_DIR)}`,
 				{ timeoutMs: 30_000 },
 			);
-			await sandbox.files.write(schemaPath, responseSchema);
 		},
 		{ timeoutMs: 30_000 },
 	);
 
 	return {
-		nodeId: workflowNode?.id,
+		nodeId: task.workflowNodeId,
 		outputPath,
-		schemaPath,
 	};
-};
-
-const getValidResponseSchema = (responseSchema: string | undefined) => {
-	const trimmed = responseSchema?.trim();
-
-	if (!trimmed || trimmed === "{}") {
-		return undefined;
-	}
-
-	try {
-		return `${JSON.stringify(JSON.parse(trimmed), null, 2)}\n`;
-	} catch {
-		return undefined;
-	}
 };
 
 const persistWorkflowStructuredOutput = async (
@@ -2099,19 +3097,27 @@ const persistWorkflowStructuredOutput = async (
 	task: Task,
 	outputPath: string,
 	workflowNodeId: string | undefined,
+	agentSessionId: string | undefined,
 ) => {
 	const rawOutput = await sandbox.files.read(outputPath).catch(() => undefined);
-	const structuredOutput = parseWorkflowStructuredOutput(rawOutput);
+	const finalMessage = rawOutput?.trim();
 
-	if (!structuredOutput) {
+	if (!finalMessage) {
 		return;
 	}
 
-	const currentInput = getWorkflowInput(task.workflowInput);
+	const latestTask = await getLatestWorkflowTask(task.id).catch(
+		() => undefined,
+	);
+	const currentInput = getWorkflowInput(
+		latestTask?.workflowInput ?? task.workflowInput,
+	);
+	const structuredOutput = parseWorkflowStructuredOutput(finalMessage);
 	const workflowInput = {
 		...currentInput,
 		...(isRecord(structuredOutput) ? structuredOutput : {}),
-		output: structuredOutput,
+		lastMessage: finalMessage,
+		...(structuredOutput !== undefined ? { output: structuredOutput } : {}),
 	};
 
 	await db.transact(
@@ -2123,7 +3129,9 @@ const persistWorkflowStructuredOutput = async (
 	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.output", {
 		taskId: task.id,
 		workflowNodeId,
+		agentSessionId,
 		output: structuredOutput,
+		lastMessage: finalMessage,
 	});
 
 	task.workflowInput = workflowInput;
@@ -2459,6 +3467,10 @@ const buildCodexExecCommand = (
 		(imagePath) => `--image ${shellQuote(imagePath)}`,
 	);
 
+	if (options.ephemeral) {
+		args.push("--ephemeral");
+	}
+
 	if (options.outputSchemaPath) {
 		args.push(`--output-schema ${shellQuote(options.outputSchemaPath)}`);
 	}
@@ -2470,7 +3482,11 @@ const buildCodexExecCommand = (
 	}
 
 	if (options.resumeLast) {
-		args.push("resume --last");
+		args.push(
+			options.agentSession?.agentThreadId
+				? `resume ${shellQuote(options.agentSession.agentThreadId)}`
+				: "resume --last",
+		);
 		args.push(...imageArgs);
 	} else {
 		args.push(
@@ -2516,27 +3532,41 @@ const getTaskAgentReasoningEffort = (task: Task) => {
 	return isValid ? effort : DEFAULT_CODEX_REASONING_EFFORT;
 };
 
-const killTaskAgentProcess = async (sandbox: Sandbox, task: Task) => {
-	if (typeof task.agentPid !== "number") {
+const killTaskAgentProcess = async (
+	sandbox: Sandbox,
+	task: Task,
+	agentSession: AgentSession | undefined,
+) => {
+	const agentPid =
+		typeof agentSession?.agentPid === "number"
+			? agentSession.agentPid
+			: task.agentPid;
+
+	if (typeof agentPid !== "number") {
 		return;
 	}
 
 	try {
-		const killed = await sandbox.commands.kill(task.agentPid);
+		const killed = await sandbox.commands.kill(agentPid);
 		console.log("Killed previous agent process", {
 			taskId: task.id,
-			pid: task.agentPid,
+			agentSessionId: agentSession?.id,
+			pid: agentPid,
 			killed,
 		});
 	} catch (error) {
 		console.log("Failed to kill previous agent process", {
 			taskId: task.id,
-			pid: task.agentPid,
+			agentSessionId: agentSession?.id,
+			pid: agentPid,
 			error,
 		});
 	}
 
-	await clearTaskAgentPid(task.id, task.agentPid);
+	await clearTaskAgentPid(task.id, agentPid);
+	if (agentSession) {
+		await clearAgentSessionPid(agentSession.id, agentPid);
+	}
 };
 
 const updateTaskAgentPid = async (taskId: string, agentPid: number) => {
@@ -2577,6 +3607,57 @@ const getTaskAgentPid = async (taskId: string) => {
 	return currentTask?.agentPid;
 };
 
+const updateAgentSessionRunState = async (
+	agentSessionId: string,
+	state: {
+		agentPid?: number;
+		status: string;
+	},
+) => {
+	await db.transact(
+		agentSessionTx(agentSessionId).update({
+			agentPid: state.agentPid,
+			status: state.status,
+			updatedAt: new Date().toISOString(),
+		}),
+	);
+};
+
+const clearAgentSessionPid = async (
+	agentSessionId: string,
+	agentPid: number,
+) => {
+	const currentPid = await getAgentSessionPid(agentSessionId);
+
+	if (currentPid !== agentPid) {
+		return;
+	}
+
+	await db.transact(
+		agentSessionTx(agentSessionId).update({
+			agentPid: undefined,
+			status: "idle",
+			updatedAt: new Date().toISOString(),
+		}),
+	);
+};
+
+const getAgentSessionPid = async (agentSessionId: string) => {
+	const currentSession = await db
+		.query({
+			agentSessions: {
+				$: {
+					where: {
+						id: agentSessionId,
+					},
+				},
+			},
+		})
+		.then((result) => result.agentSessions[0]);
+
+	return currentSession?.agentPid;
+};
+
 const clearTaskAgentToken = async (taskId: string, agentToken: string) => {
 	const currentToken = await getTaskAgentToken(taskId);
 
@@ -2607,7 +3688,11 @@ const getTaskAgentToken = async (taskId: string) => {
 	return currentTask?.agentToken;
 };
 
-const createAgentOutputHandler = (taskId: string, provider: AgentProvider) => {
+const createAgentOutputHandler = (
+	taskId: string,
+	provider: AgentProvider,
+	agentSessionId: string | undefined,
+) => {
 	let buffer = "";
 
 	const append = async (chunk: string) => {
@@ -2616,7 +3701,11 @@ const createAgentOutputHandler = (taskId: string, provider: AgentProvider) => {
 		const lines = buffer.split(/\r?\n/);
 		buffer = lines.pop() ?? "";
 
-		await persistCodexEvents(taskId, parseAgentLines(lines, provider));
+		await persistCodexEvents(
+			taskId,
+			parseAgentLines(lines, provider),
+			agentSessionId,
+		);
 	};
 
 	const flush = async () => {
@@ -2628,7 +3717,7 @@ const createAgentOutputHandler = (taskId: string, provider: AgentProvider) => {
 		}
 
 		const events = parseAgentLines([finalLine], provider);
-		await persistCodexEvents(taskId, events);
+		await persistCodexEvents(taskId, events, agentSessionId);
 	};
 
 	return { append, flush };
@@ -2685,7 +3774,11 @@ const parseAgentEvent = (line: string, provider: AgentProvider): CodexEvent => {
 	}
 };
 
-const persistCodexEvents = async (taskId: string, events: CodexEvent[]) => {
+const persistCodexEvents = async (
+	taskId: string,
+	events: CodexEvent[],
+	agentSessionId: string | undefined,
+) => {
 	if (events.length === 0) {
 		return;
 	}
@@ -2698,15 +3791,51 @@ const persistCodexEvents = async (taskId: string, events: CodexEvent[]) => {
 				throw new Error("Failed to create InstantDB event transaction");
 			}
 
-			return eventTx
+			const transaction = eventTx
 				.create({
 					type: event.type,
 					data: event.data,
 					createdAt: new Date().toISOString(),
 				})
-				.link({ task: taskId });
+				.link(
+					agentSessionId
+						? { task: taskId, agentSession: agentSessionId }
+						: { task: taskId },
+				);
+
+			return transaction;
 		}),
 	);
+
+	if (agentSessionId) {
+		const threadId = events
+			.map((event) => getAgentThreadId(event.data))
+			.find((value): value is string => Boolean(value));
+
+		if (threadId) {
+			await db.transact([
+				agentSessionTx(agentSessionId).update({
+					agentThreadId: threadId,
+					updatedAt: new Date().toISOString(),
+				}),
+				taskTx(taskId).update({
+					agentThreadId: threadId,
+				}),
+			]);
+		}
+	}
+};
+
+const getAgentThreadId = (data: unknown) => {
+	if (!isRecord(data)) {
+		return undefined;
+	}
+
+	const threadId = data.thread_id ?? data.threadId;
+
+	return typeof threadId === "string" && threadId.length > 0
+		? threadId
+		: undefined;
 };
 
 const runSetupStep = async <T>(
@@ -2813,6 +3942,9 @@ const persistFactoryplaneEvent = async (
 	type: string,
 	data: Record<string, unknown>,
 ) => {
+	const agentSessionId =
+		typeof data.agentSessionId === "string" ? data.agentSessionId : undefined;
+
 	await db.transact(
 		eventTx(randomUUID())
 			.create({
@@ -2820,7 +3952,11 @@ const persistFactoryplaneEvent = async (
 				data,
 				createdAt: new Date().toISOString(),
 			})
-			.link({ task: taskId }),
+			.link(
+				agentSessionId
+					? { task: taskId, agentSession: agentSessionId }
+					: { task: taskId },
+			),
 	);
 };
 

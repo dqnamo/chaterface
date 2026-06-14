@@ -55,6 +55,18 @@ const eventTx = (eventId: string) => {
 	return tx;
 };
 
+const agentSessionTx = (agentSessionId: string) => {
+	const tx = db.tx.agentSessions[agentSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Agent session transaction builder ${agentSessionId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 export async function POST(req: NextRequest) {
 	const body = parseCreateTaskBody(await readJson(req));
 
@@ -88,6 +100,7 @@ export async function POST(req: NextRequest) {
 	}
 
 	const taskId = body.taskId ?? id();
+	const agentSessionId = id();
 	const eventId = id();
 	const createdAt = new Date().toISOString();
 	const name = await generateTaskName(body.instructions);
@@ -104,6 +117,14 @@ export async function POST(req: NextRequest) {
 				agentSpeed: body.agentSpeed,
 			})
 			.link({ factory: authResult.factory.id, agent: agent.id }),
+		agentSessionTx(agentSessionId)
+			.create({
+				name: "Agent",
+				status: "idle",
+				createdAt,
+				updatedAt: createdAt,
+			})
+			.link({ task: taskId, agent: agent.id }),
 		eventTx(eventId)
 			.create({
 				type: "factoryplane.new_task",
@@ -116,7 +137,7 @@ export async function POST(req: NextRequest) {
 				},
 				createdAt,
 			})
-			.link({ task: taskId }),
+			.link({ task: taskId, agentSession: agentSessionId }),
 	]);
 
 	return NextResponse.json(
@@ -124,6 +145,7 @@ export async function POST(req: NextRequest) {
 			taskId,
 			factoryId: authResult.factory.id,
 			agentId: agent.id,
+			agentSessionId,
 			name,
 			status: "in_progress",
 		},

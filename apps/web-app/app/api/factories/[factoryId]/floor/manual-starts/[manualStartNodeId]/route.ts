@@ -15,7 +15,9 @@ type WorkflowNode = {
 		blockType?: string;
 		label?: string;
 		prompt?: string;
+		instruction?: string;
 		agentId?: string;
+		sessionKey?: string;
 	};
 };
 
@@ -67,6 +69,18 @@ const eventTx = (eventId: string) => {
 	return tx;
 };
 
+const agentSessionTx = (agentSessionId: string) => {
+	const tx = db.tx.agentSessions[agentSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Agent session transaction builder ${agentSessionId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 export async function POST(req: NextRequest, context: RouteContext) {
 	const { factoryId, manualStartNodeId } = await context.params;
 	const body = await readJson(req);
@@ -89,30 +103,44 @@ export async function POST(req: NextRequest, context: RouteContext) {
 		);
 	}
 
-	const manualStartNode = authResult.factory.floorWorkflow?.nodes?.find(
+	const workflow =
+		parseWorkflow(body.workflow) ?? authResult.factory.floorWorkflow;
+	const startNode = workflow?.nodes?.find(
 		(node) =>
-			node.id === manualStartNodeId && node.data?.blockType === "manualStart",
+			node.id === manualStartNodeId &&
+			(node.data?.blockType === "instruction" ||
+				node.data?.blockType === "manualStart"),
 	);
 
-	if (!manualStartNode) {
+	if (!startNode) {
 		return NextResponse.json(
-			{ message: "Manual start block not found" },
+			{ message: "Workflow start block not found" },
 			{ status: 404 },
 		);
 	}
 
-	const agentRunNode = findNextAgentRunNode(
-		authResult.factory.floorWorkflow,
+	const images = Array.isArray(body.images) ? body.images : [];
+	const workflowInput = {
+		...input,
+		message,
+		images,
+		workflowSnapshot: workflow,
+	};
+	const start = findNextAgentRunStart(
+		workflow,
 		manualStartNodeId,
+		workflowInput,
+		startNode,
 	);
 
-	if (!agentRunNode) {
+	if (!start) {
 		return NextResponse.json(
-			{ message: "Connect this Manual Start block to an Agent Run block." },
+			{ message: "Connect this Instruction block to an Agent Session block." },
 			{ status: 409 },
 		);
 	}
 
+	const { agentRunNode, prompt } = start;
 	const requestedAgentId = getOptionalString(agentRunNode.data?.agentId);
 	const agent = resolveAgent(authResult.factory, requestedAgentId);
 
@@ -128,23 +156,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	}
 
 	const taskId = getOptionalString(body.taskId) ?? id();
+	const agentSessionId = id();
 	const manualStartedEventId = id();
 	const newTaskEventId = id();
 	const createdAt = new Date().toISOString();
-	const name = `${manualStartNode.data?.label || "Manual workflow"} started`;
-	const images = Array.isArray(body.images) ? body.images : [];
-	const workflowInput = {
-		...input,
-		message,
-		images,
-	};
-	const renderedPrompt = renderWorkflowTemplate(
-		agentRunNode.data?.prompt || "Use the workflow input:\n\n{{input.message}}",
-		workflowInput,
-	);
+	const name = `${startNode.data?.label || "Workflow"} started`;
 	const instructions =
-		renderedPrompt || buildManualStartFallbackInstructions(message, images);
+		prompt || buildManualStartFallbackInstructions(message, images);
 	const agentDefaults = getAgentDefaultOptions(agent.settings);
+	const workflowSessionKey = getWorkflowSessionKey(agentRunNode);
 
 	await db.transact([
 		taskTx(taskId)
@@ -161,21 +181,32 @@ export async function POST(req: NextRequest, context: RouteContext) {
 				workflowNodeId: agentRunNode.id,
 			})
 			.link({ factory: authResult.factory.id, agent: agent.id }),
+		agentSessionTx(agentSessionId)
+			.create({
+				name: getAgentSessionName(workflowSessionKey),
+				status: "idle",
+				createdAt,
+				updatedAt: createdAt,
+				workflowNodeId: agentRunNode.id,
+				workflowSessionKey,
+			})
+			.link({ task: taskId, agent: agent.id }),
 		eventTx(manualStartedEventId)
 			.create({
 				type: "factoryplane.workflow.manual_started",
 				data: {
 					factoryId: authResult.factory.id,
 					taskId,
-					manualStartNodeId,
+					startNodeId: manualStartNodeId,
 					agentRunNodeId: agentRunNode.id,
 					agentId: agent.id,
+					sessionKey: workflowSessionKey,
 					input: workflowInput,
 					images,
 				},
 				createdAt,
 			})
-			.link({ task: taskId }),
+			.link({ task: taskId, agentSession: agentSessionId }),
 		eventTx(newTaskEventId)
 			.create({
 				type: "factoryplane.new_task",
@@ -187,13 +218,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
 					workflow: {
 						state: "agent_running",
 						input: workflowInput,
-						manualStartNodeId,
+						startNodeId: manualStartNodeId,
 						agentRunNodeId: agentRunNode.id,
+						sessionKey: workflowSessionKey,
 					},
 				},
 				createdAt,
 			})
-			.link({ task: taskId }),
+			.link({ task: taskId, agentSession: agentSessionId }),
 	]);
 
 	return NextResponse.json(
@@ -201,6 +233,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 			taskId,
 			factoryId: authResult.factory.id,
 			agentId: agent.id,
+			agentSessionId,
 			workflowState: "agent_running",
 		},
 		{ status: 201 },
@@ -268,30 +301,111 @@ const authenticateFactoryRequest = async (
 	return { ok: true as const, factory };
 };
 
-const findNextAgentRunNode = (
+const getWorkflowSessionKey = (agentRunNode: WorkflowNode) =>
+	getOptionalString(agentRunNode.data?.sessionKey) ?? agentRunNode.id;
+
+const getAgentSessionName = (sessionKey: string) =>
+	`Agent conversation ${sessionKey}`;
+
+const findNextAgentRunStart = (
 	workflow: AuthenticatedFactory["floorWorkflow"],
 	manualStartNodeId: string,
+	input: Record<string, unknown>,
+	startNode: WorkflowNode,
 ) => {
 	const nodes = workflow?.nodes ?? [];
-	const edge = (workflow?.edges ?? []).find(
+	let currentNodeId = manualStartNodeId;
+	let prompt =
+		startNode.data?.blockType === "instruction"
+			? renderWorkflowTemplate(
+					startNode.data.instruction ||
+						startNode.data.prompt ||
+						"Use the workflow input:\n\n{{input.message}}",
+					input,
+				)
+			: undefined;
+	const visitedNodeIds = new Set<string>();
+
+	while (!visitedNodeIds.has(currentNodeId)) {
+		visitedNodeIds.add(currentNodeId);
+		const edge = findWorkflowEdgeFromHandle(workflow, currentNodeId, "output");
+
+		if (!edge?.target) {
+			return undefined;
+		}
+
+		const node = nodes.find((current) => current.id === edge.target);
+
+		if (!node) {
+			return undefined;
+		}
+
+		if (node.data?.blockType === "instruction") {
+			prompt =
+				renderWorkflowTemplate(
+					node.data.instruction ||
+						node.data.prompt ||
+						"Use the workflow input:\n\n{{input.message}}",
+					input,
+				) || prompt;
+			currentNodeId = node.id;
+			continue;
+		}
+
+		if (node.data?.blockType === "agentRun") {
+			return {
+				agentRunNode: node,
+				prompt:
+					prompt ||
+					renderWorkflowTemplate(
+						node.data.prompt || "Use the workflow input:\n\n{{input.message}}",
+						input,
+					),
+			};
+		}
+
+		return undefined;
+	}
+
+	return undefined;
+};
+
+const findWorkflowEdgeFromHandle = (
+	workflow: AuthenticatedFactory["floorWorkflow"],
+	sourceNodeId: string,
+	sourceHandle: string,
+) =>
+	(workflow?.edges ?? []).find(
 		(currentEdge) =>
-			currentEdge.source === manualStartNodeId &&
+			currentEdge.source === sourceNodeId &&
 			(currentEdge.sourceHandle === undefined ||
 				currentEdge.sourceHandle === null ||
-				currentEdge.sourceHandle === "output") &&
+				currentEdge.sourceHandle === sourceHandle) &&
 			(currentEdge.targetHandle === undefined ||
 				currentEdge.targetHandle === null ||
 				currentEdge.targetHandle === "input"),
 	);
 
-	if (!edge?.target) {
+const parseWorkflow = (
+	value: unknown,
+): AuthenticatedFactory["floorWorkflow"] => {
+	if (!isRecord(value)) {
 		return undefined;
 	}
 
-	return nodes.find(
-		(node) => node.id === edge.target && node.data?.blockType === "agentRun",
-	);
+	return {
+		nodes: Array.isArray(value.nodes) ? value.nodes.filter(isWorkflowNode) : [],
+		edges: Array.isArray(value.edges) ? value.edges.filter(isWorkflowEdge) : [],
+	};
 };
+
+const isWorkflowNode = (value: unknown): value is WorkflowNode =>
+	isRecord(value) && typeof value.id === "string";
+
+const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
+	isRecord(value) &&
+	(typeof value.source === "string" || value.source === undefined) &&
+	(typeof value.target === "string" || value.target === undefined);
 
 const resolveAgent = (
 	factory: AuthenticatedFactory,

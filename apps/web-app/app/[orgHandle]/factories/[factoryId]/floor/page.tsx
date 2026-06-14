@@ -16,7 +16,6 @@ import {
 	WebhooksLogoIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
-import db from "@/instant.client";
 import {
 	addEdge,
 	Background,
@@ -63,12 +62,16 @@ import { ExpandSidebarButton } from "@/components/SidebarContext";
 import TaskStatusDots from "@/components/TaskStatusDots";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
+import db from "@/instant.client";
 import type { AppSchema } from "@/instant.schema";
 
 type WorkflowBlockType =
 	| "manualStart"
 	| "webhook"
+	| "instruction"
 	| "agentRun"
+	| "agentDecision"
+	| "yesNoClassifier"
 	| "httpRequest"
 	| "conditionalRouter"
 	| "completeTask";
@@ -81,6 +84,11 @@ type RouterCondition = {
 	expression: string;
 };
 
+type DecisionOption = {
+	id: string;
+	label: string;
+};
+
 type WorkflowNodeData = {
 	blockType: WorkflowBlockType;
 	label: string;
@@ -88,7 +96,10 @@ type WorkflowNodeData = {
 	webhookSecret?: string;
 	prompt?: string;
 	agentId?: string;
-	responseSchema?: string;
+	sessionKey?: string;
+	instruction?: string;
+	question?: string;
+	options?: DecisionOption[];
 	httpMethod?: string;
 	httpUrl?: string;
 	httpHeaders?: string;
@@ -119,24 +130,9 @@ type FloorWorkflow = {
 	edges: WorkflowEdge[];
 };
 
-type FloorChangeProposal = InstaQLEntity<AppSchema, "floorChangeProposals"> & {
-	task?: {
-		id: string;
-		name?: string;
-	};
-};
 type Agent = InstaQLEntity<AppSchema, "agents">;
 type FactoryWebhook = InstaQLEntity<AppSchema, "webhooks">;
 type WorkflowTask = InstaQLEntity<AppSchema, "tasks">;
-
-type ProposalActionState = {
-	proposalId: string;
-	action: "accept" | "reject";
-};
-
-type ProposalSaveResult = {
-	proposalId: string;
-};
 
 const workflowEdgePathOptions = {
 	borderRadius: 28,
@@ -165,19 +161,29 @@ const blockOptions: Array<{
 	description: string;
 }> = [
 	{
-		type: "manualStart",
-		label: "Manual Start",
-		description: "Start a workflow by typing input and adding files.",
-	},
-	{
 		type: "webhook",
 		label: "Webhook",
 		description: "Entry point with URL and secret.",
 	},
 	{
 		type: "agentRun",
-		label: "Agent Run",
-		description: "Prompt, template input, optional JSON schema.",
+		label: "Agent Step",
+		description: "Runs one turn in an agent conversation.",
+	},
+	{
+		type: "instruction",
+		label: "Instruction",
+		description: "Formats the next prompt before an agent session.",
+	},
+	{
+		type: "agentDecision",
+		label: "Agent Decision",
+		description: "Asks an agent to choose one route.",
+	},
+	{
+		type: "yesNoClassifier",
+		label: "Yes/No Classifier",
+		description: "Runs Codex once and routes by answer.",
 	},
 	{
 		type: "httpRequest",
@@ -198,12 +204,13 @@ const blockOptions: Array<{
 
 const defaultWorkflow = (): FloorWorkflow => {
 	const webhookNodeId = id();
+	const instructionId = id();
 	const agentId = id();
 	const completeId = id();
 
 	return {
 		nodes: [
-			createWorkflowNode("manualStart", { x: 80, y: 280 }),
+			createWorkflowNode("instruction", { x: 80, y: 280 }, instructionId),
 			createWorkflowNode("webhook", { x: 80, y: 120 }, webhookNodeId),
 			createWorkflowNode("agentRun", { x: 420, y: 120 }, agentId),
 			createWorkflowNode("completeTask", { x: 760, y: 120 }, completeId),
@@ -215,6 +222,16 @@ const defaultWorkflow = (): FloorWorkflow => {
 				animated: true,
 				pathOptions: workflowEdgePathOptions,
 				source: webhookNodeId,
+				sourceHandle: "output",
+				target: agentId,
+				targetHandle: "input",
+			},
+			{
+				id: id(),
+				type: "smoothstep",
+				animated: true,
+				pathOptions: workflowEdgePathOptions,
+				source: instructionId,
 				sourceHandle: "output",
 				target: agentId,
 				targetHandle: "input",
@@ -261,9 +278,33 @@ const getDefaultNodeData = (blockType: WorkflowBlockType): WorkflowNodeData => {
 		case "agentRun":
 			return {
 				blockType,
-				label: "Agent Run",
+				label: "Agent Step",
 				prompt: "Use the workflow input:\n\n{{input.message}}",
-				responseSchema: '{\n  "type": "object",\n  "properties": {}\n}',
+				sessionKey: "main",
+			};
+		case "instruction":
+			return {
+				blockType,
+				label: "Instruction",
+				instruction: "Use the workflow input:\n\n{{input.message}}",
+			};
+		case "agentDecision":
+			return {
+				blockType,
+				label: "Agent Decision",
+				question:
+					"Did the previous response ask for human clarification, or can the workflow continue?",
+				options: [
+					{ id: "continue", label: "Continue" },
+					{ id: "needs_human", label: "Needs human" },
+				],
+			};
+		case "yesNoClassifier":
+			return {
+				blockType,
+				label: "Yes/No Classifier",
+				prompt:
+					"Should this workflow continue without asking a human?\n\nWorkflow input:\n{{input}}",
 			};
 		case "httpRequest":
 			return {
@@ -303,7 +344,10 @@ const createSecret = () =>
 const nodeTypes = {
 	manualStart: WorkflowCard,
 	webhook: WorkflowCard,
+	instruction: WorkflowCard,
 	agentRun: WorkflowCard,
+	agentDecision: WorkflowCard,
+	yesNoClassifier: WorkflowCard,
 	httpRequest: WorkflowCard,
 	conditionalRouter: WorkflowCard,
 	completeTask: WorkflowCard,
@@ -314,18 +358,6 @@ const factoryTx = (factoryId: string) => {
 
 	if (!tx) {
 		throw new Error(`Factory transaction builder ${factoryId} not found`);
-	}
-
-	return tx;
-};
-
-const floorChangeProposalTx = (proposalId: string) => {
-	const tx = db.tx.floorChangeProposals[proposalId];
-
-	if (!tx) {
-		throw new Error(
-			`Floor change proposal transaction builder ${proposalId} not found`,
-		);
 	}
 
 	return tx;
@@ -360,23 +392,15 @@ function FactoryFloorEditor() {
 	>();
 	const [selectedNodeId, setSelectedNodeId] = useState<string>();
 	const [isAddBlockOpen, setIsAddBlockOpen] = useState(false);
-	const [isProposalDropdownOpen, setIsProposalDropdownOpen] = useState(false);
-	const [previewedProposalId, setPreviewedProposalId] = useState<string>();
 	const [inspectorSize, setInspectorSize] = useState(DEFAULT_INSPECTOR_SIZE);
 	const [hasHydratedWorkflow, setHasHydratedWorkflow] = useState(false);
 	const [unsavedChanges, setUnsavedChanges] = useState(0);
-	const [savedWorkflow, setSavedWorkflow] = useState<FloorWorkflow>();
-	const [draftSaveVersion, setDraftSaveVersion] = useState(0);
-	const [layoutSaveVersion, setLayoutSaveVersion] = useState(0);
-	const [proposalAction, setProposalAction] = useState<ProposalActionState>();
-	const [proposalError, setProposalError] = useState<string>();
+	const [isSavingWorkflow, setIsSavingWorkflow] = useState(false);
+	const [saveError, setSaveError] = useState<string>();
 	const latestWorkflowRef = useRef<FloorWorkflow>({ nodes: [], edges: [] });
-	const savedWorkflowRef = useRef<FloorWorkflow | undefined>(undefined);
+	const floorWorkflowSyncKeyRef = useRef<string | undefined>(undefined);
 	const unsavedChangeKeysRef = useRef(new Set<string>());
 	const syncedWebhookIdsRef = useRef(new Set<string>());
-	const draftProposalIdRef = useRef<string | undefined>(undefined);
-	const draftProposalCreatedRef = useRef(false);
-	const draftSaveVersionRef = useRef(0);
 	const addBlockScreenPositionRef = useRef<
 		{ x: number; y: number } | undefined
 	>(undefined);
@@ -398,9 +422,6 @@ function FactoryFloorEditor() {
 					id: currentFactoryId,
 				},
 			},
-			floorChangeProposals: {
-				task: {},
-			},
 			webhooks: {},
 		},
 		tasks: {
@@ -412,6 +433,13 @@ function FactoryFloorEditor() {
 		},
 	});
 	const factory = data?.factories?.[0];
+	const floorWorkflowSyncKey = useMemo(
+		() =>
+			factory
+				? `${factory.id}:${JSON.stringify(factory.floorWorkflow ?? null)}`
+				: undefined,
+		[factory],
+	);
 	const agents = (data?.organisations?.[0]?.agents ?? []) as Agent[];
 	const workflowTasks = useMemo(
 		() =>
@@ -441,13 +469,6 @@ function FactoryFloorEditor() {
 		[factory?.webhooks],
 	);
 	const selectedNode = nodes.find((node) => node.id === selectedNodeId);
-	const pendingFloorProposals = useMemo(
-		() =>
-			((factory?.floorChangeProposals ?? []) as FloorChangeProposal[])
-				.filter((proposal) => proposal.status === "pending")
-				.sort(compareFloorChangeProposals),
-		[factory?.floorChangeProposals],
-	);
 
 	const startInspectorResize = (
 		event: ReactPointerEvent<HTMLButtonElement>,
@@ -477,50 +498,6 @@ function FactoryFloorEditor() {
 		separator.addEventListener("pointerup", stopResize);
 	};
 
-	const persistWorkflow = useCallback(
-		async (
-			workflow: FloorWorkflow,
-			proposalId: string,
-		): Promise<ProposalSaveResult> => {
-			const title = "Factory floor edits";
-			const summary = "Saved from the floor editor.";
-
-			if (draftProposalCreatedRef.current) {
-				await db.transact(
-					floorChangeProposalTx(proposalId).update({
-						title,
-						summary,
-						workflow,
-					}),
-				);
-
-				return { proposalId };
-			}
-
-			draftProposalCreatedRef.current = true;
-
-			try {
-				await db.transact(
-					floorChangeProposalTx(proposalId)
-						.create({
-							title,
-							summary,
-							workflow,
-							status: "pending",
-							createdAt: new Date().toISOString(),
-						})
-						.link({ factory: currentFactoryId }),
-				);
-			} catch (error) {
-				draftProposalCreatedRef.current = false;
-				throw error;
-			}
-
-			return { proposalId };
-		},
-		[currentFactoryId],
-	);
-
 	const persistFloorLayout = useCallback(
 		async (workflow: FloorWorkflow) => {
 			const synced = withSyncedWebhookEntities(
@@ -540,28 +517,49 @@ function FactoryFloorEditor() {
 			for (const webhookId of synced.webhookIds) {
 				syncedWebhookIdsRef.current.add(webhookId);
 			}
+			return synced.workflow;
 		},
 		[currentFactoryId, webhooks],
 	);
 
 	useEffect(() => {
-		if (hasHydratedWorkflow || !factory) {
+		if (!factory || !floorWorkflowSyncKey) {
 			return;
 		}
 
-		const workflow = parseWorkflow(factory.floorWorkflow);
+		if (
+			hasHydratedWorkflow &&
+			floorWorkflowSyncKeyRef.current === floorWorkflowSyncKey
+		) {
+			return;
+		}
+
+		if (hasHydratedWorkflow && unsavedChanges > 0) {
+			return;
+		}
+
 		const hydratedWorkflow =
-			workflow.nodes.length > 0 || workflow.edges.length > 0
-				? workflow
-				: defaultWorkflow();
+			factory.floorWorkflow === undefined || factory.floorWorkflow === null
+				? defaultWorkflow()
+				: parseWorkflow(factory.floorWorkflow);
 		const nextWorkflow = cloneWorkflow(hydratedWorkflow);
 
 		setNodes(nextWorkflow.nodes);
 		setEdges(nextWorkflow.edges);
 		setSelectedNodeId(undefined);
-		setSavedWorkflow(cloneWorkflow(nextWorkflow));
+		unsavedChangeKeysRef.current = new Set();
+		setUnsavedChanges(0);
+		setSaveError(undefined);
+		floorWorkflowSyncKeyRef.current = floorWorkflowSyncKey;
 		setHasHydratedWorkflow(true);
-	}, [factory, hasHydratedWorkflow, setEdges, setNodes]);
+	}, [
+		factory,
+		floorWorkflowSyncKey,
+		hasHydratedWorkflow,
+		setEdges,
+		setNodes,
+		unsavedChanges,
+	]);
 
 	useEffect(() => {
 		latestWorkflowRef.current = {
@@ -571,68 +569,10 @@ function FactoryFloorEditor() {
 	}, [edges, nodes]);
 
 	useEffect(() => {
-		savedWorkflowRef.current = savedWorkflow;
-	}, [savedWorkflow]);
-
-	useEffect(() => {
 		for (const webhook of webhooks) {
 			syncedWebhookIdsRef.current.add(webhook.id);
 		}
 	}, [webhooks]);
-
-	useEffect(() => {
-		if (draftSaveVersion === 0 || unsavedChanges === 0 || !user) {
-			return;
-		}
-
-		const saveVersion = draftSaveVersion;
-		const workflow = cloneWorkflow(latestWorkflowRef.current);
-		const proposalId = draftProposalIdRef.current ?? id();
-		draftProposalIdRef.current = proposalId;
-
-		void persistWorkflow(workflow, proposalId)
-			.then((result) => {
-				draftProposalIdRef.current = result.proposalId;
-
-				if (draftSaveVersionRef.current === saveVersion) {
-					unsavedChangeKeysRef.current = new Set();
-					setUnsavedChanges(0);
-				}
-			})
-			.catch((error) => {
-				setProposalError(
-					error instanceof Error ? error.message : "Failed to save proposal.",
-				);
-			});
-	}, [draftSaveVersion, persistWorkflow, unsavedChanges, user]);
-
-	useEffect(() => {
-		if (layoutSaveVersion === 0 || !user || !savedWorkflowRef.current) {
-			return;
-		}
-
-		const acceptedWorkflow = savedWorkflowRef.current;
-		const timeout = window.setTimeout(() => {
-			const workflow = cloneWorkflow(
-				withCurrentNodePositions(
-					acceptedWorkflow,
-					latestWorkflowRef.current.nodes,
-				),
-			);
-
-			void persistFloorLayout(workflow)
-				.then(() => {
-					setSavedWorkflow(cloneWorkflow(workflow));
-				})
-				.catch((error) => {
-					setProposalError(
-						error instanceof Error ? error.message : "Failed to save layout.",
-					);
-				});
-		}, 700);
-
-		return () => window.clearTimeout(timeout);
-	}, [layoutSaveVersion, persistFloorLayout, user]);
 
 	const markWorkflowChanged = useCallback((changeKeys: string | string[]) => {
 		const keys = Array.isArray(changeKeys) ? changeKeys : [changeKeys];
@@ -649,12 +589,7 @@ function FactoryFloorEditor() {
 
 		unsavedChangeKeysRef.current = nextKeys;
 		setUnsavedChanges(nextKeys.size);
-		setDraftSaveVersion((version) => {
-			const nextVersion = version + 1;
-			draftSaveVersionRef.current = nextVersion;
-			return nextVersion;
-		});
-		setProposalError(undefined);
+		setSaveError(undefined);
 	}, []);
 
 	const onConnect = useCallback(
@@ -707,7 +642,6 @@ function FactoryFloorEditor() {
 			setNodes((currentNodes) => currentNodes.concat(node));
 			setSelectedNodeId(node.id);
 			setIsAddBlockOpen(false);
-			setIsProposalDropdownOpen(false);
 			markWorkflowChanged(`node-added:${node.id}`);
 		},
 		[markWorkflowChanged, nodes.length, screenToFlowPosition, setNodes],
@@ -746,133 +680,29 @@ function FactoryFloorEditor() {
 		[markWorkflowChanged, selectedNodeId, setNodes],
 	);
 
-	const flushDraftWorkflow = async () => {
-		if (!user || unsavedChanges === 0) {
-			return;
-		}
-
-		const proposalId = draftProposalIdRef.current ?? id();
-		draftProposalIdRef.current = proposalId;
-		await persistWorkflow(cloneWorkflow(latestWorkflowRef.current), proposalId);
-		unsavedChangeKeysRef.current = new Set();
-		setUnsavedChanges(0);
-	};
-
-	const decideFloorProposal = async (
-		proposal: FloorChangeProposal,
-		action: "accept" | "reject",
-	) => {
+	const saveWorkflow = async () => {
 		if (!user) {
-			setProposalError("You must be signed in.");
+			setSaveError("You must be signed in.");
 			return;
 		}
 
-		setProposalAction({ proposalId: proposal.id, action });
-		setProposalError(undefined);
-
+		setIsSavingWorkflow(true);
+		setSaveError(undefined);
 		try {
-			const now = new Date().toISOString();
-			const isCurrentDraft = proposal.id === draftProposalIdRef.current;
-
-			if (action === "accept") {
-				const workflow = cloneWorkflow(
-					withAcceptedLayoutPositions(
-						isCurrentDraft
-							? latestWorkflowRef.current
-							: parseWorkflow(proposal.workflow),
-						savedWorkflowRef.current,
-					),
-				);
-				const synced = withSyncedWebhookEntities(
-					workflow,
-					webhooks,
-					currentFactoryId,
-					syncedWebhookIdsRef.current,
-					now,
-				);
-
-				await db.transact([
-					factoryTx(currentFactoryId).update({
-						floorWorkflow: synced.workflow,
-						floorWorkflowUpdatedAt: now,
-					}),
-					floorChangeProposalTx(proposal.id).update({
-						status: "accepted",
-						decidedAt: now,
-						workflow: synced.workflow,
-					}),
-					...synced.transactions,
-				]);
-				for (const webhookId of synced.webhookIds) {
-					syncedWebhookIdsRef.current.add(webhookId);
-				}
-
-				setNodes(synced.workflow.nodes);
-				setEdges(synced.workflow.edges);
-				setSelectedNodeId(undefined);
-				setSavedWorkflow(cloneWorkflow(synced.workflow));
-				unsavedChangeKeysRef.current = new Set();
-				setUnsavedChanges(0);
-				draftProposalIdRef.current = undefined;
-				draftProposalCreatedRef.current = false;
-				setPreviewedProposalId(undefined);
-				setIsProposalDropdownOpen(false);
-			} else {
-				await db.transact(
-					floorChangeProposalTx(proposal.id).update({
-						status: "rejected",
-						decidedAt: now,
-					}),
-				);
-			}
-
-			if (proposal.id === draftProposalIdRef.current) {
-				draftProposalIdRef.current = undefined;
-				draftProposalCreatedRef.current = false;
-
-				if (action === "reject" && savedWorkflow) {
-					const workflow = cloneWorkflow(savedWorkflow);
-					setNodes(workflow.nodes);
-					setEdges(workflow.edges);
-					setSelectedNodeId(undefined);
-					unsavedChangeKeysRef.current = new Set();
-					setUnsavedChanges(0);
-				}
-			}
-
-			if (proposal.id === previewedProposalId) {
-				setPreviewedProposalId(undefined);
-				setIsProposalDropdownOpen(false);
-
-				if (action === "reject" && savedWorkflow) {
-					const workflow = cloneWorkflow(savedWorkflow);
-					setNodes(workflow.nodes);
-					setEdges(workflow.edges);
-					setSelectedNodeId(undefined);
-				}
-			}
+			const workflow = await persistFloorLayout(
+				cloneWorkflow(latestWorkflowRef.current),
+			);
+			setNodes(workflow.nodes);
+			setEdges(workflow.edges);
+			unsavedChangeKeysRef.current = new Set();
+			setUnsavedChanges(0);
 		} catch (error) {
-			setProposalError(
-				error instanceof Error ? error.message : "Failed to update proposal.",
+			setSaveError(
+				error instanceof Error ? error.message : "Failed to save workflow.",
 			);
 		} finally {
-			setProposalAction(undefined);
+			setIsSavingWorkflow(false);
 		}
-	};
-
-	const previewFloorProposal = async (proposal: FloorChangeProposal) => {
-		await flushDraftWorkflow();
-
-		const workflow = cloneWorkflow(parseWorkflow(proposal.workflow));
-		setNodes(workflow.nodes);
-		setEdges(workflow.edges);
-		setSelectedNodeId(undefined);
-		setPreviewedProposalId(proposal.id);
-		setIsProposalDropdownOpen(false);
-		setIsAddBlockOpen(false);
-		setProposalError(undefined);
-		draftProposalIdRef.current = proposal.id;
-		draftProposalCreatedRef.current = true;
 	};
 
 	return (
@@ -886,29 +716,16 @@ function FactoryFloorEditor() {
 			<div className="relative flex h-full w-full bg-grayscale-1">
 				<div className="absolute left-4 top-4 z-30">
 					<FloorDock
+						hasUnsavedChanges={unsavedChanges > 0}
 						isAddBlockOpen={isAddBlockOpen}
-						isProposalDropdownOpen={isProposalDropdownOpen}
-						proposalAction={proposalAction}
-						proposalError={proposalError}
-						proposals={pendingFloorProposals}
-						previewedProposalId={previewedProposalId}
+						isSavingWorkflow={isSavingWorkflow}
+						saveError={saveError}
 						onAddBlockToggle={() => {
-							setIsProposalDropdownOpen(false);
 							setIsAddBlockOpen((isOpen) => !isOpen);
 						}}
-						onAcceptProposal={(proposal) => {
-							void decideFloorProposal(proposal, "accept");
-						}}
 						onFitView={fitFloorToView}
-						onPreviewProposal={(proposal) => {
-							void previewFloorProposal(proposal);
-						}}
-						onProposalDropdownToggle={() => {
-							setIsAddBlockOpen(false);
-							setIsProposalDropdownOpen((isOpen) => !isOpen);
-						}}
-						onRejectProposal={(proposal) => {
-							void decideFloorProposal(proposal, "reject");
+						onSaveWorkflow={() => {
+							void saveWorkflow();
 						}}
 						onZoomIn={zoomIntoFloor}
 						onZoomOut={zoomOutOfFloor}
@@ -941,9 +758,6 @@ function FactoryFloorEditor() {
 							onNodesChange={(changes) => {
 								onNodesChange(changes);
 								markWorkflowChanged(getActualFlowChangeKeys(changes, "node"));
-								if (hasCompletedPositionChange(changes)) {
-									setLayoutSaveVersion((version) => version + 1);
-								}
 							}}
 							onEdgesChange={(changes) => {
 								onEdgesChange(changes);
@@ -952,21 +766,19 @@ function FactoryFloorEditor() {
 							onConnect={onConnect}
 							onPaneClick={() => {
 								setIsAddBlockOpen(false);
-								setIsProposalDropdownOpen(false);
 								setSelectedNodeId(undefined);
 							}}
 							onNodeClick={(_, node) => {
 								setSelectedNodeId(node.id);
 								setIsAddBlockOpen(false);
-								setIsProposalDropdownOpen(false);
 							}}
 							fitView
 							minZoom={0.25}
 							maxZoom={1.6}
 							proOptions={{ hideAttribution: true }}
-							className="bg-grayscale-1"
+							className="factory-floor-flow bg-grayscale-1 text-grayscale-12"
 						>
-							<Background color="var(--slate-6)" gap={18} size={1} />
+							<Background color="var(--color-grayscale-4)" gap={18} size={1} />
 						</ReactFlow>
 					</ContextMenu.Trigger>
 					<ContextMenu.Portal>
@@ -984,6 +796,7 @@ function FactoryFloorEditor() {
 							factoryId={currentFactoryId}
 							orgHandle={currentOrgHandle}
 							node={selectedNode}
+							workflow={{ nodes, edges }}
 							webhooks={webhooks}
 							onChange={updateSelectedNode}
 							onClose={() => setSelectedNodeId(undefined)}
@@ -998,206 +811,80 @@ function FactoryFloorEditor() {
 }
 
 function FloorDock({
+	hasUnsavedChanges,
 	isAddBlockOpen,
-	isProposalDropdownOpen,
-	onAcceptProposal,
+	isSavingWorkflow,
 	onAddBlockToggle,
 	onFitView,
-	onPreviewProposal,
-	onProposalDropdownToggle,
-	onRejectProposal,
+	onSaveWorkflow,
 	onZoomIn,
 	onZoomOut,
-	previewedProposalId,
-	proposalAction,
-	proposalError,
-	proposals,
+	saveError,
 }: {
+	hasUnsavedChanges: boolean;
 	isAddBlockOpen: boolean;
-	isProposalDropdownOpen: boolean;
-	onAcceptProposal: (proposal: FloorChangeProposal) => void;
+	isSavingWorkflow: boolean;
 	onAddBlockToggle: () => void;
 	onFitView: () => void;
-	onPreviewProposal: (proposal: FloorChangeProposal) => void;
-	onProposalDropdownToggle: () => void;
-	onRejectProposal: (proposal: FloorChangeProposal) => void;
+	onSaveWorkflow: () => void;
 	onZoomIn: () => void;
 	onZoomOut: () => void;
-	previewedProposalId: string | undefined;
-	proposalAction: ProposalActionState | undefined;
-	proposalError: string | undefined;
-	proposals: FloorChangeProposal[];
+	saveError: string | undefined;
 }) {
-	const proposalCountLabel =
-		proposals.length === 1
-			? "1 pending proposal"
-			: `${proposals.length} pending proposals`;
-
 	return (
-		<div className="flex items-center gap-1 rounded-lg border border-grayscale-5 bg-grayscale-1/95 p-1 shadow-lg backdrop-blur">
-			<ExpandSidebarButton className="h-8 rounded-md text-grayscale-11 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12" />
-			<FloorDockIconButton label="Zoom in" onClick={onZoomIn}>
-				<PlusIcon weight="bold" className="size-4" />
-			</FloorDockIconButton>
-			<FloorDockIconButton label="Zoom out" onClick={onZoomOut}>
-				<MinusIcon weight="bold" className="size-4" />
-			</FloorDockIconButton>
-			<FloorDockIconButton label="Fit view" onClick={onFitView}>
-				<CornersOutIcon weight="bold" className="size-4" />
-			</FloorDockIconButton>
-			<div className="mx-0.5 h-6 w-px bg-grayscale-5" />
-			<button
-				type="button"
-				aria-expanded={isAddBlockOpen}
-				onClick={onAddBlockToggle}
-				className="flex h-8 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-grayscale-12 transition-colors hover:bg-grayscale-3"
-			>
-				<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
-				<span>Add block</span>
-				<CaretDownIcon
-					weight="bold"
-					className={cn(
-						"size-3 shrink-0 transition-transform",
-						isAddBlockOpen && "rotate-180",
-					)}
-				/>
-			</button>
-			<div className="relative">
+		<div className="flex flex-col items-start gap-1">
+			<div className="factory-floor-popover flex items-center gap-1 rounded-lg border border-grayscale-5 bg-grayscale-1/95 p-1 shadow-lg backdrop-blur dark:bg-grayscale-2/95">
+				<ExpandSidebarButton className="h-8 rounded-md text-grayscale-11 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12" />
+				<FloorDockIconButton label="Zoom in" onClick={onZoomIn}>
+					<PlusIcon weight="bold" className="size-4" />
+				</FloorDockIconButton>
+				<FloorDockIconButton label="Zoom out" onClick={onZoomOut}>
+					<MinusIcon weight="bold" className="size-4" />
+				</FloorDockIconButton>
+				<FloorDockIconButton label="Fit view" onClick={onFitView}>
+					<CornersOutIcon weight="bold" className="size-4" />
+				</FloorDockIconButton>
+				<div className="mx-0.5 h-6 w-px bg-grayscale-5" />
 				<button
 					type="button"
-					aria-expanded={isProposalDropdownOpen}
-					onClick={onProposalDropdownToggle}
-					className={cn(
-						"flex h-8 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors hover:bg-grayscale-3",
-						proposals.length > 0 ? "text-grayscale-12" : "text-grayscale-10",
-						previewedProposalId && "bg-accent-3 text-accent-12",
-					)}
+					aria-expanded={isAddBlockOpen}
+					onClick={onAddBlockToggle}
+					className="flex h-8 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-grayscale-12 transition-colors hover:bg-grayscale-3"
 				>
-					<FlowArrowIcon weight="bold" className="size-4 shrink-0" />
-					<span>{proposalCountLabel}</span>
+					<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
+					<span>Add block</span>
 					<CaretDownIcon
 						weight="bold"
 						className={cn(
 							"size-3 shrink-0 transition-transform",
-							isProposalDropdownOpen && "rotate-180",
+							isAddBlockOpen && "rotate-180",
 						)}
 					/>
 				</button>
-				{isProposalDropdownOpen ? (
-					<FloorProposalDropdown
-						actionState={proposalAction}
-						error={proposalError}
-						onAccept={onAcceptProposal}
-						onPreview={onPreviewProposal}
-						onReject={onRejectProposal}
-						previewedProposalId={previewedProposalId}
-						proposals={proposals}
-					/>
-				) : null}
+				<button
+					type="button"
+					onClick={onSaveWorkflow}
+					disabled={!hasUnsavedChanges || isSavingWorkflow}
+					className={cn(
+						"flex h-8 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors",
+						hasUnsavedChanges
+							? "bg-grayscale-12 text-grayscale-1 hover:bg-grayscale-11"
+							: "text-grayscale-10",
+					)}
+				>
+					<CheckCircleIcon weight="bold" className="size-4 shrink-0" />
+					<span>{isSavingWorkflow ? "Saving" : "Save"}</span>
+				</button>
 			</div>
-		</div>
-	);
-}
-
-function FloorProposalDropdown({
-	actionState,
-	error,
-	onAccept,
-	onPreview,
-	onReject,
-	previewedProposalId,
-	proposals,
-}: {
-	actionState: ProposalActionState | undefined;
-	error: string | undefined;
-	onAccept: (proposal: FloorChangeProposal) => void;
-	onPreview: (proposal: FloorChangeProposal) => void;
-	onReject: (proposal: FloorChangeProposal) => void;
-	previewedProposalId: string | undefined;
-	proposals: FloorChangeProposal[];
-}) {
-	return (
-		<div className="absolute left-0 top-10 z-50 flex max-h-[60vh] w-96 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto rounded-lg border border-grayscale-5 bg-grayscale-1 p-2 shadow-xl">
-			<div className="px-1">
-				<p className="text-sm font-semibold text-grayscale-12">
-					Floor proposals
+			{saveError ? (
+				<p className="rounded-md border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11 shadow-lg">
+					{saveError}
 				</p>
-				<p className="text-xs text-grayscale-10">
-					Select a proposal to preview it on the canvas.
-				</p>
-			</div>
-			{error ? (
-				<p className="rounded-md border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">
-					{error}
+			) : hasUnsavedChanges ? (
+				<p className="factory-floor-popover rounded-md border border-grayscale-5 bg-grayscale-1/95 px-2 py-1.5 text-xs text-grayscale-10 shadow-lg backdrop-blur dark:bg-grayscale-2/95">
+					Unsaved changes
 				</p>
 			) : null}
-			{proposals.length > 0 ? (
-				<div className="flex flex-col gap-1">
-					{proposals.map((proposal) => {
-						const actionInFlight = actionState?.proposalId === proposal.id;
-						const acceptInFlight =
-							actionInFlight && actionState.action === "accept";
-						const rejectInFlight =
-							actionInFlight && actionState.action === "reject";
-						const isPreviewed = previewedProposalId === proposal.id;
-
-						return (
-							<div
-								key={proposal.id}
-								className={cn(
-									"rounded-md border p-2 transition-colors",
-									isPreviewed
-										? "border-accent-7 bg-accent-2"
-										: "border-grayscale-4 bg-grayscale-2",
-								)}
-							>
-								<button
-									type="button"
-									onClick={() => onPreview(proposal)}
-									className="block w-full min-w-0 text-left"
-								>
-									<p className="truncate text-sm font-medium text-grayscale-12">
-										{proposal.title}
-									</p>
-									<p className="font-mono text-[10px] text-grayscale-10">
-										{formatProposalTimestamp(proposal.createdAt)}
-									</p>
-									{proposal.summary ? (
-										<p className="mt-1 line-clamp-2 text-xs text-grayscale-11">
-											{proposal.summary}
-										</p>
-									) : null}
-								</button>
-								<div className="mt-2 flex items-center justify-end gap-2">
-									<Button
-										type="button"
-										variant="secondary"
-										className="h-7"
-										onClick={() => onReject(proposal)}
-										disabled={actionState !== undefined}
-									>
-										<XCircleIcon weight="bold" className="size-4" />
-										{rejectInFlight ? "Rejecting" : "Reject"}
-									</Button>
-									<Button
-										type="button"
-										className="h-7"
-										onClick={() => onAccept(proposal)}
-										disabled={actionState !== undefined}
-									>
-										<CheckCircleIcon weight="bold" className="size-4" />
-										{acceptInFlight ? "Accepting" : "Accept"}
-									</Button>
-								</div>
-							</div>
-						);
-					})}
-				</div>
-			) : (
-				<p className="rounded-md border border-grayscale-4 bg-grayscale-2 px-2 py-2 text-xs text-grayscale-10">
-					No pending proposals.
-				</p>
-			)}
 		</div>
 	);
 }
@@ -1240,14 +927,15 @@ function WorkflowCard({ data, selected, id: nodeId }: NodeProps<WorkflowNode>) {
 
 	const icon = getBlockIcon(data.blockType);
 	const conditions = data.conditions ?? [];
+	const decisionOptions = data.options ?? [];
 
 	return (
 		<div
 			className={cn(
-				"min-w-64 max-w-72 rounded-lg border bg-grayscale-1",
+				"factory-floor-node-card min-w-64 max-w-72 rounded-lg border bg-grayscale-1 text-grayscale-12 shadow-sm shadow-grayscale-12/5 dark:bg-grayscale-2 dark:shadow-black/25",
 				selected
 					? "border-accent-9 ring-2 ring-accent-5"
-					: "border-grayscale-6",
+					: "border-grayscale-6 dark:border-grayscale-5",
 			)}
 		>
 			{data.blockType === "agentRun" ? (
@@ -1298,7 +986,7 @@ function WorkflowCard({ data, selected, id: nodeId }: NodeProps<WorkflowNode>) {
 						{conditions.map((condition, index) => (
 							<div
 								key={condition.id}
-								className="relative rounded-md border border-grayscale-4 bg-grayscale-2 px-2 py-1"
+								className="factory-floor-node-inset relative rounded-md border border-grayscale-4 bg-grayscale-2 px-2 py-1"
 							>
 								<p className="font-medium text-grayscale-12">
 									{condition.label || `Condition ${index + 1}`}
@@ -1309,6 +997,48 @@ function WorkflowCard({ data, selected, id: nodeId }: NodeProps<WorkflowNode>) {
 								<Handle
 									type="source"
 									id={condition.id}
+									position={Position.Right}
+									style={{ top: 13 + index * 42 }}
+									className="!size-3 !border-2 !border-grayscale-1 !bg-green-9"
+								/>
+							</div>
+						))}
+					</div>
+				) : data.blockType === "agentDecision" ? (
+					<div className="flex flex-col gap-1">
+						{decisionOptions.map((option, index) => (
+							<div
+								key={option.id}
+								className="factory-floor-node-inset relative rounded-md border border-grayscale-4 bg-grayscale-2 px-2 py-1"
+							>
+								<p className="font-medium text-grayscale-12">
+									{option.label || option.id}
+								</p>
+								<p className="truncate font-mono text-[10px]">{option.id}</p>
+								<Handle
+									type="source"
+									id={option.id}
+									position={Position.Right}
+									style={{ top: 13 + index * 42 }}
+									className="!size-3 !border-2 !border-grayscale-1 !bg-green-9"
+								/>
+							</div>
+						))}
+					</div>
+				) : data.blockType === "yesNoClassifier" ? (
+					<div className="flex flex-col gap-1">
+						{(["yes", "no"] as const).map((answer, index) => (
+							<div
+								key={answer}
+								className="factory-floor-node-inset relative rounded-md border border-grayscale-4 bg-grayscale-2 px-2 py-1"
+							>
+								<p className="font-medium capitalize text-grayscale-12">
+									{answer}
+								</p>
+								<p className="font-mono text-[10px]">{answer}</p>
+								<Handle
+									type="source"
+									id={answer}
 									position={Position.Right}
 									style={{ top: 13 + index * 42 }}
 									className="!size-3 !border-2 !border-grayscale-1 !bg-green-9"
@@ -1334,7 +1064,7 @@ function HumanLoopEntry({ connected }: { connected: boolean }) {
 	return (
 		<div
 			className={cn(
-				"border-b px-3 py-2 transition-colors",
+				"factory-floor-node-strip border-b px-3 py-2 transition-colors",
 				connected
 					? "border-accent-6 bg-accent-2 text-accent-12"
 					: "border-grayscale-4 bg-grayscale-2 text-grayscale-11",
@@ -1367,11 +1097,11 @@ function ManualStartNodeCard({
 	return (
 		<div
 			className={cn(
-				"w-[360px] rounded-xl border border-grayscale-3 bg-grayscale-2 p-1.5 dark:bg-grayscale-2",
+				"factory-floor-node-shell w-[360px] rounded-xl border border-grayscale-3 bg-grayscale-2 p-1.5 shadow-sm shadow-grayscale-12/5 dark:border-grayscale-5 dark:bg-grayscale-2 dark:shadow-black/25",
 				selected ? "border-accent-9 ring-2 ring-accent-5" : "",
 			)}
 		>
-			<div className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-5 dark:bg-grayscale-3">
+			<div className="factory-floor-node-card overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-5 dark:bg-grayscale-3">
 				<div className="relative flex min-h-36 flex-col p-3">
 					<div className="mb-3 flex items-center justify-between gap-2">
 						<div className="flex min-w-0 items-center gap-2">
@@ -1392,7 +1122,7 @@ function ManualStartNodeCard({
 						Enter workflow input...
 					</div>
 					<div className="mt-3 flex items-center justify-between gap-2 border-t border-grayscale-4 pt-2">
-						<div className="flex h-7 items-center gap-1.5 rounded-md bg-grayscale-2 px-2 text-xs text-grayscale-11 ring-1 ring-grayscale-4">
+						<div className="factory-floor-node-inset flex h-7 items-center gap-1.5 rounded-md bg-grayscale-2 px-2 text-xs text-grayscale-11 ring-1 ring-grayscale-4">
 							<span>Add files</span>
 						</div>
 						<div className="flex h-8 items-center gap-2 rounded-md border border-grayscale-12 bg-grayscale-12 px-3 text-xs font-medium text-grayscale-1">
@@ -1492,6 +1222,32 @@ function NodePreview({ data }: { data: WorkflowNodeData }) {
 		);
 	}
 
+	if (data.blockType === "instruction") {
+		return (
+			<>
+				<p className="line-clamp-3 whitespace-pre-wrap">{data.instruction}</p>
+				<p className="font-mono text-[10px] text-grayscale-10">
+					Can start workflow with manual input.
+				</p>
+			</>
+		);
+	}
+
+	if (data.blockType === "agentDecision") {
+		return <p className="line-clamp-3 whitespace-pre-wrap">{data.question}</p>;
+	}
+
+	if (data.blockType === "yesNoClassifier") {
+		return (
+			<>
+				<p className="line-clamp-3 whitespace-pre-wrap">{data.prompt}</p>
+				<p className="font-mono text-[10px] text-grayscale-10">
+					Outputs yes or no.
+				</p>
+			</>
+		);
+	}
+
 	if (data.blockType === "httpRequest") {
 		return (
 			<>
@@ -1551,7 +1307,7 @@ function AddBlockDropdown({
 	return (
 		<div
 			role="menu"
-			className="mt-2 w-72 rounded-lg border border-grayscale-5 bg-grayscale-1 p-1 shadow-xl"
+			className="factory-floor-popover mt-2 w-72 rounded-lg border border-grayscale-5 bg-grayscale-1 p-1 shadow-xl dark:bg-grayscale-2"
 		>
 			<div className="px-2 py-1.5 font-mono text-[11px] font-semibold text-grayscale-10 uppercase">
 				Add block
@@ -1590,6 +1346,7 @@ function Inspector({
 	factoryId,
 	orgHandle,
 	node,
+	workflow,
 	webhooks,
 	onChange,
 	onClose,
@@ -1600,6 +1357,7 @@ function Inspector({
 	factoryId: string;
 	orgHandle: string;
 	node: WorkflowNode | undefined;
+	workflow: FloorWorkflow;
 	webhooks: FactoryWebhook[];
 	onChange: (data: Partial<WorkflowNodeData>) => void;
 	onClose: () => void;
@@ -1637,7 +1395,7 @@ function Inspector({
 
 	return (
 		<motion.aside
-			className="absolute right-0 top-0 z-20 flex h-full shrink-0 flex-col gap-3 overflow-y-auto bg-grayscale-1 p-3"
+			className="factory-floor-inspector absolute right-0 top-0 z-20 flex h-full shrink-0 flex-col gap-3 overflow-y-auto border-l border-grayscale-4 bg-grayscale-1 p-3 shadow-xl shadow-grayscale-12/5 dark:bg-grayscale-1 dark:shadow-black/30"
 			style={{ width: size }}
 			initial={{ x: "100%" }}
 			animate={{ x: "0%" }}
@@ -1671,7 +1429,11 @@ function Inspector({
 				</button>
 			</div>
 			{node.data.blockType === "manualStart" ? (
-				<ManualStartComposer factoryId={factoryId} node={node} />
+				<ManualStartComposer
+					factoryId={factoryId}
+					node={node}
+					workflow={workflow}
+				/>
 			) : null}
 			{node.data.blockType === "webhook" ? (
 				<InspectorSection title="Webhook">
@@ -1697,6 +1459,26 @@ function Inspector({
 			) : null}
 			{node.data.blockType === "agentRun" ? (
 				<AgentRunInspector agents={agents} node={node} onChange={onChange} />
+			) : null}
+			{node.data.blockType === "instruction" ? (
+				<>
+					<ManualStartComposer
+						factoryId={factoryId}
+						node={node}
+						workflow={workflow}
+					/>
+					<InstructionInspector node={node} onChange={onChange} />
+				</>
+			) : null}
+			{node.data.blockType === "agentDecision" ? (
+				<AgentDecisionInspector node={node} onChange={onChange} />
+			) : null}
+			{node.data.blockType === "yesNoClassifier" ? (
+				<YesNoClassifierInspector
+					agents={agents}
+					node={node}
+					onChange={onChange}
+				/>
 			) : null}
 			{node.data.blockType === "httpRequest" ? (
 				<InspectorSection title="HTTP request">
@@ -1785,39 +1567,25 @@ function AgentRunInspector({
 	}));
 
 	return (
-		<InspectorSection title="Agent run">
-			<div className="flex flex-col gap-1 text-xs text-grayscale-11">
-				<span>Agent</span>
-				<Select.Root
-					items={agentItems}
-					value={resolvedAgentId ?? null}
-					onValueChange={(value) =>
-						onChange({ agentId: value === null ? undefined : value })
-					}
-				>
-					<Select.Trigger>
-						<Select.Value placeholder="Select an agent" />
-						<Select.Icon />
-					</Select.Trigger>
-					<Select.Portal>
-						<Select.Positioner>
-							<Select.Popup>
-								<Select.List>
-									{agents.map((agent) => (
-										<Select.Item value={agent.id} key={agent.id}>
-											<Select.ItemText>{agent.name}</Select.ItemText>
-											<Select.ItemIndicator />
-										</Select.Item>
-									))}
-								</Select.List>
-							</Select.Popup>
-						</Select.Positioner>
-					</Select.Portal>
-				</Select.Root>
-				{agents.length === 0 ? (
-					<p className="text-xs text-red-11">No agents configured.</p>
-				) : null}
-			</div>
+		<InspectorSection title="Agent step">
+			<AgentSelectField
+				agents={agents}
+				emptyMessage="No agents configured."
+				items={agentItems}
+				value={resolvedAgentId}
+				onChange={(value) =>
+					onChange({ agentId: value === null ? undefined : value })
+				}
+			/>
+			<label className="flex flex-col gap-1 text-xs text-grayscale-11">
+				Conversation key
+				<input
+					value={node.data.sessionKey ?? ""}
+					onChange={(event) => onChange({ sessionKey: event.target.value })}
+					placeholder="Leave blank for this step only"
+					className="rounded-md border border-grayscale-6 bg-grayscale-1 px-2 py-1.5 font-mono text-xs text-grayscale-12 outline-none focus:border-grayscale-8 focus:ring-2 focus:ring-grayscale-4/60"
+				/>
+			</label>
 			<div className="flex flex-col gap-1 text-xs text-grayscale-11">
 				<span>Prompt</span>
 				<Textarea
@@ -1826,24 +1594,100 @@ function AgentRunInspector({
 					className="min-h-32 font-mono"
 				/>
 			</div>
+		</InspectorSection>
+	);
+}
+
+function YesNoClassifierInspector({
+	agents,
+	node,
+	onChange,
+}: {
+	agents: Agent[];
+	node: WorkflowNode;
+	onChange: (data: Partial<WorkflowNodeData>) => void;
+}) {
+	const codexAgents = agents.filter((agent) => agent.provider !== "cursor");
+	const resolvedAgentId = node.data.agentId || codexAgents[0]?.id;
+	const agentItems = codexAgents.map((agent) => ({
+		value: agent.id,
+		label: agent.name,
+	}));
+
+	return (
+		<InspectorSection title="Yes/no classifier">
+			<AgentSelectField
+				agents={codexAgents}
+				emptyMessage="No Codex agents configured."
+				items={agentItems}
+				value={resolvedAgentId}
+				onChange={(value) =>
+					onChange({ agentId: value === null ? undefined : value })
+				}
+			/>
 			<div className="flex flex-col gap-1 text-xs text-grayscale-11">
-				<span>Response schema JSON</span>
+				<span>Classifier prompt</span>
 				<Textarea
-					value={node.data.responseSchema ?? ""}
-					onChange={(event) => onChange({ responseSchema: event.target.value })}
-					className="min-h-32 font-mono"
+					value={node.data.prompt ?? ""}
+					onChange={(event) => onChange({ prompt: event.target.value })}
+					className="min-h-40 font-mono"
 				/>
 			</div>
 		</InspectorSection>
 	);
 }
 
+function AgentSelectField({
+	agents,
+	emptyMessage,
+	items,
+	onChange,
+	value,
+}: {
+	agents: Agent[];
+	emptyMessage: string;
+	items: Array<{ value: string; label: string }>;
+	onChange: (value: string | null) => void;
+	value: string | undefined;
+}) {
+	return (
+		<div className="flex flex-col gap-1 text-xs text-grayscale-11">
+			<span>Agent</span>
+			<Select.Root items={items} value={value ?? null} onValueChange={onChange}>
+				<Select.Trigger>
+					<Select.Value placeholder="Select an agent" />
+					<Select.Icon />
+				</Select.Trigger>
+				<Select.Portal>
+					<Select.Positioner>
+						<Select.Popup>
+							<Select.List>
+								{agents.map((agent) => (
+									<Select.Item value={agent.id} key={agent.id}>
+										<Select.ItemText>{agent.name}</Select.ItemText>
+										<Select.ItemIndicator />
+									</Select.Item>
+								))}
+							</Select.List>
+						</Select.Popup>
+					</Select.Positioner>
+				</Select.Portal>
+			</Select.Root>
+			{agents.length === 0 ? (
+				<p className="text-xs text-red-11">{emptyMessage}</p>
+			) : null}
+		</div>
+	);
+}
+
 function ManualStartComposer({
 	factoryId,
 	node,
+	workflow,
 }: {
 	factoryId: string;
 	node: WorkflowNode;
+	workflow: FloorWorkflow;
 }) {
 	const { user } = db.useAuth();
 	const [message, setMessage] = useState("");
@@ -1895,6 +1739,7 @@ function ManualStartComposer({
 							images,
 						},
 						images,
+						workflow,
 					}),
 				},
 			);
@@ -1958,11 +1803,11 @@ function ManualStartComposer({
 	};
 
 	return (
-		<InspectorSection title="Manual start">
+		<InspectorSection title="Start workflow">
 			<fieldset
-				aria-label="Manual workflow start composer"
+				aria-label="Workflow start composer"
 				className={cn(
-					"flex min-w-0 flex-col gap-2 rounded-md border border-grayscale-4 bg-grayscale-1 p-2 transition-colors",
+					"factory-floor-panel flex min-w-0 flex-col gap-2 rounded-md border border-grayscale-4 bg-grayscale-1 p-2 transition-colors",
 					isDraggingAttachments && "border-accent-8 bg-accent-2",
 				)}
 				disabled={isStarting}
@@ -2008,6 +1853,129 @@ function ManualStartComposer({
 	);
 }
 
+function InstructionInspector({
+	node,
+	onChange,
+}: {
+	node: WorkflowNode;
+	onChange: (data: Partial<WorkflowNodeData>) => void;
+}) {
+	return (
+		<InspectorSection title="Instruction">
+			<div className="flex flex-col gap-1 text-xs text-grayscale-11">
+				<span>Prompt template</span>
+				<Textarea
+					value={node.data.instruction ?? ""}
+					onChange={(event) => onChange({ instruction: event.target.value })}
+					className="min-h-40 font-mono"
+				/>
+			</div>
+		</InspectorSection>
+	);
+}
+
+function AgentDecisionInspector({
+	node,
+	onChange,
+}: {
+	node: WorkflowNode;
+	onChange: (data: Partial<WorkflowNodeData>) => void;
+}) {
+	const options = node.data.options ?? [];
+	const optionRowKeysRef = useRef<string[]>([]);
+
+	while (optionRowKeysRef.current.length < options.length) {
+		optionRowKeysRef.current.push(id());
+	}
+	if (optionRowKeysRef.current.length > options.length) {
+		optionRowKeysRef.current.splice(options.length);
+	}
+
+	const updateOption = (
+		optionIndex: number,
+		patch: Partial<DecisionOption>,
+	) => {
+		onChange({
+			options: options.map((option, index) =>
+				index === optionIndex ? { ...option, ...patch } : option,
+			),
+		});
+	};
+
+	const removeOption = (optionIndex: number) => {
+		optionRowKeysRef.current.splice(optionIndex, 1);
+		onChange({
+			options: options.filter(
+				(_current, currentIndex) => currentIndex !== optionIndex,
+			),
+		});
+	};
+
+	const addOption = () => {
+		optionRowKeysRef.current.push(id());
+		onChange({
+			options: options.concat({
+				id: `option_${options.length + 1}`,
+				label: `Option ${options.length + 1}`,
+			}),
+		});
+	};
+
+	return (
+		<InspectorSection title="Agent decision">
+			<div className="flex flex-col gap-1 text-xs text-grayscale-11">
+				<span>Question</span>
+				<Textarea
+					value={node.data.question ?? ""}
+					onChange={(event) => onChange({ question: event.target.value })}
+					className="min-h-28"
+				/>
+			</div>
+			<div className="flex flex-col gap-2">
+				{options.map((option, index) => (
+					<div
+						key={optionRowKeysRef.current[index]}
+						className="factory-floor-panel rounded-md border border-grayscale-4 bg-grayscale-2 p-2"
+					>
+						<label className="flex flex-col gap-1 text-xs text-grayscale-11">
+							Route id
+							<input
+								value={option.id}
+								onChange={(event) =>
+									updateOption(index, { id: event.target.value })
+								}
+								className="rounded-md border border-grayscale-6 bg-grayscale-1 px-2 py-1.5 font-mono text-xs text-grayscale-12 outline-none focus:border-grayscale-8 focus:ring-2 focus:ring-grayscale-4/60"
+							/>
+						</label>
+						<label className="mt-2 flex flex-col gap-1 text-xs text-grayscale-11">
+							Label
+							<input
+								value={option.label}
+								onChange={(event) =>
+									updateOption(index, { label: event.target.value })
+								}
+								className="rounded-md border border-grayscale-6 bg-grayscale-1 px-2 py-1.5 text-xs text-grayscale-12 outline-none focus:border-grayscale-8 focus:ring-2 focus:ring-grayscale-4/60"
+							/>
+						</label>
+						<Button
+							type="button"
+							variant="secondary"
+							className="mt-2 h-7 w-full"
+							onClick={() => removeOption(index)}
+							disabled={options.length === 1}
+						>
+							Remove option {index + 1}
+						</Button>
+					</div>
+				))}
+			</div>
+			<Button type="button" variant="secondary" onClick={addOption}>
+				Add option
+			</Button>
+		</InspectorSection>
+	);
+}
+
 function RouterInspector({
 	node,
 	onChange,
@@ -2034,7 +2002,7 @@ function RouterInspector({
 				{conditions.map((condition, index) => (
 					<div
 						key={condition.id}
-						className="rounded-md border border-grayscale-4 bg-grayscale-2 p-2"
+						className="factory-floor-panel rounded-md border border-grayscale-4 bg-grayscale-2 p-2"
 					>
 						<label className="flex flex-col gap-1 text-xs text-grayscale-11">
 							Exit label
@@ -2105,7 +2073,7 @@ function InspectorSection({
 	children: React.ReactNode;
 }) {
 	return (
-		<section className="flex flex-col gap-2 rounded-lg border border-grayscale-4 bg-grayscale-2 p-3">
+		<section className="factory-floor-panel flex flex-col gap-2 rounded-lg border border-grayscale-4 bg-grayscale-2 p-3">
 			<h2 className="font-mono text-[11px] font-semibold text-grayscale-10 uppercase">
 				{title}
 			</h2>
@@ -2122,8 +2090,14 @@ const getBlockIcon = (blockType: WorkflowBlockType) => {
 			return <KeyboardIcon weight="bold" className={className} />;
 		case "webhook":
 			return <WebhooksLogoIcon weight="bold" className={className} />;
+		case "instruction":
+			return <PaperPlaneTiltIcon weight="bold" className={className} />;
 		case "agentRun":
 			return <PlayCircleIcon weight="bold" className={className} />;
+		case "agentDecision":
+			return <GitBranchIcon weight="bold" className={className} />;
+		case "yesNoClassifier":
+			return <GitBranchIcon weight="bold" className={className} />;
 		case "httpRequest":
 			return <PaperPlaneTiltIcon weight="bold" className={className} />;
 		case "conditionalRouter":
@@ -2132,11 +2106,6 @@ const getBlockIcon = (blockType: WorkflowBlockType) => {
 			return <FlowArrowIcon weight="bold" className={className} />;
 	}
 };
-
-const compareFloorChangeProposals = (
-	first: FloorChangeProposal,
-	second: FloorChangeProposal,
-) => getProposalTime(second) - getProposalTime(first);
 
 const compareWorkflowTasks = (first: WorkflowTask, second: WorkflowTask) =>
 	getTaskTime(second) - getTaskTime(first);
@@ -2150,34 +2119,6 @@ const getTaskTime = (task: WorkflowTask) => {
 
 	const time = new Date(timestamp).getTime();
 	return Number.isNaN(time) ? 0 : time;
-};
-
-const getProposalTime = (proposal: FloorChangeProposal) => {
-	const timestamp = proposal.createdAt;
-
-	if (!timestamp) {
-		return 0;
-	}
-
-	const time = new Date(timestamp).getTime();
-	return Number.isNaN(time) ? 0 : time;
-};
-
-const formatProposalTimestamp = (value: unknown) => {
-	if (!value) {
-		return "Pending";
-	}
-
-	const date = new Date(String(value));
-
-	if (Number.isNaN(date.getTime())) {
-		return "Pending";
-	}
-
-	return date.toLocaleString(undefined, {
-		dateStyle: "medium",
-		timeStyle: "short",
-	});
 };
 
 const parseWorkflow = (value: unknown): FloorWorkflow => {
@@ -2227,6 +2168,12 @@ const normalizeWorkflowNode = (node: LegacyWorkflowNode): WorkflowNode => {
 				data: {
 					...data,
 					blockType: "agentRun",
+					label:
+						data.label === "Agent Run" ||
+						data.label === "Agent Session" ||
+						!data.label
+							? "Agent Step"
+							: data.label,
 				},
 			};
 		}
@@ -2250,9 +2197,11 @@ const normalizeWorkflowNode = (node: LegacyWorkflowNode): WorkflowNode => {
 		type: "agentRun",
 		data: {
 			blockType: "agentRun",
-			label: node.data.label || "Agent Run",
+			label:
+				node.data.label === "Agent Run" || !node.data.label
+					? "Agent Step"
+					: node.data.label,
 			prompt: "Use the human input:\n\n{{input.message}}",
-			responseSchema: '{\n  "type": "object",\n  "properties": {}\n}',
 		},
 	};
 };
@@ -2276,6 +2225,9 @@ const cloneWorkflow = (workflow: FloorWorkflow): FloorWorkflow => ({
 			conditions: node.data.conditions?.map((condition) => ({
 				...condition,
 			})),
+			options: node.data.options?.map((option) => ({
+				...option,
+			})),
 		},
 	})),
 	edges: workflow.edges.map((edge) =>
@@ -2287,37 +2239,6 @@ const cloneWorkflow = (workflow: FloorWorkflow): FloorWorkflow => ({
 		}),
 	),
 });
-
-const withCurrentNodePositions = (
-	workflow: FloorWorkflow,
-	currentNodes: WorkflowNode[],
-): FloorWorkflow => {
-	const positionsByNodeId = new Map(
-		currentNodes.map((node) => [node.id, node.position]),
-	);
-
-	return {
-		nodes: workflow.nodes.map((node) => {
-			const position = positionsByNodeId.get(node.id);
-
-			return position
-				? {
-						...node,
-						position: { ...position },
-					}
-				: node;
-		}),
-		edges: workflow.edges,
-	};
-};
-
-const withAcceptedLayoutPositions = (
-	workflow: FloorWorkflow,
-	acceptedWorkflow: FloorWorkflow | undefined,
-): FloorWorkflow =>
-	acceptedWorkflow
-		? withCurrentNodePositions(workflow, acceptedWorkflow.nodes)
-		: workflow;
 
 const withSyncedWebhookEntities = (
 	workflow: FloorWorkflow,
@@ -2422,13 +2343,6 @@ const getActualFlowChangeKeys = (
 		return [`${entityType}-${change.type}:${change.id ?? index}`];
 	});
 
-const hasCompletedPositionChange = (
-	changes: Array<{ type: string; dragging?: boolean }>,
-) =>
-	changes.some(
-		(change) => change.type === "position" && change.dragging !== true,
-	);
-
 const isLegacyWorkflowNode = (value: unknown): value is LegacyWorkflowNode =>
 	isRecord(value) &&
 	typeof value.id === "string" &&
@@ -2447,7 +2361,10 @@ const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
 const isWorkflowBlockType = (value: unknown): value is WorkflowBlockType =>
 	value === "manualStart" ||
 	value === "webhook" ||
+	value === "instruction" ||
 	value === "agentRun" ||
+	value === "agentDecision" ||
+	value === "yesNoClassifier" ||
 	value === "httpRequest" ||
 	value === "conditionalRouter" ||
 	value === "completeTask";

@@ -15,7 +15,6 @@ import {
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import { type FileDiffMetadata, parsePatchFiles } from "@pierre/diffs";
-import db from "@/instant.client";
 import { DateTime } from "luxon";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
@@ -63,6 +62,7 @@ import {
 } from "@/helpers/chat-view-helper";
 import { cn } from "@/helpers/classname-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
+import db from "@/instant.client";
 
 const MIN_PREVIEW_SIZE = 320;
 const MAX_PREVIEW_SIZE = 720;
@@ -123,6 +123,18 @@ const eventTx = (eventId: string) => {
 
 	if (!tx) {
 		throw new Error(`Event transaction builder ${eventId} not found`);
+	}
+
+	return tx;
+};
+
+const agentSessionTx = (agentSessionId: string) => {
+	const tx = db.tx.agentSessions[agentSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Agent session transaction builder ${agentSessionId} not found`,
+		);
 	}
 
 	return tx;
@@ -243,6 +255,11 @@ const asJsonRecord = (value: unknown): JsonRecord | null => {
 	return null;
 };
 
+const getEntityId = (value: unknown) => {
+	const id = asJsonRecord(value)?.id;
+	return typeof id === "string" ? id : undefined;
+};
+
 const getTaskStatusLabel = ({
 	completedAt,
 	status,
@@ -263,6 +280,26 @@ const getTaskStatusLabel = ({
 	}
 
 	return "Idle";
+};
+
+const compareAgentSessions = (
+	first: { createdAt?: string | number | Date | null },
+	second: { createdAt?: string | number | Date | null },
+) => getTimestamp(first.createdAt) - getTimestamp(second.createdAt);
+
+const getTimestamp = (value: string | number | Date | null | undefined) => {
+	if (!value) {
+		return 0;
+	}
+
+	const timestamp =
+		value instanceof Date
+			? value.getTime()
+			: typeof value === "number"
+				? value
+				: new Date(value).getTime();
+
+	return Number.isNaN(timestamp) ? 0 : timestamp;
 };
 
 export default function TaskPage() {
@@ -287,6 +324,9 @@ export default function TaskPage() {
 	const [chatViewMode, setChatViewMode] = useState<ChatViewMode>(
 		DEFAULT_CHAT_VIEW_MODE,
 	);
+	const [selectedAgentSessionId, setSelectedAgentSessionId] = useState<
+		string | null
+	>(null);
 
 	useEffect(() => {
 		setHasRightPanel(true);
@@ -371,6 +411,10 @@ export default function TaskPage() {
 			terminalSessions: {
 				services: {},
 			},
+			agent: {},
+			agentSessions: {
+				agent: {},
+			},
 		},
 	});
 
@@ -389,12 +433,34 @@ export default function TaskPage() {
 					serverCreatedAt: "desc",
 				},
 			},
+			agentSession: {},
 		},
 	});
 
 	const task = data?.tasks?.[0];
 	const events = eventsData?.events;
-	const timeline = useMemo(() => buildTimeline(events ?? []), [events]);
+	const agentSessions = useMemo(
+		() => (task?.agentSessions ?? []).slice().sort(compareAgentSessions),
+		[task?.agentSessions],
+	);
+	const selectedAgentSession =
+		agentSessions.find((session) => session.id === selectedAgentSessionId) ??
+		agentSessions[0];
+	const scopedEvents = useMemo(() => {
+		if (!selectedAgentSession) {
+			return events ?? [];
+		}
+
+		const isFirstSession = selectedAgentSession.id === agentSessions[0]?.id;
+
+		return (events ?? []).filter((event) => {
+			const eventSessionId = getEntityId(event.agentSession);
+			return eventSessionId
+				? eventSessionId === selectedAgentSession.id
+				: isFirstSession;
+		});
+	}, [agentSessions, events, selectedAgentSession]);
+	const timeline = useMemo(() => buildTimeline(scopedEvents), [scopedEvents]);
 	const visibleTimeline = useMemo(
 		() =>
 			chatViewMode === "minified"
@@ -516,6 +582,22 @@ export default function TaskPage() {
 	}, [task]);
 
 	useEffect(() => {
+		const firstAgentSession = agentSessions[0];
+
+		if (!firstAgentSession) {
+			setSelectedAgentSessionId(null);
+			return;
+		}
+
+		if (
+			!selectedAgentSessionId ||
+			!agentSessions.some((session) => session.id === selectedAgentSessionId)
+		) {
+			setSelectedAgentSessionId(firstAgentSession.id);
+		}
+	}, [agentSessions, selectedAgentSessionId]);
+
+	useEffect(() => {
 		const firstService = services[0];
 
 		if (!firstService) {
@@ -623,6 +705,8 @@ export default function TaskPage() {
 
 		try {
 			const attachments = await uploadFileAttachments(task.id);
+			const agentSessionId =
+				selectedAgentSession?.id ?? (await createAgentSession("Agent"));
 
 			setMessage("");
 			clearFileAttachments();
@@ -645,11 +729,37 @@ export default function TaskPage() {
 						data: { content, attachments },
 						createdAt: DateTime.now().toISO(),
 					})
-					.link({ task: taskId as string }),
+					.link({ task: taskId as string, agentSession: agentSessionId }),
 			);
 		} finally {
 			setIsSendingMessage(false);
 		}
+	};
+
+	const createAgentSession = async (name = "Agent") => {
+		if (!task) {
+			throw new Error("Task is not loaded");
+		}
+
+		const rawAgentId = asJsonRecord(task.agent)?.id;
+		const agentId = typeof rawAgentId === "string" ? rawAgentId : undefined;
+		const agentSessionId = id();
+		const createdAt = DateTime.now().toISO();
+
+		const transaction = agentSessionTx(agentSessionId).create({
+			name,
+			status: "idle",
+			createdAt,
+			updatedAt: createdAt,
+		});
+
+		await db.transact(
+			agentId
+				? transaction.link({ task: task.id, agent: agentId })
+				: transaction.link({ task: task.id }),
+		);
+		setSelectedAgentSessionId(agentSessionId);
+		return agentSessionId;
 	};
 
 	const handleComposerDragOver = (
@@ -787,6 +897,11 @@ export default function TaskPage() {
 						<span className="truncate text-xs font-medium text-grayscale-11">
 							{taskStatusLabel}
 						</span>
+						{selectedAgentSession ? (
+							<span className="truncate border-l border-grayscale-4 pl-2 text-xs text-grayscale-10">
+								{selectedAgentSession.status ?? "idle"}
+							</span>
+						) : null}
 					</div>
 					<Tabs.Root
 						value={chatViewMode}
@@ -803,6 +918,41 @@ export default function TaskPage() {
 							<Tabs.Indicator />
 						</Tabs.List>
 					</Tabs.Root>
+				</div>
+				<div className="flex shrink-0 flex-row items-center gap-2 border-b border-grayscale-4 px-3 py-1.5">
+					{agentSessions.length > 0 ? (
+						<Tabs.Root
+							value={selectedAgentSession?.id ?? null}
+							onValueChange={(value) => {
+								setSelectedAgentSessionId(value == null ? null : String(value));
+							}}
+							className="min-w-0 flex-1"
+						>
+							<Tabs.List>
+								{agentSessions.map((session, index) => (
+									<Tabs.Tab key={session.id} value={session.id}>
+										{session.name || `Session ${index + 1}`}
+									</Tabs.Tab>
+								))}
+								<Tabs.Indicator />
+							</Tabs.List>
+						</Tabs.Root>
+					) : (
+						<p className="min-w-0 flex-1 truncate text-xs text-grayscale-10">
+							No agent sessions yet
+						</p>
+					)}
+					<Button
+						type="button"
+						variant="secondary"
+						className="h-7 shrink-0"
+						onClick={() => {
+							void createAgentSession(`Session ${agentSessions.length + 1}`);
+						}}
+					>
+						<PlusCircleIcon weight="bold" className="size-4" />
+						Add session
+					</Button>
 				</div>
 				<ScrollArea.Root className="min-h-0 flex-1">
 					<ScrollArea.Viewport ref={scrollContainerRef} onScroll={handleScroll}>
