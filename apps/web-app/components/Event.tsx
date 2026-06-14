@@ -14,6 +14,7 @@ import {
 	type LinkSafetyConfig,
 	Streamdown,
 } from "streamdown";
+import { getPublicServiceUrl } from "@/helpers/service-preview-url-helper";
 import type { AppSchema } from "@/instant.schema";
 import CodeBlock from "./CodeBlock";
 import Logo from "./Logo";
@@ -61,9 +62,6 @@ const MESSAGE_COMPONENTS = {
 	code: MarkdownCodeBlock,
 	inlineCode: InlineCode,
 } as Components;
-const previewsDomain =
-	process.env.NEXT_PUBLIC_FACTORYPLANE_PREVIEWS_DOMAIN ??
-	"previews.factoryplane.com";
 
 const toneClasses: Record<Tone, string> = {
 	neutral: "text-grayscale-11",
@@ -495,7 +493,10 @@ function ServiceEvent({
 	type: string;
 }) {
 	const name = getString(data, "name") ?? "Service";
-	const url = getPublicServiceUrl(data);
+	const url = getPublicServiceUrl({
+		serviceId: getString(data, "serviceId"),
+		url: getString(data, "url"),
+	});
 	const isFailure = type.includes("failed");
 	const title =
 		type === "factoryplane.service_started"
@@ -539,18 +540,6 @@ function ServiceEvent({
 			/>
 		</EventCard>
 	);
-}
-
-function getPublicServiceUrl(data: JsonRecord) {
-	const url = getString(data, "url");
-
-	if (url && !url.includes(".e2b.app")) {
-		return url;
-	}
-
-	const serviceId = getString(data, "serviceId");
-
-	return serviceId ? `https://${serviceId}.${previewsDomain}` : undefined;
 }
 
 function RepositoryEvent({

@@ -61,6 +61,7 @@ import {
 	getStoredDefaultChatViewMode,
 } from "@/helpers/chat-view-helper";
 import { cn } from "@/helpers/classname-helper";
+import { getPublicServiceUrl } from "@/helpers/service-preview-url-helper";
 import { toTaskDotStatus } from "@/helpers/task-status-helper";
 import db from "@/instant.client";
 
@@ -1486,31 +1487,39 @@ function TerminalSessionSummary({
 				<p className="text-xs text-grayscale-10">Linked previews</p>
 				{services.length > 0 ? (
 					<div className="flex flex-col gap-1.5">
-						{services.map((service) => (
-							<div
-								key={service.id}
-								className="flex flex-row items-center justify-between gap-3 bg-grayscale-2 px-2 py-1.5"
-							>
-								<div className="min-w-0">
-									<p className="truncate text-xs text-grayscale-12">
-										{service.name}
-									</p>
-									<p className="truncate text-xs text-grayscale-10">
-										:{service.portNumber ?? "?"} · {service.status ?? "unknown"}
-									</p>
+						{services.map((service) => {
+							const publicUrl = getPublicServiceUrl({
+								serviceId: service.id,
+								url: service.url,
+							});
+
+							return (
+								<div
+									key={service.id}
+									className="flex flex-row items-center justify-between gap-3 bg-grayscale-2 px-2 py-1.5"
+								>
+									<div className="min-w-0">
+										<p className="truncate text-xs text-grayscale-12">
+											{service.name}
+										</p>
+										<p className="truncate text-xs text-grayscale-10">
+											:{service.portNumber ?? "?"} ·{" "}
+											{service.status ?? "unknown"}
+										</p>
+									</div>
+									{publicUrl ? (
+										<a
+											href={publicUrl}
+											target="_blank"
+											rel="noreferrer"
+											className="shrink-0 text-xs text-accent-11 hover:text-accent-12"
+										>
+											Open
+										</a>
+									) : null}
 								</div>
-								{service.url ? (
-									<a
-										href={service.url}
-										target="_blank"
-										rel="noreferrer"
-										className="shrink-0 text-xs text-accent-11 hover:text-accent-12"
-									>
-										Open
-									</a>
-								) : null}
-							</div>
-						))}
+							);
+						})}
 					</div>
 				) : (
 					<p className="text-xs text-grayscale-10">
