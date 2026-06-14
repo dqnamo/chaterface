@@ -44,6 +44,26 @@ const CHAT_VIEW_LABELS: Record<ChatViewMode, string> = {
 	full: "Full",
 };
 
+const userTx = (userId: string) => {
+	const tx = db.tx.$users[userId];
+
+	if (!tx) {
+		throw new Error(`User transaction builder ${userId} not found`);
+	}
+
+	return tx;
+};
+
+const memberTx = (memberId: string) => {
+	const tx = db.tx.members[memberId];
+
+	if (!tx) {
+		throw new Error(`Member transaction builder ${memberId} not found`);
+	}
+
+	return tx;
+};
+
 export default function PersonalSettingsPage() {
 	return (
 		<div className="relative h-full w-full overflow-y-auto bg-grayscale-1">
@@ -162,7 +182,7 @@ function ProfileNameSetting() {
 	}, [member?.name, userRecord?.name]);
 
 	const saveProfile = async () => {
-		if (!user?.refresh_token || isSaving) {
+		if (!user?.id || isSaving) {
 			return;
 		}
 
@@ -170,24 +190,18 @@ function ProfileNameSetting() {
 		setIsSaving(true);
 
 		try {
-			const response = await fetch("/api/profile", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${user.refresh_token}`,
-				},
-				body: JSON.stringify({
-					userName,
-					...(member?.id ? { memberId: member.id, memberName } : {}),
+			await db.transact([
+				userTx(user.id).update({
+					name: normalizeName(userName),
 				}),
-			});
-
-			if (!response.ok) {
-				const body = (await response.json().catch(() => undefined)) as
-					| { message?: string }
-					| undefined;
-				throw new Error(body?.message ?? "Failed to save profile");
-			}
+				...(member?.id
+					? [
+							memberTx(member.id).update({
+								name: normalizeName(memberName),
+							}),
+						]
+					: []),
+			]);
 
 			setStatus("Saved.");
 		} catch (error) {
@@ -223,7 +237,7 @@ function ProfileNameSetting() {
 				</p>
 				<Button
 					type="button"
-					disabled={isSaving || !user?.refresh_token}
+					disabled={isSaving || !user?.id}
 					onClick={saveProfile}
 					className="shrink-0"
 				>
@@ -233,6 +247,11 @@ function ProfileNameSetting() {
 			</div>
 		</div>
 	);
+}
+
+function normalizeName(value: string) {
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function ThemeSetting() {
