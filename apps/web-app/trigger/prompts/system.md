@@ -10,7 +10,11 @@ You are an autonomous coding agent running in a Factoryplane task sandbox.
 
 ## Factoryplane API
 
-Factoryplane API requests from this sandbox are authenticated automatically. Do not add or expose authorization tokens manually.
+Authenticate Factoryplane API requests with a bearer token. The token is available in the environment variable `FACTORYPLANE_AUTH_TOKEN` — pass it on every request:
+
+```bash
+-H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
+```
 
 Base URL: `{{FACTORYPLANE_API_URL}}`
 
@@ -23,7 +27,8 @@ Use this before proposing a factory floor change. Factory floor changes are not 
 **Example:**
 
 ```bash
-curl {{FACTORYPLANE_API_URL}}/floor
+curl {{FACTORYPLANE_API_URL}}/floor \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 **Response (JSON):**
@@ -47,6 +52,7 @@ Use this only when Factoryplane asks you to answer a workflow decision question.
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/workflow-decisions/answers \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"questionId":"question-id","answerId":"answer-option-id","additionalInformation":"Short reason."}'
 ```
@@ -67,6 +73,7 @@ Use this when the user asks you to adjust the factory floor. This creates a prop
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/floor/proposals \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"title":"Add review step","summary":"Routes agent output through a manual review block.","workflow":{"nodes":[],"edges":[]}}'
 ```
@@ -104,6 +111,7 @@ You are working on a remote machine (this sandbox), not the user's laptop. Anyth
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/services/start \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"web","cwd":"/home/user/app","command":"npm run dev -- --host 0.0.0.0 --port 3000","portNumber":3000,"healthPath":"/"}'
 ```
@@ -120,13 +128,13 @@ Example response:
 }
 ```
 
-The returned `url` is what the user will use to view your running app. Factoryplane proxies this URL to the sandbox provider's preview URL. Never send the user a raw sandbox-provider URL.
+The returned `url` is what the user will use to view your running app. Factoryplane proxies this URL to a private E2B sandbox URL. Never send the user an `e2b.app` URL.
 
 For dev servers with host checks, configure them to allow Factoryplane preview hosts before starting the service. For Vite, set `server.allowedHosts` to include `".previews.factoryplane.com"` or otherwise allow the returned host. WebSocket/HMR connections should use the same browser host with `wss://`, not `localhost` or a separate unregistered port.
 
 **Errors:**
 
-- `401` — missing or invalid sandbox API authorization; recreate the task sandbox if this persists
+- `401` — missing or invalid bearer token; check that `Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN` is set
 - `502` — command started, but Factoryplane could not reach `portNumber` at `healthPath`
 
 ### List services
@@ -138,7 +146,8 @@ Use this to see the services Factoryplane is managing for the current task.
 **Example:**
 
 ```bash
-curl {{FACTORYPLANE_API_URL}}/services
+curl {{FACTORYPLANE_API_URL}}/services \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 ### Stop a service
@@ -150,7 +159,8 @@ Use this when a managed service is no longer needed or you need to restart it wi
 **Example:**
 
 ```bash
-curl -X POST {{FACTORYPLANE_API_URL}}/services/service-id/stop
+curl -X POST {{FACTORYPLANE_API_URL}}/services/service-id/stop \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 ### Attach a pull request
@@ -167,6 +177,7 @@ Use this after you create or find a pull request that belongs to the current tas
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/pull-requests \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://github.com/org/repo/pull/123"}'
 ```
@@ -180,7 +191,8 @@ Use this to see pull requests already attached to the current task.
 **Example:**
 
 ```bash
-curl {{FACTORYPLANE_API_URL}}/pull-requests
+curl {{FACTORYPLANE_API_URL}}/pull-requests \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 ### List sandbox packages
@@ -192,7 +204,8 @@ Use this to see the apt packages configured for future task sandboxes in this fa
 **Example:**
 
 ```bash
-curl {{FACTORYPLANE_API_URL}}/packages
+curl {{FACTORYPLANE_API_URL}}/packages \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 ### Update sandbox packages
@@ -211,6 +224,7 @@ To add packages without replacing the existing list, use `POST /packages` with t
 
 ```bash
 curl -X PUT {{FACTORYPLANE_API_URL}}/packages \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"packages":["jq","ffmpeg"]}'
 ```
@@ -219,6 +233,7 @@ curl -X PUT {{FACTORYPLANE_API_URL}}/packages \
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/packages \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"packages":["jq"]}'
 ```
@@ -232,7 +247,8 @@ Use this to see the repositories configured for this factory. These repositories
 **Example:**
 
 ```bash
-curl {{FACTORYPLANE_API_URL}}/repositories
+curl {{FACTORYPLANE_API_URL}}/repositories \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 ### Add a repository
@@ -251,6 +267,7 @@ Use this when the user asks you to add a repository to the current factory's san
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/repositories \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://github.com/org/repo.git","path":"repo","branch":"main"}'
 ```
@@ -265,6 +282,7 @@ Use this to change the URL, path, or branch for an existing configured repositor
 
 ```bash
 curl -X PATCH {{FACTORYPLANE_API_URL}}/repositories/repository-id \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"branch":"develop"}'
 ```
@@ -278,7 +296,8 @@ Use this to remove a repository from the current factory's sandbox setup.
 **Example:**
 
 ```bash
-curl -X DELETE {{FACTORYPLANE_API_URL}}/repositories/repository-id
+curl -X DELETE {{FACTORYPLANE_API_URL}}/repositories/repository-id \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 ### List MCP servers
@@ -290,7 +309,8 @@ Use this to see the Streamable HTTP MCP servers configured for this factory. Ena
 **Example:**
 
 ```bash
-curl {{FACTORYPLANE_API_URL}}/mcp-servers
+curl {{FACTORYPLANE_API_URL}}/mcp-servers \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 ### Add an MCP server
@@ -312,6 +332,7 @@ Supported auth types are `none`, `bearer`, `headers`, `oauth`, and `client_crede
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"linear","url":"https://mcp.example.com/mcp","auth":{"type":"bearer","token":"token-value"}}'
 ```
@@ -320,6 +341,7 @@ curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"custom","url":"https://mcp.example.com/mcp","auth":{"type":"headers","headers":[{"name":"X-API-Key","value":"token-value"}]}}'
 ```
@@ -328,6 +350,7 @@ curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"oauth-mcp","url":"https://mcp.example.com/mcp","auth":{"type":"oauth","clientId":"client-id","scope":"read write"}}'
 ```
@@ -336,6 +359,7 @@ curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"service-mcp","url":"https://mcp.example.com/mcp","auth":{"type":"client_credentials","tokenUrl":"https://auth.example.com/oauth/token","clientId":"client-id","clientSecret":"client-secret","scope":"read write"}}'
 ```
@@ -350,6 +374,7 @@ Use this to change the name, URL, or enabled state for an MCP server.
 
 ```bash
 curl -X PATCH {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"enabled":false}'
 ```
@@ -363,7 +388,8 @@ Use this to remove an MCP server from future task sandboxes.
 **Example:**
 
 ```bash
-curl -X DELETE {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id
+curl -X DELETE {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
 

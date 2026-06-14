@@ -1,15 +1,12 @@
 "use client";
 
-import { type InstaQLEntity, id } from "@instantdb/react";
+import type { InstaQLEntity } from "@instantdb/react";
 import {
 	PlusIcon,
 	RobotIcon,
 	TrashIcon,
 	WarningCircleIcon,
 } from "@phosphor-icons/react";
-import db from "@/instant.client";
-import type { AppSchema } from "@/instant.schema";
-import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
@@ -25,6 +22,8 @@ import CornerBrackets from "@/components/CornerBrackets";
 import { Input, Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
+import db from "@/instant.client";
+import type { AppSchema } from "@/instant.schema";
 
 type Agent = InstaQLEntity<AppSchema, "agents">;
 type AgentProvider = "codex" | "cursor";
@@ -62,6 +61,7 @@ const getProviderLabel = (provider: string | undefined) =>
 export default function AgentsPage() {
 	const { orgHandle } = useParams();
 	const currentOrgHandle = orgHandle as string;
+	const { user } = db.useAuth();
 	const [name, setName] = useState("");
 	const [provider, setProvider] = useState<AgentProvider>("codex");
 	const [codexAuth, setCodexAuth] = useState("");
@@ -80,7 +80,11 @@ export default function AgentsPage() {
 					handle: currentOrgHandle,
 				},
 			},
-			agents: {},
+			agents: {
+				$: {
+					fields: ["name", "createdAt", "provider", "settings", "status"],
+				},
+			},
 		},
 	});
 
@@ -126,23 +130,41 @@ export default function AgentsPage() {
 			}
 		}
 
-		const agentId = id();
-		await db.transact(
-			agentTx(agentId)
-				.create({
-					name: trimmedName,
-					provider,
-					createdAt: DateTime.now().toISO(),
-					status: "creating",
-					auth,
-					settings: {
-						agentModel,
-						agentReasoningEffort,
-						agentSpeed,
-					},
-				})
-				.link({ organisation: organisation.id }),
-		);
+		if (!user?.refresh_token) {
+			setFormError("You must be signed in to create an agent.");
+			return;
+		}
+
+		const response = await fetch("/api/agents", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${user.refresh_token}`,
+			},
+			body: JSON.stringify({
+				organisationId: organisation.id,
+				name: trimmedName,
+				provider,
+				auth,
+				settings: {
+					agentModel,
+					agentReasoningEffort,
+					agentSpeed,
+				},
+			}),
+		});
+
+		if (!response.ok) {
+			const body = (await response.json().catch(() => ({}))) as {
+				message?: unknown;
+			};
+			setFormError(
+				typeof body.message === "string"
+					? body.message
+					: "Failed to create agent.",
+			);
+			return;
+		}
 
 		setName("");
 		setCodexAuth("");

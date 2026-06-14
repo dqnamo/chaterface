@@ -414,7 +414,11 @@ function FactoryFloorEditor() {
 					handle: currentOrgHandle,
 				},
 			},
-			agents: {},
+			agents: {
+				$: {
+					fields: ["name", "provider", "settings"],
+				},
+			},
 		},
 		factories: {
 			$: {

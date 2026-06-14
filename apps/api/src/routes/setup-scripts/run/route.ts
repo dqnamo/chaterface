@@ -1,8 +1,8 @@
 import db, { id } from "@repo/db/admin";
 import { createEncryptionService } from "@repo/encryption";
 import { getBearerToken } from "../../../lib/agent-auth.js";
+import { E2BSandbox as Sandbox } from "../../../lib/e2b-sandbox.js";
 import type { RouteHandler } from "../../../lib/file-router.js";
-import { UpstashBoxSandbox as Sandbox } from "../../../lib/upstash-box-sandbox.js";
 
 type SetupScriptKind = "new_task" | "new_turn";
 

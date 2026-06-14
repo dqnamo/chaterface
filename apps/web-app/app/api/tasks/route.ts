@@ -189,7 +189,11 @@ const authenticateFactoryRequest = async (
 					},
 				},
 				organisation: {
-					agents: {},
+					agents: {
+						$: {
+							fields: ["name"],
+						},
+					},
 					members: {
 						user: {},
 					},

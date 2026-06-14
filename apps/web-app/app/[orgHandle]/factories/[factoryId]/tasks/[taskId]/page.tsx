@@ -510,7 +510,9 @@ export default function TaskPage() {
 					serverCreatedAt: "desc",
 				},
 			},
-			agentSession: {},
+			agentSession: {
+				agent: {},
+			},
 		},
 	});
 
@@ -530,6 +532,8 @@ export default function TaskPage() {
 	const selectedAgentSession =
 		agentSessions.find((session) => session.id === selectedAgentSessionId) ??
 		agentSessions[0];
+	const selectedAgentName =
+		selectedAgentSession?.agent?.name ?? task?.agent?.name ?? undefined;
 	const scopedEvents = useMemo(() => {
 		if (!selectedAgentSession) {
 			return events ?? [];
@@ -1063,6 +1067,7 @@ export default function TaskPage() {
 								<AnimatePresence initial={false}>
 									{visibleTimeline.map((node) => (
 										<Event
+											agentName={selectedAgentName}
 											currentUserProfile={currentUserProfile}
 											key={node.key}
 											node={node}

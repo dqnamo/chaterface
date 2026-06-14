@@ -2,7 +2,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
 import db from "@repo/db/admin";
-import { WebSocket, WebSocketServer } from "ws";
+import type { CommandHandle } from "e2b";
+import { type RawData, WebSocket, WebSocketServer } from "ws";
+import { E2BSandbox as Sandbox } from "./e2b-sandbox.js";
 
 type TerminalSessionTicket = {
 	terminalSessionId: string;
@@ -15,6 +17,17 @@ type TerminalSessionContext = {
 	sandboxId: string;
 	pid: number;
 };
+
+type ClientMessage =
+	| {
+			type: "input";
+			data: string;
+	  }
+	| {
+			type: "resize";
+			cols: number;
+			rows: number;
+	  };
 
 const terminalSessionPathPattern = /^\/terminal-sessions\/([^/]+)\/connect$/;
 
@@ -62,17 +75,86 @@ const bridgeTerminalSession = async (
 	ws: WebSocket,
 	context: TerminalSessionContext,
 ) => {
-	console.log("Terminal attach is unavailable for Upstash Box sessions", {
-		terminalSessionId: context.terminalSessionId,
-		sandboxId: context.sandboxId,
-		pid: context.pid,
+	let sandbox: Sandbox | undefined;
+	let handle: CommandHandle | undefined;
+
+	try {
+		sendJson(ws, {
+			type: "status",
+			status: "connecting",
+		});
+
+		sandbox = await Sandbox.connect(context.sandboxId);
+		handle = await sandbox.pty.connect(context.pid, {
+			timeoutMs: 0,
+			onData: (data) => {
+				sendJson(ws, {
+					type: "data",
+					data: new TextDecoder().decode(data),
+				});
+			},
+		});
+
+		sendJson(ws, {
+			type: "ready",
+			pid: handle.pid,
+		});
+
+		ws.on("message", (message) => {
+			void handleClientMessage(ws, sandbox, context, message);
+		});
+
+		ws.on("close", () => {
+			void handle?.disconnect();
+		});
+	} catch (error) {
+		sendJson(ws, {
+			type: "error",
+			message: serializeError(error),
+		});
+		ws.close(1011, "Failed to connect terminal session");
+		await handle?.disconnect();
+	}
+};
+
+const handleClientMessage = async (
+	ws: WebSocket,
+	sandbox: Sandbox | undefined,
+	context: TerminalSessionContext,
+	message: RawData,
+) => {
+	if (!sandbox) {
+		return;
+	}
+
+	const parsed = parseClientMessage(message);
+
+	if (!parsed) {
+		sendJson(ws, {
+			type: "error",
+			message: "Invalid terminal message",
+		});
+		return;
+	}
+
+	if (parsed.type === "input") {
+		await sandbox.pty.sendInput(
+			context.pid,
+			new TextEncoder().encode(parsed.data),
+		);
+		await touchTerminalSession(context.terminalSessionId);
+		return;
+	}
+
+	await sandbox.pty.resize(context.pid, {
+		cols: parsed.cols,
+		rows: parsed.rows,
 	});
-	sendJson(ws, {
-		type: "error",
-		message:
-			"Interactive terminal attach is not supported by the Upstash Box SDK.",
-	});
-	ws.close(1011, "Terminal attach is not supported");
+	await updateTerminalSessionSize(
+		context.terminalSessionId,
+		parsed.cols,
+		parsed.rows,
+	);
 };
 
 const getTerminalSessionContext = async (
@@ -180,6 +262,83 @@ const isTerminalSessionTicket = (
 	);
 };
 
+const parseClientMessage = (message: RawData): ClientMessage | null => {
+	if (!Buffer.isBuffer(message)) {
+		return null;
+	}
+
+	let parsed: unknown;
+
+	try {
+		parsed = JSON.parse(message.toString("utf8"));
+	} catch {
+		return null;
+	}
+
+	if (!isRecord(parsed) || typeof parsed.type !== "string") {
+		return null;
+	}
+
+	if (parsed.type === "input" && typeof parsed.data === "string") {
+		return {
+			type: "input",
+			data: parsed.data,
+		};
+	}
+
+	if (
+		parsed.type === "resize" &&
+		typeof parsed.cols === "number" &&
+		typeof parsed.rows === "number" &&
+		Number.isInteger(parsed.cols) &&
+		Number.isInteger(parsed.rows) &&
+		parsed.cols > 0 &&
+		parsed.rows > 0
+	) {
+		return {
+			type: "resize",
+			cols: parsed.cols,
+			rows: parsed.rows,
+		};
+	}
+
+	return null;
+};
+
+const updateTerminalSessionSize = async (
+	terminalSessionId: string,
+	cols: number,
+	rows: number,
+) => {
+	await db.transact(
+		terminalSessionTx(terminalSessionId).update({
+			cols,
+			rows,
+			lastActivityAt: new Date().toISOString(),
+		}),
+	);
+};
+
+const touchTerminalSession = async (terminalSessionId: string) => {
+	await db.transact(
+		terminalSessionTx(terminalSessionId).update({
+			lastActivityAt: new Date().toISOString(),
+		}),
+	);
+};
+
+const terminalSessionTx = (terminalSessionId: string) => {
+	const tx = db.tx.terminalSessions[terminalSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Terminal session transaction builder ${terminalSessionId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 const sendJson = (ws: WebSocket, value: unknown) => {
 	if (ws.readyState === WebSocket.OPEN) {
 		ws.send(JSON.stringify(value));
@@ -222,6 +381,10 @@ const getTicketSecret = () => {
 	}
 
 	return secret;
+};
+
+const serializeError = (error: unknown) => {
+	return error instanceof Error ? error.message : String(error);
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {

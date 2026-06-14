@@ -1,6 +1,6 @@
 import db, { id } from "@repo/db/admin";
+import { E2BSandbox as Sandbox } from "../../../../lib/e2b-sandbox.js";
 import type { RouteHandler } from "../../../../lib/file-router.js";
-import { UpstashBoxSandbox as Sandbox } from "../../../../lib/upstash-box-sandbox.js";
 
 const serviceTx = (serviceId: string) => {
 	const tx = db.tx.services[serviceId];
@@ -90,7 +90,9 @@ export const POST: RouteHandler = async (c) => {
 	if (typeof pid === "number") {
 		try {
 			const sandbox = await Sandbox.connect(task.sandboxId);
-			killed = await sandbox.commands.kill(pid);
+			killed = terminalSessionId
+				? await sandbox.pty.kill(pid)
+				: await sandbox.commands.kill(pid);
 
 			if (!killed && typeof service.pid === "number") {
 				killed = await sandbox.commands.kill(service.pid);

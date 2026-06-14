@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { InstaQLEntity } from "@instantdb/react";
 import { task } from "@trigger.dev/sdk";
+import { decryptAgentAuth } from "@/agent-auth-storage";
 import {
 	CODEX_REASONING_EFFORT_OPTIONS,
 	DEFAULT_CODEX_MODEL,
@@ -16,8 +17,8 @@ import {
 	formatCodexDeveloperInstructionsConfig,
 	getCodexDeveloperInstructions,
 } from "./codex-system-prompt";
+import { E2BSandbox as Sandbox } from "./e2b-sandbox";
 import { syncAgentAuthFromSandbox } from "./sync-agent-auth";
-import { UpstashBoxSandbox as Sandbox } from "./upstash-box-sandbox";
 
 type Event = InstaQLEntity<AppSchema, "events">;
 type Task = InstaQLEntity<AppSchema, "tasks">;
@@ -196,14 +197,24 @@ const getCursorApiKey = (auth: unknown) => {
 		: undefined;
 };
 
-const getCursorAuthEnvs = (agent: Agent): Record<string, string> => {
-	const apiKey = getCursorApiKey(agent.auth);
+const getCursorAuthEnvs = async (
+	agent: Agent,
+): Promise<Record<string, string>> => {
+	const apiKey = getCursorApiKey(await getAgentAuth(agent));
 
 	if (!apiKey) {
 		throw new Error(`Cursor agent ${agent.id} is missing auth.apiKey`);
 	}
 
 	return { CURSOR_API_KEY: apiKey };
+};
+
+const getAgentAuth = async (agent: Agent) => {
+	if (!agent.auth) {
+		throw new Error(`Agent ${agent.id} is missing auth`);
+	}
+
+	return decryptAgentAuth(agent.auth);
 };
 
 const getCursorPathPrefix = () =>
@@ -1758,22 +1769,19 @@ const setupTaskSandbox = async (
 	task: Task,
 	factory: FactoryWithRepositories,
 ) => {
-	if (!agent.auth || !factory) {
-		throw new Error(`Agent ${agent.id} is missing auth or factory`);
+	if (!factory) {
+		throw new Error(`Agent ${agent.id} is missing factory`);
 	}
 
+	const agentAuth = await getAgentAuth(agent);
 	const sandbox = await runSetupStep(
 		task.id,
 		"sandbox",
 		"Create sandbox",
-		async () => {
-			const agentToken = await ensureTaskAgentToken(task);
-
-			return Sandbox.create("codex", {
+		() =>
+			Sandbox.create("codex", {
 				timeoutMs: 10 * 60 * 1000,
-				attachHeaders: buildFactoryplaneAttachHeaders(agentToken),
-			});
-		},
+			}),
 		{ timeoutMs: 120_000 },
 	);
 	const provider = getAgentProvider(agent);
@@ -1781,11 +1789,12 @@ const setupTaskSandbox = async (
 	await db.transact(
 		taskTx(task.id).update({
 			sandboxId: sandbox.sandboxId,
+			sandboxTrafficAccessToken: sandbox.trafficAccessToken,
 		}),
 	);
 
 	if (provider === "cursor") {
-		getCursorAuthEnvs(agent);
+		await getCursorAuthEnvs(agent);
 		const cursorInstall = await runSetupStep(
 			task.id,
 			"cursor_update",
@@ -1799,7 +1808,7 @@ const setupTaskSandbox = async (
 		console.log(cursorInstall);
 	} else {
 		await runSetupStep(task.id, "codex_auth", "Write Codex auth", () =>
-			sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth)),
+			sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agentAuth)),
 		);
 
 		const codexUpdate = await runSetupStep(
@@ -3046,12 +3055,10 @@ const prepareAgentAuthForRun = async (
 		return;
 	}
 
-	if (!agent.auth) {
-		throw new Error(`Codex agent ${agent.id} is missing auth`);
-	}
+	const agentAuth = await getAgentAuth(agent);
 
 	await runSetupStep(taskId, "codex_auth", "Write Codex auth", () =>
-		sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agent.auth)),
+		sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agentAuth)),
 	);
 };
 
@@ -3348,43 +3355,58 @@ const setupRun = async (
 	agent: Agent,
 	factory: Factory,
 ) => {
-	const agentToken = await ensureTaskAgentToken(task);
-	const envs: Record<string, string> = {};
+	const agentToken = randomUUID();
+	await db.transact(
+		taskTx(task.id).update({
+			agentToken,
+		}),
+	);
+
+	const envs: Record<string, string> = {
+		FACTORYPLANE_AUTH_TOKEN: agentToken,
+	};
 
 	if (getAgentProvider(agent) === "cursor") {
-		Object.assign(envs, getCursorAuthEnvs(agent));
+		Object.assign(envs, await getCursorAuthEnvs(agent));
 	}
 
-	await runOptionalSetupStep(
-		task.id,
-		"github_auth",
-		"Validate GitHub token",
-		async () => {
-			const githubEnvs = await getFactoryGithubAuthEnvs(factory);
+	try {
+		await runOptionalSetupStep(
+			task.id,
+			"github_auth",
+			"Validate GitHub token",
+			async () => {
+				const githubEnvs = await getFactoryGithubAuthEnvs(factory);
 
-			if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
-				throw new Error(`Factory ${factory.id} is missing GitHub access token`);
-			}
+				if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
+					throw new Error(
+						`Factory ${factory.id} is missing GitHub access token`,
+					);
+				}
 
-			Object.assign(envs, githubEnvs);
-			await validateGithubToken(sandbox, envs);
-		},
-	);
+				Object.assign(envs, githubEnvs);
+				await validateGithubToken(sandbox, envs);
+			},
+		);
 
-	await runFactorySetupScript(
-		sandbox,
-		task.id,
-		factory,
-		"new_turn",
-		factory.newTurnSetupScript,
-		envs,
-	);
+		await runFactorySetupScript(
+			sandbox,
+			task.id,
+			factory,
+			"new_turn",
+			factory.newTurnSetupScript,
+			envs,
+		);
+	} catch (error) {
+		await clearTaskAgentToken(task.id, agentToken);
+		throw error;
+	}
 
 	return { envs, agentToken };
 };
 
-const postRun = async (_taskId: string, _agentToken: string) => {
-	return;
+const postRun = async (taskId: string, agentToken: string) => {
+	await clearTaskAgentToken(taskId, agentToken);
 };
 
 const buildAgentExecCommand = (
@@ -3676,38 +3698,18 @@ const getTaskAgentToken = async (taskId: string) => {
 	return currentTask?.agentToken;
 };
 
-const ensureTaskAgentToken = async (task: Task) => {
-	const existingToken = task.agentToken ?? (await getTaskAgentToken(task.id));
+const clearTaskAgentToken = async (taskId: string, agentToken: string) => {
+	const existingToken = await getTaskAgentToken(taskId);
 
-	if (existingToken) {
-		return existingToken;
+	if (existingToken !== agentToken) {
+		return;
 	}
 
-	const agentToken = randomUUID();
 	await db.transact(
-		taskTx(task.id).update({
-			agentToken,
+		taskTx(taskId).update({
+			agentToken: undefined,
 		}),
 	);
-
-	task.agentToken = agentToken;
-	return agentToken;
-};
-
-const buildFactoryplaneAttachHeaders = (agentToken: string) => {
-	const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
-
-	try {
-		const { hostname } = new URL(apiUrl);
-
-		return {
-			[hostname]: {
-				Authorization: `Bearer ${agentToken}`,
-			},
-		};
-	} catch {
-		return {};
-	}
 };
 
 const createAgentOutputHandler = (

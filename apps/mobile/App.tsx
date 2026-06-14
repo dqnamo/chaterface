@@ -43,6 +43,7 @@ import {
 	View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import type { AppSchema } from "../web-app/instant.schema";
 import {
 	Button,
 	CenterShell,
@@ -59,7 +60,6 @@ import {
 	textStyles,
 } from "./src/components/primitives";
 import db from "./src/db/client";
-import type { AppSchema } from "../web-app/instant.schema";
 import { colors, spacing } from "./src/theme";
 import { nowIso } from "./src/utils/date";
 import {
@@ -610,7 +610,11 @@ function FactoryScreen({
 					handle: orgHandle,
 				},
 			},
-			agents: {},
+			agents: {
+				$: {
+					fields: ["name", "provider", "settings"],
+				},
+			},
 		},
 		factories: {
 			$: {
@@ -1454,7 +1458,11 @@ function FactorySettingsScreen({
 					handle: orgHandle,
 				},
 			},
-			agents: {},
+			agents: {
+				$: {
+					fields: ["name", "provider", "settings"],
+				},
+			},
 			members: {
 				user: {},
 			},

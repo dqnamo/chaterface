@@ -67,7 +67,11 @@ export default function FactoryPage() {
 					handle: currentOrgHandle,
 				},
 			},
-			agents: {},
+			agents: {
+				$: {
+					fields: ["name", "provider", "settings"],
+				},
+			},
 		},
 		tasks: {
 			$: {
@@ -210,13 +214,16 @@ export default function FactoryPage() {
 	return (
 		<div className="relative flex h-full w-full flex-col items-center justify-center gap-4 px-4 md:px-0">
 			<ExpandSidebarButton className="absolute left-2 top-2 z-20" />
-			<Logo size={8} />
-			<div className="flex flex-col gap-px items-center justify-center">
+			<Logo size={7} />
+			<div className="flex flex-col gap-px items-center justify-center max-w-md text-center">
 				<h1 className="text-lg font-medium text-grayscale-12">
 					What do you want to build?
 				</h1>
+				<p className="text-sm text-grayscale-11 text-balance">
+					Creates a fresh new sandbox to do your task.
+				</p>
 			</div>
-			<div className="mx-auto w-full max-w-xl rounded-xl border border-grayscale-3 bg-grayscale-2 p-1.5 dark:bg-grayscale-2">
+			<div className="mt-6 mx-auto w-full max-w-xl rounded-xl border border-grayscale-3 bg-grayscale-2 p-1.5 dark:bg-grayscale-2">
 				<div className="overflow-hidden rounded-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-5 dark:bg-grayscale-3">
 					<fieldset
 						aria-label="New task composer"

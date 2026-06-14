@@ -8,18 +8,17 @@ type PublicServiceUrlInput = {
 };
 
 export function getPublicServiceUrl({ serviceId, url }: PublicServiceUrlInput) {
-	if (url && !isSandboxProviderUrl(url)) {
+	if (url && !isE2bUrl(url)) {
 		return url;
 	}
 
 	return serviceId ? `https://${serviceId}.${previewsDomain}` : undefined;
 }
 
-function isSandboxProviderUrl(url: string) {
+function isE2bUrl(url: string) {
 	try {
-		const hostname = new URL(url).hostname;
-		return hostname.endsWith(".box.upstash.com") || hostname.includes(".box.");
+		return new URL(url).hostname.endsWith(".e2b.app");
 	} catch {
-		return url.includes(".box.");
+		return url.includes(".e2b.app");
 	}
 }

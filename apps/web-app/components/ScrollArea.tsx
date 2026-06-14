@@ -74,7 +74,7 @@ function Scrollbar({ className, ...props }: ScrollAreaScrollbarProps) {
 	return (
 		<BaseScrollArea.Scrollbar
 			className={mergeClassName(
-				"z-20 flex touch-none select-none p-1 opacity-0 transition-opacity duration-150 data-[hovering]:opacity-100 data-[scrolling]:opacity-100 data-[orientation=horizontal]:h-3 data-[orientation=vertical]:w-3",
+				"z-20 flex touch-none select-none p-[3px] opacity-0 transition-opacity duration-150 data-[hovering]:opacity-100 data-[scrolling]:opacity-100 data-[orientation=horizontal]:h-3 data-[orientation=vertical]:w-2.5",
 				className,
 			)}
 			{...props}
@@ -86,7 +86,7 @@ function Thumb({ className, ...props }: ScrollAreaThumbProps) {
 	return (
 		<BaseScrollArea.Thumb
 			className={mergeClassName(
-				"bg-grayscale-4 transition-colors duration-150 hover:bg-grayscale-10 data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full",
+				"bg-grayscale-4 rounded-full transition-colors duration-150 hover:bg-grayscale-10 data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full",
 				className,
 			)}
 			{...props}

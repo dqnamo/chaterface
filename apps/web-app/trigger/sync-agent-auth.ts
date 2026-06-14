@@ -1,5 +1,6 @@
+import { encryptAgentAuth } from "@/agent-auth-storage";
 import db from "@/instant.admin";
-import type { Sandbox } from "./upstash-box-sandbox";
+import type { Sandbox } from "./e2b-sandbox";
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 
@@ -23,7 +24,7 @@ export const syncAgentAuthFromSandbox = async (
 
 		await db.transact(
 			agentTx(agentId).update({
-				auth,
+				auth: await encryptAgentAuth(auth),
 			}),
 		);
 	} catch (error) {

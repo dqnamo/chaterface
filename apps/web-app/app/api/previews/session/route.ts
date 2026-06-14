@@ -56,11 +56,21 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	if (!service.upstreamHost) {
+	if (!service.e2bHost) {
 		return NextResponse.json(
 			{
 				message:
-					"Preview service is missing its upstream. Stop it and start it again after deploying the latest API.",
+					"Preview service is missing its E2B upstream. Stop it and start it again after deploying the latest API.",
+			},
+			{ status: 409 },
+		);
+	}
+
+	if (!service.task?.sandboxTrafficAccessToken) {
+		return NextResponse.json(
+			{
+				message:
+					"Preview sandbox is missing a private access token. Recreate the task sandbox and start the service again.",
 			},
 			{ status: 409 },
 		);
