@@ -2,14 +2,18 @@
 
 import {
 	CheckIcon,
+	FloppyDiskIcon,
 	MoonIcon,
 	SignOutIcon,
 	SunIcon,
 	UserCircleIcon,
 } from "@phosphor-icons/react";
+import { useParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
+import { Input } from "@/components/Input";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 import SignOutButton from "@/components/SignOutButton";
 import {
@@ -20,6 +24,7 @@ import {
 	setStoredDefaultChatViewMode,
 } from "@/helpers/chat-view-helper";
 import { cn } from "@/helpers/classname-helper";
+import db from "@/instant.client";
 
 const THEME_OPTIONS = [
 	{
@@ -68,6 +73,26 @@ export default function PersonalSettingsPage() {
 					<div className="border-b border-grayscale-4 p-3">
 						<div className="flex items-center gap-2 text-sm font-medium text-grayscale-12">
 							<UserCircleIcon weight="bold" className="size-4" />
+							Identity
+						</div>
+					</div>
+					<div className="flex flex-col gap-3 p-3">
+						<ProfileNameSetting />
+					</div>
+				</section>
+
+				<section className="relative border border-grayscale-4 bg-grayscale-1">
+					<CornerBrackets
+						placement="outside"
+						spacing={3}
+						translate={12}
+						size={6}
+						color="var(--color-grayscale-6)"
+						active={true}
+					/>
+					<div className="border-b border-grayscale-4 p-3">
+						<div className="flex items-center gap-2 text-sm font-medium text-grayscale-12">
+							<UserCircleIcon weight="bold" className="size-4" />
 							Appearance
 						</div>
 					</div>
@@ -100,6 +125,111 @@ export default function PersonalSettingsPage() {
 						<SignOutButton />
 					</div>
 				</section>
+			</div>
+		</div>
+	);
+}
+
+function ProfileNameSetting() {
+	const { orgHandle } = useParams();
+	const currentOrgHandle = orgHandle as string;
+	const { user } = db.useAuth();
+	const currentUserId = user?.id ?? "__unauthenticated__";
+	const { data } = db.useQuery({
+		organisations: {
+			$: {
+				where: {
+					handle: currentOrgHandle,
+				},
+			},
+			members: {
+				user: {},
+			},
+		},
+	});
+	const member = data?.organisations?.[0]?.members?.find(
+		(member) => member.user?.id === currentUserId,
+	);
+	const userRecord = member?.user;
+	const [userName, setUserName] = useState("");
+	const [memberName, setMemberName] = useState("");
+	const [status, setStatus] = useState<string>();
+	const [isSaving, setIsSaving] = useState(false);
+
+	useEffect(() => {
+		setUserName(userRecord?.name ?? "");
+		setMemberName(member?.name ?? "");
+	}, [member?.name, userRecord?.name]);
+
+	const saveProfile = async () => {
+		if (!user?.refresh_token || isSaving) {
+			return;
+		}
+
+		setStatus(undefined);
+		setIsSaving(true);
+
+		try {
+			const response = await fetch("/api/profile", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${user.refresh_token}`,
+				},
+				body: JSON.stringify({
+					userName,
+					...(member?.id ? { memberId: member.id, memberName } : {}),
+				}),
+			});
+
+			if (!response.ok) {
+				const body = (await response.json().catch(() => undefined)) as
+					| { message?: string }
+					| undefined;
+				throw new Error(body?.message ?? "Failed to save profile");
+			}
+
+			setStatus("Saved.");
+		} catch (error) {
+			setStatus(error instanceof Error ? error.message : "Failed to save.");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	return (
+		<div className="flex flex-col gap-3">
+			<div className="grid gap-3 md:grid-cols-2">
+				<Field label="User name">
+					<Input
+						placeholder="Your name"
+						value={userName}
+						onChange={(event) => setUserName(event.target.value)}
+						onSubmit={saveProfile}
+					/>
+				</Field>
+				<Field label="Member name">
+					<Input
+						placeholder="Organisation display name"
+						value={memberName}
+						onChange={(event) => setMemberName(event.target.value)}
+						onSubmit={saveProfile}
+					/>
+				</Field>
+			</div>
+			<div className="flex items-center justify-between gap-3">
+				<p className="min-w-0 text-xs text-grayscale-10">
+					{status ?? "Member name overrides user name in this organisation."}
+				</p>
+				<Button
+					type="button"
+					disabled={isSaving || !user?.refresh_token}
+					onClick={saveProfile}
+					className="shrink-0"
+				>
+					<FloppyDiskIcon weight="bold" className="size-4" />
+					{isSaving ? "Saving..." : "Save"}
+				</Button>
 			</div>
 		</div>
 	);

@@ -41,7 +41,11 @@ import {
 } from "@/codex-options";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
-import Event, { buildTimeline, type TimelineNode } from "@/components/Event";
+import Event, {
+	buildTimeline,
+	type TimelineNode,
+	type UserDisplayProfile,
+} from "@/components/Event";
 import {
 	getAttachmentFiles,
 	hasAttachmentFiles,
@@ -265,6 +269,67 @@ const getEntityId = (value: unknown) => {
 	return typeof id === "string" ? id : undefined;
 };
 
+const getOptionalString = (value: unknown) =>
+	typeof value === "string" && value.trim().length > 0
+		? value.trim()
+		: undefined;
+
+const getAuthUserDisplayProfile = (
+	user: unknown,
+): UserDisplayProfile | undefined => {
+	const record = asJsonRecord(user);
+	const id = getOptionalString(record?.id);
+
+	if (!id) {
+		return undefined;
+	}
+
+	return {
+		id,
+		email: getOptionalString(record?.email),
+		userName: getOptionalString(record?.name),
+	};
+};
+
+const buildUserDisplayProfiles = (
+	task: unknown,
+	authUser: unknown,
+): Record<string, UserDisplayProfile> => {
+	const profiles: Record<string, UserDisplayProfile> = {};
+	const authProfile = getAuthUserDisplayProfile(authUser);
+
+	if (authProfile) {
+		profiles[authProfile.id] = authProfile;
+	}
+
+	const factory = asJsonRecord(asJsonRecord(task)?.factory);
+	const organisation = asJsonRecord(factory?.organisation);
+	const members = organisation?.members;
+
+	if (!Array.isArray(members)) {
+		return profiles;
+	}
+
+	for (const memberValue of members) {
+		const member = asJsonRecord(memberValue);
+		const memberUser = asJsonRecord(member?.user);
+		const userId = getOptionalString(memberUser?.id);
+
+		if (!userId) {
+			continue;
+		}
+
+		profiles[userId] = {
+			id: userId,
+			email: getOptionalString(memberUser?.email),
+			memberName: getOptionalString(member?.name),
+			userName: getOptionalString(memberUser?.name),
+		};
+	}
+
+	return profiles;
+};
+
 const getTaskStatusLabel = ({
 	completedAt,
 	status,
@@ -416,6 +481,13 @@ export default function TaskPage() {
 			terminalSessions: {
 				services: {},
 			},
+			factory: {
+				organisation: {
+					members: {
+						user: {},
+					},
+				},
+			},
 			agent: {},
 			agentSessions: {
 				agent: {},
@@ -444,6 +516,13 @@ export default function TaskPage() {
 
 	const task = data?.tasks?.[0];
 	const events = eventsData?.events;
+	const userDisplayProfiles = useMemo(
+		() => buildUserDisplayProfiles(task, user),
+		[task, user],
+	);
+	const currentUserProfile = user?.id
+		? (userDisplayProfiles[user.id] ?? getAuthUserDisplayProfile(user))
+		: undefined;
 	const agentSessions = useMemo(
 		() => (task?.agentSessions ?? []).slice().sort(compareAgentSessions),
 		[task?.agentSessions],
@@ -731,7 +810,7 @@ export default function TaskPage() {
 				eventTx(eventId)
 					.create({
 						type: "factoryplane.new_user_message",
-						data: { content, attachments },
+						data: { content, attachments, userId: user?.id },
 						createdAt: DateTime.now().toISO(),
 					})
 					.link({ task: taskId as string, agentSession: agentSessionId }),
@@ -983,7 +1062,13 @@ export default function TaskPage() {
 								)}
 								<AnimatePresence initial={false}>
 									{visibleTimeline.map((node) => (
-										<Event key={node.key} node={node} task={task} />
+										<Event
+											currentUserProfile={currentUserProfile}
+											key={node.key}
+											node={node}
+											task={task}
+											userProfiles={userDisplayProfiles}
+										/>
 									))}
 								</AnimatePresence>
 							</div>
