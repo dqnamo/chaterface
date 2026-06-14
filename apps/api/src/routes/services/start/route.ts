@@ -1,7 +1,9 @@
 import db, { id } from "@repo/db/admin";
-import type { CommandHandle } from "e2b/dist/index.mjs";
-import { Sandbox } from "e2b/dist/index.mjs";
 import type { RouteHandler } from "../../../lib/file-router.js";
+import {
+	type CommandHandle,
+	UpstashBoxSandbox as Sandbox,
+} from "../../../lib/upstash-box-sandbox.js";
 
 type StartServiceBody = {
 	name: string;
@@ -66,7 +68,7 @@ export const POST: RouteHandler = async (c) => {
 		.query({
 			tasks: {
 				$: {
-					fields: ["sandboxId", "sandboxTrafficAccessToken"],
+					fields: ["sandboxId"],
 					where: {
 						agentToken: token,
 					},
@@ -83,21 +85,12 @@ export const POST: RouteHandler = async (c) => {
 		return c.json({ error: "Task is missing sandbox id" }, 400);
 	}
 
-	if (!task.sandboxTrafficAccessToken) {
-		return c.json(
-			{
-				error:
-					"Task sandbox is missing a private preview token. Recreate the task sandbox before starting services.",
-			},
-			409,
-		);
-	}
-
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	const serviceId = id();
 	const terminalSessionId = id();
-	const host = sandbox.getHost(body.portNumber);
-	const e2bUrl = `https://${host}`;
+	const upstream = await sandbox.createPublicUrl(body.portNumber);
+	const upstreamUrl = upstream.url;
+	const host = new URL(upstreamUrl).host;
 	const url = getPreviewUrl(serviceId);
 	const now = new Date().toISOString();
 
@@ -121,8 +114,9 @@ export const POST: RouteHandler = async (c) => {
 				healthPath: body.healthPath,
 				portNumber: body.portNumber,
 				status: "starting",
-				e2bHost: host,
-				e2bUrl,
+				upstreamHost: host,
+				upstreamUrl,
+				upstreamToken: upstream.token,
 				url,
 			})
 			.link({ task: task.id, terminalSession: terminalSessionId }),
@@ -131,18 +125,16 @@ export const POST: RouteHandler = async (c) => {
 	let process: CommandHandle;
 
 	try {
-		process = await sandbox.pty.create({
-			cols: 80,
-			rows: 24,
-			cwd: body.cwd,
-			timeoutMs: 0,
-			onData: () => {},
-		});
-		await sandbox.pty.sendInput(
-			process.pid,
-			new TextEncoder().encode(`exec ${body.command}\n`),
+		process = await sandbox.commands.run(
+			[
+				`cd ${shellQuote(body.cwd)}`,
+				`exec /bin/bash -lc ${shellQuote(body.command)}`,
+			].join("\n"),
+			{
+				background: true,
+				timeoutMs: 0,
+			},
 		);
-		await process.disconnect();
 	} catch (error) {
 		await markServiceFailed(serviceId, terminalSessionId, task.id, {
 			name: body.name,
@@ -216,7 +208,7 @@ export const POST: RouteHandler = async (c) => {
 					name: body.name,
 					portNumber: body.portNumber,
 					url,
-					e2bHost: host,
+					upstreamHost: host,
 					pid: process.pid,
 				},
 				createdAt: new Date().toISOString(),
@@ -226,12 +218,12 @@ export const POST: RouteHandler = async (c) => {
 
 	const persistedService = await getPersistedPreviewService(serviceId);
 
-	if (persistedService?.e2bHost !== host || persistedService.url !== url) {
+	if (persistedService?.upstreamHost !== host || persistedService.url !== url) {
 		await markServiceFailed(serviceId, terminalSessionId, task.id, {
 			name: body.name,
 			portNumber: body.portNumber,
 			url,
-			e2bHost: host,
+			upstreamHost: host,
 			pid: process.pid,
 			error: "Preview service metadata did not persist correctly",
 		});
@@ -325,7 +317,7 @@ const getPersistedPreviewService = async (serviceId: string) => {
 		.query({
 			services: {
 				$: {
-					fields: ["url", "e2bHost"],
+					fields: ["url", "upstreamHost"],
 					where: {
 						id: serviceId,
 					},

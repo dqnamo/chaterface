@@ -14,7 +14,7 @@
 		"@hono/node-server": "^1.14.4",
 		"@repo/db": "workspace:*",
 		"@repo/encryption": "workspace:*",
-		"e2b": "^2.27.1",
+		"@upstash/box": "^0.5.0",
 		"hono": "^4.7.11",
 		"ws": "^8.21.0"
 	},

@@ -5,7 +5,7 @@
 		"build": {
 			"dependsOn": ["^build"],
 			"env": [
-				"E2B_API_KEY",
+				"UPSTASH_BOX_API_KEY",
 				"FACTORYPLANE_PREVIEW_COOKIE_DOMAIN",
 				"FACTORYPLANE_PREVIEW_SESSION_SECRET",
 				"FACTORYPLANE_PREVIEWS_DOMAIN",

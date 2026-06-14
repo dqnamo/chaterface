@@ -1,8 +1,8 @@
-import db from "@/instant.admin";
 import { task } from "@trigger.dev/sdk";
-import { Sandbox } from "e2b/dist/index.mjs";
+import db from "@/instant.admin";
 
 import { syncAgentAuthFromSandbox } from "./sync-agent-auth";
+import { UpstashBoxSandbox as Sandbox } from "./upstash-box-sandbox";
 
 function agentTx(agentId: string) {
 	const tx = db.tx.agents[agentId];
@@ -14,7 +14,6 @@ function agentTx(agentId: string) {
 	return tx;
 }
 
-const e2bPortPlaceholder = ["$", "{PORT}"].join("");
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 
 type AgentProvider = "codex" | "cursor";
@@ -92,14 +91,6 @@ export const setupAgentTask = task({
 			const provider = getAgentProvider(agent);
 			const sandbox = await Sandbox.create("codex", {
 				timeoutMs: 10 * 60 * 1000,
-				lifecycle: {
-					onTimeout: "pause",
-					autoResume: true,
-				},
-				network: {
-					allowPublicTraffic: false,
-					maskRequestHost: `localhost:${e2bPortPlaceholder}`,
-				},
 			});
 
 			if (provider === "cursor") {
@@ -139,7 +130,6 @@ export const setupAgentTask = task({
 			await db.transact(
 				agentTx(payload.agentId).update({
 					sandboxId: sandbox.sandboxId,
-					sandboxTrafficAccessToken: sandbox.trafficAccessToken,
 					status: "ready",
 				}),
 			);

@@ -16,17 +16,14 @@ type PreviewSession = {
 
 type PreviewService = {
 	id: string;
-	e2bHost?: string;
-	task?: {
-		sandboxTrafficAccessToken?: string;
-	};
+	upstreamHost?: string;
+	upstreamToken?: string;
 };
 
 type ResolvedProxyRequest =
 	| {
 			ok: true;
-			service: Required<Pick<PreviewService, "e2bHost">> & PreviewService;
-			trafficAccessToken: string;
+			service: Required<Pick<PreviewService, "upstreamHost">> & PreviewService;
 	  }
 	| { ok: false; status: number; message: string };
 
@@ -93,9 +90,9 @@ server.on("upgrade", async (req, socket, head) => {
 		proxy.ws(req, socket, head, {
 			headers: {
 				...getForwardedPreviewHeaders(req),
-				"e2b-traffic-access-token": resolution.trafficAccessToken,
+				...getUpstreamAuthHeaders(resolution.service),
 			},
-			target: `wss://${resolution.service.e2bHost}`,
+			target: `wss://${resolution.service.upstreamHost}`,
 		});
 	} catch (error) {
 		console.error(error);
@@ -130,9 +127,9 @@ const handleHttpRequest = async (req: IncomingMessage, res: ServerResponse) => {
 	proxy.web(req, res, {
 		headers: {
 			...getForwardedPreviewHeaders(req),
-			"e2b-traffic-access-token": resolution.trafficAccessToken,
+			...getUpstreamAuthHeaders(resolution.service),
 		},
-		target: `https://${resolution.service.e2bHost}`,
+		target: `https://${resolution.service.upstreamHost}`,
 	});
 };
 
@@ -187,30 +184,19 @@ const resolveProxyRequest = async (
 
 	const service = await getPreviewService(serviceId);
 
-	if (!service?.e2bHost) {
+	if (!service?.upstreamHost) {
 		return {
 			ok: false,
 			status: 404,
 			message:
-				"Preview service is missing its E2B upstream. Stop it and start it again after deploying the latest API.",
-		};
-	}
-
-	const trafficAccessToken = service.task?.sandboxTrafficAccessToken;
-
-	if (!trafficAccessToken) {
-		return {
-			ok: false,
-			status: 502,
-			message: "Preview sandbox is missing a traffic access token",
+				"Preview service is missing its upstream. Stop it and start it again after deploying the latest API.",
 		};
 	}
 
 	return {
 		ok: true,
-		service: service as Required<Pick<PreviewService, "e2bHost">> &
+		service: service as Required<Pick<PreviewService, "upstreamHost">> &
 			PreviewService,
-		trafficAccessToken,
 	};
 };
 
@@ -271,6 +257,18 @@ const getForwardedPreviewHeaders = (
 	};
 };
 
+const getUpstreamAuthHeaders = (
+	service: PreviewService,
+): Record<string, string> => {
+	if (!service.upstreamToken) {
+		return {};
+	}
+
+	return {
+		authorization: `Bearer ${service.upstreamToken}`,
+	};
+};
+
 const rewriteUpstreamLocation = (
 	location: string | string[] | undefined,
 	hostHeader: string | undefined,
@@ -289,7 +287,7 @@ const rewriteUpstreamLocation = (
 		return undefined;
 	}
 
-	if (!url.hostname.endsWith(".e2b.app")) {
+	if (!isSandboxPreviewHost(url.hostname)) {
 		return undefined;
 	}
 
@@ -298,6 +296,9 @@ const rewriteUpstreamLocation = (
 
 	return url.toString();
 };
+
+const isSandboxPreviewHost = (hostname: string) =>
+	hostname.endsWith(".box.upstash.com") || hostname.includes(".box.");
 
 const signValue = (value: PreviewSession) => {
 	if (!sessionSecret) {

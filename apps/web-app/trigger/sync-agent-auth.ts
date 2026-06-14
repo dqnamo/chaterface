@@ -1,5 +1,5 @@
 import db from "@/instant.admin";
-import type { Sandbox } from "e2b/dist/index.mjs";
+import type { Sandbox } from "./upstash-box-sandbox";
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 
