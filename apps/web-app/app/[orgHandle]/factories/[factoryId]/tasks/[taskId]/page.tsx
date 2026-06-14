@@ -828,11 +828,20 @@ export default function TaskPage() {
 					</div>
 					<div className="flex flex-row items-center gap-1.5">
 						{task?.pullRequestUrl ? (
-							<a
-								href={task.pullRequestUrl}
-								rel="noopener noreferrer"
-								target="_blank"
-								className="bg-grayscale-3 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-green-3"
+							<Button
+								render={(buttonProps) => (
+									<a
+										{...buttonProps}
+										href={task.pullRequestUrl}
+										rel="noopener noreferrer"
+										target="_blank"
+									>
+										{buttonProps.children}
+									</a>
+								)}
+								nativeButton={false}
+								variant="secondary"
+								className="h-7 border-grayscale-4 bg-grayscale-3 hover:border-green-6 hover:bg-green-3"
 							>
 								<CornerBrackets
 									placement="inside"
@@ -845,12 +854,12 @@ export default function TaskPage() {
 									weight="bold"
 									className="size-4 text-green-9"
 								/>
-								<p className="text-xs text-grayscale-12">View PR</p>
+								<span>View PR</span>
 								<ArrowSquareOutIcon
 									weight="bold"
 									className="size-3 text-grayscale-10"
 								/>
-							</a>
+							</Button>
 						) : null}
 						<Button
 							type="button"
