@@ -1,8 +1,8 @@
 import db, { id } from "@repo/db/admin";
 import { createEncryptionService } from "@repo/encryption";
-import { Sandbox } from "e2b/dist/index.mjs";
 import { getBearerToken } from "../../../lib/agent-auth.js";
 import type { RouteHandler } from "../../../lib/file-router.js";
+import { UpstashBoxSandbox as Sandbox } from "../../../lib/upstash-box-sandbox.js";
 
 type SetupScriptKind = "new_task" | "new_turn";
 
@@ -128,12 +128,11 @@ const getTaskForSetupScriptRun = async (agentToken: string) => {
 };
 
 const getSetupScriptEnvs = async (
-	agentToken: string,
+	_agentToken: string,
 	task: NonNullable<Awaited<ReturnType<typeof getTaskForSetupScriptRun>>>,
 	workspacePath: string,
 ) => {
 	const envs: Record<string, string> = {
-		FACTORYPLANE_AUTH_TOKEN: agentToken,
 		FACTORYPLANE_FACTORY_ID: task.factory?.id ?? "",
 		FACTORYPLANE_TASK_ID: task.id,
 		FACTORYPLANE_WORKSPACE: workspacePath,

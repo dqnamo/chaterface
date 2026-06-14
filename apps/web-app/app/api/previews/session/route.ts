@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
-import db from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
+import db from "@/instant.admin";
 
 type PreviewSession = {
 	serviceId: string;
@@ -56,21 +56,11 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	if (!service.e2bHost) {
+	if (!service.upstreamHost) {
 		return NextResponse.json(
 			{
 				message:
-					"Preview service is missing its E2B upstream. Stop it and start it again after deploying the latest API.",
-			},
-			{ status: 409 },
-		);
-	}
-
-	if (!service.task?.sandboxTrafficAccessToken) {
-		return NextResponse.json(
-			{
-				message:
-					"Preview sandbox is missing a private access token. Recreate the task sandbox and start the service again.",
+					"Preview service is missing its upstream. Stop it and start it again after deploying the latest API.",
 			},
 			{ status: 409 },
 		);

@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { InstaQLEntity } from "@instantdb/react";
 import { task } from "@trigger.dev/sdk";
-import { Sandbox } from "e2b/dist/index.mjs";
 import {
 	CODEX_REASONING_EFFORT_OPTIONS,
 	DEFAULT_CODEX_MODEL,
@@ -18,6 +17,7 @@ import {
 	getCodexDeveloperInstructions,
 } from "./codex-system-prompt";
 import { syncAgentAuthFromSandbox } from "./sync-agent-auth";
+import { UpstashBoxSandbox as Sandbox } from "./upstash-box-sandbox";
 
 type Event = InstaQLEntity<AppSchema, "events">;
 type Task = InstaQLEntity<AppSchema, "tasks">;
@@ -139,7 +139,6 @@ type SetupStepOptions = {
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 const CODEX_CONFIG_PATH = "~/.codex/config.toml";
-const e2bPortPlaceholder = ["$", "{PORT}"].join("");
 const DEFAULT_API_URL = "https://api.factoryplane.com";
 const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
 const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
@@ -729,6 +728,7 @@ const continueWorkflowFromNode = async (
 				completedAt: now,
 				workflowState: "complete",
 				workflowNodeId: nextNode.id,
+				agentToken: undefined,
 			}),
 		);
 		await persistFactoryplaneEvent(task.id, "factoryplane.workflow.completed", {
@@ -1228,7 +1228,6 @@ const buildAgentDecisionQuestionPrompt = (
 		"",
 		"```bash",
 		`curl -X POST ${apiUrl}/workflow-decisions/answers \\`,
-		'  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \\',
 		"  -H 'Content-Type: application/json' \\",
 		`  -d '{"questionId":"${decision.questionId}","answerId":"OPTION_ID","additionalInformation":"optional context"}'`,
 		"```",
@@ -1767,18 +1766,14 @@ const setupTaskSandbox = async (
 		task.id,
 		"sandbox",
 		"Create sandbox",
-		() =>
-			Sandbox.create("codex", {
+		async () => {
+			const agentToken = await ensureTaskAgentToken(task);
+
+			return Sandbox.create("codex", {
 				timeoutMs: 10 * 60 * 1000,
-				lifecycle: {
-					onTimeout: "pause",
-					autoResume: true,
-				},
-				network: {
-					allowPublicTraffic: false,
-					maskRequestHost: `localhost:${e2bPortPlaceholder}`,
-				},
-			}),
+				attachHeaders: buildFactoryplaneAttachHeaders(agentToken),
+			});
+		},
 		{ timeoutMs: 120_000 },
 	);
 	const provider = getAgentProvider(agent);
@@ -1786,7 +1781,6 @@ const setupTaskSandbox = async (
 	await db.transact(
 		taskTx(task.id).update({
 			sandboxId: sandbox.sandboxId,
-			sandboxTrafficAccessToken: sandbox.trafficAccessToken,
 		}),
 	);
 
@@ -2267,7 +2261,6 @@ const buildCodexMcpConfig = (
 			[
 				`[mcp_servers.${formatTomlString(mcpServer.name)}]`,
 				`url = ${formatTomlString(mcpServer.proxyUrl)}`,
-				`bearer_token_env_var = ${formatTomlString("FACTORYPLANE_AUTH_TOKEN")}`,
 				"enabled = true",
 			].join("\n"),
 		)
@@ -3355,58 +3348,43 @@ const setupRun = async (
 	agent: Agent,
 	factory: Factory,
 ) => {
-	const agentToken = randomUUID();
-	await db.transact(
-		taskTx(task.id).update({
-			agentToken,
-		}),
-	);
-
-	const envs: Record<string, string> = {
-		FACTORYPLANE_AUTH_TOKEN: agentToken,
-	};
+	const agentToken = await ensureTaskAgentToken(task);
+	const envs: Record<string, string> = {};
 
 	if (getAgentProvider(agent) === "cursor") {
 		Object.assign(envs, getCursorAuthEnvs(agent));
 	}
 
-	try {
-		await runOptionalSetupStep(
-			task.id,
-			"github_auth",
-			"Validate GitHub token",
-			async () => {
-				const githubEnvs = await getFactoryGithubAuthEnvs(factory);
+	await runOptionalSetupStep(
+		task.id,
+		"github_auth",
+		"Validate GitHub token",
+		async () => {
+			const githubEnvs = await getFactoryGithubAuthEnvs(factory);
 
-				if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
-					throw new Error(
-						`Factory ${factory.id} is missing GitHub access token`,
-					);
-				}
+			if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
+				throw new Error(`Factory ${factory.id} is missing GitHub access token`);
+			}
 
-				Object.assign(envs, githubEnvs);
-				await validateGithubToken(sandbox, envs);
-			},
-		);
+			Object.assign(envs, githubEnvs);
+			await validateGithubToken(sandbox, envs);
+		},
+	);
 
-		await runFactorySetupScript(
-			sandbox,
-			task.id,
-			factory,
-			"new_turn",
-			factory.newTurnSetupScript,
-			envs,
-		);
-	} catch (error) {
-		await clearTaskAgentToken(task.id, agentToken);
-		throw error;
-	}
+	await runFactorySetupScript(
+		sandbox,
+		task.id,
+		factory,
+		"new_turn",
+		factory.newTurnSetupScript,
+		envs,
+	);
 
 	return { envs, agentToken };
 };
 
-const postRun = async (taskId: string, agentToken: string) => {
-	await clearTaskAgentToken(taskId, agentToken);
+const postRun = async (_taskId: string, _agentToken: string) => {
+	return;
 };
 
 const buildAgentExecCommand = (
@@ -3682,20 +3660,6 @@ const getAgentSessionPid = async (agentSessionId: string) => {
 	return currentSession?.agentPid;
 };
 
-const clearTaskAgentToken = async (taskId: string, agentToken: string) => {
-	const currentToken = await getTaskAgentToken(taskId);
-
-	if (currentToken !== agentToken) {
-		return;
-	}
-
-	await db.transact(
-		taskTx(taskId).update({
-			agentToken: undefined,
-		}),
-	);
-};
-
 const getTaskAgentToken = async (taskId: string) => {
 	const currentTask = await db
 		.query({
@@ -3710,6 +3674,40 @@ const getTaskAgentToken = async (taskId: string) => {
 		.then((result) => result.tasks[0]);
 
 	return currentTask?.agentToken;
+};
+
+const ensureTaskAgentToken = async (task: Task) => {
+	const existingToken = task.agentToken ?? (await getTaskAgentToken(task.id));
+
+	if (existingToken) {
+		return existingToken;
+	}
+
+	const agentToken = randomUUID();
+	await db.transact(
+		taskTx(task.id).update({
+			agentToken,
+		}),
+	);
+
+	task.agentToken = agentToken;
+	return agentToken;
+};
+
+const buildFactoryplaneAttachHeaders = (agentToken: string) => {
+	const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+
+	try {
+		const { hostname } = new URL(apiUrl);
+
+		return {
+			[hostname]: {
+				Authorization: `Bearer ${agentToken}`,
+			},
+		};
+	} catch {
+		return {};
+	}
 };
 
 const createAgentOutputHandler = (
