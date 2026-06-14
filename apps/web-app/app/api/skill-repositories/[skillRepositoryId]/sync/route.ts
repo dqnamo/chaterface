@@ -4,8 +4,8 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import db, { id } from "@repo/db/admin";
-import { createEncryptionService } from "@repo/encryption";
+import db, { id } from "@/instant.admin";
+import { createEncryptionService } from "@/encryption";
 import { type NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";

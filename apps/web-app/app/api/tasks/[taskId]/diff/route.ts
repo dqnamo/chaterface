@@ -1,4 +1,4 @@
-import db from "@repo/db/admin";
+import db from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
 
 export async function GET(

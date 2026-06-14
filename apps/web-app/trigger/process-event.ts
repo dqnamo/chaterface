@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { InstaQLEntity } from "@instantdb/react";
-import db from "@repo/db/admin";
-import { createEncryptionService } from "@repo/encryption";
+import db from "@/instant.admin";
+import { createEncryptionService } from "@/encryption";
 import { task } from "@trigger.dev/sdk";
 import { Sandbox } from "e2b/dist/index.mjs";
 import {

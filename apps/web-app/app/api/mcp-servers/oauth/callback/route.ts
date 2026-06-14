@@ -1,5 +1,5 @@
-import db from "@repo/db/admin";
-import { createEncryptionService } from "@repo/encryption";
+import db from "@/instant.admin";
+import { createEncryptionService } from "@/encryption";
 import { type NextRequest, NextResponse } from "next/server";
 import { exchangeAuthorizationCode, parseOAuthState } from "../../_lib/oauth";
 

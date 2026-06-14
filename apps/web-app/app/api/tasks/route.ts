@@ -1,4 +1,4 @@
-import db, { id } from "@repo/db/admin";
+import db, { id } from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
 
 const DEFAULT_CODEX_MODEL = "gpt-5.5";

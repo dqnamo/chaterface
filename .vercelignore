@@ -1,0 +1,8 @@
+.overmind.sock
+.turbo
+**/.turbo
+**/.next
+**/node_modules
+**/dist
+.env*
+!.env.example

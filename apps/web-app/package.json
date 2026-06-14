@@ -14,12 +14,11 @@
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.5.0",
+		"@instantdb/admin": "^1.0.43",
 		"@instantdb/react": "^1.0.43",
 		"@phosphor-icons/react": "^2.1.10",
 		"@pierre/diffs": "^1.2.7",
 		"@radix-ui/colors": "^3.0.0",
-		"@repo/db": "workspace:*",
-		"@repo/encryption": "workspace:*",
 		"@repo/ui": "workspace:*",
 		"@trigger.dev/sdk": "^4.4.6",
 		"@xterm/addon-fit": "^0.11.0",

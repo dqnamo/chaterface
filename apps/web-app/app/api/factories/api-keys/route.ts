@@ -1,5 +1,5 @@
-import db, { id } from "@repo/db/admin";
-import { generateSecretToken, hashSecretValue } from "@repo/encryption";
+import db, { id } from "@/instant.admin";
+import { generateSecretToken, hashSecretValue } from "@/encryption";
 import { type NextRequest, NextResponse } from "next/server";
 
 type ApiKeyRecord = {

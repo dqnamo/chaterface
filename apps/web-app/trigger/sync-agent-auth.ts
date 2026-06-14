@@ -1,4 +1,4 @@
-import db from "@repo/db/admin";
+import db from "@/instant.admin";
 import type { Sandbox } from "e2b/dist/index.mjs";
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";

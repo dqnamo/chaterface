@@ -1,5 +1,5 @@
 import { idempotencyKeys, tasks } from "@trigger.dev/sdk";
-import db from "@repo/db/admin";
+import db from "@/instant.admin";
 import type { processEventTask } from "@/trigger/process-event";
 
 const { typedHandlers, combineHandlers } = db.webhooks.helpers();

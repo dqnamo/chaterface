@@ -1,4 +1,4 @@
-import db, { id } from "@repo/db/admin";
+import db, { id } from "@/instant.admin";
 import { randomBytes } from "crypto";
 import { DateTime } from "luxon";
 import { NextRequest, NextResponse } from "next/server";

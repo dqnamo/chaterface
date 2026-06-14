@@ -1,4 +1,4 @@
-import db from "@repo/db/admin";
+import db from "@/instant.admin";
 import { task } from "@trigger.dev/sdk";
 import { Sandbox } from "e2b/dist/index.mjs";
 

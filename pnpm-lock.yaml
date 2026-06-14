@@ -146,6 +146,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.5.0
         version: 1.5.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@instantdb/admin':
+        specifier: ^1.0.43
+        version: 1.0.43
       '@instantdb/react':
         specifier: ^1.0.43
         version: 1.0.43(react@19.2.0)
@@ -158,12 +161,6 @@ importers:
       '@radix-ui/colors':
         specifier: ^3.0.0
         version: 3.0.0
-      '@repo/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@repo/encryption':
-        specifier: workspace:*
-        version: link:../../packages/encryption
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui

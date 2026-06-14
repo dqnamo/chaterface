@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import db from "@repo/db/admin";
+import db from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
 
 type TerminalSessionTicket = {
