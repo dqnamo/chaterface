@@ -40,7 +40,6 @@ const sessionSecret = process.env.FACTORYPLANE_PREVIEW_SESSION_SECRET;
 const sessionMaxAgeSeconds = 60 * 60 * 8;
 
 const proxy = httpProxy.createProxyServer({
-	autoRewrite: true,
 	changeOrigin: true,
 	secure: true,
 	ws: true,
@@ -57,6 +56,17 @@ proxy.on("error", (_error, _req, res) => {
 	}
 
 	res.end("Preview upstream failed");
+});
+
+proxy.on("proxyRes", (proxyRes: IncomingMessage, req: IncomingMessage) => {
+	const rewrittenLocation = rewriteUpstreamLocation(
+		proxyRes.headers.location,
+		req.headers.host,
+	);
+
+	if (rewrittenLocation) {
+		proxyRes.headers.location = rewrittenLocation;
+	}
 });
 
 const server = createServer(async (req, res) => {
@@ -240,6 +250,34 @@ const getServiceIdFromHost = (hostHeader: string | undefined) => {
 const getRequestUrl = (req: IncomingMessage) => {
 	const host = req.headers.host ?? previewsDomain;
 	return new URL(req.url ?? "/", `https://${host}`);
+};
+
+const rewriteUpstreamLocation = (
+	location: string | string[] | undefined,
+	hostHeader: string | undefined,
+) => {
+	const host = hostHeader?.split(":")[0]?.toLowerCase();
+
+	if (typeof location !== "string" || !host?.endsWith(`.${previewsDomain}`)) {
+		return undefined;
+	}
+
+	let url: URL;
+
+	try {
+		url = new URL(location);
+	} catch {
+		return undefined;
+	}
+
+	if (!url.hostname.endsWith(".e2b.app")) {
+		return undefined;
+	}
+
+	url.protocol = "https:";
+	url.host = host;
+
+	return url.toString();
 };
 
 const signValue = (value: PreviewSession) => {
