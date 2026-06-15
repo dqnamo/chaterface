@@ -53,11 +53,12 @@ GITHUB_APP_SLUG=
 GITHUB_APP_PRIVATE_KEY=
 ```
 
-Set the GitHub App repository permissions to at least Contents: read-only and
-Metadata: read-only. `GITHUB_APP_STATE_SECRET` can override the install state
-signing secret; otherwise `SECRET_ENCRYPTION_KEY` is used. The API and task
-worker environments also need `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` so
-they can mint installation tokens for setup scripts and repository clones.
+Set the GitHub App repository permissions to at least Contents: read & write,
+Pull requests: read & write, and Metadata: read-only. `GITHUB_APP_STATE_SECRET`
+can override the install state signing secret; otherwise `SECRET_ENCRYPTION_KEY`
+is used. The API and task worker environments also need `GITHUB_APP_ID` and
+`GITHUB_APP_PRIVATE_KEY` so they can mint installation tokens for setup scripts,
+repository clones, branch pushes, and pull request creation.
 
 If either tunnel fails to start, reserve `*.interface.ngrok.pro` in the [ngrok dashboard](https://dashboard.ngrok.com/domains).
 
