@@ -5,6 +5,7 @@ import {
 	CheckCircleIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
+	KanbanIcon,
 	MinusCircleIcon,
 	PlusCircleIcon,
 	ShapesIcon,
@@ -180,12 +181,15 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	);
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
 	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
-	const newTaskHref = `/${currentOrgHandle}/factories/${currentFactoryId}`;
+	const tasksHref = `/${currentOrgHandle}/factories/${currentFactoryId}/tasks`;
+	const newTaskHref = tasksHref;
 	const floorHref = `/${currentOrgHandle}/factories/${currentFactoryId}/floor`;
 	const completedTasksHref = `/${currentOrgHandle}/factories/${currentFactoryId}/completed-tasks`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
+	const isTasksSelected =
+		pathname === tasksHref || pathname.startsWith(`${tasksHref}/`);
 	const isFloorSelected = pathname === floorHref;
 	const isCompletedTasksSelected = pathname === completedTasksHref;
 	const isOrganisationSettingsSelected = pathname.startsWith(
@@ -302,10 +306,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						<div className="mt-2">
 							<Button
 								render={
-									<Link
-										href={newTaskHref}
-										onClick={closeAfterMobileNavigation}
-									/>
+									<Link href={tasksHref} onClick={closeAfterMobileNavigation} />
 								}
 								nativeButton={false}
 								aria-keyshortcuts="N"
@@ -316,6 +317,27 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								<p className="min-w-0 flex-1 truncate text-current">New Task</p>
 							</Button>
 						</div>
+						<Link
+							href={tasksHref}
+							onClick={closeAfterMobileNavigation}
+							className={cn(
+								"group relative mt-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+								isTasksSelected ? "bg-grayscale-3" : "",
+							)}
+						>
+							<CornerBrackets
+								placement="inside"
+								color={isTasksSelected ? "accent-9" : "grayscale-8"}
+								size={6}
+								active={isTasksSelected}
+							/>
+							<KanbanIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">Tasks</span>
+							<NumberFlow
+								value={activeTasks.length}
+								className="shrink-0 font-mono text-[11px] leading-none font-semibold text-grayscale-10 tabular-nums"
+							/>
+						</Link>
 						<Link
 							href={completedTasksHref}
 							onClick={closeAfterMobileNavigation}

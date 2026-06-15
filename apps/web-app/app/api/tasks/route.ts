@@ -11,6 +11,7 @@ type CreateTaskBody = {
 	taskId?: string;
 	factoryId?: string;
 	agentId?: string;
+	name?: string;
 	instructions?: string;
 	attachments?: unknown;
 	images?: unknown;
@@ -40,28 +41,6 @@ const taskTx = (taskId: string) => {
 
 	if (!tx) {
 		throw new Error(`Task transaction builder ${taskId} not found`);
-	}
-
-	return tx;
-};
-
-const eventTx = (eventId: string) => {
-	const tx = db.tx.events[eventId];
-
-	if (!tx) {
-		throw new Error(`Event transaction builder ${eventId} not found`);
-	}
-
-	return tx;
-};
-
-const agentSessionTx = (agentSessionId: string) => {
-	const tx = db.tx.agentSessions[agentSessionId];
-
-	if (!tx) {
-		throw new Error(
-			`Agent session transaction builder ${agentSessionId} not found`,
-		);
 	}
 
 	return tx;
@@ -103,16 +82,14 @@ export async function POST(req: NextRequest) {
 	}
 
 	const taskId = body.taskId ?? id();
-	const agentSessionId = id();
-	const eventId = id();
 	const createdAt = new Date().toISOString();
-	const name = await generateTaskName(instructions);
+	const name = body.name ?? (await generateTaskName(instructions));
 
-	await db.transact([
+	await db.transact(
 		taskTx(taskId)
 			.create({
 				name,
-				status: "in_progress",
+				status: "todo",
 				instructions,
 				createdAt,
 				agentModel: body.agentModel,
@@ -120,37 +97,15 @@ export async function POST(req: NextRequest) {
 				agentSpeed: body.agentSpeed,
 			})
 			.link({ factory: authResult.factory.id, agent: agent.id }),
-		agentSessionTx(agentSessionId)
-			.create({
-				name: "Agent",
-				status: "idle",
-				createdAt,
-				updatedAt: createdAt,
-			})
-			.link({ task: taskId, agent: agent.id }),
-		eventTx(eventId)
-			.create({
-				type: "factoryplane.new_task",
-				data: {
-					taskId,
-					name,
-					instructions,
-					attachments: body.attachments,
-					images: body.images,
-				},
-				createdAt,
-			})
-			.link({ task: taskId, agentSession: agentSessionId }),
-	]);
+	);
 
 	return NextResponse.json(
 		{
 			taskId,
 			factoryId: authResult.factory.id,
 			agentId: agent.id,
-			agentSessionId,
 			name,
-			status: "in_progress",
+			status: "todo",
 		},
 		{ status: 201 },
 	);
@@ -377,6 +332,7 @@ const parseCreateTaskBody = (
 	taskId: getOptionalString(value.taskId),
 	factoryId: getOptionalString(value.factoryId),
 	agentId: getOptionalString(value.agentId),
+	name: getOptionalString(value.name),
 	instructions: getOptionalString(value.instructions),
 	attachments: Array.isArray(value.attachments) ? value.attachments : undefined,
 	images: Array.isArray(value.images) ? value.images : undefined,

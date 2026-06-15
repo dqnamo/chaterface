@@ -10,6 +10,7 @@ import {
 	GitPullRequestIcon,
 	MinusCircleIcon,
 	PencilSimpleIcon,
+	PlayCircleIcon,
 	PlusCircleIcon,
 	SidebarSimpleIcon,
 	XCircleIcon,
@@ -363,6 +364,7 @@ export default function TaskPage() {
 	} = useSidebar();
 	const [message, setMessage] = useState("");
 	const [isSendingMessage, setIsSendingMessage] = useState(false);
+	const [isStartingTask, setIsStartingTask] = useState(false);
 	const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
 	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
@@ -545,6 +547,9 @@ export default function TaskPage() {
 	const terminalSessions = task?.terminalSessions ?? [];
 	const pullRequests = getTaskPullRequests(task);
 	const isTaskCompleted = Boolean(task?.completedAt);
+	const isTaskStarted = Boolean(
+		agentSessions.length > 0 || task?.sandboxId || task?.agentThreadId,
+	);
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
 	const selectedTerminalSession =
@@ -626,6 +631,36 @@ export default function TaskPage() {
 			}),
 		);
 	}, [isTaskCompleted, task]);
+
+	const startTask = useCallback(async () => {
+		if (!task || isStartingTask) {
+			return;
+		}
+
+		if (!user?.refresh_token) {
+			throw new Error("You must be signed in to start a task.");
+		}
+
+		setIsStartingTask(true);
+
+		try {
+			const response = await fetch(`/api/tasks/${task.id}/start`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${user.refresh_token}`,
+				},
+			});
+
+			if (!response.ok) {
+				const result = (await response.json().catch(() => null)) as {
+					message?: string;
+				} | null;
+				throw new Error(result?.message ?? "Failed to start task.");
+			}
+		} finally {
+			setIsStartingTask(false);
+		}
+	}, [isStartingTask, task, user?.refresh_token]);
 
 	useHotkeys(
 		"d",
@@ -926,6 +961,24 @@ export default function TaskPage() {
 								/>
 							</Button>
 						) : null}
+						{!isTaskStarted && !isTaskCompleted ? (
+							<Button
+								type="button"
+								onClick={() => {
+									void startTask().catch((error) => {
+										console.error("Failed to start task", {
+											error:
+												error instanceof Error ? error.message : String(error),
+										});
+									});
+								}}
+								disabled={isStartingTask}
+								className="h-7"
+							>
+								<PlayCircleIcon weight="bold" className="size-4 shrink-0" />
+								{isStartingTask ? "Starting..." : "Start task"}
+							</Button>
+						) : null}
 						<Button
 							type="button"
 							aria-keyshortcuts="D"
@@ -1003,17 +1056,37 @@ export default function TaskPage() {
 							No agent sessions yet
 						</p>
 					)}
-					<Button
-						type="button"
-						variant="secondary"
-						className="h-7 shrink-0"
-						onClick={() => {
-							void createAgentSession(`Session ${agentSessions.length + 1}`);
-						}}
-					>
-						<PlusCircleIcon weight="bold" className="size-4" />
-						Add session
-					</Button>
+					{isTaskStarted ? (
+						<Button
+							type="button"
+							variant="secondary"
+							className="h-7 shrink-0"
+							onClick={() => {
+								void createAgentSession(`Session ${agentSessions.length + 1}`);
+							}}
+						>
+							<PlusCircleIcon weight="bold" className="size-4" />
+							Add session
+						</Button>
+					) : (
+						<Button
+							type="button"
+							variant="secondary"
+							className="h-7 shrink-0"
+							disabled={isStartingTask}
+							onClick={() => {
+								void startTask().catch((error) => {
+									console.error("Failed to start task", {
+										error:
+											error instanceof Error ? error.message : String(error),
+									});
+								});
+							}}
+						>
+							<PlayCircleIcon weight="bold" className="size-4" />
+							{isStartingTask ? "Starting..." : "Start"}
+						</Button>
+					)}
 					<Tabs.Root
 						value={chatViewMode}
 						onValueChange={(value) => {
@@ -1079,15 +1152,19 @@ export default function TaskPage() {
 								<div className="flex flex-col p-2 gap-2">
 									<Textarea
 										className="text-sm bg-grayscale-1 border-grayscale-3 p-2 dark:bg-grayscale-4 focus:bg-grayscale-2 dark:hover:bg-grayscale-5 dark:focus:bg-grayscale-5"
-										placeholder="Task Instructions"
-										disabled={isSendingMessage}
+										placeholder={
+											isTaskStarted
+												? "Task Instructions"
+												: "Start this task before sending messages"
+										}
+										disabled={isSendingMessage || !isTaskStarted}
 										value={message}
 										onChange={(e) => setMessage(e.target.value)}
 										onSubmit={sendMessage}
 									/>
 									<ImageAttachments
 										attachments={fileAttachments}
-										disabled={isSendingMessage}
+										disabled={isSendingMessage || !isTaskStarted}
 										onAddFiles={addAttachmentFiles}
 										onRemoveAttachment={removeFileAttachment}
 									/>
@@ -1119,11 +1196,32 @@ export default function TaskPage() {
 									<div className="flex flex-row items-center justify-center gap-2 ml-auto">
 										<Button
 											type="button"
-											disabled={isSendingMessage}
-											onClick={sendMessage}
+											disabled={
+												isSendingMessage || (!isTaskStarted && isStartingTask)
+											}
+											onClick={
+												isTaskStarted
+													? sendMessage
+													: () => {
+															void startTask().catch((error) => {
+																console.error("Failed to start task", {
+																	error:
+																		error instanceof Error
+																			? error.message
+																			: String(error),
+																});
+															});
+														}
+											}
 											className="shrink-0"
 										>
-											{isSendingMessage ? "Sending..." : "Send Message"}
+											{isTaskStarted
+												? isSendingMessage
+													? "Sending..."
+													: "Send Message"
+												: isStartingTask
+													? "Starting..."
+													: "Start task"}
 										</Button>
 									</div>
 								</div>
