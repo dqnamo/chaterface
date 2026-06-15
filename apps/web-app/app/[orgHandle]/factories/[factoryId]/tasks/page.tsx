@@ -6,7 +6,7 @@ import {
 	dropTargetForElements,
 	monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-import { type InstaQLEntity, id } from "@instantdb/react";
+import type { InstaQLEntity } from "@instantdb/react";
 import NumberFlow from "@number-flow/react";
 import {
 	CheckCircleIcon,
@@ -26,15 +26,8 @@ import {
 	useRef,
 	useState,
 } from "react";
-import {
-	DEFAULT_CODEX_MODEL,
-	DEFAULT_CODEX_REASONING_EFFORT,
-	DEFAULT_CODEX_SPEED,
-	getAgentDefaultOptions,
-} from "@/codex-options";
 import { Button } from "@/components/Button";
-import { Dialog } from "@/components/Dialog";
-import { Input, Textarea } from "@/components/Input";
+import { NewTaskDialog } from "@/components/NewTaskDialog";
 import { ExpandSidebarButton } from "@/components/SidebarContext";
 import TaskStatusDots from "@/components/TaskStatusDots";
 import { cn } from "@/helpers/classname-helper";
@@ -98,11 +91,7 @@ export default function TasksPage() {
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
 	const { user } = db.useAuth();
-	const [isCreateOpen, setIsCreateOpen] = useState(false);
-	const [taskName, setTaskName] = useState("");
-	const [taskInstructions, setTaskInstructions] = useState("");
-	const [isCreating, setIsCreating] = useState(false);
-	const [createError, setCreateError] = useState<string>();
+	const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
 	const [movingTaskId, setMovingTaskId] = useState<string>();
 
 	const { data } = db.useQuery({
@@ -129,7 +118,6 @@ export default function TasksPage() {
 	});
 
 	const agents = data?.organisations?.[0]?.agents as Agent[] | undefined;
-	const selectedAgent = agents?.[0];
 	const tasks = useMemo(
 		() => [...(data?.tasks ?? [])].sort(compareTasks),
 		[data?.tasks],
@@ -228,67 +216,6 @@ export default function TasksPage() {
 		});
 	}, [moveTaskToColumn]);
 
-	const createTask = async () => {
-		const name = taskName.trim();
-		const instructions = taskInstructions.trim();
-
-		if (isCreating || !name || !instructions) {
-			return;
-		}
-
-		if (!selectedAgent) {
-			setCreateError("Create an agent before creating a task.");
-			return;
-		}
-
-		if (!user?.refresh_token) {
-			setCreateError("You must be signed in to create a task.");
-			return;
-		}
-
-		const defaults = getAgentDefaultOptions(selectedAgent.settings);
-		setIsCreating(true);
-		setCreateError(undefined);
-
-		try {
-			const response = await fetch("/api/tasks", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${user.refresh_token}`,
-				},
-				body: JSON.stringify({
-					taskId: id(),
-					factoryId: currentFactoryId,
-					agentId: selectedAgent.id,
-					name,
-					instructions,
-					agentModel: defaults.agentModel ?? DEFAULT_CODEX_MODEL,
-					agentReasoningEffort:
-						defaults.agentReasoningEffort ?? DEFAULT_CODEX_REASONING_EFFORT,
-					agentSpeed: defaults.agentSpeed ?? DEFAULT_CODEX_SPEED,
-				}),
-			});
-
-			if (!response.ok) {
-				const result = (await response.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				throw new Error(result?.message ?? "Failed to create task.");
-			}
-
-			setTaskName("");
-			setTaskInstructions("");
-			setIsCreateOpen(false);
-		} catch (error) {
-			setCreateError(
-				error instanceof Error ? error.message : "Failed to create task.",
-			);
-		} finally {
-			setIsCreating(false);
-		}
-	};
-
 	return (
 		<div className="relative flex h-full w-full flex-col overflow-hidden">
 			<header className="flex shrink-0 flex-row items-center justify-between border-b border-grayscale-4 p-1.5">
@@ -298,8 +225,7 @@ export default function TasksPage() {
 				</div>
 				<Button
 					type="button"
-					disabled={noAgentsConfigured}
-					onClick={() => setIsCreateOpen(true)}
+					onClick={() => setIsNewTaskOpen(true)}
 					className="h-7 shrink-0"
 				>
 					<PlusCircleIcon weight="bold" className="size-4" />
@@ -330,73 +256,7 @@ export default function TasksPage() {
 					/>
 				))}
 			</div>
-			<Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-				<Dialog.Portal>
-					<Dialog.Backdrop />
-					<Dialog.Popup>
-						<form
-							onSubmit={(event) => {
-								event.preventDefault();
-								void createTask();
-							}}
-						>
-							<div className="flex flex-col gap-1 p-3">
-								<Dialog.Title>Create task</Dialog.Title>
-								<Dialog.Description>
-									Add a todo task without starting an agent session.
-								</Dialog.Description>
-							</div>
-							<div className="flex flex-col gap-3 border-t border-grayscale-4 p-3">
-								<label className="flex flex-col gap-1.5" htmlFor="task-name">
-									<span className="text-xs text-grayscale-11">Name</span>
-									<Input
-										autoFocus
-										id="task-name"
-										type="text"
-										placeholder="Task name"
-										value={taskName}
-										onChange={(event) => setTaskName(event.target.value)}
-									/>
-								</label>
-								<label
-									className="flex flex-col gap-1.5"
-									htmlFor="task-instructions"
-								>
-									<span className="text-xs text-grayscale-11">
-										Instructions
-									</span>
-									<Textarea
-										id="task-instructions"
-										className="min-h-32 text-sm"
-										placeholder="What should the agent do when this starts?"
-										value={taskInstructions}
-										onChange={(event) =>
-											setTaskInstructions(event.target.value)
-										}
-										onSubmit={createTask}
-									/>
-								</label>
-								{createError ? (
-									<p className="rounded-md border border-red-6 bg-red-2 px-2 py-1.5 text-xs text-red-11">
-										{createError}
-									</p>
-								) : null}
-							</div>
-							<div className="flex items-center justify-end gap-2 border-t border-grayscale-4 p-3">
-								<Dialog.Close type="button">Cancel</Dialog.Close>
-								<Button
-									type="submit"
-									disabled={
-										isCreating || !taskName.trim() || !taskInstructions.trim()
-									}
-								>
-									{isCreating ? "Creating..." : "Create task"}
-								</Button>
-							</div>
-						</form>
-					</Dialog.Popup>
-				</Dialog.Portal>
-			</Dialog.Root>
+			<NewTaskDialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen} />
 		</div>
 	);
 }

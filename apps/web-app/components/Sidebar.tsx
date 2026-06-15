@@ -30,6 +30,7 @@ import { Dialog } from "./Dialog";
 import { Input } from "./Input";
 import { Menu } from "./Menu";
 import Monogram from "./Monogram";
+import { NewTaskDialog } from "./NewTaskDialog";
 import { ScrollArea } from "./ScrollArea";
 import { useSidebar } from "./SidebarContext";
 import TaskStatusDots from "./TaskStatusDots";
@@ -136,10 +137,10 @@ const compareActiveTaskEntries = (
 };
 
 export default function Sidebar({ onToggleCollapse }: SidebarProps) {
-	const router = useRouter();
 	const { orgHandle, factoryId, taskId } = useParams();
 	const pathname = usePathname();
 	const { isMobile, collapse } = useSidebar();
+	const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
 	const currentTaskId = taskId as string;
@@ -198,7 +199,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
 	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
 	const tasksHref = `/${currentOrgHandle}/factories/${currentFactoryId}/tasks`;
-	const newTaskHref = tasksHref;
 	const floorHref = `/${currentOrgHandle}/factories/${currentFactoryId}/floor`;
 	const integrationsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/integrations`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
@@ -211,204 +211,216 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
 	);
-	const navigateToNewTask = useCallback(() => {
-		router.push(newTaskHref);
+	const openNewTask = useCallback(() => {
+		setIsNewTaskOpen(true);
 		closeAfterMobileNavigation();
-	}, [closeAfterMobileNavigation, newTaskHref, router]);
+	}, [closeAfterMobileNavigation]);
 
 	useHotkeys(
 		"n",
-		navigateToNewTask,
+		openNewTask,
 		{
 			description: "New task",
 			preventDefault: true,
 		},
-		[navigateToNewTask],
+		[openNewTask],
 	);
 
 	return (
-		<ScrollArea.Root className="h-full w-full min-w-0 max-w-full">
-			<ScrollArea.Viewport>
-				<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-2 px-2 py-2">
-					<div className="sticky top-0 z-20 mb-2 flex min-w-0 max-w-full flex-row items-start justify-between gap-2 bg-grayscale-1 pb-2">
-						<FactorySwitcher
-							organisations={organisations}
-							currentOrgHandle={currentOrgHandle}
-							currentFactoryId={currentFactoryId}
-							onNavigate={closeAfterMobileNavigation}
-						/>
-						<button
-							type="button"
-							aria-label="Collapse sidebar"
-							onClick={onToggleCollapse}
-							className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
-						>
-							<SidebarSimpleIcon weight="bold" />
-						</button>
-					</div>
-					<div className="min-w-0 max-w-full">
-						<Link
-							href={settingsHref}
-							onClick={closeAfterMobileNavigation}
-							className={cn(
-								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-								isSettingsSelected ? "bg-grayscale-3" : "",
-							)}
-						>
-							<CornerBrackets
-								placement="inside"
-								color={isSettingsSelected ? "accent-9" : "grayscale-8"}
-								size={6}
-								active={isSettingsSelected}
+		<>
+			<ScrollArea.Root className="h-full w-full min-w-0 max-w-full">
+				<ScrollArea.Viewport>
+					<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-2 px-2 py-2">
+						<div className="sticky top-0 z-20 mb-2 flex min-w-0 max-w-full flex-row items-start justify-between gap-2 bg-grayscale-1 pb-2">
+							<FactorySwitcher
+								organisations={organisations}
+								currentOrgHandle={currentOrgHandle}
+								currentFactoryId={currentFactoryId}
+								onNavigate={closeAfterMobileNavigation}
 							/>
-							<FadersHorizontalIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">Factory Settings</span>
-						</Link>
-						<Link
-							href={personalSettingsHref}
-							onClick={closeAfterMobileNavigation}
-							className={cn(
-								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-								isPersonalSettingsSelected ? "bg-grayscale-3" : "",
-							)}
-						>
-							<CornerBrackets
-								placement="inside"
-								color={isPersonalSettingsSelected ? "accent-9" : "grayscale-8"}
-								size={6}
-								active={isPersonalSettingsSelected}
-							/>
-							<UserCircleIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">Personal Settings</span>
-						</Link>
-						<Link
-							href={floorHref}
-							onClick={closeAfterMobileNavigation}
-							className={cn(
-								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-								isFloorSelected ? "bg-grayscale-3" : "",
-							)}
-						>
-							<CornerBrackets
-								placement="inside"
-								color={isFloorSelected ? "accent-9" : "grayscale-8"}
-								size={6}
-								active={isFloorSelected}
-							/>
-							<ShapesIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">Factory</span>
-						</Link>
-						<Link
-							href={integrationsHref}
-							onClick={closeAfterMobileNavigation}
-							className={cn(
-								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-								isIntegrationsSelected ? "bg-grayscale-3" : "",
-							)}
-						>
-							<CornerBrackets
-								placement="inside"
-								color={isIntegrationsSelected ? "accent-9" : "grayscale-8"}
-								size={6}
-								active={isIntegrationsSelected}
-							/>
-							<SlackLogoIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">Integrations</span>
-						</Link>
-						<Link
-							href={organisationSettingsHref}
-							onClick={closeAfterMobileNavigation}
-							className={cn(
-								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-								isOrganisationSettingsSelected ? "bg-grayscale-3" : "",
-							)}
-						>
-							<CornerBrackets
-								placement="inside"
-								color={
-									isOrganisationSettingsSelected ? "accent-9" : "grayscale-8"
-								}
-								size={6}
-								active={isOrganisationSettingsSelected}
-							/>
-							<BuildingsIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">
-								Organisation Settings
-							</span>
-						</Link>
-						<Link
-							href={tasksHref}
-							onClick={closeAfterMobileNavigation}
-							className={cn(
-								"group relative mt-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-								isTasksSelected ? "bg-grayscale-3" : "",
-							)}
-						>
-							<CornerBrackets
-								placement="inside"
-								color={isTasksSelected ? "accent-9" : "grayscale-8"}
-								size={6}
-								active={isTasksSelected}
-							/>
-							<KanbanIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">Tasks</span>
+							<button
+								type="button"
+								aria-label="Collapse sidebar"
+								onClick={onToggleCollapse}
+								className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
+							>
+								<SidebarSimpleIcon weight="bold" />
+							</button>
+						</div>
+						<div className="min-w-0 max-w-full">
+							<Link
+								href={settingsHref}
+								onClick={closeAfterMobileNavigation}
+								className={cn(
+									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+									isSettingsSelected ? "bg-grayscale-3" : "",
+								)}
+							>
+								<CornerBrackets
+									placement="inside"
+									color={isSettingsSelected ? "accent-9" : "grayscale-8"}
+									size={6}
+									active={isSettingsSelected}
+								/>
+								<FadersHorizontalIcon
+									weight="bold"
+									className="size-4 shrink-0"
+								/>
+								<span className="min-w-0 flex-1 truncate">
+									Factory Settings
+								</span>
+							</Link>
+							<Link
+								href={personalSettingsHref}
+								onClick={closeAfterMobileNavigation}
+								className={cn(
+									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+									isPersonalSettingsSelected ? "bg-grayscale-3" : "",
+								)}
+							>
+								<CornerBrackets
+									placement="inside"
+									color={
+										isPersonalSettingsSelected ? "accent-9" : "grayscale-8"
+									}
+									size={6}
+									active={isPersonalSettingsSelected}
+								/>
+								<UserCircleIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">
+									Personal Settings
+								</span>
+							</Link>
+							<Link
+								href={floorHref}
+								onClick={closeAfterMobileNavigation}
+								className={cn(
+									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+									isFloorSelected ? "bg-grayscale-3" : "",
+								)}
+							>
+								<CornerBrackets
+									placement="inside"
+									color={isFloorSelected ? "accent-9" : "grayscale-8"}
+									size={6}
+									active={isFloorSelected}
+								/>
+								<ShapesIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">Factory</span>
+							</Link>
+							<Link
+								href={integrationsHref}
+								onClick={closeAfterMobileNavigation}
+								className={cn(
+									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+									isIntegrationsSelected ? "bg-grayscale-3" : "",
+								)}
+							>
+								<CornerBrackets
+									placement="inside"
+									color={isIntegrationsSelected ? "accent-9" : "grayscale-8"}
+									size={6}
+									active={isIntegrationsSelected}
+								/>
+								<SlackLogoIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">Integrations</span>
+							</Link>
+							<Link
+								href={organisationSettingsHref}
+								onClick={closeAfterMobileNavigation}
+								className={cn(
+									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+									isOrganisationSettingsSelected ? "bg-grayscale-3" : "",
+								)}
+							>
+								<CornerBrackets
+									placement="inside"
+									color={
+										isOrganisationSettingsSelected ? "accent-9" : "grayscale-8"
+									}
+									size={6}
+									active={isOrganisationSettingsSelected}
+								/>
+								<BuildingsIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">
+									Organisation Settings
+								</span>
+							</Link>
+							<Link
+								href={tasksHref}
+								onClick={closeAfterMobileNavigation}
+								className={cn(
+									"group relative mt-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+									isTasksSelected ? "bg-grayscale-3" : "",
+								)}
+							>
+								<CornerBrackets
+									placement="inside"
+									color={isTasksSelected ? "accent-9" : "grayscale-8"}
+									size={6}
+									active={isTasksSelected}
+								/>
+								<KanbanIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">Tasks</span>
+								<NumberFlow
+									value={activeTasks.length}
+									className="shrink-0 font-mono text-[11px] leading-none font-semibold text-grayscale-10 tabular-nums"
+								/>
+							</Link>
+							<div className="mt-2">
+								<Button
+									type="button"
+									onClick={openNewTask}
+									aria-keyshortcuts="N"
+									className="w-full"
+									shortcut="N"
+								>
+									<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
+									<p className="min-w-0 flex-1 truncate text-current">
+										New Task
+									</p>
+								</Button>
+							</div>
+						</div>
+						<div className="mt-2 flex flex-row items-center justify-between px-3">
+							<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+								Active Tasks
+							</p>
 							<NumberFlow
 								value={activeTasks.length}
-								className="shrink-0 font-mono text-[11px] leading-none font-semibold text-grayscale-10 tabular-nums"
+								className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase tabular-nums"
 							/>
-						</Link>
-						<div className="mt-2">
-							<Button
-								render={
-									<Link href={tasksHref} onClick={closeAfterMobileNavigation} />
-								}
-								nativeButton={false}
-								aria-keyshortcuts="N"
-								className="w-full"
-								shortcut="N"
-							>
-								<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
-								<p className="min-w-0 flex-1 truncate text-current">New Task</p>
-							</Button>
 						</div>
-					</div>
-					<div className="mt-2 flex flex-row items-center justify-between px-3">
-						<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-							Active Tasks
-						</p>
-						<NumberFlow
-							value={activeTasks.length}
-							className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase tabular-nums"
-						/>
-					</div>
-					<div className="flex min-w-0 max-w-full flex-col gap-px">
-						<AnimatePresence initial={false} mode="popLayout">
-							{activeTasks.map((task) => (
-								<motion.div
-									key={task.id}
-									layout="position"
-									initial={{ opacity: 0, y: 4 }}
-									animate={{ opacity: 1, y: 0 }}
-									exit={{ opacity: 0, y: -4 }}
-									transition={{ duration: 0.18, ease: "easeOut" }}
-								>
-									<TaskSidebarItem
-										href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
-										fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-										task={task}
-										selected={task.id === currentTaskId}
-										onNavigate={closeAfterMobileNavigation}
-									/>
-								</motion.div>
-							))}
-						</AnimatePresence>
-					</div>
-				</ScrollArea.Content>
-			</ScrollArea.Viewport>
-			<ScrollArea.Scrollbar>
-				<ScrollArea.Thumb />
-			</ScrollArea.Scrollbar>
-		</ScrollArea.Root>
+						<div className="flex min-w-0 max-w-full flex-col gap-px">
+							<AnimatePresence initial={false} mode="popLayout">
+								{activeTasks.map((task) => (
+									<motion.div
+										key={task.id}
+										layout="position"
+										initial={{ opacity: 0, y: 4 }}
+										animate={{ opacity: 1, y: 0 }}
+										exit={{ opacity: 0, y: -4 }}
+										transition={{ duration: 0.18, ease: "easeOut" }}
+									>
+										<TaskSidebarItem
+											href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
+											fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+											task={task}
+											selected={task.id === currentTaskId}
+											onNavigate={closeAfterMobileNavigation}
+										/>
+									</motion.div>
+								))}
+							</AnimatePresence>
+						</div>
+					</ScrollArea.Content>
+				</ScrollArea.Viewport>
+				<ScrollArea.Scrollbar>
+					<ScrollArea.Thumb />
+				</ScrollArea.Scrollbar>
+			</ScrollArea.Root>
+			<NewTaskDialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen} />
+		</>
 	);
 }
 
