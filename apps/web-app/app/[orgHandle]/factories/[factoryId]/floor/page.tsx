@@ -1850,7 +1850,7 @@ function SlackIntegrationInspector({
 				</Select.Root>
 				{slackConnections.length === 0 ? (
 					<Link
-						href="../settings/integrations"
+						href="../integrations"
 						className="text-xs text-accent-11 hover:underline"
 					>
 						Connect Slack in Integrations.

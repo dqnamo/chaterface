@@ -9,6 +9,7 @@ import {
 	PlusCircleIcon,
 	ShapesIcon,
 	SidebarSimpleIcon,
+	SlackLogoIcon,
 	UserCircleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
@@ -182,11 +183,13 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
 	const newTaskHref = `/${currentOrgHandle}/factories/${currentFactoryId}`;
 	const floorHref = `/${currentOrgHandle}/factories/${currentFactoryId}/floor`;
+	const integrationsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/integrations`;
 	const completedTasksHref = `/${currentOrgHandle}/factories/${currentFactoryId}/completed-tasks`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
 	const isFloorSelected = pathname === floorHref;
+	const isIntegrationsSelected = pathname === integrationsHref;
 	const isCompletedTasksSelected = pathname === completedTasksHref;
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
@@ -277,6 +280,23 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 							/>
 							<ShapesIcon weight="bold" className="size-4 shrink-0" />
 							<span className="min-w-0 flex-1 truncate">Factory</span>
+						</Link>
+						<Link
+							href={integrationsHref}
+							onClick={closeAfterMobileNavigation}
+							className={cn(
+								"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+								isIntegrationsSelected ? "bg-grayscale-3" : "",
+							)}
+						>
+							<CornerBrackets
+								placement="inside"
+								color={isIntegrationsSelected ? "accent-9" : "grayscale-8"}
+								size={6}
+								active={isIntegrationsSelected}
+							/>
+							<SlackLogoIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">Integrations</span>
 						</Link>
 						<Link
 							href={organisationSettingsHref}

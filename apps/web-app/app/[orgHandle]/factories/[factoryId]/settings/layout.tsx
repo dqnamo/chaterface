@@ -8,7 +8,6 @@ import {
 	PackageIcon,
 	PlugsConnectedIcon,
 	PuzzlePieceIcon,
-	SlackLogoIcon,
 	TerminalIcon,
 	TerminalWindowIcon,
 } from "@phosphor-icons/react";
@@ -43,11 +42,6 @@ const SETTINGS_ITEMS = [
 		label: "Repositories",
 		slug: "repositories",
 		Icon: GitBranchIcon,
-	},
-	{
-		label: "Integrations",
-		slug: "integrations",
-		Icon: SlackLogoIcon,
 	},
 	{
 		label: "MCP Servers",
