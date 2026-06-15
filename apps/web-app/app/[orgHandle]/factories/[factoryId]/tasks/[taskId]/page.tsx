@@ -331,28 +331,6 @@ const buildUserDisplayProfiles = (
 	return profiles;
 };
 
-const getTaskStatusLabel = ({
-	completedAt,
-	status,
-}: {
-	completedAt?: string | number | null;
-	status?: string;
-}) => {
-	if (completedAt || status === "complete") {
-		return "Complete";
-	}
-
-	if (status === "in_progress") {
-		return "Running";
-	}
-
-	if (status === "failed") {
-		return "Failed";
-	}
-
-	return "Idle";
-};
-
 const compareAgentSessions = (
 	first: { createdAt?: string | number | Date | null },
 	second: { createdAt?: string | number | Date | null },
@@ -567,11 +545,6 @@ export default function TaskPage() {
 	const terminalSessions = task?.terminalSessions ?? [];
 	const pullRequests = getTaskPullRequests(task);
 	const isTaskCompleted = Boolean(task?.completedAt);
-	const taskDotStatus = toTaskDotStatus(task?.status);
-	const taskStatusLabel = getTaskStatusLabel({
-		completedAt: task?.completedAt,
-		status: task?.status,
-	});
 	const selectedService =
 		services.find((service) => service.id === selectedServiceId) ?? services[0];
 	const selectedTerminalSession =
@@ -995,34 +968,6 @@ export default function TaskPage() {
 						</AnimatePresence>
 					</div>
 				</div>
-				<div className="flex shrink-0 flex-row items-center justify-between gap-3 border-b border-grayscale-4 px-3 py-1.5">
-					<div className="flex min-w-0 items-center gap-2">
-						<TaskStatusDots status={taskDotStatus} size={3} gap={1} />
-						<span className="truncate text-xs font-medium text-grayscale-11">
-							{taskStatusLabel}
-						</span>
-						{selectedAgentSession ? (
-							<span className="truncate border-l border-grayscale-4 pl-2 text-xs text-grayscale-10">
-								{selectedAgentSession.status ?? "idle"}
-							</span>
-						) : null}
-					</div>
-					<Tabs.Root
-						value={chatViewMode}
-						onValueChange={(value) => {
-							if (value === "minified" || value === "full") {
-								setChatViewMode(value);
-							}
-						}}
-						className="min-h-0 shrink-0"
-					>
-						<Tabs.List>
-							<Tabs.Tab value="minified">Minified</Tabs.Tab>
-							<Tabs.Tab value="full">Full</Tabs.Tab>
-							<Tabs.Indicator />
-						</Tabs.List>
-					</Tabs.Root>
-				</div>
 				<div className="flex shrink-0 flex-row items-center gap-2 border-b border-grayscale-4 px-3 py-1.5">
 					{agentSessions.length > 0 ? (
 						<Tabs.Root
@@ -1035,7 +980,17 @@ export default function TaskPage() {
 							<Tabs.List>
 								{agentSessions.map((session, index) => (
 									<Tabs.Tab key={session.id} value={session.id}>
-										{session.name || `Session ${index + 1}`}
+										<span className="flex min-w-0 items-center gap-2">
+											<TaskStatusDots
+												status={toTaskDotStatus(session.status)}
+												size={3}
+												gap={1}
+												label={`${session.name || `Session ${index + 1}`} status`}
+											/>
+											<span className="truncate">
+												{session.name || `Session ${index + 1}`}
+											</span>
+										</span>
 									</Tabs.Tab>
 								))}
 								<Tabs.Indicator />
@@ -1057,6 +1012,21 @@ export default function TaskPage() {
 						<PlusCircleIcon weight="bold" className="size-4" />
 						Add session
 					</Button>
+					<Tabs.Root
+						value={chatViewMode}
+						onValueChange={(value) => {
+							if (value === "minified" || value === "full") {
+								setChatViewMode(value);
+							}
+						}}
+						className="min-h-0 shrink-0"
+					>
+						<Tabs.List>
+							<Tabs.Tab value="minified">Minified</Tabs.Tab>
+							<Tabs.Tab value="full">Full</Tabs.Tab>
+							<Tabs.Indicator />
+						</Tabs.List>
+					</Tabs.Root>
 				</div>
 				<ScrollArea.Root className="min-h-0 flex-1">
 					<ScrollArea.Viewport ref={scrollContainerRef} onScroll={handleScroll}>

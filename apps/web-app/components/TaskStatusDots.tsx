@@ -5,9 +5,9 @@ const FAILED_PATTERN = [true, true, true, true, true, true] as const;
 const DOT_INDICES = [0, 1, 2, 3, 4, 5] as const;
 
 const statusLabels: Record<TaskDotStatus, string> = {
-	idle: "Task idle",
-	running: "Task in progress",
-	failed: "Task failed",
+	idle: "Idle",
+	running: "In progress",
+	failed: "Failed",
 };
 
 type TaskStatusDotsProps = {
@@ -15,6 +15,7 @@ type TaskStatusDotsProps = {
 	size?: number;
 	gap?: number;
 	className?: string;
+	label?: string;
 };
 
 export default function TaskStatusDots({
@@ -22,13 +23,14 @@ export default function TaskStatusDots({
 	size = 3,
 	gap = 1,
 	className,
+	label,
 }: TaskStatusDotsProps) {
 	const pattern = status === "failed" ? FAILED_PATTERN : null;
 	const cellStyle = { width: size, height: size };
 
 	return (
 		<div
-			aria-label={statusLabels[status]}
+			aria-label={label ?? `Task ${statusLabels[status].toLowerCase()}`}
 			className={cn("grid w-max shrink-0 grid-cols-2", className)}
 			role="status"
 			style={{ gap }}

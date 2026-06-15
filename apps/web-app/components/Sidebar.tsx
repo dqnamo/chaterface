@@ -33,7 +33,13 @@ import { ScrollArea } from "./ScrollArea";
 import { useSidebar } from "./SidebarContext";
 import TaskStatusDots from "./TaskStatusDots";
 
-type Task = InstaQLEntity<AppSchema, "tasks">;
+type AgentSession = Pick<
+	InstaQLEntity<AppSchema, "agentSessions">,
+	"id" | "name" | "status"
+>;
+type Task = InstaQLEntity<AppSchema, "tasks"> & {
+	agentSessions?: AgentSession[];
+};
 type Factory = Pick<InstaQLEntity<AppSchema, "factories">, "id" | "name">;
 type Organisation = Pick<
 	InstaQLEntity<AppSchema, "organisations">,
@@ -131,6 +137,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 					factory: currentFactoryId,
 				},
 			},
+			agentSessions: {},
 		},
 	});
 	const { data: switcherData } = db.useQuery({
@@ -804,6 +811,7 @@ const TaskSidebarItem = ({
 	const router = useRouter();
 	const status = toTaskDotStatus(task.status);
 	const isCompleted = Boolean(task.completedAt);
+	const agentSessions = task.agentSessions ?? [];
 
 	const toggleCompletion = async () => {
 		await db.transact(
@@ -845,7 +853,21 @@ const TaskSidebarItem = ({
 					active={selected}
 				/>
 				<span className="min-w-0 flex-1 truncate">{task.name}</span>
-				{isCompleted ? null : <TaskStatusDots status={status} />}
+				{isCompleted ? null : (
+					<span className="flex shrink-0 flex-row items-center gap-1.5 overflow-hidden">
+						{agentSessions.length > 0 ? (
+							agentSessions.map((session, index) => (
+								<TaskStatusDots
+									key={session.id}
+									status={toTaskDotStatus(session.status)}
+									label={`${session.name || `Session ${index + 1}`} status`}
+								/>
+							))
+						) : (
+							<TaskStatusDots status={status} />
+						)}
+					</span>
+				)}
 			</ContextMenu.Trigger>
 			<ContextMenu.Portal>
 				<ContextMenu.Positioner>
