@@ -203,7 +203,7 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 		<ScrollArea.Root className="h-full w-full min-w-0 max-w-full">
 			<ScrollArea.Viewport>
 				<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-2 px-2 py-2">
-					<div className="sticky top-0 z-20 mb-2 flex min-w-0 max-w-full flex-row items-center justify-between gap-2 bg-grayscale-1 pb-2">
+					<div className="sticky top-0 z-20 mb-2 flex min-w-0 max-w-full flex-row items-start justify-between gap-2 bg-grayscale-1 pb-2">
 						<FactorySwitcher
 							organisations={organisations}
 							currentOrgHandle={currentOrgHandle}
