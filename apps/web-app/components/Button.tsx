@@ -27,7 +27,7 @@ const variantClassName: Record<ButtonVariant, string> = {
 	primary:
 		"border-grayscale-12 bg-grayscale-12 text-grayscale-1 hover:bg-grayscale-11 hover:border-grayscale-11",
 	secondary:
-		"border-grayscale-3 bg-grayscale-1 text-grayscale-12 hover:bg-grayscale-2 hover:border-grayscale-4",
+		"border-grayscale-4 bg-grayscale-1 text-grayscale-12 hover:bg-grayscale-2 hover:border-grayscale-5",
 };
 
 export type ButtonProps = ComponentProps<typeof BaseButton> & {
