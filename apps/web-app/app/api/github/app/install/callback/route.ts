@@ -62,16 +62,60 @@ export async function GET(req: NextRequest) {
 		);
 	}
 
-	const installation = await getGithubAppInstallation(installationId, config);
+	let installation: Awaited<ReturnType<typeof getGithubAppInstallation>>;
 
-	await db.transact(
-		factoryTx(factory.id).update({
-			githubAppInstallationAccountLogin: installation.account?.login,
-			githubAppInstallationAccountType: installation.account?.type,
-			githubAppInstallationId: installationId,
-			githubAppInstalledAt: new Date().toISOString(),
-		}),
-	);
+	try {
+		installation = await getGithubAppInstallation(installationId, config);
+	} catch (error) {
+		console.error("Failed to load GitHub App installation", {
+			factoryId: factory.id,
+			installationId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+
+		return redirectWithStatus(
+			req,
+			redirectPath,
+			"github_error",
+			"installation_lookup_failed",
+		);
+	}
+
+	try {
+		await db.transact(
+			factoryTx(factory.id).update({
+				githubAppInstallationAccountLogin: installation.account?.login,
+				githubAppInstallationAccountType: installation.account?.type,
+				githubAppInstallationId: installationId,
+				githubAppInstalledAt: new Date(),
+			}),
+		);
+
+		const updatedFactory = await getAuthenticatedFactory(factory.id);
+
+		if (updatedFactory?.githubAppInstallationId !== installationId) {
+			console.error("GitHub App installation did not persist", {
+				factoryId: factory.id,
+				installationId,
+				persistedInstallationId: updatedFactory?.githubAppInstallationId,
+			});
+
+			return redirectWithStatus(
+				req,
+				redirectPath,
+				"github_error",
+				"save_failed",
+			);
+		}
+	} catch (error) {
+		console.error("Failed to save GitHub App installation", {
+			factoryId: factory.id,
+			installationId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+
+		return redirectWithStatus(req, redirectPath, "github_error", "save_failed");
+	}
 
 	return redirectWithStatus(req, redirectPath, "github", "connected");
 }
