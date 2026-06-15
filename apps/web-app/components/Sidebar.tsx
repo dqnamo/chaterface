@@ -2,7 +2,6 @@ import { type InstaQLEntity, id } from "@instantdb/react";
 import NumberFlow from "@number-flow/react";
 import {
 	BuildingsIcon,
-	CheckCircleIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
 	KanbanIcon,
@@ -107,6 +106,24 @@ const getActiveTaskStatusRank = (status: Task["status"]) =>
 		? ACTIVE_TASK_STATUS_RANKS[status as keyof typeof ACTIVE_TASK_STATUS_RANKS]
 		: ACTIVE_TASK_STATUS_RANKS.idle;
 
+const isActiveTask = (task: Task) => {
+	if (
+		task.completedAt ||
+		task.status === "complete" ||
+		task.status === "done" ||
+		task.status === "todo"
+	) {
+		return false;
+	}
+
+	return (
+		task.status === "in_progress" ||
+		(task.agentSessions?.length ?? 0) > 0 ||
+		Boolean(task.sandboxId) ||
+		Boolean(task.agentThreadId)
+	);
+};
+
 const compareActiveTaskEntries = (
 	first: { task: Task; index: number },
 	second: { task: Task; index: number },
@@ -169,15 +186,13 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 				),
 		[switcherData?.organisations],
 	);
-	const { activeTasks, completedTasks } = useMemo(
-		() => ({
-			activeTasks: tasks
+	const activeTasks = useMemo(
+		() =>
+			tasks
 				.map((task, index) => ({ task, index }))
-				.filter(({ task }) => !task.completedAt)
+				.filter(({ task }) => isActiveTask(task))
 				.sort(compareActiveTaskEntries)
 				.map(({ task }) => task),
-			completedTasks: tasks.filter((task) => task.completedAt),
-		}),
 		[tasks],
 	);
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
@@ -186,7 +201,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const newTaskHref = tasksHref;
 	const floorHref = `/${currentOrgHandle}/factories/${currentFactoryId}/floor`;
 	const integrationsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/integrations`;
-	const completedTasksHref = `/${currentOrgHandle}/factories/${currentFactoryId}/completed-tasks`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
@@ -194,7 +208,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 		pathname === tasksHref || pathname.startsWith(`${tasksHref}/`);
 	const isFloorSelected = pathname === floorHref;
 	const isIntegrationsSelected = pathname === integrationsHref;
-	const isCompletedTasksSelected = pathname === completedTasksHref;
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
 	);
@@ -323,20 +336,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								Organisation Settings
 							</span>
 						</Link>
-						<div className="mt-2">
-							<Button
-								render={
-									<Link href={tasksHref} onClick={closeAfterMobileNavigation} />
-								}
-								nativeButton={false}
-								aria-keyshortcuts="N"
-								className="w-full"
-								shortcut="N"
-							>
-								<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
-								<p className="min-w-0 flex-1 truncate text-current">New Task</p>
-							</Button>
-						</div>
 						<Link
 							href={tasksHref}
 							onClick={closeAfterMobileNavigation}
@@ -358,27 +357,20 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								className="shrink-0 font-mono text-[11px] leading-none font-semibold text-grayscale-10 tabular-nums"
 							/>
 						</Link>
-						<Link
-							href={completedTasksHref}
-							onClick={closeAfterMobileNavigation}
-							className={cn(
-								"group relative mt-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-								isCompletedTasksSelected ? "bg-grayscale-3" : "",
-							)}
-						>
-							<CornerBrackets
-								placement="inside"
-								color={isCompletedTasksSelected ? "accent-9" : "grayscale-8"}
-								size={6}
-								active={isCompletedTasksSelected}
-							/>
-							<CheckCircleIcon weight="bold" className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">Completed Tasks</span>
-							<NumberFlow
-								value={completedTasks.length}
-								className="shrink-0 font-mono text-[11px] leading-none font-semibold text-grayscale-10 tabular-nums"
-							/>
-						</Link>
+						<div className="mt-2">
+							<Button
+								render={
+									<Link href={tasksHref} onClick={closeAfterMobileNavigation} />
+								}
+								nativeButton={false}
+								aria-keyshortcuts="N"
+								className="w-full"
+								shortcut="N"
+							>
+								<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
+								<p className="min-w-0 flex-1 truncate text-current">New Task</p>
+							</Button>
+						</div>
 					</div>
 					<div className="mt-2 flex flex-row items-center justify-between px-3">
 						<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
