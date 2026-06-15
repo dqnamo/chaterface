@@ -188,6 +188,30 @@ curl -X POST {{FACTORYPLANE_API_URL}}/github/pull-requests \
   -d '{"repositoryPath":".","branchName":"factoryplane/update-feature","title":"Update feature","body":"Implements the requested change."}'
 ```
 
+### Merge a GitHub pull request
+
+Use this when the user explicitly asks you to merge the task's attached GitHub pull request. The merge target must be the pull request already attached to the task; omit `url` to merge the attached pull request.
+
+**Endpoint:** `POST /github/pull-requests/merge`
+
+**Body (JSON):**
+
+- `url` — optional GitHub pull request URL; when present, it must match the task's attached pull request
+- `mergeMethod` — optional merge strategy: `"merge"`, `"squash"`, or `"rebase"`; defaults to `"merge"`
+- `commitTitle` — optional merge commit title
+- `commitMessage` — optional merge commit message
+- `expectedHeadSha` — optional 40-character head SHA to protect against merging newer commits
+- `deleteBranch` — optional boolean; deletes the pull request head branch after a successful merge when possible
+
+**Example:**
+
+```bash
+curl -X POST {{FACTORYPLANE_API_URL}}/github/pull-requests/merge \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"mergeMethod":"squash","deleteBranch":true}'
+```
+
 ### Attach a pull request
 
 Use this after you create or find a pull request outside the Factoryplane GitHub PR endpoint. This attaches the PR to the task so the user can open it from Factoryplane.

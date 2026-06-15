@@ -350,8 +350,11 @@ export default function Event({
 		return <RepositoryEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
-	if (type === "factoryplane.pull_request_attached") {
-		return <PullRequestEvent data={data} timestamp={timestamp} />;
+	if (
+		type === "factoryplane.pull_request_attached" ||
+		type === "factoryplane.pull_request_merged"
+	) {
+		return <PullRequestEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
 	if (type.startsWith("factoryplane.setup_step_")) {
@@ -615,11 +618,17 @@ function RepositoryEvent({
 function PullRequestEvent({
 	data,
 	timestamp,
+	type,
 }: {
 	data: JsonRecord;
 	timestamp?: string;
+	type: string;
 }) {
 	const url = getString(data, "url");
+	const title =
+		type === "factoryplane.pull_request_merged"
+			? "Pull request merged"
+			: "Pull request attached";
 
 	return (
 		<EventCard
@@ -627,7 +636,7 @@ function PullRequestEvent({
 			meta={timestamp}
 			phase="success"
 			source="factoryplane"
-			title="Pull request attached"
+			title={title}
 			tone="success"
 		>
 			<DetailGrid
@@ -646,6 +655,8 @@ function PullRequestEvent({
 							</a>
 						) : undefined,
 					],
+					["method", getString(data, "mergeMethod")],
+					["sha", getString(data, "sha")],
 				]}
 			/>
 		</EventCard>
