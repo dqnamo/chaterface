@@ -58,7 +58,7 @@ Pull requests: read & write, and Metadata: read-only. `GITHUB_APP_STATE_SECRET`
 can override the install state signing secret; otherwise `SECRET_ENCRYPTION_KEY`
 is used. The API and task worker environments also need `GITHUB_APP_ID` and
 `GITHUB_APP_PRIVATE_KEY` so they can mint installation tokens for repository
-clones, branch pushes, and pull request creation.
+clones, branch pushes, pull request creation, and pull request merging.
 
 If either tunnel fails to start, reserve `*.interface.ngrok.pro` in the [ngrok dashboard](https://dashboard.ngrok.com/domains).
 
