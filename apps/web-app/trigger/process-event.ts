@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createSign, randomUUID } from "node:crypto";
 import type { InstaQLEntity } from "@instantdb/react";
 import { task } from "@trigger.dev/sdk";
 import { decryptAgentAuth } from "@/agent-auth-storage";
@@ -1858,7 +1858,7 @@ const setupTaskSandbox = async (
 		factory,
 		"new_task",
 		factory.newTaskSetupScript,
-		repositoryGithubEnvs,
+		getAgentSafeBaseEnvs(),
 	);
 
 	const diffWorkspacePath = await runSetupStep(
@@ -2376,7 +2376,7 @@ const setupRepositoryGithubAuth = async (
 	await runOptionalSetupStep(
 		taskId,
 		"repository_auth",
-		"Validate repository GitHub token",
+		"Validate repository GitHub App installation",
 		async () => {
 			await validateGithubToken(sandbox, envs);
 			return envs;
@@ -2390,7 +2390,7 @@ const setupRepositoryGithubAuth = async (
 const buildGithubAuthNoticeCommand = () =>
 	[
 		'if [ -z "$GITHUB_ACCESS_TOKEN" ]; then',
-		'  printf "No factory GitHub token configured; private GitHub repositories will fail to clone. Add one in factory settings.\\n" >&2',
+		'  printf "No factory GitHub App installation configured; private GitHub repositories will fail to clone. Connect GitHub in factory settings.\\n" >&2',
 		"fi",
 	].join("\n");
 
@@ -2404,17 +2404,14 @@ const buildGithubAuthHeaderCommand = () =>
 const getFactoryGithubAuthEnvs = async (
 	factory: Factory,
 ): Promise<Record<string, string>> => {
-	if (!factory.githubAccessTokenEncrypted) {
+	if (!factory.githubAppInstallationId) {
 		return {
 			GIT_TERMINAL_PROMPT: "0",
 		};
 	}
 
-	const encryptionService = createEncryptionService(
-		process.env.SECRET_ENCRYPTION_KEY ?? "",
-	);
-	const githubAccessToken = await encryptionService.decrypt(
-		factory.githubAccessTokenEncrypted,
+	const githubAccessToken = await createGithubAppInstallationAccessToken(
+		factory.githubAppInstallationId,
 	);
 
 	return {
@@ -2423,6 +2420,87 @@ const getFactoryGithubAuthEnvs = async (
 		GH_PROMPT_DISABLED: "1",
 		GIT_TERMINAL_PROMPT: "0",
 	};
+};
+
+const createGithubAppInstallationAccessToken = async (
+	installationId: string,
+) => {
+	const config = getGithubAppConfig();
+	const response = await fetch(
+		`https://api.github.com/app/installations/${encodeURIComponent(installationId)}/access_tokens`,
+		{
+			method: "POST",
+			headers: {
+				Accept: "application/vnd.github+json",
+				Authorization: `Bearer ${createGithubAppJwt(config)}`,
+				"User-Agent": "Factoryplane",
+				"X-GitHub-Api-Version": "2022-11-28",
+			},
+		},
+	);
+
+	if (!response.ok) {
+		throw new Error("Failed to create GitHub App installation token");
+	}
+
+	const result = (await response.json()) as { token?: string };
+
+	if (!result.token) {
+		throw new Error("GitHub App installation token response was empty");
+	}
+
+	return result.token;
+};
+
+const getGithubAppConfig = () => {
+	const appId = process.env.GITHUB_APP_ID?.trim();
+	const privateKey = normalizeGithubAppPrivateKey(
+		process.env.GITHUB_APP_PRIVATE_KEY,
+	);
+
+	if (!appId || !privateKey) {
+		throw new Error("GitHub App credentials are not configured");
+	}
+
+	return { appId, privateKey };
+};
+
+const createGithubAppJwt = ({
+	appId,
+	privateKey,
+}: {
+	appId: string;
+	privateKey: string;
+}) => {
+	const now = Math.floor(Date.now() / 1000);
+	const header = Buffer.from(
+		JSON.stringify({ alg: "RS256", typ: "JWT" }),
+		"utf8",
+	).toString("base64url");
+	const payload = Buffer.from(
+		JSON.stringify({
+			iat: now - 60,
+			exp: now + 9 * 60,
+			iss: appId,
+		}),
+		"utf8",
+	).toString("base64url");
+	const unsignedToken = `${header}.${payload}`;
+	const signature = createSign("RSA-SHA256")
+		.update(unsignedToken)
+		.sign(privateKey, "base64url");
+
+	return `${unsignedToken}.${signature}`;
+};
+
+const normalizeGithubAppPrivateKey = (value: string | undefined) => {
+	const trimmed = value?.trim();
+
+	if (!trimmed) {
+		return undefined;
+	}
+
+	return trimmed.replace(/\\n/g, "\n");
 };
 
 const validateGithubToken = async (
@@ -2435,13 +2513,13 @@ const validateGithubToken = async (
 		const ghAuth = await sandbox.commands.run(
 			[
 				"set +e",
-				'login="$(gh api user --jq .login 2>&1)"',
+				'repository_count="$(gh api installation/repositories --jq .total_count 2>&1)"',
 				"status=$?",
 				'if [ "$status" -ne 0 ]; then',
-				'  printf "GitHub CLI auth failed while validating factory GitHub token:\\n%s\\n" "$login" >&2',
+				'  printf "GitHub CLI auth failed while validating factory GitHub App installation:\\n%s\\n" "$repository_count" >&2',
 				'  exit "$status"',
 				"fi",
-				'printf "Authenticated GitHub CLI as %s\\n" "$login"',
+				'printf "Authenticated GitHub App installation with access to %s repositories\\n" "$repository_count"',
 			].join("\n"),
 			{
 				timeoutMs: GITHUB_AUTH_VALIDATION_TIMEOUT_MS,
@@ -3415,6 +3493,7 @@ const setupRun = async (
 
 	const envs: Record<string, string> = {
 		FACTORYPLANE_AUTH_TOKEN: agentToken,
+		...getAgentSafeBaseEnvs(),
 	};
 
 	if (getAgentProvider(agent) === "cursor") {
@@ -3422,24 +3501,6 @@ const setupRun = async (
 	}
 
 	try {
-		await runOptionalSetupStep(
-			task.id,
-			"github_auth",
-			"Validate GitHub token",
-			async () => {
-				const githubEnvs = await getFactoryGithubAuthEnvs(factory);
-
-				if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
-					throw new Error(
-						`Factory ${factory.id} is missing GitHub access token`,
-					);
-				}
-
-				Object.assign(envs, githubEnvs);
-				await validateGithubToken(sandbox, envs);
-			},
-		);
-
 		await runFactorySetupScript(
 			sandbox,
 			task.id,
@@ -3455,6 +3516,11 @@ const setupRun = async (
 
 	return { envs, agentToken };
 };
+
+const getAgentSafeBaseEnvs = () => ({
+	GH_PROMPT_DISABLED: "1",
+	GIT_TERMINAL_PROMPT: "0",
+});
 
 const postRun = async (taskId: string, agentToken: string) => {
 	await clearTaskAgentToken(taskId, agentToken);

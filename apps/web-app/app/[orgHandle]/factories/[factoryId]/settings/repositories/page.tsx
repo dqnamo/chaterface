@@ -1,12 +1,17 @@
 "use client";
 
 import { id } from "@instantdb/react";
-import { GitBranchIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import db from "@/instant.client";
+import {
+	GitBranchIcon,
+	GithubLogoIcon,
+	PlusIcon,
+	TrashIcon,
+} from "@phosphor-icons/react";
 import { DateTime } from "luxon";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/Button";
+import db from "@/instant.client";
 import { Field } from "../_components/Field";
 import {
 	SettingsPageShell,
@@ -23,10 +28,29 @@ import {
 	SECRET_NAME_PATTERN,
 } from "../_lib/factory-settings";
 
+type GithubRepository = {
+	fullName: string;
+	cloneUrl: string;
+	defaultBranch: string;
+	private: boolean;
+	htmlUrl: string;
+};
+
 export default function FactoryRepositoriesSettingsPage() {
 	const { factoryId } = useParams();
 	const currentFactoryId = factoryId as string;
 	const { user } = db.useAuth();
+	const [githubRepositories, setGithubRepositories] = useState<
+		GithubRepository[]
+	>([]);
+	const [selectedGithubRepository, setSelectedGithubRepository] = useState("");
+	const [githubRepositoryStatus, setGithubRepositoryStatus] =
+		useState<string>();
+	const [isLoadingGithubRepositories, setIsLoadingGithubRepositories] =
+		useState(false);
+	const [isConnectingGithub, setIsConnectingGithub] = useState(false);
+	const [shouldLoadGithubRepositories, setShouldLoadGithubRepositories] =
+		useState(false);
 
 	const { data } = db.useQuery({
 		factories: {
@@ -40,6 +64,7 @@ export default function FactoryRepositoriesSettingsPage() {
 	});
 
 	const factory = data?.factories?.[0];
+	const hasGithubConnection = Boolean(factory?.githubAppInstallationId);
 	const repositories = [...(factory?.repositories ?? [])].sort(
 		(a, b) =>
 			new Date(a.createdAt ?? 0).getTime() -
@@ -69,6 +94,162 @@ export default function FactoryRepositoriesSettingsPage() {
 		);
 
 		form.reset();
+	};
+
+	const connectGithub = async () => {
+		setGithubRepositoryStatus(undefined);
+
+		if (!user?.refresh_token) {
+			setGithubRepositoryStatus("You must be signed in to connect GitHub.");
+			return;
+		}
+
+		setIsConnectingGithub(true);
+
+		try {
+			const response = await fetch("/api/github/app/install/start", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${user.refresh_token}`,
+				},
+				body: JSON.stringify({
+					factoryId: currentFactoryId,
+					redirectPath: window.location.pathname,
+				}),
+			});
+			const result = (await response.json().catch(() => null)) as {
+				installationUrl?: string;
+				message?: string;
+			} | null;
+
+			if (!response.ok || !result?.installationUrl) {
+				throw new Error(result?.message ?? "Failed to start GitHub install.");
+			}
+
+			window.location.assign(result.installationUrl);
+		} catch (error) {
+			setGithubRepositoryStatus(
+				error instanceof Error ? error.message : "Failed to connect GitHub.",
+			);
+			setIsConnectingGithub(false);
+		}
+	};
+
+	const loadGithubRepositories = useCallback(async () => {
+		setGithubRepositoryStatus(undefined);
+
+		if (!user?.refresh_token) {
+			setGithubRepositoryStatus("You must be signed in to load repositories.");
+			return;
+		}
+
+		setIsLoadingGithubRepositories(true);
+
+		try {
+			const response = await fetch(
+				`/api/github/repositories?factoryId=${encodeURIComponent(currentFactoryId)}`,
+				{
+					headers: {
+						Authorization: `Bearer ${user.refresh_token}`,
+					},
+				},
+			);
+			const result = (await response.json().catch(() => null)) as {
+				repositories?: GithubRepository[];
+				message?: string;
+			} | null;
+
+			if (!response.ok || !result?.repositories) {
+				throw new Error(
+					result?.message ?? "Failed to load GitHub repositories.",
+				);
+			}
+
+			setGithubRepositories(result.repositories);
+			setSelectedGithubRepository(result.repositories[0]?.fullName ?? "");
+			setGithubRepositoryStatus(
+				result.repositories.length > 0
+					? undefined
+					: "No GitHub repositories were returned.",
+			);
+		} catch (error) {
+			setGithubRepositoryStatus(
+				error instanceof Error
+					? error.message
+					: "Failed to load GitHub repositories.",
+			);
+		} finally {
+			setIsLoadingGithubRepositories(false);
+		}
+	}, [currentFactoryId, user?.refresh_token]);
+
+	useEffect(() => {
+		const searchParams = new URLSearchParams(window.location.search);
+		const githubResult = searchParams.get("github");
+		const githubError = searchParams.get("github_error");
+
+		if (githubResult === "connected") {
+			setGithubRepositoryStatus("GitHub connected.");
+			setShouldLoadGithubRepositories(true);
+		} else if (githubError) {
+			setGithubRepositoryStatus(`GitHub connection failed: ${githubError}`);
+		}
+
+		if (githubResult || githubError) {
+			searchParams.delete("github");
+			searchParams.delete("github_error");
+			const nextSearch = searchParams.toString();
+			window.history.replaceState(
+				null,
+				"",
+				`${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`,
+			);
+		}
+	}, []);
+
+	useEffect(() => {
+		if (
+			!shouldLoadGithubRepositories ||
+			!hasGithubConnection ||
+			!user?.refresh_token
+		) {
+			return;
+		}
+
+		setShouldLoadGithubRepositories(false);
+		void loadGithubRepositories();
+	}, [
+		hasGithubConnection,
+		loadGithubRepositories,
+		shouldLoadGithubRepositories,
+		user?.refresh_token,
+	]);
+
+	const addSelectedGithubRepository = async () => {
+		const repository = githubRepositories.find(
+			(candidate) => candidate.fullName === selectedGithubRepository,
+		);
+
+		if (!repository) {
+			setGithubRepositoryStatus("Choose a GitHub repository first.");
+			return;
+		}
+
+		const repositoryId = id();
+		await db.transact(
+			repositoryTx(repositoryId)
+				.create({
+					url: repository.cloneUrl,
+					path: optionalRepositoryPath(
+						repository.fullName.split("/").at(-1) ?? "",
+					),
+					branch: optionalString(repository.defaultBranch),
+					createdAt: DateTime.now().toISO(),
+				})
+				.link({ factory: currentFactoryId }),
+		);
+		setGithubRepositoryStatus(`${repository.fullName} added.`);
 	};
 
 	const updateRepository = async (
@@ -154,6 +335,92 @@ export default function FactoryRepositoriesSettingsPage() {
 			description="Repositories cloned into the sandbox before each new task starts."
 		>
 			<SettingsSection title="Repositories" Icon={GitBranchIcon}>
+				<div className="flex flex-col gap-3 border-b border-grayscale-4 p-3">
+					<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+						<div className="flex min-w-0 items-center gap-2">
+							<GithubLogoIcon
+								weight="bold"
+								className="size-4 shrink-0 text-grayscale-10"
+							/>
+							<div className="flex min-w-0 flex-col gap-1">
+								<p className="text-xs text-grayscale-11">
+									{hasGithubConnection
+										? "Add from connected GitHub account."
+										: "GitHub is not connected."}
+								</p>
+								<p className="text-xs text-grayscale-10">
+									Manual clone URLs are still supported below.
+								</p>
+							</div>
+						</div>
+						{hasGithubConnection ? (
+							<div className="flex shrink-0 items-center gap-2">
+								<button
+									type="button"
+									disabled={isConnectingGithub}
+									onClick={() => {
+										void connectGithub();
+									}}
+									className="px-2 py-1.5 text-xs text-grayscale-11 transition-colors hover:bg-grayscale-3 hover:text-grayscale-12 disabled:opacity-60"
+								>
+									{isConnectingGithub ? "Opening..." : "Manage GitHub Access"}
+								</button>
+								<Button
+									type="button"
+									disabled={isLoadingGithubRepositories}
+									onClick={() => {
+										void loadGithubRepositories();
+									}}
+								>
+									{isLoadingGithubRepositories
+										? "Loading..."
+										: "Load GitHub Repos"}
+								</Button>
+							</div>
+						) : (
+							<Button
+								type="button"
+								disabled={isConnectingGithub}
+								onClick={() => {
+									void connectGithub();
+								}}
+							>
+								{isConnectingGithub ? "Connecting..." : "Connect GitHub"}
+							</Button>
+						)}
+					</div>
+					{githubRepositories.length > 0 ? (
+						<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+							<select
+								value={selectedGithubRepository}
+								onChange={(event) =>
+									setSelectedGithubRepository(event.target.value)
+								}
+								className="w-full border border-grayscale-4 bg-grayscale-2 px-2 py-1.5 text-xs text-grayscale-12 outline-none transition-colors duration-150 focus:bg-grayscale-3"
+							>
+								{githubRepositories.map((repository) => (
+									<option key={repository.fullName} value={repository.fullName}>
+										{repository.fullName}
+										{repository.private ? " (private)" : ""}
+									</option>
+								))}
+							</select>
+							<Button
+								type="button"
+								onClick={() => {
+									void addSelectedGithubRepository();
+								}}
+							>
+								Add Selected
+							</Button>
+						</div>
+					) : null}
+					{githubRepositoryStatus ? (
+						<p className="text-xs text-grayscale-10">
+							{githubRepositoryStatus}
+						</p>
+					) : null}
+				</div>
 				<div className="flex flex-col divide-y divide-grayscale-4">
 					{repositories.length > 0 ? (
 						repositories.map((repository) => (

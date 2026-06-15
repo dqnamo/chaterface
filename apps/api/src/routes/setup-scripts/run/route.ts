@@ -1,5 +1,4 @@
 import db, { id } from "@repo/db/admin";
-import { createEncryptionService } from "@repo/encryption";
 import { getBearerToken } from "../../../lib/agent-auth.js";
 import { E2BSandbox as Sandbox } from "../../../lib/e2b-sandbox.js";
 import type { RouteHandler } from "../../../lib/file-router.js";
@@ -115,11 +114,7 @@ const getTaskForSetupScriptRun = async (agentToken: string) => {
 				},
 				factory: {
 					$: {
-						fields: [
-							"githubAccessTokenEncrypted",
-							"newTaskSetupScript",
-							"newTurnSetupScript",
-						],
+						fields: ["newTaskSetupScript", "newTurnSetupScript"],
 					},
 				},
 			},
@@ -139,22 +134,7 @@ const getSetupScriptEnvs = async (
 		GIT_TERMINAL_PROMPT: "0",
 	};
 
-	const encryptedToken = task.factory?.githubAccessTokenEncrypted;
-
-	if (!encryptedToken) {
-		return envs;
-	}
-
-	const encryptionService = createEncryptionService(
-		process.env.SECRET_ENCRYPTION_KEY ?? "",
-	);
-	const githubAccessToken = await encryptionService.decrypt(encryptedToken);
-
-	return {
-		...envs,
-		GITHUB_ACCESS_TOKEN: githubAccessToken,
-		GH_TOKEN: githubAccessToken,
-	};
+	return envs;
 };
 
 const parseRunSetupScriptBody = (

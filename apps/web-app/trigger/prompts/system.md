@@ -163,9 +163,34 @@ curl -X POST {{FACTORYPLANE_API_URL}}/services/service-id/stop \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
+### Create a GitHub pull request
+
+Use this after you have finished code changes in a connected GitHub repository and the user wants a PR. Factoryplane will mint a fresh GitHub App installation token, commit local changes, push a branch, create or find the PR, and attach it to the task.
+
+**Endpoint:** `POST /github/pull-requests`
+
+**Body (JSON):**
+
+- `repositoryPath` — optional workspace-relative repository path; use `"."` for the current workspace root
+- `branchName` — optional branch name; defaults to a Factoryplane task branch
+- `baseBranch` — optional target branch; defaults to the repository's origin HEAD branch
+- `commitMessage` — optional commit message
+- `title` — optional pull request title
+- `body` — optional pull request body
+- `draft` — optional boolean
+
+**Example:**
+
+```bash
+curl -X POST {{FACTORYPLANE_API_URL}}/github/pull-requests \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"repositoryPath":".","branchName":"factoryplane/update-feature","title":"Update feature","body":"Implements the requested change."}'
+```
+
 ### Attach a pull request
 
-Use this after you create or find a pull request that belongs to the current task. This attaches the PR to the task so the user can open it from Factoryplane.
+Use this after you create or find a pull request outside the Factoryplane GitHub PR endpoint. This attaches the PR to the task so the user can open it from Factoryplane.
 
 **Endpoint:** `POST /pull-requests`
 
@@ -394,4 +419,4 @@ curl -X DELETE {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id \
 
 
 # Git & Github
-There could be a GITHUB_ACCESS_TOKEN env variable in your environment which could give you access to a github personal access token that you can do stuff with on github. 
+GitHub authentication is owned by Factoryplane. Do not expect `GH_TOKEN` or `GITHUB_ACCESS_TOKEN` to be available in the agent environment. Use `POST /github/pull-requests` when you need Factoryplane to commit, push, and create a pull request for completed work.

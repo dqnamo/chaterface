@@ -1,22 +1,24 @@
 import { randomUUID } from "node:crypto";
-import db from "@/instant.admin";
-import { createEncryptionService } from "@/encryption";
 import { type NextRequest, NextResponse } from "next/server";
+import db from "@/instant.admin";
+import {
+	authenticateFactoryRequest,
+	getNonEmptyString,
+	readJson,
+} from "../../github/_lib/github-app";
 
 export async function POST(req: NextRequest) {
 	const requestId = randomUUID();
 
 	try {
-		const body = (await req.json()) as {
+		const body = (await readJson(req)) as {
 			factoryId?: string;
-			githubAccessToken?: string;
 			gitAuthorName?: string;
 			gitAuthorEmail?: string;
 		};
-		const { factoryId, githubAccessToken } = body;
+		const factoryId = getNonEmptyString(body.factoryId);
 		const hasGitAuthorName = Object.hasOwn(body, "gitAuthorName");
 		const hasGitAuthorEmail = Object.hasOwn(body, "gitAuthorEmail");
-		const trimmedGithubAccessToken = githubAccessToken?.trim();
 		const gitAuthorName =
 			typeof body.gitAuthorName === "string"
 				? body.gitAuthorName.trim()
@@ -25,64 +27,45 @@ export async function POST(req: NextRequest) {
 			typeof body.gitAuthorEmail === "string"
 				? body.gitAuthorEmail.trim()
 				: undefined;
-		const authorizationHeader = req.headers.get("Authorization");
-		const refreshToken = authorizationHeader?.startsWith("Bearer ")
-			? authorizationHeader.slice("Bearer ".length)
-			: undefined;
 
 		console.info("saveGithub request received", {
 			requestId,
 			url: req.url,
-			hasAuthorizationHeader: Boolean(authorizationHeader),
-			hasRefreshToken: Boolean(refreshToken),
+			hasAuthorizationHeader: Boolean(req.headers.get("Authorization")),
 			factoryId,
-			hasGithubAccessToken: Boolean(trimmedGithubAccessToken),
 			hasGitAuthorName,
 			hasGitAuthorEmail,
 		});
 
-		if (
-			!factoryId ||
-			(!trimmedGithubAccessToken && !hasGitAuthorName && !hasGitAuthorEmail)
-		) {
+		if (!factoryId || (!hasGitAuthorName && !hasGitAuthorEmail)) {
 			console.warn("saveGithub request missing required fields", {
 				requestId,
 				hasFactoryId: Boolean(factoryId),
-				hasGithubAccessToken: Boolean(trimmedGithubAccessToken),
 				hasGitAuthorName,
 				hasGitAuthorEmail,
 			});
 
 			return NextResponse.json(
 				{
-					message: "factoryId and at least one GitHub setting are required",
+					message: "factoryId and at least one Git setting are required",
 					requestId,
 				},
 				{ status: 400 },
 			);
 		}
 
-		if (!refreshToken) {
-			console.warn("saveGithub request missing bearer token", {
+		const authResult = await authenticateFactoryRequest(req, factoryId);
+
+		if (!authResult.ok) {
+			console.warn("saveGithub request failed authentication", {
 				requestId,
 				factoryId,
+				status: authResult.status,
+				message: authResult.message,
 			});
 			return NextResponse.json(
-				{ message: "Unauthorized", requestId },
-				{ status: 401 },
-			);
-		}
-
-		const user = await db.auth.verifyToken(refreshToken);
-
-		if (!user) {
-			console.warn("saveGithub request had invalid token", {
-				requestId,
-				factoryId,
-			});
-			return NextResponse.json(
-				{ message: "Unauthorized", requestId },
-				{ status: 401 },
+				{ message: authResult.message, requestId },
+				{ status: authResult.status },
 			);
 		}
 
@@ -100,32 +83,9 @@ export async function POST(req: NextRequest) {
 		}
 
 		const update: {
-			githubAccessTokenEncrypted?: string;
 			gitAuthorName?: string;
 			gitAuthorEmail?: string;
 		} = {};
-
-		if (trimmedGithubAccessToken) {
-			const encryptionKey = process.env.SECRET_ENCRYPTION_KEY;
-			if (!encryptionKey) {
-				console.error("saveGithub secret encryption key is not configured", {
-					requestId,
-					factoryId,
-				});
-				return NextResponse.json(
-					{
-						message: "Secret encryption key is not configured",
-						requestId,
-					},
-					{ status: 500 },
-				);
-			}
-
-			const encryptionService = createEncryptionService(encryptionKey);
-			update.githubAccessTokenEncrypted = await encryptionService.encrypt(
-				trimmedGithubAccessToken,
-			);
-		}
 
 		if (hasGitAuthorName) {
 			update.gitAuthorName = gitAuthorName || undefined;
@@ -140,7 +100,7 @@ export async function POST(req: NextRequest) {
 		console.info("saveGithub credentials saved", {
 			requestId,
 			factoryId,
-			userId: user.id,
+			userId: authResult.user.id,
 		});
 
 		return NextResponse.json(

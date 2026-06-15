@@ -1,0 +1,92 @@
+import { type NextRequest, NextResponse } from "next/server";
+import db from "@/instant.admin";
+import {
+	clearGithubAppStateCookie,
+	factoryTx,
+	GITHUB_APP_STATE_COOKIE,
+	getAuthenticatedFactory,
+	getGithubAppConfig,
+	getGithubAppInstallation,
+	hasFactoryAccess,
+	verifyGithubAppState,
+} from "../../../_lib/github-app";
+
+export async function GET(req: NextRequest) {
+	const requestState = req.nextUrl.searchParams.get("state") ?? "";
+	const cookieState = req.cookies.get(GITHUB_APP_STATE_COOKIE)?.value ?? "";
+	const verifiedState =
+		requestState && cookieState && requestState === cookieState
+			? verifyGithubAppState(requestState)
+			: undefined;
+	const redirectPath = verifiedState?.redirectPath ?? "/";
+
+	if (!verifiedState) {
+		return redirectWithStatus(
+			req,
+			redirectPath,
+			"github_error",
+			"invalid_state",
+		);
+	}
+
+	const setupAction = req.nextUrl.searchParams.get("setup_action");
+	const installationId = req.nextUrl.searchParams.get("installation_id");
+
+	if (setupAction === "request") {
+		return redirectWithStatus(req, redirectPath, "github_error", "requested");
+	}
+
+	if (!installationId) {
+		return redirectWithStatus(
+			req,
+			redirectPath,
+			"github_error",
+			"missing_installation",
+		);
+	}
+
+	const factory = await getAuthenticatedFactory(verifiedState.factoryId);
+
+	if (!factory || !hasFactoryAccess(factory, verifiedState.userId)) {
+		return redirectWithStatus(req, redirectPath, "github_error", "forbidden");
+	}
+
+	const config = getGithubAppConfig();
+
+	if (!config.ok) {
+		return redirectWithStatus(
+			req,
+			redirectPath,
+			"github_error",
+			"not_configured",
+		);
+	}
+
+	const installation = await getGithubAppInstallation(installationId, config);
+
+	await db.transact(
+		factoryTx(factory.id).update({
+			githubAppInstallationAccountLogin: installation.account?.login,
+			githubAppInstallationAccountType: installation.account?.type,
+			githubAppInstallationId: installationId,
+			githubAppInstalledAt: new Date().toISOString(),
+		}),
+	);
+
+	return redirectWithStatus(req, redirectPath, "github", "connected");
+}
+
+const redirectWithStatus = (
+	req: NextRequest,
+	redirectPath: string,
+	key: "github" | "github_error",
+	value: string,
+) => {
+	const url = new URL(redirectPath, req.nextUrl.origin);
+	url.searchParams.set(key, value);
+
+	const response = NextResponse.redirect(url);
+	clearGithubAppStateCookie(response);
+
+	return response;
+};
