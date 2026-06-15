@@ -2,8 +2,8 @@ import { type InstaQLEntity, id } from "@instantdb/react";
 import NumberFlow from "@number-flow/react";
 import {
 	BuildingsIcon,
-	CheckIcon,
 	CheckCircleIcon,
+	CheckIcon,
 	FadersHorizontalIcon,
 	MinusCircleIcon,
 	PlusCircleIcon,
