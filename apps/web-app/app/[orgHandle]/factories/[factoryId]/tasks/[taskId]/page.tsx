@@ -55,6 +55,7 @@ import {
 import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { ScrollArea } from "@/components/ScrollArea";
+import { Select } from "@/components/Select";
 import { ServicePreviewFrame } from "@/components/ServicePreviewFrame";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
@@ -532,8 +533,14 @@ export default function TaskPage() {
 	const selectedAgentSession =
 		agentSessions.find((session) => session.id === selectedAgentSessionId) ??
 		agentSessions[0];
+	const taskAgentId = getEntityId(task?.agent);
+	const selectedAgentId =
+		getEntityId(selectedAgentSession?.agent) ?? taskAgentId;
 	const selectedAgentName =
 		selectedAgentSession?.agent?.name ?? task?.agent?.name ?? undefined;
+	const selectedAgentItems = selectedAgentId
+		? [{ value: selectedAgentId, label: selectedAgentName ?? "Agent" }]
+		: [];
 	const scopedEvents = useMemo(() => {
 		if (!selectedAgentSession) {
 			return events ?? [];
@@ -1114,7 +1121,20 @@ export default function TaskPage() {
 									/>
 								</div>
 								<div className="flex flex-row items-center justify-between p-3">
-									<div className="flex flex-row items-center justify-center gap-2">
+									<div className="flex min-w-0 flex-row items-center justify-center gap-2">
+										<Select.Root
+											items={selectedAgentItems}
+											value={selectedAgentId}
+										>
+											<Select.Trigger
+												disabled
+												aria-label="Task agent"
+												className="max-w-40 shrink-0 cursor-default opacity-100 hover:border-grayscale-6 hover:bg-grayscale-1 hover:text-grayscale-11 disabled:pointer-events-none disabled:opacity-100"
+											>
+												<Select.Value placeholder="No agent" />
+												<Select.Icon />
+											</Select.Trigger>
+										</Select.Root>
 										<ModelConfigMenu
 											model={agentModel}
 											reasoningEffort={agentReasoningEffort}
