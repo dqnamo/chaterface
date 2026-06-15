@@ -120,6 +120,16 @@ type Attachment = {
 	contentType: string;
 	size: number;
 };
+type AttachmentDownload = {
+	contentType: string;
+	downloadUrl: string;
+	filePath: string;
+};
+type CommandResultLike = {
+	exitCode: number;
+	stdout?: string;
+	stderr?: string;
+};
 
 type RunCodexExecOptions = {
 	attachments?: Attachment[];
@@ -2861,6 +2871,7 @@ const runAgentExec = async (
 	try {
 		const result = await command.wait();
 		console.log(result);
+		assertCommandSucceeded(result, `${getProviderLabel(provider)} execution`);
 
 		if (!wasInterrupted) {
 			await updateTaskStatus(task.id, "idle");
@@ -3170,25 +3181,24 @@ const materializeAttachments = async (
 	}
 
 	const attachmentDir = `/tmp/factoryplane-attachments/${taskId}`;
-	const downloads = await Promise.all(
-		validAttachments.map(async (attachment, index) => {
-			const downloadUrl = await db.storage.getDownloadUrl(attachment.path);
-			const filePath = `${attachmentDir}/${String(index + 1).padStart(2, "0")}-${sanitizeSandboxFileName(attachment.name)}`;
-
-			return {
-				contentType: attachment.contentType,
-				downloadUrl,
-				filePath,
-			};
-		}),
-	);
-
-	await runSetupStep(
+	const downloads = await runSetupStep(
 		taskId,
 		"file_attachments",
 		"Download file attachments",
-		() =>
-			sandbox.commands.run(
+		async () => {
+			const downloads: AttachmentDownload[] = await Promise.all(
+				validAttachments.map(async (attachment, index) => {
+					const downloadUrl = await getAttachmentDownloadUrl(attachment.path);
+					const filePath = `${attachmentDir}/${String(index + 1).padStart(2, "0")}-${sanitizeSandboxFileName(attachment.name)}`;
+
+					return {
+						contentType: attachment.contentType,
+						downloadUrl,
+						filePath,
+					};
+				}),
+			);
+			const result = await sandbox.commands.run(
 				[
 					"set -e",
 					`mkdir -p ${shellQuote(attachmentDir)}`,
@@ -3198,13 +3208,54 @@ const materializeAttachments = async (
 					),
 				].join("\n"),
 				{ timeoutMs: 120_000 },
-			),
+			);
+
+			assertCommandSucceeded(result, "Download file attachments");
+			return downloads;
+		},
+		{ timeoutMs: 120_000 },
 	);
 
 	return downloads.map((download) => ({
 		contentType: download.contentType,
 		filePath: download.filePath,
 	}));
+};
+
+const getAttachmentDownloadUrl = async (path: string) => {
+	const fileUrl = await getStorageFileUrl(path);
+
+	if (fileUrl) {
+		return fileUrl;
+	}
+
+	const storage = db.storage as typeof db.storage & {
+		getDownloadUrl?: (path: string) => Promise<string>;
+	};
+	const downloadUrl = await storage.getDownloadUrl?.(path);
+
+	if (downloadUrl) {
+		return downloadUrl;
+	}
+
+	throw new Error(`Attachment file was not found in storage: ${path}`);
+};
+
+const getStorageFileUrl = async (path: string) => {
+	const result = await db.query({
+		$files: {
+			$: {
+				where: {
+					path,
+				},
+			},
+		},
+	});
+	const file = result.$files[0] as { url?: unknown } | undefined;
+
+	return typeof file?.url === "string" && file.url.length > 0
+		? file.url
+		: undefined;
 };
 
 const createTaskWorkspaceBaseline = async (
@@ -3938,6 +3989,22 @@ const runWithTimeout = async <T>(
 		}
 	}
 };
+
+const assertCommandSucceeded = (result: CommandResultLike, label: string) => {
+	if (result.exitCode === 0) {
+		return;
+	}
+
+	const stderr = result.stderr?.trim();
+	const stdout = result.stdout?.trim();
+	const output = stderr || stdout;
+	const detail = output ? `: ${truncateForError(output)}` : "";
+
+	throw new Error(`${label} failed with exit code ${result.exitCode}${detail}`);
+};
+
+const truncateForError = (value: string) =>
+	value.length > 800 ? `${value.slice(0, 797)}...` : value;
 
 const runOptionalSetupStep = async <T>(
 	taskId: string,
