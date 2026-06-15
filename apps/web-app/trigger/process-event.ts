@@ -432,6 +432,10 @@ const processNewUserMessage = async (
 
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	const agentSession = await resolveAgentSession(event, task, agent, factory);
+	const provider = getAgentProvider(agent);
+	const canResumeAgentSession =
+		provider === "codex" ? Boolean(agentSession.agentThreadId) : true;
+	const userPrompt = content ?? "Please use the attached file input.";
 	await killTaskAgentProcess(sandbox, task, agentSession);
 	await setupSandboxGitIdentity(sandbox, task.id, factory);
 	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, factory);
@@ -440,11 +444,11 @@ const processNewUserMessage = async (
 		task,
 		agent,
 		factory,
-		content ?? "Please use the attached file input.",
+		userPrompt,
 		{
 			agentSession,
 			attachments,
-			resumeLast: true,
+			resumeLast: canResumeAgentSession,
 		},
 	);
 
@@ -3078,17 +3082,21 @@ const runAgentExec = async (
 	await prepareAgentAuthForRun(sandbox, task.id, agent);
 	const { envs, agentToken } = await setupRun(sandbox, task, agent, factory);
 	const agentSession = options.agentSession;
+	const shouldResumeRun =
+		options.resumeLast &&
+		(provider !== "codex" || Boolean(agentSession?.agentThreadId));
 	const output = createAgentOutputHandler(task.id, provider, agentSession?.id);
 	const command = await runSetupStep(
 		task.id,
 		provider === "cursor" ? "cursor_launch" : "codex_launch",
-		options.resumeLast
+		shouldResumeRun
 			? `Resume ${getProviderLabel(provider)}`
 			: `Start ${getProviderLabel(provider)}`,
 		() =>
 			sandbox.commands.run(
 				buildAgentExecCommand(provider, task, prompt, {
 					...options,
+					resumeLast: shouldResumeRun,
 					attachmentPaths: attachmentPaths.map(
 						(attachment) => attachment.filePath,
 					),
@@ -3794,12 +3802,8 @@ const buildCodexExecCommand = (
 		);
 	}
 
-	if (options.resumeLast) {
-		args.push(
-			options.agentSession?.agentThreadId
-				? `resume ${shellQuote(options.agentSession.agentThreadId)}`
-				: "resume --last",
-		);
+	if (options.resumeLast && options.agentSession?.agentThreadId) {
+		args.push(`resume ${shellQuote(options.agentSession.agentThreadId)}`);
 		args.push(...imageArgs);
 	} else {
 		args.push(
