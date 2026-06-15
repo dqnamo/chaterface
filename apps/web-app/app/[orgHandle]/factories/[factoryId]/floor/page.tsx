@@ -13,6 +13,7 @@ import {
 	PlayCircleIcon,
 	PlusCircleIcon,
 	PlusIcon,
+	SlackLogoIcon,
 	WebhooksLogoIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
@@ -73,6 +74,8 @@ type WorkflowBlockType =
 	| "agentDecision"
 	| "yesNoClassifier"
 	| "httpRequest"
+	| "integrationTrigger"
+	| "integrationAction"
 	| "conditionalRouter"
 	| "completeTask";
 
@@ -104,6 +107,13 @@ type WorkflowNodeData = {
 	httpUrl?: string;
 	httpHeaders?: string;
 	httpBody?: string;
+	provider?: string;
+	action?: string;
+	trigger?: string;
+	connectionId?: string;
+	channelId?: string;
+	messageTemplate?: string;
+	threadTsTemplate?: string;
 	conditions?: RouterCondition[];
 	completionMessage?: string;
 };
@@ -132,6 +142,11 @@ type FloorWorkflow = {
 
 type Agent = InstaQLEntity<AppSchema, "agents">;
 type FactoryWebhook = InstaQLEntity<AppSchema, "webhooks">;
+type IntegrationConnection = InstaQLEntity<AppSchema, "integrationConnections">;
+type IntegrationTriggerSubscription = InstaQLEntity<
+	AppSchema,
+	"integrationTriggerSubscriptions"
+>;
 type WorkflowTask = InstaQLEntity<AppSchema, "tasks">;
 
 const workflowEdgePathOptions = {
@@ -189,6 +204,16 @@ const blockOptions: Array<{
 		type: "httpRequest",
 		label: "HTTP Request",
 		description: "Send an HTTP request to an external service.",
+	},
+	{
+		type: "integrationTrigger",
+		label: "Slack Message Trigger",
+		description: "Starts when a Slack channel receives a message.",
+	},
+	{
+		type: "integrationAction",
+		label: "Slack Message",
+		description: "Sends a message to a Slack channel.",
 	},
 	{
 		type: "conditionalRouter",
@@ -315,6 +340,21 @@ const getDefaultNodeData = (blockType: WorkflowBlockType): WorkflowNodeData => {
 				httpHeaders: '{\n  "Content-Type": "application/json"\n}',
 				httpBody: '{\n  "message": "{{input.message}}"\n}',
 			};
+		case "integrationTrigger":
+			return {
+				blockType,
+				label: "Slack Message Trigger",
+				provider: "slack",
+				trigger: "messageReceived",
+			};
+		case "integrationAction":
+			return {
+				blockType,
+				label: "Slack Message",
+				provider: "slack",
+				action: "sendMessage",
+				messageTemplate: "{{input.message}}",
+			};
 		case "conditionalRouter":
 			return {
 				blockType,
@@ -349,6 +389,8 @@ const nodeTypes = {
 	agentDecision: WorkflowCard,
 	yesNoClassifier: WorkflowCard,
 	httpRequest: WorkflowCard,
+	integrationTrigger: WorkflowCard,
+	integrationAction: WorkflowCard,
 	conditionalRouter: WorkflowCard,
 	completeTask: WorkflowCard,
 };
@@ -368,6 +410,18 @@ const webhookTx = (webhookId: string) => {
 
 	if (!tx) {
 		throw new Error(`Webhook transaction builder ${webhookId} not found`);
+	}
+
+	return tx;
+};
+
+const integrationTriggerSubscriptionTx = (subscriptionId: string) => {
+	const tx = db.tx.integrationTriggerSubscriptions[subscriptionId];
+
+	if (!tx) {
+		throw new Error(
+			`Integration trigger subscription ${subscriptionId} not found`,
+		);
 	}
 
 	return tx;
@@ -401,6 +455,7 @@ function FactoryFloorEditor() {
 	const floorWorkflowSyncKeyRef = useRef<string | undefined>(undefined);
 	const unsavedChangeKeysRef = useRef(new Set<string>());
 	const syncedWebhookIdsRef = useRef(new Set<string>());
+	const syncedIntegrationSubscriptionIdsRef = useRef(new Set<string>());
 	const addBlockScreenPositionRef = useRef<
 		{ x: number; y: number } | undefined
 	>(undefined);
@@ -419,6 +474,7 @@ function FactoryFloorEditor() {
 					fields: ["name", "provider", "settings"],
 				},
 			},
+			integrationConnections: {},
 		},
 		factories: {
 			$: {
@@ -427,6 +483,9 @@ function FactoryFloorEditor() {
 				},
 			},
 			webhooks: {},
+			integrationTriggerSubscriptions: {
+				integrationConnection: {},
+			},
 		},
 		tasks: {
 			$: {
@@ -445,6 +504,8 @@ function FactoryFloorEditor() {
 		[factory],
 	);
 	const agents = (data?.organisations?.[0]?.agents ?? []) as Agent[];
+	const integrationConnections = (data?.organisations?.[0]
+		?.integrationConnections ?? []) as IntegrationConnection[];
 	const workflowTasks = useMemo(
 		() =>
 			((data?.tasks ?? []) as WorkflowTask[])
@@ -471,6 +532,12 @@ function FactoryFloorEditor() {
 	const webhooks = useMemo(
 		() => (factory?.webhooks ?? []) as FactoryWebhook[],
 		[factory?.webhooks],
+	);
+	const integrationTriggerSubscriptions = useMemo(
+		() =>
+			(factory?.integrationTriggerSubscriptions ??
+				[]) as IntegrationTriggerSubscription[],
+		[factory?.integrationTriggerSubscriptions],
 	);
 	const selectedNode = nodes.find((node) => node.id === selectedNodeId);
 
@@ -504,26 +571,36 @@ function FactoryFloorEditor() {
 
 	const persistFloorLayout = useCallback(
 		async (workflow: FloorWorkflow) => {
-			const synced = withSyncedWebhookEntities(
+			const webhookSynced = withSyncedWebhookEntities(
 				workflow,
 				webhooks,
 				currentFactoryId,
 				syncedWebhookIdsRef.current,
 			);
+			const integrationSynced = withSyncedIntegrationTriggerSubscriptions(
+				webhookSynced.workflow,
+				integrationTriggerSubscriptions,
+				currentFactoryId,
+				syncedIntegrationSubscriptionIdsRef.current,
+			);
 
 			await db.transact([
 				factoryTx(currentFactoryId).update({
-					floorWorkflow: synced.workflow,
+					floorWorkflow: integrationSynced.workflow,
 					floorWorkflowUpdatedAt: new Date().toISOString(),
 				}),
-				...synced.transactions,
+				...webhookSynced.transactions,
+				...integrationSynced.transactions,
 			]);
-			for (const webhookId of synced.webhookIds) {
+			for (const webhookId of webhookSynced.webhookIds) {
 				syncedWebhookIdsRef.current.add(webhookId);
 			}
-			return synced.workflow;
+			for (const subscriptionId of integrationSynced.subscriptionIds) {
+				syncedIntegrationSubscriptionIdsRef.current.add(subscriptionId);
+			}
+			return integrationSynced.workflow;
 		},
-		[currentFactoryId, webhooks],
+		[currentFactoryId, webhooks, integrationTriggerSubscriptions],
 	);
 
 	useEffect(() => {
@@ -802,6 +879,7 @@ function FactoryFloorEditor() {
 							node={selectedNode}
 							workflow={{ nodes, edges }}
 							webhooks={webhooks}
+							integrationConnections={integrationConnections}
 							onChange={updateSelectedNode}
 							onClose={() => setSelectedNodeId(undefined)}
 							onResizeStart={startInspectorResize}
@@ -961,7 +1039,8 @@ function WorkflowCard({ data, selected, id: nodeId }: NodeProps<WorkflowNode>) {
 						)}
 					/>
 				</>
-			) : data.blockType !== "webhook" ? (
+			) : data.blockType !== "webhook" &&
+				data.blockType !== "integrationTrigger" ? (
 				<Handle
 					type="target"
 					id="input"
@@ -1263,6 +1342,30 @@ function NodePreview({ data }: { data: WorkflowNodeData }) {
 		);
 	}
 
+	if (data.blockType === "integrationTrigger") {
+		return (
+			<>
+				<p>Starts when Slack receives a channel message.</p>
+				<p className="truncate font-mono text-[10px]">
+					Channel: {data.channelId || "not selected"}
+				</p>
+			</>
+		);
+	}
+
+	if (data.blockType === "integrationAction") {
+		return (
+			<>
+				<p className="line-clamp-3 whitespace-pre-wrap">
+					{data.messageTemplate}
+				</p>
+				<p className="truncate font-mono text-[10px]">
+					Channel: {data.channelId || "not selected"}
+				</p>
+			</>
+		);
+	}
+
 	if (data.blockType === "completeTask") {
 		return <p className="line-clamp-3">{data.completionMessage}</p>;
 	}
@@ -1352,6 +1455,7 @@ function Inspector({
 	node,
 	workflow,
 	webhooks,
+	integrationConnections,
 	onChange,
 	onClose,
 	onResizeStart,
@@ -1363,6 +1467,7 @@ function Inspector({
 	node: WorkflowNode | undefined;
 	workflow: FloorWorkflow;
 	webhooks: FactoryWebhook[];
+	integrationConnections: IntegrationConnection[];
 	onChange: (data: Partial<WorkflowNodeData>) => void;
 	onClose: () => void;
 	onResizeStart: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -1524,6 +1629,14 @@ function Inspector({
 					</div>
 				</InspectorSection>
 			) : null}
+			{node.data.blockType === "integrationTrigger" ||
+			node.data.blockType === "integrationAction" ? (
+				<SlackIntegrationInspector
+					connections={integrationConnections}
+					node={node}
+					onChange={onChange}
+				/>
+			) : null}
 			{node.data.blockType === "conditionalRouter" ? (
 				<RouterInspector node={node} onChange={onChange} />
 			) : null}
@@ -1598,6 +1711,212 @@ function AgentRunInspector({
 					className="min-h-32 font-mono"
 				/>
 			</div>
+		</InspectorSection>
+	);
+}
+
+type SlackConversation = {
+	id: string;
+	name: string;
+	isPrivate?: boolean;
+};
+
+function SlackIntegrationInspector({
+	connections,
+	node,
+	onChange,
+}: {
+	connections: IntegrationConnection[];
+	node: WorkflowNode;
+	onChange: (data: Partial<WorkflowNodeData>) => void;
+}) {
+	const { user } = db.useAuth();
+	const [conversations, setConversations] = useState<SlackConversation[]>([]);
+	const [isLoadingChannels, setIsLoadingChannels] = useState(false);
+	const [channelError, setChannelError] = useState<string>();
+	const slackConnections = connections.filter(
+		(connection) =>
+			connection.provider === "slack" && connection.status === "connected",
+	);
+	const connectionItems = slackConnections.map((connection) => ({
+		value: connection.id,
+		label: connection.externalName || connection.name || "Slack",
+	}));
+	const channelItems = conversations.map((conversation) => ({
+		value: conversation.id,
+		label: `#${conversation.name}`,
+	}));
+	const selectedConnectionId = node.data.connectionId ?? undefined;
+
+	useEffect(() => {
+		if (!selectedConnectionId || !user?.refresh_token) {
+			setConversations([]);
+			setChannelError(undefined);
+			return;
+		}
+
+		let cancelled = false;
+
+		const loadConversations = async () => {
+			setIsLoadingChannels(true);
+			setChannelError(undefined);
+
+			try {
+				const response = await fetch(
+					`/api/integrations/slack/conversations?connectionId=${encodeURIComponent(
+						selectedConnectionId,
+					)}`,
+					{
+						headers: {
+							Authorization: `Bearer ${user.refresh_token}`,
+						},
+					},
+				);
+
+				if (!response.ok) {
+					throw new Error(await getApiErrorMessage(response));
+				}
+
+				const body = (await response.json()) as {
+					conversations?: SlackConversation[];
+				};
+
+				if (!cancelled) {
+					setConversations(body.conversations ?? []);
+				}
+			} catch (error) {
+				if (!cancelled) {
+					setConversations([]);
+					setChannelError(
+						error instanceof Error
+							? error.message
+							: "Failed to load Slack channels.",
+					);
+				}
+			} finally {
+				if (!cancelled) {
+					setIsLoadingChannels(false);
+				}
+			}
+		};
+
+		void loadConversations();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedConnectionId, user?.refresh_token]);
+
+	return (
+		<InspectorSection
+			title={
+				node.data.blockType === "integrationTrigger"
+					? "Slack trigger"
+					: "Slack message"
+			}
+		>
+			<div className="flex flex-col gap-1 text-xs text-grayscale-11">
+				<span>Connection</span>
+				<Select.Root
+					items={connectionItems}
+					value={node.data.connectionId ?? null}
+					onValueChange={(value) =>
+						onChange({
+							connectionId: value ?? undefined,
+							channelId: undefined,
+						})
+					}
+				>
+					<Select.Trigger>
+						<Select.Value placeholder="Select Slack workspace" />
+						<Select.Icon />
+					</Select.Trigger>
+					<Select.Portal>
+						<Select.Positioner>
+							<Select.Popup>
+								<Select.List>
+									{slackConnections.map((connection) => (
+										<Select.Item value={connection.id} key={connection.id}>
+											<Select.ItemText>
+												{connection.externalName || connection.name || "Slack"}
+											</Select.ItemText>
+											<Select.ItemIndicator />
+										</Select.Item>
+									))}
+								</Select.List>
+							</Select.Popup>
+						</Select.Positioner>
+					</Select.Portal>
+				</Select.Root>
+				{slackConnections.length === 0 ? (
+					<Link
+						href="../settings/integrations"
+						className="text-xs text-accent-11 hover:underline"
+					>
+						Connect Slack in Integrations.
+					</Link>
+				) : null}
+			</div>
+			<div className="flex flex-col gap-1 text-xs text-grayscale-11">
+				<span>Channel</span>
+				<Select.Root
+					items={channelItems}
+					value={node.data.channelId ?? null}
+					onValueChange={(value) => onChange({ channelId: value ?? undefined })}
+					disabled={!selectedConnectionId || isLoadingChannels}
+				>
+					<Select.Trigger>
+						<Select.Value
+							placeholder={
+								isLoadingChannels ? "Loading channels" : "Select channel"
+							}
+						/>
+						<Select.Icon />
+					</Select.Trigger>
+					<Select.Portal>
+						<Select.Positioner>
+							<Select.Popup>
+								<Select.List>
+									{conversations.map((conversation) => (
+										<Select.Item value={conversation.id} key={conversation.id}>
+											<Select.ItemText>#{conversation.name}</Select.ItemText>
+											<Select.ItemIndicator />
+										</Select.Item>
+									))}
+								</Select.List>
+							</Select.Popup>
+						</Select.Positioner>
+					</Select.Portal>
+				</Select.Root>
+				{channelError ? (
+					<p className="text-xs text-red-11">{channelError}</p>
+				) : null}
+			</div>
+			{node.data.blockType === "integrationAction" ? (
+				<>
+					<div className="flex flex-col gap-1 text-xs text-grayscale-11">
+						<span>Message</span>
+						<Textarea
+							value={node.data.messageTemplate ?? ""}
+							onChange={(event) =>
+								onChange({ messageTemplate: event.target.value })
+							}
+							className="min-h-32 font-mono"
+						/>
+					</div>
+					<label className="flex flex-col gap-1 text-xs text-grayscale-11">
+						Thread timestamp
+						<input
+							value={node.data.threadTsTemplate ?? ""}
+							onChange={(event) =>
+								onChange({ threadTsTemplate: event.target.value })
+							}
+							placeholder="{{input.slack.threadTs}}"
+							className="rounded-md border border-grayscale-6 bg-grayscale-1 px-2 py-1.5 font-mono text-xs text-grayscale-12 outline-none focus:border-grayscale-8 focus:ring-2 focus:ring-grayscale-4/60"
+						/>
+					</label>
+				</>
+			) : null}
 		</InspectorSection>
 	);
 }
@@ -2119,6 +2438,10 @@ const getBlockIcon = (blockType: WorkflowBlockType) => {
 			return <GitBranchIcon weight="bold" className={className} />;
 		case "httpRequest":
 			return <PaperPlaneTiltIcon weight="bold" className={className} />;
+		case "integrationTrigger":
+			return <SlackLogoIcon weight="bold" className={className} />;
+		case "integrationAction":
+			return <SlackLogoIcon weight="bold" className={className} />;
 		case "conditionalRouter":
 			return <GitBranchIcon weight="bold" className={className} />;
 		case "completeTask":
@@ -2338,6 +2661,91 @@ const withSyncedWebhookEntities = (
 	};
 };
 
+const withSyncedIntegrationTriggerSubscriptions = (
+	workflow: FloorWorkflow,
+	subscriptions: IntegrationTriggerSubscription[],
+	factoryId: string,
+	knownSubscriptionIds: Set<string>,
+	timestamp = new Date().toISOString(),
+) => {
+	const activeSubscriptionIds = new Set<string>();
+	const existingByNodeId = new Map(
+		subscriptions.map((subscription) => [subscription.nodeId, subscription]),
+	);
+	const transactions = [];
+
+	for (const node of workflow.nodes) {
+		if (
+			node.data.blockType !== "integrationTrigger" ||
+			node.data.provider !== "slack" ||
+			node.data.trigger !== "messageReceived" ||
+			!node.data.connectionId ||
+			!node.data.channelId
+		) {
+			continue;
+		}
+
+		const existingSubscription = existingByNodeId.get(node.id);
+		const subscriptionId = existingSubscription?.id ?? id();
+		const shouldUpdateSubscription =
+			existingSubscription !== undefined ||
+			knownSubscriptionIds.has(subscriptionId);
+		const subscriptionData = {
+			provider: "slack",
+			trigger: "messageReceived",
+			nodeId: node.id,
+			externalId: node.data.channelId,
+			config: {
+				channelId: node.data.channelId,
+			},
+			enabled: true,
+			updatedAt: timestamp,
+		};
+		activeSubscriptionIds.add(subscriptionId);
+
+		transactions.push(
+			shouldUpdateSubscription
+				? integrationTriggerSubscriptionTx(subscriptionId)
+						.update(subscriptionData)
+						.link({
+							factory: factoryId,
+							integrationConnection: node.data.connectionId,
+						})
+				: integrationTriggerSubscriptionTx(subscriptionId)
+						.create({
+							...subscriptionData,
+							createdAt: timestamp,
+						})
+						.link({
+							factory: factoryId,
+							integrationConnection: node.data.connectionId,
+						}),
+		);
+	}
+
+	for (const subscription of subscriptions) {
+		if (
+			subscription.provider === "slack" &&
+			subscription.trigger === "messageReceived" &&
+			!activeSubscriptionIds.has(subscription.id) &&
+			subscription.enabled !== false
+		) {
+			transactions.push(
+				integrationTriggerSubscriptionTx(subscription.id).update({
+					enabled: false,
+					updatedAt: timestamp,
+				}),
+			);
+		}
+	}
+
+	return {
+		workflow,
+		transactions,
+		subscriptionIds: activeSubscriptionIds,
+	};
+};
+
 const findWebhookForNode = (
 	node: WorkflowNode,
 	webhooks: FactoryWebhook[],
@@ -2385,6 +2793,8 @@ const isWorkflowBlockType = (value: unknown): value is WorkflowBlockType =>
 	value === "agentDecision" ||
 	value === "yesNoClassifier" ||
 	value === "httpRequest" ||
+	value === "integrationTrigger" ||
+	value === "integrationAction" ||
 	value === "conditionalRouter" ||
 	value === "completeTask";
 
@@ -2392,6 +2802,20 @@ const isLegacyWorkflowBlockType = (
 	value: unknown,
 ): value is LegacyWorkflowBlockType =>
 	isWorkflowBlockType(value) || value === "humanInput";
+
+const getApiErrorMessage = async (response: Response) => {
+	try {
+		const body = (await response.json()) as { message?: unknown };
+
+		if (typeof body.message === "string") {
+			return body.message;
+		}
+	} catch {
+		return "Request failed";
+	}
+
+	return "Request failed";
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);

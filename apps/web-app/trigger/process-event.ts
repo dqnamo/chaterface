@@ -14,6 +14,13 @@ import { createEncryptionService } from "@/encryption";
 import db from "@/instant.admin";
 import type { AppSchema } from "@/instant.schema";
 import {
+	decryptSlackBotToken,
+	parseSlackAuth,
+	postSlackMessage,
+	SLACK_PROVIDER,
+	SLACK_SEND_MESSAGE_ACTION,
+} from "@/integrations/slack";
+import {
 	formatCodexDeveloperInstructionsConfig,
 	getCodexDeveloperInstructions,
 } from "./codex-system-prompt";
@@ -31,6 +38,7 @@ type Repository = InstaQLEntity<AppSchema, "repositories">;
 type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
 type Skill = InstaQLEntity<AppSchema, "skills">;
 type McpServer = InstaQLEntity<AppSchema, "mcpServers">;
+type IntegrationConnection = InstaQLEntity<AppSchema, "integrationConnections">;
 type FactoryWithRepositories = Factory & {
 	repositories?: Repository[];
 	environmentFiles?: EnvironmentFile[];
@@ -38,6 +46,7 @@ type FactoryWithRepositories = Factory & {
 	mcpServers?: McpServer[];
 	organisation?: {
 		agents?: Agent[];
+		integrationConnections?: IntegrationConnection[];
 	};
 };
 type WorkflowNode = {
@@ -53,6 +62,12 @@ type WorkflowNode = {
 		options?: DecisionOption[];
 		completionMessage?: string;
 		conditions?: RouterCondition[];
+		provider?: string;
+		action?: string;
+		connectionId?: string;
+		channelId?: string;
+		messageTemplate?: string;
+		threadTsTemplate?: string;
 	};
 };
 type DecisionOption = {
@@ -261,6 +276,16 @@ const agentSessionTx = (agentSessionId: string) => {
 	return tx;
 };
 
+const integrationConnectionTx = (connectionId: string) => {
+	const tx = db.tx.integrationConnections[connectionId];
+
+	if (!tx) {
+		throw new Error(`Integration connection ${connectionId} not found`);
+	}
+
+	return tx;
+};
+
 const updateTaskStatus = async (
 	taskId: string,
 	status: "idle" | "in_progress" | "failed",
@@ -310,6 +335,7 @@ export const processEventTask = task({
 							mcpServers: {},
 							organisation: {
 								agents: {},
+								integrationConnections: {},
 							},
 						},
 					},
@@ -808,6 +834,18 @@ const continueWorkflowFromNode = async (
 		return;
 	}
 
+	if (nextNode.data?.blockType === "integrationAction") {
+		await continueFromIntegrationActionNode(
+			sandbox,
+			task,
+			factory,
+			workflow,
+			nextNode,
+			options,
+		);
+		return;
+	}
+
 	if (nextNode.data?.blockType !== "agentRun") {
 		return;
 	}
@@ -1113,6 +1151,120 @@ const continueFromInstructionNode = async (
 	await continueWorkflowFromNode(sandbox, task, factory, workflow, nextNode, {
 		...options,
 		prompt,
+	});
+};
+
+const continueFromIntegrationActionNode = async (
+	sandbox: Sandbox,
+	task: Task,
+	factory: FactoryWithRepositories,
+	workflow: Required<FloorWorkflow>,
+	actionNode: WorkflowNode,
+	options: {
+		agentSession?: AgentSession;
+		prompt?: string;
+	} = {},
+) => {
+	if (
+		actionNode.data?.provider !== SLACK_PROVIDER ||
+		actionNode.data?.action !== SLACK_SEND_MESSAGE_ACTION
+	) {
+		throw new Error("Unsupported integration action block");
+	}
+
+	const workflowInput = getWorkflowInput(task.workflowInput);
+	const connectionId = getOptionalDataString(actionNode.data.connectionId);
+	const channelId = getOptionalDataString(actionNode.data.channelId);
+	const connection = resolveIntegrationConnection(factory, connectionId);
+
+	if (!connection) {
+		throw new Error(
+			connectionId
+				? `Slack connection ${connectionId} not found`
+				: "Slack Message blocks require a Slack connection",
+		);
+	}
+
+	if (!channelId) {
+		throw new Error("Slack Message blocks require a channel.");
+	}
+
+	const text =
+		renderWorkflowTemplate(
+			actionNode.data.messageTemplate || "{{input.message}}",
+			workflowInput,
+		) || "Workflow update.";
+	const threadTs =
+		actionNode.data.threadTsTemplate !== undefined
+			? renderWorkflowTemplate(actionNode.data.threadTsTemplate, workflowInput)
+			: undefined;
+	const botToken = await decryptSlackBotToken(parseSlackAuth(connection.auth));
+	const postedMessage = await postSlackMessage({
+		botToken,
+		channel: channelId,
+		text,
+		threadTs,
+	});
+	const completedAt = new Date().toISOString();
+	const nextWorkflowInput = {
+		...workflowInput,
+		slack: {
+			...(isRecord(workflowInput.slack) ? workflowInput.slack : {}),
+			lastMessage: {
+				channelId: postedMessage.channel ?? channelId,
+				ts: postedMessage.ts,
+				text,
+				sentAt: completedAt,
+			},
+		},
+		integrationAction: {
+			provider: SLACK_PROVIDER,
+			action: SLACK_SEND_MESSAGE_ACTION,
+			connectionId: connection.id,
+			workflowNodeId: actionNode.id,
+			completedAt,
+		},
+	};
+
+	await db.transact([
+		taskTx(task.id).update({
+			status: "idle",
+			workflowState: "integration_action_completed",
+			workflowNodeId: actionNode.id,
+			workflowInput: nextWorkflowInput,
+		}),
+		integrationConnectionTx(connection.id).update({
+			lastUsedAt: completedAt,
+			updatedAt: completedAt,
+		}),
+	]);
+
+	await persistFactoryplaneEvent(
+		task.id,
+		"factoryplane.workflow.integration_action",
+		{
+			taskId: task.id,
+			workflowNodeId: actionNode.id,
+			provider: SLACK_PROVIDER,
+			action: SLACK_SEND_MESSAGE_ACTION,
+			connectionId: connection.id,
+			channelId,
+			messageTs: postedMessage.ts,
+		},
+	);
+
+	task.workflowInput = nextWorkflowInput;
+	task.workflowNodeId = actionNode.id;
+
+	const nextNode = findNextWorkflowNode(workflow, actionNode.id);
+
+	if (!nextNode) {
+		return;
+	}
+
+	await continueWorkflowFromNode(sandbox, task, factory, workflow, nextNode, {
+		...options,
+		prompt: options.prompt,
 	});
 };
 
@@ -1458,6 +1610,25 @@ const resolveWorkflowAgent = (
 ) => {
 	const agents = factory.organisation?.agents ?? [];
 	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
+};
+
+const resolveIntegrationConnection = (
+	factory: FactoryWithRepositories,
+	connectionId: string | undefined,
+) => {
+	const connections = factory.organisation?.integrationConnections ?? [];
+	return connectionId
+		? connections.find(
+				(connection) =>
+					connection.id === connectionId &&
+					connection.provider === SLACK_PROVIDER &&
+					connection.status === "connected",
+			)
+		: connections.find(
+				(connection) =>
+					connection.provider === SLACK_PROVIDER &&
+					connection.status === "connected",
+			);
 };
 
 const getWorkflowInput = (value: unknown): Record<string, unknown> =>
