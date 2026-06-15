@@ -238,6 +238,7 @@ export default function FactoryPage() {
 					>
 						<div className="flex flex-col gap-2 p-2">
 							<Textarea
+								autoFocus
 								className="bg-grayscale-1 p-2 text-sm border-grayscale-3 dark:bg-grayscale-4 focus:bg-grayscale-2 dark:hover:bg-grayscale-5 dark:focus:bg-grayscale-5"
 								placeholder="Task Instructions"
 								disabled={isCreating}
