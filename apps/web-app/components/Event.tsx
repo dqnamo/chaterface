@@ -837,17 +837,31 @@ function AgentMessage({
 	text: string;
 	timestamp?: string;
 }) {
+	const displayName = agentName ?? "Codex";
+
 	return (
-		<EventCard
-			actorName={agentName}
-			glyph="AI"
-			logo
-			meta={timestamp}
-			source="agent"
-			tone="accent"
+		<motion.article
+			animate={{ opacity: 1, y: 0 }}
+			className="relative min-w-0 max-w-full overflow-hidden py-2"
+			initial={{ opacity: 0, y: 6 }}
+			layout="position"
+			transition={{ duration: 0.18, ease: "easeOut" }}
 		>
-			<MessageBubble text={text} />
-		</EventCard>
+			<div className="flex min-w-0 max-w-full flex-col gap-1 px-3">
+				<div className="flex min-w-0 items-center gap-2">
+					<TimelineAvatar glyph="AI" logo source="agent" />
+					<p className="min-w-0 truncate text-[13px] font-medium leading-5 text-grayscale-12">
+						{displayName}
+					</p>
+					{timestamp ? (
+						<time className="shrink-0 text-[11px] leading-4 text-grayscale-9">
+							{timestamp}
+						</time>
+					) : null}
+				</div>
+				<MessageBubble text={text} />
+			</div>
+		</motion.article>
 	);
 }
 
@@ -870,28 +884,24 @@ function UserMessage({
 			layout="position"
 			transition={{ duration: 0.18, ease: "easeOut" }}
 		>
-			<div className="flex min-w-0 max-w-full gap-2.5 px-3">
-				<Monogram
-					className="mt-0.5 size-7 shrink-0 rounded-full text-xs"
-					letters={1}
-					seed={name}
-				/>
-				<div className="min-w-0 flex-1">
-					<div className="flex min-w-0 items-baseline gap-2">
-						<p className="min-w-0 truncate text-[13px] font-medium leading-5 text-grayscale-12">
-							{name}
-						</p>
-						{timestamp ? (
-							<time className="shrink-0 text-[11px] leading-4 text-grayscale-9">
-								{timestamp}
-							</time>
-						) : null}
-					</div>
-					<div className="mt-0.5 flex min-w-0 max-w-full flex-col gap-1.5">
-						{text ? <MessageBubble text={text} /> : null}
-						<AttachmentGrid attachments={attachments} />
-					</div>
+			<div className="flex min-w-0 max-w-full flex-col gap-1 px-3">
+				<div className="flex min-w-0 items-center gap-2">
+					<Monogram
+						className="size-7 shrink-0 rounded-full text-xs"
+						letters={1}
+						seed={name}
+					/>
+					<p className="min-w-0 truncate text-[13px] font-medium leading-5 text-grayscale-12">
+						{name}
+					</p>
+					{timestamp ? (
+						<time className="shrink-0 text-[11px] leading-4 text-grayscale-9">
+							{timestamp}
+						</time>
+					) : null}
 				</div>
+				{text ? <MessageBubble text={text} /> : null}
+				<AttachmentGrid attachments={attachments} />
 			</div>
 		</motion.article>
 	);
