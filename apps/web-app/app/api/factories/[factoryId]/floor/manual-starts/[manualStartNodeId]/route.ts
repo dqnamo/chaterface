@@ -185,7 +185,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 		agentSessionTx(agentSessionId)
 			.create({
 				name: getAgentSessionName(workflowSessionKey),
-				status: "idle",
+				status: "running",
 				createdAt,
 				updatedAt: createdAt,
 				workflowNodeId: agentRunNode.id,

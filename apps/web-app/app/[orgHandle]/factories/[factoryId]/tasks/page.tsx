@@ -177,7 +177,11 @@ export default function TasksPage() {
 		async (taskId: string, nextColumnId: TaskColumnId) => {
 			const task = tasks.find((candidate) => candidate.id === taskId);
 
-			if (!task || getTaskColumnId(task) === nextColumnId) {
+			if (
+				!task ||
+				getTaskColumnId(task) === nextColumnId ||
+				nextColumnId === "todo"
+			) {
 				return;
 			}
 
@@ -287,58 +291,44 @@ export default function TasksPage() {
 
 	return (
 		<div className="relative flex h-full w-full flex-col overflow-hidden">
-			<ExpandSidebarButton className="absolute left-2 top-2 z-20" />
-			<div className="flex min-h-0 flex-1 flex-col px-4 py-14 md:px-8">
-				<div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-5">
-					<header className="flex shrink-0 flex-col gap-3 md:flex-row md:items-end md:justify-between">
-						<div className="min-w-0">
-							<p className="font-mono text-[11px] font-semibold leading-none text-grayscale-10 uppercase">
-								Tasks
-							</p>
-							<h1 className="mt-2 text-2xl font-medium text-grayscale-12">
-								Kanban Board
-							</h1>
-						</div>
-						<Button
-							type="button"
-							disabled={noAgentsConfigured}
-							onClick={() => setIsCreateOpen(true)}
-							className="w-full md:w-auto"
-						>
-							<PlusCircleIcon weight="bold" className="size-4" />
-							New task
-						</Button>
-					</header>
-					{noAgentsConfigured ? (
-						<p className="rounded-md border border-red-6 bg-red-2 px-3 py-2 text-xs text-red-11">
-							Create an agent before adding tasks.
-						</p>
-					) : null}
-					<div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto md:grid-cols-3 md:overflow-hidden">
-						{COLUMNS.map((column) => (
-							<KanbanColumn
-								key={column.id}
-								column={column}
-								tasks={tasksByColumn[column.id]}
-								currentOrgHandle={currentOrgHandle}
-								currentFactoryId={currentFactoryId}
-								movingTaskId={movingTaskId}
-								onStartTask={(taskId) => {
-									void moveTaskToColumn(taskId, "in_progress").catch(
-										(error) => {
-											console.error("Failed to start task", {
-												error:
-													error instanceof Error
-														? error.message
-														: String(error),
-											});
-										},
-									);
-								}}
-							/>
-						))}
-					</div>
+			<header className="flex shrink-0 flex-row items-center justify-between border-b border-grayscale-4 p-1.5">
+				<div className="flex min-w-0 flex-row items-center">
+					<ExpandSidebarButton />
+					<p className="truncate p-1 text-sm text-grayscale-11">Tasks</p>
 				</div>
+				<Button
+					type="button"
+					disabled={noAgentsConfigured}
+					onClick={() => setIsCreateOpen(true)}
+					className="h-7 shrink-0"
+				>
+					<PlusCircleIcon weight="bold" className="size-4" />
+					New task
+				</Button>
+			</header>
+			{noAgentsConfigured ? (
+				<p className="shrink-0 border-b border-red-6 bg-red-2 px-3 py-2 text-xs text-red-11">
+					Create an agent before adding tasks.
+				</p>
+			) : null}
+			<div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-3 md:divide-x md:divide-grayscale-4 md:overflow-hidden">
+				{COLUMNS.map((column) => (
+					<KanbanColumn
+						key={column.id}
+						column={column}
+						tasks={tasksByColumn[column.id]}
+						currentOrgHandle={currentOrgHandle}
+						currentFactoryId={currentFactoryId}
+						movingTaskId={movingTaskId}
+						onStartTask={(taskId) => {
+							void moveTaskToColumn(taskId, "in_progress").catch((error) => {
+								console.error("Failed to start task", {
+									error: error instanceof Error ? error.message : String(error),
+								});
+							});
+						}}
+					/>
+				))}
 			</div>
 			<Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<Dialog.Portal>
@@ -439,7 +429,8 @@ function KanbanColumn({
 		return dropTargetForElements({
 			element,
 			getData: () => ({ columnId: column.id }),
-			canDrop: ({ source }) => getDragDataString(source.data.type) === "task",
+			canDrop: ({ source }) =>
+				getDragDataString(source.data.type) === "task" && column.id !== "todo",
 			onDragEnter: () => setIsDraggedOver(true),
 			onDragLeave: () => setIsDraggedOver(false),
 			onDrop: () => setIsDraggedOver(false),
@@ -450,11 +441,11 @@ function KanbanColumn({
 		<section
 			ref={ref}
 			className={cn(
-				"flex min-h-[18rem] min-w-0 flex-col overflow-hidden rounded-lg border border-grayscale-4 bg-grayscale-2 transition-colors md:min-h-0",
-				isDraggedOver && "border-accent-8 bg-accent-2",
+				"flex min-h-[18rem] min-w-0 flex-col overflow-hidden border-b border-grayscale-4 bg-grayscale-1 transition-colors md:min-h-0 md:border-b-0",
+				isDraggedOver && "bg-accent-2",
 			)}
 		>
-			<header className="flex shrink-0 items-center justify-between gap-3 border-b border-grayscale-4 bg-grayscale-1 px-3 py-2">
+			<header className="flex shrink-0 items-center justify-between gap-3 border-b border-grayscale-4 px-3 py-2">
 				<div className="flex min-w-0 items-center gap-2">
 					{column.icon}
 					<h2 className="truncate text-sm font-medium text-grayscale-12">
@@ -466,7 +457,7 @@ function KanbanColumn({
 					className="font-mono text-[11px] font-semibold leading-none text-grayscale-10 tabular-nums"
 				/>
 			</header>
-			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
 				{tasks.length > 0 ? (
 					tasks.map((task) => (
 						<TaskCard
@@ -475,11 +466,12 @@ function KanbanColumn({
 							href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
 							showStart={column.id === "todo"}
 							isMoving={movingTaskId === task.id}
+							columnId={column.id}
 							onStart={() => onStartTask(task.id)}
 						/>
 					))
 				) : (
-					<div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed border-grayscale-5 bg-grayscale-1 px-4 text-center text-xs text-grayscale-10">
+					<div className="flex min-h-28 flex-1 items-center justify-center border border-dashed border-grayscale-5 px-4 text-center text-xs text-grayscale-10">
 						{column.empty}
 					</div>
 				)}
@@ -493,12 +485,14 @@ function TaskCard({
 	href,
 	showStart,
 	isMoving,
+	columnId,
 	onStart,
 }: {
 	task: Task;
 	href: string;
 	showStart: boolean;
 	isMoving: boolean;
+	columnId: TaskColumnId;
 	onStart: () => void;
 }) {
 	const ref = useRef<HTMLDivElement | null>(null);
@@ -517,12 +511,13 @@ function TaskCard({
 				getInitialData: () => ({
 					type: "task",
 					taskId: task.id,
+					columnId,
 				}),
 				onDragStart: () => setIsDragging(true),
 				onDrop: () => setIsDragging(false),
 			}),
 		);
-	}, [task.id]);
+	}, [task.id, columnId]);
 
 	const sessions = task.agentSessions ?? [];
 	const status = toTaskDotStatus(task.status);

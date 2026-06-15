@@ -91,12 +91,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	const existingSession = task.agentSessions?.[0];
 
 	if (existingSession) {
-		await db.transact(
+		await db.transact([
 			taskTx(task.id).update({
 				status: "in_progress",
 				completedAt: undefined,
 			}),
-		);
+			agentSessionTx(existingSession.id).update({
+				status: "running",
+				updatedAt: now,
+			}),
+		]);
 
 		return NextResponse.json({
 			taskId: task.id,
@@ -124,7 +128,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 		agentSessionTx(agentSessionId)
 			.create({
 				name: "Agent",
-				status: "idle",
+				status: "running",
 				createdAt: now,
 				updatedAt: now,
 			})
