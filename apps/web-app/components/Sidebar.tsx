@@ -13,6 +13,7 @@ import {
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import { DateTime } from "luxon";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
@@ -87,6 +88,28 @@ const factoryTx = (factoryId: string) => {
 	return tx;
 };
 
+const ACTIVE_TASK_STATUS_RANKS = {
+	failed: 0,
+	idle: 1,
+	in_progress: 2,
+} as const;
+
+const getActiveTaskStatusRank = (status: Task["status"]) =>
+	status && status in ACTIVE_TASK_STATUS_RANKS
+		? ACTIVE_TASK_STATUS_RANKS[status as keyof typeof ACTIVE_TASK_STATUS_RANKS]
+		: ACTIVE_TASK_STATUS_RANKS.idle;
+
+const compareActiveTaskEntries = (
+	first: { task: Task; index: number },
+	second: { task: Task; index: number },
+) => {
+	const rankDelta =
+		getActiveTaskStatusRank(first.task.status) -
+		getActiveTaskStatusRank(second.task.status);
+
+	return rankDelta || first.index - second.index;
+};
+
 export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	const router = useRouter();
 	const { orgHandle, factoryId, taskId } = useParams();
@@ -139,7 +162,11 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	);
 	const { activeTasks, completedTasks } = useMemo(
 		() => ({
-			activeTasks: tasks.filter((task) => !task.completedAt),
+			activeTasks: tasks
+				.map((task, index) => ({ task, index }))
+				.filter(({ task }) => !task.completedAt)
+				.sort(compareActiveTaskEntries)
+				.map(({ task }) => task),
 			completedTasks: tasks.filter((task) => task.completedAt),
 		}),
 		[tasks],
@@ -314,16 +341,26 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 						/>
 					</div>
 					<div className="flex min-w-0 max-w-full flex-col gap-px">
-						{activeTasks.map((task) => (
-							<TaskSidebarItem
-								key={task.id}
-								href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
-								fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
-								task={task}
-								selected={task.id === currentTaskId}
-								onNavigate={closeAfterMobileNavigation}
-							/>
-						))}
+						<AnimatePresence initial={false} mode="popLayout">
+							{activeTasks.map((task) => (
+								<motion.div
+									key={task.id}
+									layout="position"
+									initial={{ opacity: 0, y: 4 }}
+									animate={{ opacity: 1, y: 0 }}
+									exit={{ opacity: 0, y: -4 }}
+									transition={{ duration: 0.18, ease: "easeOut" }}
+								>
+									<TaskSidebarItem
+										href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
+										fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+										task={task}
+										selected={task.id === currentTaskId}
+										onNavigate={closeAfterMobileNavigation}
+									/>
+								</motion.div>
+							))}
+						</AnimatePresence>
 					</div>
 				</ScrollArea.Content>
 			</ScrollArea.Viewport>
