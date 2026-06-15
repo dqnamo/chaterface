@@ -1858,7 +1858,7 @@ const setupTaskSandbox = async (
 		factory,
 		"new_task",
 		factory.newTaskSetupScript,
-		repositoryGithubEnvs,
+		getAgentSafeBaseEnvs(),
 	);
 
 	const diffWorkspacePath = await runSetupStep(
@@ -3493,6 +3493,7 @@ const setupRun = async (
 
 	const envs: Record<string, string> = {
 		FACTORYPLANE_AUTH_TOKEN: agentToken,
+		...getAgentSafeBaseEnvs(),
 	};
 
 	if (getAgentProvider(agent) === "cursor") {
@@ -3500,24 +3501,6 @@ const setupRun = async (
 	}
 
 	try {
-		await runOptionalSetupStep(
-			task.id,
-			"github_auth",
-			"Validate GitHub App installation",
-			async () => {
-				const githubEnvs = await getFactoryGithubAuthEnvs(factory);
-
-				if (!githubEnvs.GITHUB_ACCESS_TOKEN) {
-					throw new Error(
-						`Factory ${factory.id} is missing GitHub App installation`,
-					);
-				}
-
-				Object.assign(envs, githubEnvs);
-				await validateGithubToken(sandbox, envs);
-			},
-		);
-
 		await runFactorySetupScript(
 			sandbox,
 			task.id,
@@ -3533,6 +3516,11 @@ const setupRun = async (
 
 	return { envs, agentToken };
 };
+
+const getAgentSafeBaseEnvs = () => ({
+	GH_PROMPT_DISABLED: "1",
+	GIT_TERMINAL_PROMPT: "0",
+});
 
 const postRun = async (taskId: string, agentToken: string) => {
 	await clearTaskAgentToken(taskId, agentToken);

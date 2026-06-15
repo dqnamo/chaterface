@@ -419,4 +419,4 @@ curl -X DELETE {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id \
 
 
 # Git & Github
-There could be a GITHUB_ACCESS_TOKEN env variable in your environment containing a short-lived GitHub App installation token for repositories connected to this factory. Because that token can expire, use `POST /github/pull-requests` when you need Factoryplane to commit, push, and create a pull request for completed work.
+GitHub authentication is owned by Factoryplane. Do not expect `GH_TOKEN` or `GITHUB_ACCESS_TOKEN` to be available in the agent environment. Use `POST /github/pull-requests` when you need Factoryplane to commit, push, and create a pull request for completed work.

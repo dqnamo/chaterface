@@ -2,7 +2,6 @@ import db, { id } from "@repo/db/admin";
 import { getBearerToken } from "../../../lib/agent-auth.js";
 import { E2BSandbox as Sandbox } from "../../../lib/e2b-sandbox.js";
 import type { RouteHandler } from "../../../lib/file-router.js";
-import { createInstallationAccessToken } from "../../../lib/github-app.js";
 
 type SetupScriptKind = "new_task" | "new_turn";
 
@@ -115,11 +114,7 @@ const getTaskForSetupScriptRun = async (agentToken: string) => {
 				},
 				factory: {
 					$: {
-						fields: [
-							"githubAppInstallationId",
-							"newTaskSetupScript",
-							"newTurnSetupScript",
-						],
+						fields: ["newTaskSetupScript", "newTurnSetupScript"],
 					},
 				},
 			},
@@ -139,19 +134,7 @@ const getSetupScriptEnvs = async (
 		GIT_TERMINAL_PROMPT: "0",
 	};
 
-	const installationId = task.factory?.githubAppInstallationId;
-
-	if (!installationId) {
-		return envs;
-	}
-
-	const githubAccessToken = await createInstallationAccessToken(installationId);
-
-	return {
-		...envs,
-		GITHUB_ACCESS_TOKEN: githubAccessToken,
-		GH_TOKEN: githubAccessToken,
-	};
+	return envs;
 };
 
 const parseRunSetupScriptBody = (
