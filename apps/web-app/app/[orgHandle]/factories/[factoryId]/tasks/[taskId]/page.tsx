@@ -775,11 +775,13 @@ export default function TaskPage() {
 			const attachments = await uploadFileAttachments(task.id);
 			const agentSessionId =
 				selectedAgentSession?.id ?? (await createAgentSession("Agent"));
+			const eventId = id();
+			const createdAt = DateTime.now().toISO();
 
 			setMessage("");
 			clearFileAttachments();
 
-			await db.transact(
+			await db.transact([
 				taskTx(task.id).update({
 					status: "in_progress",
 					completedAt: undefined,
@@ -787,18 +789,18 @@ export default function TaskPage() {
 					agentReasoningEffort,
 					agentSpeed,
 				}),
-			);
-
-			const eventId = id();
-			await db.transact(
+				agentSessionTx(agentSessionId).update({
+					status: "running",
+					updatedAt: createdAt,
+				}),
 				eventTx(eventId)
 					.create({
 						type: "factoryplane.new_user_message",
 						data: { content, attachments, userId: user?.id },
-						createdAt: DateTime.now().toISO(),
+						createdAt,
 					})
 					.link({ task: taskId as string, agentSession: agentSessionId }),
-			);
+			]);
 		} finally {
 			setIsSendingMessage(false);
 		}

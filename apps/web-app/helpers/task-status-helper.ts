@@ -10,7 +10,7 @@ export type TaskDbStatus = (typeof TASK_STATUSES)[number];
 export type TaskDotStatus = "idle" | "running" | "failed";
 
 export function toTaskDotStatus(status: string | undefined): TaskDotStatus {
-	if (status === "in_progress") {
+	if (status === "in_progress" || status === "running") {
 		return "running";
 	}
 
