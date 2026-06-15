@@ -4,6 +4,10 @@ import type { AppSchema } from "@/instant.schema";
 
 export type Repository = InstaQLEntity<AppSchema, "repositories">;
 export type McpServer = InstaQLEntity<AppSchema, "mcpServers">;
+export type IntegrationConnection = InstaQLEntity<
+	AppSchema,
+	"integrationConnections"
+>;
 export type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
 export type SkillRepository = InstaQLEntity<AppSchema, "skillRepositories">;
 export type Skill = InstaQLEntity<AppSchema, "skills">;
@@ -36,6 +40,16 @@ export const mcpServerTx = (mcpServerId: string) => {
 
 	if (!tx) {
 		throw new Error(`MCP server transaction builder ${mcpServerId} not found`);
+	}
+
+	return tx;
+};
+
+export const integrationConnectionTx = (connectionId: string) => {
+	const tx = db.tx.integrationConnections[connectionId];
+
+	if (!tx) {
+		throw new Error(`Integration connection ${connectionId} not found`);
 	}
 
 	return tx;

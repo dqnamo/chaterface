@@ -52,6 +52,34 @@ const _schema = i.schema({
 			createdAt: i.date().optional(),
 			updatedAt: i.date().optional(),
 		}),
+		integrationConnections: i.entity({
+			provider: i.string().indexed(),
+			name: i.string().indexed(),
+			status: i.string().indexed().optional(),
+			externalId: i.string().indexed().optional(),
+			externalName: i.string().optional(),
+			auth: i.json().optional(),
+			config: i.json().optional(),
+			createdAt: i.date().optional(),
+			updatedAt: i.date().optional(),
+			lastUsedAt: i.date().optional(),
+		}),
+		integrationTriggerSubscriptions: i.entity({
+			provider: i.string().indexed(),
+			trigger: i.string().indexed(),
+			nodeId: i.string().indexed(),
+			externalId: i.string().indexed().optional(),
+			config: i.json().optional(),
+			enabled: i.boolean().optional(),
+			createdAt: i.date().optional(),
+			updatedAt: i.date().optional(),
+			lastTriggeredAt: i.date().optional(),
+		}),
+		integrationEventReceipts: i.entity({
+			provider: i.string().indexed(),
+			externalEventId: i.string().unique().indexed(),
+			receivedAt: i.date().optional(),
+		}),
 		skillRepositories: i.entity({
 			url: i.string().indexed(),
 			path: i.string().optional(),
@@ -457,6 +485,45 @@ const _schema = i.schema({
 				onDelete: "cascade",
 			},
 		},
+		factoryIntegrationTriggerSubscriptions: {
+			forward: {
+				on: "factories",
+				has: "many",
+				label: "integrationTriggerSubscriptions",
+			},
+			reverse: {
+				on: "integrationTriggerSubscriptions",
+				has: "one",
+				label: "factory",
+				onDelete: "cascade",
+			},
+		},
+		integrationConnectionTriggerSubscriptions: {
+			forward: {
+				on: "integrationConnections",
+				has: "many",
+				label: "triggerSubscriptions",
+			},
+			reverse: {
+				on: "integrationTriggerSubscriptions",
+				has: "one",
+				label: "integrationConnection",
+				onDelete: "cascade",
+			},
+		},
+		integrationConnectionEventReceipts: {
+			forward: {
+				on: "integrationConnections",
+				has: "many",
+				label: "eventReceipts",
+			},
+			reverse: {
+				on: "integrationEventReceipts",
+				has: "one",
+				label: "integrationConnection",
+				onDelete: "cascade",
+			},
+		},
 		organisationFactories: {
 			forward: {
 				on: "organisations",
@@ -491,6 +558,19 @@ const _schema = i.schema({
 				on: "agents",
 				has: "one",
 				label: "organisation",
+			},
+		},
+		organisationIntegrationConnections: {
+			forward: {
+				on: "organisations",
+				has: "many",
+				label: "integrationConnections",
+			},
+			reverse: {
+				on: "integrationConnections",
+				has: "one",
+				label: "organisation",
+				onDelete: "cascade",
 			},
 		},
 		memberUsers: {
