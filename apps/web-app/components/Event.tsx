@@ -941,16 +941,16 @@ function EventCard({
 				layout="position"
 				transition={{ duration: 0.16, ease: "easeOut" }}
 			>
-				<div className="flex min-w-0 max-w-full gap-2.5 px-3">
-					<SystemEventIcon
-						glyph={glyph}
-						logo={logo}
-						phase={phase}
-						tone={tone}
-					/>
-					<div className="min-w-0 flex-1">
+				<div className="flex min-w-0 max-w-full flex-col gap-1 px-3">
+					<div className="flex min-w-0 max-w-full gap-2.5">
+						<SystemEventIcon
+							glyph={glyph}
+							logo={logo}
+							phase={phase}
+							tone={tone}
+						/>
 						{title || subtitle || meta ? (
-							<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+							<div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
 								{title ? (
 									<p className="min-w-0 break-words text-[13px] font-medium leading-5 text-grayscale-12">
 										{title}
@@ -968,12 +968,12 @@ function EventCard({
 								) : null}
 							</div>
 						) : null}
-						{children ? (
-							<div className="mt-1 flex min-w-0 max-w-full flex-col gap-1.5 overflow-hidden">
-								{children}
-							</div>
-						) : null}
 					</div>
+					{children ? (
+						<div className="flex min-w-0 max-w-full flex-col gap-1.5 overflow-hidden">
+							{children}
+						</div>
+					) : null}
 				</div>
 			</motion.article>
 		);
@@ -989,45 +989,47 @@ function EventCard({
 			layout="position"
 			transition={{ duration: 0.18, ease: "easeOut" }}
 		>
-			<div className="flex min-w-0 max-w-full gap-2.5 px-3">
-				<TimelineAvatar glyph={glyph} logo={logo} source={source} />
-				<div className="min-w-0 flex-1">
-					<div className="flex min-w-0 items-baseline gap-2">
-						<p className="min-w-0 truncate text-[13px] font-medium leading-5 text-grayscale-12">
-							{displayName}
-						</p>
-						{meta ? (
-							<time className="shrink-0 text-[11px] leading-4 text-grayscale-9">
-								{meta}
-							</time>
+			<div className="flex min-w-0 max-w-full flex-col gap-1 px-3">
+				<div className="flex min-w-0 max-w-full gap-2.5">
+					<TimelineAvatar glyph={glyph} logo={logo} source={source} />
+					<div className="min-w-0 flex-1">
+						<div className="flex min-w-0 items-baseline gap-2">
+							<p className="min-w-0 truncate text-[13px] font-medium leading-5 text-grayscale-12">
+								{displayName}
+							</p>
+							{meta ? (
+								<time className="shrink-0 text-[11px] leading-4 text-grayscale-9">
+									{meta}
+								</time>
+							) : null}
+						</div>
+						{title || subtitle ? (
+							<div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+								{title ? (
+									<p className="flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium leading-5 text-grayscale-12">
+										<PhaseIcon phase={phase} tone={tone} />
+										<span className="min-w-0 break-words">{title}</span>
+									</p>
+								) : null}
+								{subtitle ? (
+									<p className="min-w-0 max-w-full break-words font-mono text-[11px] leading-4 text-grayscale-9">
+										{subtitle}
+									</p>
+								) : null}
+							</div>
 						) : null}
 					</div>
-					{title || subtitle ? (
-						<div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-							{title ? (
-								<p className="flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium leading-5 text-grayscale-12">
-									<PhaseIcon phase={phase} tone={tone} />
-									<span className="min-w-0 break-words">{title}</span>
-								</p>
-							) : null}
-							{subtitle ? (
-								<p className="min-w-0 max-w-full break-words font-mono text-[11px] leading-4 text-grayscale-9">
-									{subtitle}
-								</p>
-							) : null}
-						</div>
-					) : null}
-					{children ? (
-						<div
-							className={cx(
-								"flex min-w-0 max-w-full flex-col gap-1.5 overflow-hidden",
-								title || subtitle ? "mt-1.5" : "mt-0.5",
-							)}
-						>
-							{children}
-						</div>
-					) : null}
 				</div>
+				{children ? (
+					<div
+						className={cx(
+							"flex min-w-0 max-w-full flex-col gap-1.5 overflow-hidden",
+							title || subtitle ? "mt-0.5" : "",
+						)}
+					>
+						{children}
+					</div>
+				) : null}
 			</div>
 		</motion.article>
 	);
