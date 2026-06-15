@@ -407,6 +407,7 @@ const processNewUserMessage = async (
 	const sandbox = await Sandbox.connect(task.sandboxId);
 	const agentSession = await resolveAgentSession(event, task, agent, factory);
 	await killTaskAgentProcess(sandbox, task, agentSession);
+	await setupSandboxGitIdentity(sandbox, task.id, factory);
 	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, factory);
 	const completed = await runAgentExec(
 		sandbox,
