@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
 import db from "@repo/db/admin";
-import type { CommandHandle } from "e2b";
+import type { CommandHandle } from "e2b/dist/index.mjs";
 import { type RawData, WebSocket, WebSocketServer } from "ws";
 import { E2BSandbox as Sandbox } from "./e2b-sandbox.js";
 

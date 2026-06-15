@@ -1,9 +1,8 @@
-import {
-	CommandExitError,
-	type CommandResult,
-	type CommandHandle as E2BCommandHandle,
-	Sandbox as E2BSdkSandbox,
-} from "e2b";
+import type {
+	CommandResult,
+	CommandHandle as E2BCommandHandle,
+} from "e2b/dist/index.mjs";
+import { CommandExitError, Sandbox as E2BSdkSandbox } from "e2b/dist/index.mjs";
 
 type CommandRunOptions = {
 	timeoutMs?: number;

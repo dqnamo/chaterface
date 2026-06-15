@@ -1,35 +1,21 @@
 import type { Server } from "node:http";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { createAdaptorServer } from "@hono/node-server";
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { registerFileRoutes } from "./lib/file-router.js";
+import { createApp } from "./app.js";
 import { attachTerminalSessionWebSocket } from "./lib/terminal-session-websocket.js";
 
-const app = new Hono();
+const startServer = async () => {
+	const app = await createApp();
+	const port = Number(process.env.PORT ?? 3002);
+	const server = createAdaptorServer({ fetch: app.fetch });
 
-app.use(
-	"*",
-	cors({
-		allowHeaders: ["Authorization", "Content-Type", "token"],
-		allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-		origin: "*",
-	}),
-);
+	attachTerminalSessionWebSocket(server as Server);
 
-const routesDir = path.join(
-	path.dirname(fileURLToPath(import.meta.url)),
-	"routes",
-);
+	server.listen(port, () => {
+		console.log(`api listening on http://localhost:${port}`);
+	});
+};
 
-await registerFileRoutes(app, routesDir);
-
-const port = Number(process.env.PORT ?? 3002);
-const server = createAdaptorServer({ fetch: app.fetch });
-
-attachTerminalSessionWebSocket(server as Server);
-
-server.listen(port, () => {
-	console.log(`api listening on http://localhost:${port}`);
+startServer().catch((error) => {
+	console.error("Failed to start api", error);
+	process.exitCode = 1;
 });

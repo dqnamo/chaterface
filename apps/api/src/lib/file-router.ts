@@ -1,8 +1,7 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import type { Hono } from "hono";
-import type { Context, MiddlewareHandler } from "hono";
+import type { Context, Hono, MiddlewareHandler } from "hono";
 
 const ROUTE_FILE = /^route\.(ts|js|mjs|cjs)$/;
 const HTTP_METHODS = [
@@ -15,10 +14,7 @@ const HTTP_METHODS = [
 	"OPTIONS",
 ] as const;
 
-type HttpMethod = (typeof HTTP_METHODS)[number];
-export type RouteHandler = (
-	c: Context,
-) => Response | Promise<Response>;
+export type RouteHandler = (c: Context) => Response | Promise<Response>;
 
 function segmentToPattern(segment: string): string | null {
 	if (segment.startsWith("(") && segment.endsWith(")")) {
@@ -71,10 +67,6 @@ async function collectRouteFiles(dir: string): Promise<string[]> {
 	return files;
 }
 
-function isHttpMethod(value: string): value is HttpMethod {
-	return (HTTP_METHODS as readonly string[]).includes(value);
-}
-
 export async function registerFileRoutes(
 	app: Hono,
 	routesDir: string,
@@ -91,8 +83,7 @@ export async function registerFileRoutes(
 				continue;
 			}
 
-			const wrapped: MiddlewareHandler = (c) =>
-				Promise.resolve(handler(c));
+			const wrapped: MiddlewareHandler = (c) => Promise.resolve(handler(c));
 			app.on(method, pattern, wrapped);
 		}
 	}

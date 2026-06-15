@@ -17,9 +17,9 @@ export const GET: RouteHandler = async (c) => {
 					},
 				},
 				services: {},
-        factory: {
-          secrets: {},
-        }
+				factory: {
+					secrets: {},
+				},
 			},
 		})
 		.then((data) => data.tasks[0]);
