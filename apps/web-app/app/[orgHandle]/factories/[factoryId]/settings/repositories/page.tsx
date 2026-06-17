@@ -330,7 +330,7 @@ export default function FactoryRepositoriesSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title="Repositories"
 			description="Repositories cloned into the sandbox before each new task starts."
 		>

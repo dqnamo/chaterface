@@ -131,13 +131,13 @@ export default function OrganisationMembersPage() {
 		<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-14 md:px-8">
 			<div className="flex flex-col gap-1">
 				<p className="font-mono text-[11px] font-semibold text-grayscale-10 uppercase">
-					Members
+					Humans
 				</p>
 				<h1 className="text-lg font-medium text-grayscale-12">
-					{organisation?.name ?? "Organisation"} members
+					{organisation?.name ?? "Organisation"} humans
 				</h1>
 				<p className="text-sm text-grayscale-10">
-					Manage organisation members, roles, and pending invites.
+					Manage organisation humans, roles, and pending invites.
 				</p>
 			</div>
 
@@ -155,12 +155,12 @@ export default function OrganisationMembersPage() {
 				<div className="border-b border-grayscale-4 p-3">
 					<div className="flex items-center gap-2 text-sm font-medium text-grayscale-12">
 						<UsersIcon weight="bold" className="size-4" />
-						Members
+						Humans
 					</div>
 				</div>
 				<div className="flex flex-col divide-y divide-grayscale-4">
 					{isLoading ? (
-						<p className="p-3 text-sm text-grayscale-10">Loading members...</p>
+						<p className="p-3 text-sm text-grayscale-10">Loading humans...</p>
 					) : members.length > 0 ? (
 						members.map((member) => (
 							<div
@@ -169,9 +169,7 @@ export default function OrganisationMembersPage() {
 							>
 								<div className="flex min-w-0 flex-col gap-1">
 									<p className="truncate text-sm font-medium text-grayscale-12">
-										{member.user?.name ??
-											member.user?.email ??
-											"Pending member"}
+										{member.user?.name ?? member.user?.email ?? "Pending human"}
 									</p>
 									<p className="text-xs text-grayscale-10">
 										{member.role ?? "member"} -{" "}
@@ -196,7 +194,7 @@ export default function OrganisationMembersPage() {
 						))
 					) : (
 						<p className="p-3 text-sm text-grayscale-10">
-							No members configured.
+							No humans configured.
 						</p>
 					)}
 				</div>
@@ -204,7 +202,7 @@ export default function OrganisationMembersPage() {
 				<div className="flex flex-col gap-3 border-t border-grayscale-4 p-3">
 					<div className="flex items-center gap-2 text-xs font-medium text-grayscale-11">
 						<PlusIcon weight="bold" className="size-3.5" />
-						Add Member
+						Add Human
 					</div>
 					<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
 						<Field label="Email">

@@ -20,3 +20,14 @@ export function toTaskDotStatus(status: string | undefined): TaskDotStatus {
 
 	return "idle";
 }
+
+export function toAgentSessionDotStatus(
+	taskStatus: string | undefined,
+	sessionStatus: string | undefined,
+): TaskDotStatus {
+	if (taskStatus === "failed") {
+		return "failed";
+	}
+
+	return toTaskDotStatus(sessionStatus);
+}

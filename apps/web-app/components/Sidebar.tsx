@@ -3,12 +3,15 @@ import NumberFlow from "@number-flow/react";
 import {
 	BuildingsIcon,
 	CheckIcon,
-	FadersHorizontalIcon,
+	GearSixIcon,
+	HeadCircuitIcon,
+	IdentificationCardIcon,
 	MinusCircleIcon,
 	PlusCircleIcon,
 	ShapesIcon,
-	SidebarSimpleIcon,
-	UserCircleIcon,
+	SignOutIcon,
+	TerminalWindowIcon,
+	UsersIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
 import { DateTime } from "luxon";
@@ -18,7 +21,10 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn } from "@/helpers/classname-helper";
-import { toTaskDotStatus } from "@/helpers/task-status-helper";
+import {
+	toAgentSessionDotStatus,
+	toTaskDotStatus,
+} from "@/helpers/task-status-helper";
 import db from "@/instant.client";
 import type { AppSchema } from "@/instant.schema";
 import { Button } from "./Button";
@@ -29,9 +35,11 @@ import { Input } from "./Input";
 import { Menu } from "./Menu";
 import Monogram from "./Monogram";
 import { NewTaskDialog } from "./NewTaskDialog";
+import { OrganisationSettingsContent } from "./OrganisationSettings";
+import { PersonalSettingsContent } from "./PersonalSettings";
 import { ScrollArea } from "./ScrollArea";
 import { useSidebar } from "./SidebarContext";
-import { TaskPresenceAvatars } from "./TaskPresence";
+import { getUserProfileDisplayName, TaskPresenceAvatars } from "./TaskPresence";
 import TaskStatusDots from "./TaskStatusDots";
 
 type AgentSession = Pick<
@@ -47,10 +55,6 @@ type Organisation = Pick<
 	"id" | "name" | "handle"
 > & {
 	factories?: Factory[];
-};
-
-type SidebarProps = {
-	onToggleCollapse: () => void;
 };
 
 const taskTx = (taskId: string) => {
@@ -135,11 +139,14 @@ const compareActiveTaskEntries = (
 	return rankDelta || first.index - second.index;
 };
 
-export default function Sidebar({ onToggleCollapse }: SidebarProps) {
+export default function Sidebar() {
 	const { orgHandle, factoryId, taskId } = useParams();
 	const pathname = usePathname();
 	const { isMobile, collapse } = useSidebar();
 	const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+	const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+	const [isOrganisationSettingsOpen, setIsOrganisationSettingsOpen] =
+		useState(false);
 	const currentOrgHandle = orgHandle as string;
 	const currentFactoryId = factoryId as string;
 	const currentTaskId = taskId as string;
@@ -196,15 +203,21 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 		[tasks],
 	);
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
-	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
-	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
+	const humansHref = `/${currentOrgHandle}/factories/${currentFactoryId}/humans`;
+	const agentsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/agents`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
-	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
-	const isOrganisationSettingsSelected = pathname.startsWith(
-		organisationSettingsHref,
-	);
+	const isHumansSelected = pathname.startsWith(humansHref);
+	const isAgentsSelected = pathname.startsWith(agentsHref);
 	const openNewTask = useCallback(() => {
 		setIsNewTaskOpen(true);
+		closeAfterMobileNavigation();
+	}, [closeAfterMobileNavigation]);
+	const openAccountSettings = useCallback(() => {
+		setIsAccountSettingsOpen(true);
+		closeAfterMobileNavigation();
+	}, [closeAfterMobileNavigation]);
+	const openOrganisationSettings = useCallback(() => {
+		setIsOrganisationSettingsOpen(true);
 		closeAfterMobileNavigation();
 	}, [closeAfterMobileNavigation]);
 
@@ -223,21 +236,14 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 			<ScrollArea.Root className="h-full w-full min-w-0 max-w-full">
 				<ScrollArea.Viewport>
 					<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-2 px-2 py-2">
-						<div className="sticky top-0 z-20 mb-2 flex min-w-0 max-w-full flex-row items-start justify-between gap-2 bg-grayscale-1 pb-2">
+						<div className="sticky top-0 z-20 mb-1 flex min-w-0 max-w-full flex-row items-start bg-grayscale-1 pb-1">
 							<FactorySwitcher
 								organisations={organisations}
 								currentOrgHandle={currentOrgHandle}
 								currentFactoryId={currentFactoryId}
 								onNavigate={closeAfterMobileNavigation}
+								onOpenOrganisationSettings={openOrganisationSettings}
 							/>
-							<button
-								type="button"
-								aria-label="Collapse sidebar"
-								onClick={onToggleCollapse}
-								className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-grayscale-2 transition-colors duration-150 hover:bg-grayscale-3"
-							>
-								<SidebarSimpleIcon weight="bold" />
-							</button>
 						</div>
 						<div className="min-w-0 max-w-full">
 							<Link
@@ -254,55 +260,44 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 									size={6}
 									active={isSettingsSelected}
 								/>
-								<FadersHorizontalIcon
-									weight="bold"
-									className="size-4 shrink-0"
-								/>
+								<TerminalWindowIcon weight="bold" className="size-4 shrink-0" />
 								<span className="min-w-0 flex-1 truncate">
-									Factory Settings
+									Agent Environment
 								</span>
 							</Link>
 							<Link
-								href={personalSettingsHref}
+								href={humansHref}
 								onClick={closeAfterMobileNavigation}
 								className={cn(
 									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-									isPersonalSettingsSelected ? "bg-grayscale-3" : "",
+									isHumansSelected ? "bg-grayscale-3" : "",
 								)}
 							>
 								<CornerBrackets
 									placement="inside"
-									color={
-										isPersonalSettingsSelected ? "accent-9" : "grayscale-8"
-									}
+									color={isHumansSelected ? "accent-9" : "grayscale-8"}
 									size={6}
-									active={isPersonalSettingsSelected}
+									active={isHumansSelected}
 								/>
-								<UserCircleIcon weight="bold" className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">
-									Personal Settings
-								</span>
+								<UsersIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">Humans</span>
 							</Link>
 							<Link
-								href={organisationSettingsHref}
+								href={agentsHref}
 								onClick={closeAfterMobileNavigation}
 								className={cn(
 									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-									isOrganisationSettingsSelected ? "bg-grayscale-3" : "",
+									isAgentsSelected ? "bg-grayscale-3" : "",
 								)}
 							>
 								<CornerBrackets
 									placement="inside"
-									color={
-										isOrganisationSettingsSelected ? "accent-9" : "grayscale-8"
-									}
+									color={isAgentsSelected ? "accent-9" : "grayscale-8"}
 									size={6}
-									active={isOrganisationSettingsSelected}
+									active={isAgentsSelected}
 								/>
-								<BuildingsIcon weight="bold" className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">
-									Organisation Settings
-								</span>
+								<HeadCircuitIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">Agents</span>
 							</Link>
 							<div className="mt-2">
 								<Button
@@ -350,6 +345,12 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								))}
 							</AnimatePresence>
 						</div>
+						<div className="sticky bottom-0 z-10 mt-auto bg-grayscale-1 pt-2">
+							<UserSidebarMenu
+								currentOrgHandle={currentOrgHandle}
+								onOpenAccountSettings={openAccountSettings}
+							/>
+						</div>
 					</ScrollArea.Content>
 				</ScrollArea.Viewport>
 				<ScrollArea.Scrollbar>
@@ -357,20 +358,164 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 				</ScrollArea.Scrollbar>
 			</ScrollArea.Root>
 			<NewTaskDialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen} />
+			<Dialog.Root
+				open={isAccountSettingsOpen}
+				onOpenChange={setIsAccountSettingsOpen}
+			>
+				<Dialog.Portal>
+					<Dialog.Backdrop />
+					<Dialog.Popup className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden">
+						<Dialog.Title className="sr-only">Account Settings</Dialog.Title>
+						<Dialog.Description className="sr-only">
+							Manage your personal settings.
+						</Dialog.Description>
+						<div className="overflow-y-auto p-4 md:p-6">
+							<PersonalSettingsContent />
+						</div>
+					</Dialog.Popup>
+				</Dialog.Portal>
+			</Dialog.Root>
+			<Dialog.Root
+				open={isOrganisationSettingsOpen}
+				onOpenChange={setIsOrganisationSettingsOpen}
+			>
+				<Dialog.Portal>
+					<Dialog.Backdrop />
+					<Dialog.Popup className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden">
+						<Dialog.Title className="sr-only">
+							Organisation Settings
+						</Dialog.Title>
+						<Dialog.Description className="sr-only">
+							Manage organisation details.
+						</Dialog.Description>
+						<div className="overflow-y-auto p-4 md:p-6">
+							<OrganisationSettingsContent />
+						</div>
+					</Dialog.Popup>
+				</Dialog.Portal>
+			</Dialog.Root>
 		</>
 	);
 }
+
+const UserSidebarMenu = ({
+	currentOrgHandle,
+	onOpenAccountSettings,
+}: {
+	currentOrgHandle: string;
+	onOpenAccountSettings: () => void;
+}) => {
+	const { user } = db.useAuth();
+	const currentUserId = user?.id ?? "__unauthenticated__";
+	const [isSigningOut, setIsSigningOut] = useState(false);
+	const { data } = db.useQuery({
+		organisations: {
+			$: {
+				where: {
+					handle: currentOrgHandle,
+				},
+			},
+			members: {
+				user: {},
+			},
+		},
+	});
+	const member = data?.organisations?.[0]?.members?.find(
+		(member) => member.user?.id === currentUserId,
+	);
+	const userRecord = member?.user;
+	const displayName = getUserProfileDisplayName({
+		memberName: member?.name,
+		userName: userRecord?.name,
+		email: user?.email ?? undefined,
+		fallback: "Account",
+	});
+	const displayDetail = user?.email ?? "Signed in";
+
+	const signOut = async () => {
+		if (isSigningOut) {
+			return;
+		}
+
+		setIsSigningOut(true);
+
+		try {
+			await db.auth.signOut();
+		} catch (error) {
+			console.error("Failed to sign out", {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			setIsSigningOut(false);
+		}
+	};
+
+	return (
+		<Menu.Root>
+			<Menu.Trigger className="w-full min-w-0 rounded-md border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
+				<Monogram seed={displayName} letters={1} className="size-7 shrink-0" />
+				<span className="flex min-w-0 flex-1 flex-col text-left">
+					<span className="truncate text-sm leading-tight text-grayscale-12">
+						{displayName}
+					</span>
+					<span className="truncate text-[11px] leading-tight text-grayscale-10">
+						{displayDetail}
+					</span>
+				</span>
+				<Menu.TriggerIcon />
+			</Menu.Trigger>
+			<Menu.Portal>
+				<Menu.Positioner align="start" side="top" sideOffset={8}>
+					<Menu.Popup className="w-72 max-w-[calc(100vw-1rem)]">
+						<div className="flex min-w-0 items-center gap-2 px-3 py-2">
+							<Monogram
+								seed={displayName}
+								letters={1}
+								className="size-8 shrink-0"
+							/>
+							<div className="flex min-w-0 flex-col">
+								<p className="truncate text-sm font-medium text-grayscale-12">
+									{displayName}
+								</p>
+								<p className="truncate text-xs text-grayscale-10">
+									{displayDetail}
+								</p>
+							</div>
+						</div>
+						<Menu.Separator />
+						<Menu.Item onClick={onOpenAccountSettings}>
+							<GearSixIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">Account settings</span>
+						</Menu.Item>
+						<Menu.Item
+							disabled={isSigningOut}
+							onClick={() => {
+								void signOut();
+							}}
+						>
+							<SignOutIcon weight="bold" className="size-4 shrink-0" />
+							<span className="min-w-0 flex-1 truncate">
+								{isSigningOut ? "Signing out..." : "Sign out"}
+							</span>
+						</Menu.Item>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	);
+};
 
 const FactorySwitcher = ({
 	organisations,
 	currentOrgHandle,
 	currentFactoryId,
 	onNavigate,
+	onOpenOrganisationSettings,
 }: {
 	organisations: Organisation[];
 	currentOrgHandle: string;
 	currentFactoryId: string;
 	onNavigate: () => void;
+	onOpenOrganisationSettings: () => void;
 }) => {
 	const router = useRouter();
 	const { user } = db.useAuth();
@@ -478,7 +623,7 @@ const FactorySwitcher = ({
 	return (
 		<>
 			<Menu.Root>
-				<Menu.Trigger className="min-w-0 flex-1 rounded-md border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
+				<Menu.Trigger className="w-full min-w-0 rounded-md border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
 					<Monogram
 						seed={triggerSeed}
 						letters={currentFactory ? 2 : 1}
@@ -600,6 +745,18 @@ const FactorySwitcher = ({
 								</Menu.Item>
 							)}
 							<Menu.Separator />
+							<Menu.Item
+								disabled={!currentOrganisation}
+								onClick={onOpenOrganisationSettings}
+							>
+								<IdentificationCardIcon
+									weight="bold"
+									className="size-4 shrink-0"
+								/>
+								<span className="min-w-0 flex-1 truncate">
+									Organisation settings
+								</span>
+							</Menu.Item>
 							<Menu.Item
 								disabled={!currentOrganisation}
 								onClick={() => {
@@ -819,7 +976,10 @@ const TaskSidebarItem = ({
 								agentSessions.map((session, index) => (
 									<TaskStatusDots
 										key={session.id}
-										status={toTaskDotStatus(session.status)}
+										status={toAgentSessionDotStatus(
+											task.status,
+											session.status,
+										)}
 										label={`${session.name || `Session ${index + 1}`} status`}
 									/>
 								))
@@ -833,8 +993,7 @@ const TaskSidebarItem = ({
 					<TaskPresenceAvatars
 						taskId={task.id}
 						limit={3}
-						avatarSizeClassName="size-3"
-						avatarClassName="[&>p]:text-[7px]"
+						avatarSizeClassName="size-4"
 					/>
 				)}
 			</ContextMenu.Trigger>

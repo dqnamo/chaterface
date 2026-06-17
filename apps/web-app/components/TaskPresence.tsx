@@ -12,6 +12,14 @@ export type TaskPresenceProfile = {
 	name: string;
 };
 
+export type UserProfileDisplayInput = {
+	memberName?: string;
+	userName?: string;
+	name?: string;
+	email?: string;
+	fallback?: string;
+};
+
 type TaskPresencePeer = PresencePeer<AppSchema, "task">;
 type CompleteTaskPresencePeer = TaskPresencePeer & {
 	userId: string;
@@ -23,13 +31,26 @@ const getTaskRoom = (taskId: string) => db.room("task", taskId);
 
 export function getTaskPresenceProfile(input: {
 	userId?: string;
+	memberName?: string;
+	userName?: string;
 	name?: string;
 	email?: string;
 }): TaskPresenceProfile {
 	return {
 		userId: input.userId,
-		name: input.name || input.email || "User",
+		name: getUserProfileDisplayName(input),
 	};
+}
+
+export function getUserProfileDisplayName(input: UserProfileDisplayInput) {
+	return (
+		input.memberName?.trim() ||
+		input.userName?.trim() ||
+		input.name?.trim() ||
+		input.email?.trim() ||
+		input.fallback ||
+		"User"
+	);
 }
 
 export function TaskPresenceAvatars({
@@ -79,7 +100,7 @@ export function TaskPresenceAvatars({
 			{overflowCount > 0 ? (
 				<span
 					className={cn(
-						"flex items-center justify-center rounded-full border border-grayscale-1 bg-grayscale-4 font-mono text-[9px] font-semibold leading-none text-grayscale-11",
+						"flex items-center justify-center rounded-md border border-grayscale-1 bg-grayscale-4 font-mono text-[9px] font-semibold leading-none text-grayscale-11",
 						avatarSizeClassName,
 					)}
 				>
@@ -102,7 +123,7 @@ export function TaskPresenceAvatar({
 	return (
 		<Monogram
 			className={cn(
-				"shrink-0 rounded-full [&>p]:text-[9px]",
+				"shrink-0 rounded-md [&>p]:text-[9px]",
 				sizeClassName,
 				className,
 			)}
@@ -136,8 +157,7 @@ export function TaskPresenceTypingIndicator({
 					<TaskPresenceAvatar
 						key={presence.userId}
 						presence={presence}
-						sizeClassName="size-3"
-						className="[&>p]:text-[7px]"
+						sizeClassName="size-4"
 					/>
 				))}
 			</span>

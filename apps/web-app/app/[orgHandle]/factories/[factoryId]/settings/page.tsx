@@ -179,7 +179,7 @@ export default function FactoryGithubSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title={factory?.name ?? "Factory"}
 			description="Private repository access and git commit identity for new sandboxes."
 		>

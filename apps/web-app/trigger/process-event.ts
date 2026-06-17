@@ -33,6 +33,9 @@ type Agent = InstaQLEntity<AppSchema, "agents">;
 type AgentSession = InstaQLEntity<AppSchema, "agentSessions"> & {
 	agent?: Agent;
 };
+type EventWithAgentSession = Event & {
+	agentSession?: AgentSession;
+};
 type Factory = InstaQLEntity<AppSchema, "factories">;
 type Repository = InstaQLEntity<AppSchema, "repositories">;
 type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
@@ -297,6 +300,29 @@ const updateTaskStatus = async (
 	);
 };
 
+const updateTaskFailureState = async (
+	taskId: string,
+	agentSessionId: string | undefined,
+) => {
+	const failedTaskUpdate = taskTx(taskId).update({
+		status: "failed",
+	});
+
+	if (!agentSessionId) {
+		await db.transact(failedTaskUpdate);
+		return;
+	}
+
+	await db.transact([
+		failedTaskUpdate,
+		agentSessionTx(agentSessionId).update({
+			agentPid: undefined,
+			status: "failed",
+			updatedAt: new Date().toISOString(),
+		}),
+	]);
+};
+
 const eventTx = (eventId: string) => {
 	const tx = db.tx.events[eventId];
 
@@ -369,7 +395,10 @@ export const processEventTask = task({
 				);
 			}
 		} catch (error) {
-			await updateTaskStatus(task.id, "failed");
+			await updateTaskFailureState(
+				task.id,
+				(event as EventWithAgentSession).agentSession?.id,
+			);
 			throw error;
 		}
 	},
@@ -2034,7 +2063,10 @@ const setupTaskSandbox = async (
 		factory,
 		"new_task",
 		factory.newTaskSetupScript,
-		getAgentSafeBaseEnvs(),
+		{
+			...getAgentSafeBaseEnvs(),
+			...repositoryGithubEnvs,
+		},
 	);
 
 	const diffWorkspacePath = await runSetupStep(
@@ -2592,6 +2624,10 @@ const getFactoryGithubAuthEnvs = async (
 
 	return {
 		GITHUB_ACCESS_TOKEN: githubAccessToken,
+		GITHUB_AUTH_HEADER: Buffer.from(
+			`x-access-token:${githubAccessToken}`,
+			"utf8",
+		).toString("base64"),
 		GH_TOKEN: githubAccessToken,
 		GH_PROMPT_DISABLED: "1",
 		GIT_TERMINAL_PROMPT: "0",
@@ -3125,6 +3161,7 @@ const runAgentExec = async (
 
 	let wasInterrupted = false;
 	let completed = false;
+	let failed = false;
 
 	try {
 		const result = await command.wait();
@@ -3156,6 +3193,7 @@ const runAgentExec = async (
 			return false;
 		}
 
+		failed = true;
 		throw error;
 	} finally {
 		await output.flush();
@@ -3169,7 +3207,11 @@ const runAgentExec = async (
 		}
 		await clearTaskAgentPid(task.id, command.pid);
 		if (agentSession) {
-			await clearAgentSessionPid(agentSession.id, command.pid);
+			await clearAgentSessionPid(
+				agentSession.id,
+				command.pid,
+				failed ? "failed" : "idle",
+			);
 		}
 		await postRun(task.id, agentToken);
 		if (provider === "codex") {
@@ -3674,6 +3716,7 @@ const setupRun = async (
 	const envs: Record<string, string> = {
 		FACTORYPLANE_AUTH_TOKEN: agentToken,
 		...getAgentSafeBaseEnvs(),
+		...(await getFactoryGithubAuthEnvs(factory)),
 	};
 
 	if (getAgentProvider(agent) === "cursor") {
@@ -3943,6 +3986,7 @@ const updateAgentSessionRunState = async (
 const clearAgentSessionPid = async (
 	agentSessionId: string,
 	agentPid: number,
+	status: "idle" | "failed" = "idle",
 ) => {
 	const currentPid = await getAgentSessionPid(agentSessionId);
 
@@ -3953,7 +3997,7 @@ const clearAgentSessionPid = async (
 	await db.transact(
 		agentSessionTx(agentSessionId).update({
 			agentPid: undefined,
-			status: "idle",
+			status,
 			updatedAt: new Date().toISOString(),
 		}),
 	);

@@ -163,7 +163,7 @@ export default function FactorySkillsSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title="Skills"
 			description="Git-backed agent skills discovered from SKILL.md packages and installed into new task sandboxes."
 		>

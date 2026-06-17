@@ -73,7 +73,7 @@ export default function FactoryPackagesSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title="Sandbox packages"
 			description="Apt packages installed before each new task starts."
 		>

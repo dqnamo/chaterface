@@ -180,7 +180,7 @@ export default function FactoryDeveloperAccessSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title={factory?.name ?? "Factory"}
 			description="Factory-scoped API keys for programmatic task creation."
 		>

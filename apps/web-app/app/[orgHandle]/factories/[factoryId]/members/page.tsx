@@ -7,7 +7,5 @@ export default async function MembersPage({
 }) {
 	const { orgHandle, factoryId } = await params;
 
-	redirect(
-		`/${orgHandle}/factories/${factoryId}/organisation/settings/members`,
-	);
+	redirect(`/${orgHandle}/factories/${factoryId}/humans`);
 }

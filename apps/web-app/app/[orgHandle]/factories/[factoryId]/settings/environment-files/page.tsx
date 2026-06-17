@@ -90,7 +90,7 @@ export default function FactoryEnvironmentFilesSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title="Environment files"
 			description="Files written into the sandbox after repositories are cloned."
 		>

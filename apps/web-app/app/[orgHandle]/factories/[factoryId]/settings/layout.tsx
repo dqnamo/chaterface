@@ -1,7 +1,6 @@
 "use client";
 
 import {
-	FadersHorizontalIcon,
 	FileTextIcon,
 	GitBranchIcon,
 	KeyIcon,
@@ -75,12 +74,12 @@ export default function FactorySettingsLayout({
 			<div className="flex min-h-0 flex-1 flex-col md:flex-row">
 				<aside className="w-full shrink-0 border-b border-grayscale-4 bg-grayscale-1 px-2 py-3 md:w-64 md:border-r md:border-b-0">
 					<div className="mb-3 flex items-center gap-2 px-3">
-						<FadersHorizontalIcon
+						<TerminalWindowIcon
 							weight="bold"
 							className="size-4 text-grayscale-10"
 						/>
 						<p className="font-mono text-[11px] font-semibold text-grayscale-10 uppercase">
-							Factory Settings
+							Agent Environment
 						</p>
 					</div>
 					<nav className="flex flex-col gap-px">

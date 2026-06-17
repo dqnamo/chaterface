@@ -119,58 +119,9 @@ curl -X POST {{FACTORYPLANE_API_URL}}/services/service-id/stop \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
 ```
 
-### Create a GitHub pull request
-
-Use this after you have finished code changes in a connected GitHub repository and the user wants a PR. Factoryplane will mint a fresh GitHub App installation token, commit local changes, push a branch, create or find the PR, and attach it to the task.
-
-**Endpoint:** `POST /github/pull-requests`
-
-**Body (JSON):**
-
-- `repositoryPath` — optional workspace-relative repository path; use `"."` for the current workspace root
-- `branchName` — optional branch name; defaults to a Factoryplane task branch
-- `baseBranch` — optional target branch; defaults to the repository's origin HEAD branch
-- `commitMessage` — optional commit message
-- `title` — optional pull request title
-- `body` — optional pull request body
-- `draft` — optional boolean
-
-**Example:**
-
-```bash
-curl -X POST {{FACTORYPLANE_API_URL}}/github/pull-requests \
-  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"repositoryPath":".","branchName":"factoryplane/update-feature","title":"Update feature","body":"Implements the requested change."}'
-```
-
-### Merge a GitHub pull request
-
-Use this when the user explicitly asks you to merge the task's attached GitHub pull request. The merge target must be the pull request already attached to the task; omit `url` to merge the attached pull request.
-
-**Endpoint:** `POST /github/pull-requests/merge`
-
-**Body (JSON):**
-
-- `url` — optional GitHub pull request URL; when present, it must match the task's attached pull request
-- `mergeMethod` — optional merge strategy: `"merge"`, `"squash"`, or `"rebase"`; defaults to `"merge"`
-- `commitTitle` — optional merge commit title
-- `commitMessage` — optional merge commit message
-- `expectedHeadSha` — optional 40-character head SHA to protect against merging newer commits
-- `deleteBranch` — optional boolean; deletes the pull request head branch after a successful merge when possible
-
-**Example:**
-
-```bash
-curl -X POST {{FACTORYPLANE_API_URL}}/github/pull-requests/merge \
-  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"mergeMethod":"squash","deleteBranch":true}'
-```
-
 ### Attach a pull request
 
-Use this after you create or find a pull request outside the Factoryplane GitHub PR endpoint. This attaches the PR to the task so the user can open it from Factoryplane.
+Use this after you create or find a pull request with `gh` or `git`. This attaches the PR to the task so the user can open it from Factoryplane.
 
 **Endpoint:** `POST /pull-requests`
 
@@ -399,4 +350,6 @@ curl -X DELETE {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id \
 
 
 # Git & Github
-GitHub authentication is owned by Factoryplane. Do not expect `GH_TOKEN` or `GITHUB_ACCESS_TOKEN` to be available in the agent environment. Use `POST /github/pull-requests` when you need Factoryplane to commit, push, and create a pull request for completed work.
+When the factory has a connected GitHub App installation, Factoryplane provides a fresh installation token for the current turn as `GH_TOKEN` and `GITHUB_ACCESS_TOKEN`. Use `gh` and `git` directly for GitHub work, including pushing branches, creating pull requests, merging pull requests, and deleting branches. For plain `git` HTTPS operations, run `gh auth setup-git` first or pass `-c "http.https://github.com/.extraheader=Authorization: Basic $GITHUB_AUTH_HEADER"`.
+
+If you create or find a pull request, call `POST /pull-requests` with the PR URL so Factoryplane can attach it to the task.

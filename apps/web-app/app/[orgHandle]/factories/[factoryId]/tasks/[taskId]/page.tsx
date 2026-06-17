@@ -62,6 +62,7 @@ import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
 import {
 	getTaskPresenceProfile,
+	getUserProfileDisplayName,
 	TaskPresenceAvatars,
 	TaskPresenceTypingIndicator,
 	useTaskTypingPresence,
@@ -74,7 +75,7 @@ import {
 } from "@/helpers/chat-view-helper";
 import { cn } from "@/helpers/classname-helper";
 import { getPublicServiceUrl } from "@/helpers/service-preview-url-helper";
-import { toTaskDotStatus } from "@/helpers/task-status-helper";
+import { toAgentSessionDotStatus } from "@/helpers/task-status-helper";
 import db from "@/instant.client";
 
 const MIN_PREVIEW_SIZE = 320;
@@ -517,10 +518,7 @@ export default function TaskPage() {
 			currentUserProfile
 				? getTaskPresenceProfile({
 						userId: currentUserProfile.id,
-						name:
-							currentUserProfile.memberName ??
-							currentUserProfile.userName ??
-							currentUserProfile.email,
+						name: getUserProfileDisplayName(currentUserProfile),
 						email: currentUserProfile.email,
 					})
 				: undefined,
@@ -1070,7 +1068,10 @@ export default function TaskPage() {
 									<Tabs.Tab key={session.id} value={session.id}>
 										<span className="flex min-w-0 items-center gap-2">
 											<TaskStatusDots
-												status={toTaskDotStatus(session.status)}
+												status={toAgentSessionDotStatus(
+													task?.status,
+													session.status,
+												)}
 												size={3}
 												gap={1}
 												label={`${session.name || `Session ${index + 1}`} status`}

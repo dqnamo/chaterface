@@ -1,23 +1,23 @@
 "use client";
 
-import db from "@/instant.client";
-import { AnimatePresence, motion } from "motion/react";
 import { useParams } from "next/navigation";
+import { useEffect, useRef } from "react";
 import {
-	type PointerEvent as ReactPointerEvent,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+	Group,
+	Panel,
+	type PanelImperativeHandle,
+	Separator,
+} from "react-resizable-panels";
 import MobileDrawer from "@/components/MobileDrawer";
 import MobileHeader from "@/components/MobileHeader";
 import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import { rememberLastFactory } from "@/helpers/last-factory-helper";
+import db from "@/instant.client";
 
-const MIN_SIDEBAR_SIZE = 160;
-const MAX_SIDEBAR_SIZE = 480;
-const DEFAULT_SIDEBAR_SIZE = 256;
+const MIN_SIDEBAR_SIZE = "160px";
+const MAX_SIDEBAR_SIZE = "480px";
+const DEFAULT_SIDEBAR_SIZE = "256px";
 
 export default function FactoryLayout({
 	children,
@@ -34,9 +34,8 @@ export default function FactoryLayout({
 function FactoryLayoutChrome({ children }: { children: React.ReactNode }) {
 	const { orgHandle, factoryId } = useParams();
 	const { user } = db.useAuth();
-	const { isMobile, isCollapsed, collapse } = useSidebar();
-	const [sidebarSize, setSidebarSize] = useState(DEFAULT_SIDEBAR_SIZE);
-	const isResizing = useRef(false);
+	const { isMobile, isCollapsed, collapse, expand } = useSidebar();
+	const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
 
 	useEffect(() => {
 		if (
@@ -54,77 +53,63 @@ function FactoryLayoutChrome({ children }: { children: React.ReactNode }) {
 		});
 	}, [factoryId, orgHandle, user?.id]);
 
-	const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-		if (isCollapsed) {
+	useEffect(() => {
+		const sidebarPanel = sidebarPanelRef.current;
+
+		if (!sidebarPanel || isMobile) {
 			return;
 		}
 
-		event.preventDefault();
-		isResizing.current = true;
-		const startX = event.clientX;
-		const startSize = sidebarSize;
-
-		const handleMove = (moveEvent: PointerEvent) => {
-			if (!isResizing.current) {
-				return;
-			}
-
-			const nextSize = Math.min(
-				MAX_SIDEBAR_SIZE,
-				Math.max(MIN_SIDEBAR_SIZE, startSize + (moveEvent.clientX - startX)),
-			);
-			setSidebarSize(nextSize);
-		};
-
-		const stopResize = () => {
-			isResizing.current = false;
-			window.removeEventListener("pointermove", handleMove);
-			window.removeEventListener("pointerup", stopResize);
-		};
-
-		window.addEventListener("pointermove", handleMove);
-		window.addEventListener("pointerup", stopResize);
-	};
+		if (isCollapsed) {
+			sidebarPanel.collapse();
+		} else if (sidebarPanel.isCollapsed()) {
+			sidebarPanel.expand();
+		}
+	}, [isCollapsed, isMobile]);
 
 	return (
-		<div className="relative flex h-full w-full flex-col overflow-hidden md:flex-row">
+		<div className="relative flex h-full w-full flex-col overflow-hidden">
 			<MobileHeader />
 
 			{isMobile ? (
-				<MobileDrawer side="left" isOpen={!isCollapsed} onClose={collapse}>
-					<Sidebar onToggleCollapse={collapse} />
-				</MobileDrawer>
-			) : (
 				<>
-					<motion.div
-						className="relative shrink-0"
-						style={{ width: sidebarSize }}
-						initial={false}
-						animate={{ marginLeft: isCollapsed ? -sidebarSize : 0 }}
-						transition={{ type: "spring", stiffness: 420, damping: 42 }}
-					>
-						<div className="h-full" style={{ width: sidebarSize }}>
-							<Sidebar onToggleCollapse={collapse} />
-						</div>
-					</motion.div>
-
-					<AnimatePresence initial={false}>
-						{!isCollapsed && (
-							<motion.div
-								aria-label="Resize task sidebar"
-								onPointerDown={startResize}
-								initial={{ opacity: 0 }}
-								animate={{ opacity: 1 }}
-								exit={{ opacity: 0 }}
-								transition={{ duration: 0.15 }}
-								className="relative z-10 w-px shrink-0 cursor-col-resize bg-grayscale-4 transition-colors hover:bg-accent-8"
-							/>
-						)}
-					</AnimatePresence>
+					<MobileDrawer side="left" isOpen={!isCollapsed} onClose={collapse}>
+						<Sidebar />
+					</MobileDrawer>
+					<div className="relative min-h-0 min-w-0 flex-1">{children}</div>
 				</>
+			) : (
+				<Group orientation="horizontal" className="min-h-0 min-w-0 flex-1">
+					<Panel
+						panelRef={sidebarPanelRef}
+						id="sidebar"
+						defaultSize={DEFAULT_SIDEBAR_SIZE}
+						minSize={MIN_SIDEBAR_SIZE}
+						maxSize={MAX_SIDEBAR_SIZE}
+						collapsible={true}
+						collapsedSize="0px"
+						onResize={(size) => {
+							if (size.inPixels === 0) {
+								collapse();
+							} else {
+								expand();
+							}
+						}}
+					>
+						<div className="h-full min-w-0 overflow-hidden">
+							<Sidebar />
+						</div>
+					</Panel>
+					<Separator
+						id="sidebar-resize-handle"
+						aria-label="Resize task sidebar"
+						className="relative z-10 w-px shrink-0 cursor-col-resize bg-grayscale-4 transition-colors hover:bg-accent-8 focus-visible:bg-accent-8 focus-visible:outline-none"
+					/>
+					<Panel id="content" minSize="40%">
+						<div className="relative h-full min-h-0 min-w-0">{children}</div>
+					</Panel>
+				</Group>
 			)}
-
-			<div className="relative min-h-0 min-w-0 flex-1">{children}</div>
 		</div>
 	);
 }

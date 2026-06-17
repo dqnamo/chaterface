@@ -171,7 +171,7 @@ export default function FactoryMcpServersSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title="MCP servers"
 			description="Streamable HTTP MCP servers available to Codex task sandboxes."
 		>

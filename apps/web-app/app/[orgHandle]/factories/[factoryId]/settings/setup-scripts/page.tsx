@@ -62,7 +62,7 @@ export default function FactorySetupScriptsSettingsPage() {
 
 	return (
 		<SettingsPageShell
-			eyebrow="Factory Settings"
+			eyebrow="Agent Environment"
 			title="Setup scripts"
 			description="Commands run automatically when tasks and turns start."
 		>
