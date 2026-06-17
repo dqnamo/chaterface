@@ -9,7 +9,7 @@ import {
 	WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	type AgentDefaultOptions,
 	DEFAULT_CODEX_MODEL,
@@ -20,6 +20,7 @@ import {
 } from "@/codex-options";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
+import { Dialog } from "@/components/Dialog";
 import { Input } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
@@ -73,6 +74,8 @@ export default function AgentsPage() {
 	const [cursorApiKey, setCursorApiKey] = useState("");
 	const [pendingCodexAgentId, setPendingCodexAgentId] = useState<string>();
 	const [codexDeviceAuth, setCodexDeviceAuth] = useState<CodexDeviceAuth>();
+	const [codexAuthStatus, setCodexAuthStatus] = useState<string>();
+	const [codexAuthModalOpen, setCodexAuthModalOpen] = useState(false);
 	const [isStartingCodexAuth, setIsStartingCodexAuth] = useState(false);
 	const [isCompletingCodexAuth, setIsCompletingCodexAuth] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
@@ -91,7 +94,14 @@ export default function AgentsPage() {
 			},
 			agents: {
 				$: {
-					fields: ["name", "createdAt", "provider", "settings", "status"],
+					fields: [
+						"name",
+						"authState",
+						"createdAt",
+						"provider",
+						"settings",
+						"status",
+					],
 				},
 			},
 		},
@@ -108,6 +118,36 @@ export default function AgentsPage() {
 		[workspace?.agents],
 	);
 	const selectedProvider = PROVIDERS.find((item) => item.value === provider);
+	const pendingCodexAgent = pendingCodexAgentId
+		? agents.find((agent) => agent.id === pendingCodexAgentId)
+		: undefined;
+
+	useEffect(() => {
+		if (!pendingCodexAgentId) {
+			return;
+		}
+
+		const deviceAuth = getCodexDeviceAuth(pendingCodexAgent?.authState);
+
+		if (deviceAuth) {
+			setCodexDeviceAuth(deviceAuth);
+			setCodexAuthStatus("pending");
+			setFormError(undefined);
+			return;
+		}
+
+		const authStatus = getCodexAuthStatus(pendingCodexAgent?.authState);
+
+		if (authStatus) {
+			setCodexAuthStatus(authStatus);
+		}
+
+		const authError = getCodexAuthError(pendingCodexAgent?.authState);
+
+		if (authError) {
+			setFormError(authError);
+		}
+	}, [pendingCodexAgentId, pendingCodexAgent?.authState]);
 
 	const createAgent = async () => {
 		setFormError(undefined);
@@ -123,6 +163,11 @@ export default function AgentsPage() {
 		}
 
 		if (provider === "codex") {
+			if (pendingCodexAgentId) {
+				setCodexAuthModalOpen(true);
+				return;
+			}
+
 			await startCodexDeviceAuth(trimmedName);
 			return;
 		}
@@ -183,6 +228,10 @@ export default function AgentsPage() {
 			return;
 		}
 
+		setPendingCodexAgentId(undefined);
+		setCodexDeviceAuth(undefined);
+		setCodexAuthStatus("queued");
+		setCodexAuthModalOpen(true);
 		setIsStartingCodexAuth(true);
 
 		try {
@@ -205,10 +254,6 @@ export default function AgentsPage() {
 
 			const body = (await response.json().catch(() => ({}))) as {
 				agent?: { id?: unknown };
-				deviceAuth?: {
-					verificationUri?: unknown;
-					userCode?: unknown;
-				};
 				message?: unknown;
 			};
 
@@ -221,20 +266,12 @@ export default function AgentsPage() {
 				return;
 			}
 
-			if (
-				typeof body.agent?.id !== "string" ||
-				typeof body.deviceAuth?.verificationUri !== "string" ||
-				typeof body.deviceAuth.userCode !== "string"
-			) {
+			if (typeof body.agent?.id !== "string") {
 				setFormError("Codex device auth response was incomplete.");
 				return;
 			}
 
 			setPendingCodexAgentId(body.agent.id);
-			setCodexDeviceAuth({
-				verificationUri: body.deviceAuth.verificationUri,
-				userCode: body.deviceAuth.userCode,
-			});
 		} catch (error) {
 			setFormError(
 				error instanceof Error
@@ -288,6 +325,8 @@ export default function AgentsPage() {
 			setName("");
 			setPendingCodexAgentId(undefined);
 			setCodexDeviceAuth(undefined);
+			setCodexAuthStatus(undefined);
+			setCodexAuthModalOpen(false);
 		} catch (error) {
 			setFormError(
 				error instanceof Error
@@ -452,88 +491,218 @@ export default function AgentsPage() {
 							/>
 						</Field>
 					) : (
-						<div className="flex flex-col gap-2">
-							<p className="text-xs text-grayscale-10">
-								Start device auth, open the Codex login link, enter the one-time
-								code, then complete auth here.
-							</p>
-							{codexDeviceAuth ? (
-								<CodexDeviceAuthPanel deviceAuth={codexDeviceAuth} />
-							) : null}
-						</div>
+						<p className="text-xs text-grayscale-10">
+							Start device auth to open a Codex sign-in modal with a one-time
+							code.
+						</p>
 					)}
-					{formError ? (
+					{formError && !codexAuthModalOpen ? (
 						<div className="flex items-center gap-1.5 text-xs text-red-11">
 							<WarningCircleIcon weight="bold" className="size-3.5" />
 							{formError}
 						</div>
 					) : null}
 					<div className="flex justify-end">
-						{provider === "codex" && codexDeviceAuth ? (
-							<Button
-								type="button"
-								disabled={isCompletingCodexAuth}
-								onClick={() => {
-									void completeCodexDeviceAuth();
-								}}
-							>
-								{isCompletingCodexAuth
-									? "Completing..."
-									: "Complete Codex Auth"}
-							</Button>
-						) : (
-							<Button
-								type="button"
-								disabled={isStartingCodexAuth}
-								onClick={() => {
-									void createAgent();
-								}}
-							>
-								{provider === "codex"
-									? isStartingCodexAuth
-										? "Starting..."
+						<Button
+							type="button"
+							disabled={isStartingCodexAuth}
+							onClick={() => {
+								void createAgent();
+							}}
+						>
+							{provider === "codex"
+								? isStartingCodexAuth
+									? "Starting..."
+									: pendingCodexAgentId
+										? "Show Codex Auth"
 										: "Start Codex Auth"
-									: "Create Agent"}
-							</Button>
-						)}
+								: "Create Agent"}
+						</Button>
 					</div>
 				</div>
 			</section>
+			<CodexDeviceAuthDialog
+				open={codexAuthModalOpen}
+				deviceAuth={codexDeviceAuth}
+				authStatus={codexAuthStatus}
+				error={formError}
+				isStarting={isStartingCodexAuth}
+				isCompleting={isCompletingCodexAuth}
+				onOpenChange={setCodexAuthModalOpen}
+				onComplete={completeCodexDeviceAuth}
+			/>
 		</div>
 	);
 }
 
-function CodexDeviceAuthPanel({ deviceAuth }: { deviceAuth: CodexDeviceAuth }) {
+const getCodexDeviceAuth = (
+	authState: unknown,
+): CodexDeviceAuth | undefined => {
+	if (!isRecord(authState) || authState.type !== "codex_device_auth") {
+		return undefined;
+	}
+
+	const deviceAuth = authState.deviceAuth;
+
+	if (!isRecord(deviceAuth)) {
+		return undefined;
+	}
+
+	return typeof deviceAuth.verificationUri === "string" &&
+		typeof deviceAuth.userCode === "string"
+		? {
+				verificationUri: deviceAuth.verificationUri,
+				userCode: deviceAuth.userCode,
+			}
+		: undefined;
+};
+
+const getCodexAuthError = (authState: unknown) => {
+	if (
+		!isRecord(authState) ||
+		authState.type !== "codex_device_auth" ||
+		authState.status !== "failed"
+	) {
+		return undefined;
+	}
+
+	return typeof authState.error === "string"
+		? authState.error
+		: "Failed to start Codex device auth.";
+};
+
+const getCodexAuthStatus = (authState: unknown) => {
+	if (!isRecord(authState) || authState.type !== "codex_device_auth") {
+		return undefined;
+	}
+
+	return typeof authState.status === "string" ? authState.status : undefined;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+function CodexDeviceAuthDialog({
+	open,
+	deviceAuth,
+	authStatus,
+	error,
+	isStarting,
+	isCompleting,
+	onOpenChange,
+	onComplete,
+}: {
+	open: boolean;
+	deviceAuth: CodexDeviceAuth | undefined;
+	authStatus: string | undefined;
+	error: string | undefined;
+	isStarting: boolean;
+	isCompleting: boolean;
+	onOpenChange: (open: boolean) => void;
+	onComplete: () => Promise<void>;
+}) {
+	const busy = isStarting || isCompleting;
+	const waitingForDeviceAuth = !deviceAuth && !error;
+	const waitingMessage = getCodexAuthWaitingMessage(authStatus);
+
 	return (
-		<div className="grid gap-3 border border-grayscale-4 bg-grayscale-2 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
-			<div className="flex min-w-0 flex-col gap-1">
-				<p className="text-xs font-medium text-grayscale-12">
-					Codex sign-in code
-				</p>
-				<p className="font-mono text-lg font-semibold text-grayscale-12">
-					{deviceAuth.userCode}
-				</p>
-				<a
-					href={deviceAuth.verificationUri}
-					target="_blank"
-					rel="noreferrer"
-					className="truncate text-xs text-accent-11 underline-offset-2 hover:underline"
-				>
-					{deviceAuth.verificationUri}
-				</a>
-			</div>
-			<a
-				href={deviceAuth.verificationUri}
-				target="_blank"
-				rel="noreferrer"
-				className="flex items-center justify-center gap-1.5 border border-grayscale-5 px-2.5 py-1.5 text-xs font-medium text-grayscale-12 transition-colors hover:bg-grayscale-3"
-			>
-				<ArrowSquareOutIcon weight="bold" className="size-3.5" />
-				Open Sign In
-			</a>
-		</div>
+		<Dialog.Root
+			open={open}
+			onOpenChange={(nextOpen) => {
+				if (!busy) {
+					onOpenChange(nextOpen);
+				}
+			}}
+		>
+			<Dialog.Portal>
+				<Dialog.Backdrop />
+				<Dialog.Popup>
+					<div className="flex flex-col gap-1 border-b border-grayscale-4 p-3">
+						<Dialog.Title>Codex sign in</Dialog.Title>
+						<Dialog.Description>
+							Use the one-time code to connect this workspace agent to Codex.
+						</Dialog.Description>
+					</div>
+					<div className="flex flex-col gap-3 p-3">
+						{isStarting || waitingForDeviceAuth ? (
+							<div className="border border-grayscale-4 bg-grayscale-2 p-3 text-sm text-grayscale-11">
+								{waitingMessage}
+							</div>
+						) : deviceAuth ? (
+							<div className="grid gap-3 border border-grayscale-4 bg-grayscale-2 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+								<div className="flex min-w-0 flex-col gap-1">
+									<p className="text-xs font-medium text-grayscale-12">
+										One-time code
+									</p>
+									<p className="font-mono text-lg font-semibold text-grayscale-12">
+										{deviceAuth.userCode}
+									</p>
+									<a
+										href={deviceAuth.verificationUri}
+										target="_blank"
+										rel="noreferrer"
+										className="truncate text-xs text-accent-11 underline-offset-2 hover:underline"
+									>
+										{deviceAuth.verificationUri}
+									</a>
+								</div>
+								<a
+									href={deviceAuth.verificationUri}
+									target="_blank"
+									rel="noreferrer"
+									className="flex items-center justify-center gap-1.5 border border-grayscale-5 px-2.5 py-1.5 text-xs font-medium text-grayscale-12 transition-colors hover:bg-grayscale-3"
+								>
+									<ArrowSquareOutIcon weight="bold" className="size-3.5" />
+									Open Sign In
+								</a>
+							</div>
+						) : null}
+						{error ? (
+							<div className="flex items-center gap-1.5 text-xs text-red-11">
+								<WarningCircleIcon weight="bold" className="size-3.5" />
+								{error}
+							</div>
+						) : null}
+					</div>
+					<div className="flex justify-end gap-2 border-t border-grayscale-4 p-3">
+						<Dialog.Close type="button" disabled={busy}>
+							Close
+						</Dialog.Close>
+						<Button
+							type="button"
+							disabled={!deviceAuth || busy}
+							onClick={() => {
+								void onComplete();
+							}}
+						>
+							{isCompleting ? "Completing..." : "Complete Codex Auth"}
+						</Button>
+					</div>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
 	);
 }
+
+const getCodexAuthWaitingMessage = (status: string | undefined) => {
+	if (status === "waiting_for_code") {
+		return "Waiting for Codex to print the sign-in code...";
+	}
+
+	if (status === "installing") {
+		return "Installing Codex in the auth sandbox...";
+	}
+
+	if (status === "starting") {
+		return "Starting the Codex auth sandbox...";
+	}
+
+	if (status === "queued") {
+		return "Queued Codex device auth...";
+	}
+
+	return "Preparing Codex device auth...";
+};
 
 function AgentListItem({
 	agent,

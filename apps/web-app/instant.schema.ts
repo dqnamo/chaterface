@@ -143,6 +143,7 @@ const _schema = i.schema({
 		agents: i.entity({
 			name: i.string().indexed(),
 			auth: i.json().optional(),
+			authState: i.json().optional(),
 			createdAt: i.date().optional(),
 			provider: i.string().optional(),
 			settings: i.json().optional(),

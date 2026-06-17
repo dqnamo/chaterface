@@ -1,7 +1,9 @@
+import { tasks } from "@trigger.dev/sdk";
 import { type NextRequest, NextResponse } from "next/server";
 import { encryptAgentAuth } from "@/agent-auth-storage";
 import db, { id } from "@/instant.admin";
 import { E2BSandbox as Sandbox } from "@/trigger/e2b-sandbox";
+import type { startCodexDeviceAuthTask } from "@/trigger/start-codex-device-auth";
 
 type AuthenticatedWorkspace = {
 	id: string;
@@ -20,12 +22,6 @@ type AuthenticatedAgent = {
 };
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
-const DEVICE_AUTH_OUTPUT_TIMEOUT_MS = 120_000;
-
-type CodexDeviceAuthInstructions = {
-	verificationUri: string;
-	userCode: string;
-};
 
 const agentTx = (agentId: string) => {
 	const tx = db.tx.agents[agentId];
@@ -54,9 +50,6 @@ export async function POST(req: NextRequest) {
 		return NextResponse.json({ message: "name is required" }, { status: 400 });
 	}
 
-	const sandbox = await Sandbox.create("codex", {
-		timeoutMs: 10 * 60 * 1000,
-	});
 	const agentId = id();
 	const createdAt = new Date().toISOString();
 
@@ -67,33 +60,36 @@ export async function POST(req: NextRequest) {
 				provider: "codex",
 				createdAt,
 				status: "auth_pending",
-				sandboxId: sandbox.sandboxId,
+				authState: {
+					type: "codex_device_auth",
+					status: "queued",
+					queuedAt: createdAt,
+				},
 				settings: getAgentSettings(body.settings),
 			})
 			.link({ workspace: authResult.workspace.id }),
 	);
 
 	try {
-		const output = new DeviceAuthOutputBuffer();
-		const process = await sandbox.pty.create({
-			cols: 80,
-			rows: 24,
-			cwd: "/home/user",
-			timeoutMs: 0,
-			onData: (data) => {
-				output.append(data);
+		const handle = await tasks.trigger<typeof startCodexDeviceAuthTask>(
+			"start-codex-device-auth",
+			{ agentId },
+			{
+				idempotencyKey: `codex-device-auth-${agentId}`,
+				idempotencyKeyTTL: "1h",
 			},
-		});
-		await sandbox.pty.sendInput(
-			process.pid,
-			new TextEncoder().encode(
-				`exec bash -lc ${shellQuote(buildCodexDeviceAuthCommand())}\n`,
-			),
 		);
-		const deviceAuth = await output.waitForInstructions(
-			DEVICE_AUTH_OUTPUT_TIMEOUT_MS,
+
+		await db.transact(
+			agentTx(agentId).update({
+				authState: {
+					type: "codex_device_auth",
+					status: "queued",
+					triggerRunId: handle.id,
+					queuedAt: createdAt,
+				},
+			}),
 		);
-		await process.disconnect();
 
 		return NextResponse.json(
 			{
@@ -104,18 +100,24 @@ export async function POST(req: NextRequest) {
 					createdAt,
 					status: "auth_pending",
 				},
-				deviceAuth,
+				triggerRunId: handle.id,
 			},
-			{ status: 201 },
+			{ status: 202 },
 		);
 	} catch (error) {
 		const message = getErrorMessage(error);
 
-		await db.transact([
+		await db.transact(
 			agentTx(agentId).update({
 				status: "auth_failed",
+				authState: {
+					type: "codex_device_auth",
+					status: "failed",
+					error: message,
+					updatedAt: new Date().toISOString(),
+				},
 			}),
-		]);
+		);
 
 		return NextResponse.json(
 			{ message: "Failed to start Codex device auth", error: message },
@@ -145,7 +147,7 @@ export async function PATCH(req: NextRequest) {
 
 	if (!authResult.agent.sandboxId) {
 		return NextResponse.json(
-			{ message: "Agent auth sandbox is missing" },
+			{ message: "Agent auth sandbox is still starting." },
 			{ status: 409 },
 		);
 	}
@@ -170,6 +172,11 @@ export async function PATCH(req: NextRequest) {
 		agentTx(authResult.agent.id).update({
 			auth: await encryptAgentAuth(auth),
 			status: "ready",
+			authState: {
+				type: "codex_device_auth",
+				status: "completed",
+				updatedAt: new Date().toISOString(),
+			},
 		}),
 	);
 
@@ -335,15 +342,6 @@ const readCodexAuth = async (sandbox: Sandbox) => {
 	return auth;
 };
 
-const buildCodexDeviceAuthCommand = () =>
-	[
-		"set -e",
-		"mkdir -p ~/.codex",
-		`printf '%s\n' ${shellQuote('cli_auth_credentials_store = "file"')} > ~/.codex/config.toml`,
-		"npm install -g @openai/codex@latest --no-audit --no-fund || codex --version",
-		"codex login --device-auth",
-	].join("\n");
-
 const hasWorkspaceAccess = (
 	workspace: AuthenticatedWorkspace,
 	userId: string,
@@ -382,144 +380,8 @@ const getAgentSettings = (value: unknown) => (isRecord(value) ? value : {});
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
-const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-
 const getErrorMessage = (error: unknown) =>
 	error instanceof Error ? error.message : String(error);
-
-class DeviceAuthOutputBuffer {
-	private readonly decoder = new TextDecoder();
-	private output = "";
-	private instructions: CodexDeviceAuthInstructions | undefined;
-	private rejected = false;
-	private resolve:
-		| ((instructions: CodexDeviceAuthInstructions) => void)
-		| undefined;
-
-	append(data: unknown) {
-		if (this.rejected || this.instructions) {
-			return;
-		}
-
-		this.output += decodePtyData(data, this.decoder);
-
-		const instructions = parseCodexDeviceAuthInstructions(this.output);
-
-		if (!instructions) {
-			return;
-		}
-
-		this.instructions = instructions;
-		this.resolve?.(instructions);
-	}
-
-	waitForInstructions(timeoutMs: number) {
-		if (this.instructions) {
-			return Promise.resolve(this.instructions);
-		}
-
-		return new Promise<CodexDeviceAuthInstructions>((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				this.rejected = true;
-				reject(
-					new Error(
-						"Codex device auth did not print a sign-in link and code before timing out.",
-					),
-				);
-			}, timeoutMs);
-
-			this.resolve = (instructions) => {
-				clearTimeout(timeout);
-				resolve(instructions);
-			};
-		});
-	}
-}
-
-const parseCodexDeviceAuthInstructions = (
-	output: string,
-): CodexDeviceAuthInstructions | undefined => {
-	const text = stripAnsi(output);
-	const verificationUri = findVerificationUri(text);
-	const userCode = findUserCode(text) ?? findUserCodeInUrl(verificationUri);
-
-	if (!verificationUri || !userCode) {
-		return undefined;
-	}
-
-	return {
-		verificationUri,
-		userCode,
-	};
-};
-
-const findVerificationUri = (text: string) => {
-	const urls = [...text.matchAll(/https?:\/\/[^\s"'<>]+/gi)]
-		.map((match) => cleanUrl(match[0]))
-		.filter(Boolean);
-
-	return (
-		urls.find((url) =>
-			/(^https?:\/\/([^/]+\.)?(openai|chatgpt)\.com\b|device|verify|activate|login|oauth)/i.test(
-				url,
-			),
-		) ?? urls.at(-1)
-	);
-};
-
-const findUserCode = (text: string) => {
-	const labeledCode = text.match(
-		/(?:[Uu][Ss][Ee][Rr]\s*)?[Cc][Oo][Dd][Ee][^\nA-Z0-9]*([A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,3}|[A-Z0-9]{6,12})(?![a-z])/,
-	)?.[1];
-
-	if (labeledCode) {
-		return labeledCode.toUpperCase();
-	}
-
-	return text.match(/\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,3}\b/)?.[0].toUpperCase();
-};
-
-const findUserCodeInUrl = (url: string | undefined) => {
-	if (!url) {
-		return undefined;
-	}
-
-	try {
-		const parsed = new URL(url);
-		return (
-			parsed.searchParams.get("user_code") ??
-			parsed.searchParams.get("code") ??
-			undefined
-		)?.toUpperCase();
-	} catch {
-		return undefined;
-	}
-};
-
-const decodePtyData = (data: unknown, decoder: TextDecoder) => {
-	if (typeof data === "string") {
-		return data;
-	}
-
-	if (data instanceof Uint8Array) {
-		return decoder.decode(data, { stream: true });
-	}
-
-	if (isRecord(data) && typeof data.data === "string") {
-		return data.data;
-	}
-
-	return "";
-};
-
-const cleanUrl = (value: string) => value.replace(/[),.;\]]+$/g, "").trim();
-
-const stripAnsi = (value: string) =>
-	value.replace(
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape parsing requires control characters.
-		/[\u001b\u009b][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[a-zA-Z\d]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g,
-		"",
-	);
 
 class ResponseError extends Error {
 	constructor(
