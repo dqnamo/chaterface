@@ -75,6 +75,7 @@ export default function AgentsPage() {
 	const [pendingCodexAgentId, setPendingCodexAgentId] = useState<string>();
 	const [codexDeviceAuth, setCodexDeviceAuth] = useState<CodexDeviceAuth>();
 	const [codexAuthStatus, setCodexAuthStatus] = useState<string>();
+	const [codexAuthOutput, setCodexAuthOutput] = useState<string>();
 	const [codexAuthModalOpen, setCodexAuthModalOpen] = useState(false);
 	const [isStartingCodexAuth, setIsStartingCodexAuth] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
@@ -128,6 +129,11 @@ export default function AgentsPage() {
 
 		const deviceAuth = getCodexDeviceAuth(pendingCodexAgent?.authState);
 		const authStatus = getCodexAuthStatus(pendingCodexAgent?.authState);
+		const authOutput = getCodexAuthOutput(pendingCodexAgent?.authState);
+
+		if (authOutput) {
+			setCodexAuthOutput(authOutput);
+		}
 
 		if (deviceAuth) {
 			setCodexDeviceAuth(deviceAuth);
@@ -236,6 +242,7 @@ export default function AgentsPage() {
 
 		setPendingCodexAgentId(undefined);
 		setCodexDeviceAuth(undefined);
+		setCodexAuthOutput(undefined);
 		setCodexAuthStatus("queued");
 		setCodexAuthModalOpen(true);
 		setIsStartingCodexAuth(true);
@@ -296,6 +303,7 @@ export default function AgentsPage() {
 			setName("");
 			setPendingCodexAgentId(undefined);
 			setCodexDeviceAuth(undefined);
+			setCodexAuthOutput(undefined);
 			setCodexAuthStatus(undefined);
 			setFormError(undefined);
 		}
@@ -488,6 +496,7 @@ export default function AgentsPage() {
 				open={codexAuthModalOpen}
 				deviceAuth={codexDeviceAuth}
 				authStatus={codexAuthStatus}
+				authOutput={codexAuthOutput}
 				error={formError}
 				isStarting={isStartingCodexAuth}
 				onOpenChange={(open) => {
@@ -547,6 +556,14 @@ const getCodexAuthStatus = (authState: unknown) => {
 	return typeof authState.status === "string" ? authState.status : undefined;
 };
 
+const getCodexAuthOutput = (authState: unknown) => {
+	if (!isRecord(authState) || authState.type !== "codex_device_auth") {
+		return undefined;
+	}
+
+	return typeof authState.output === "string" ? authState.output : undefined;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -554,6 +571,7 @@ function CodexDeviceAuthDialog({
 	open,
 	deviceAuth,
 	authStatus,
+	authOutput,
 	error,
 	isStarting,
 	onOpenChange,
@@ -561,6 +579,7 @@ function CodexDeviceAuthDialog({
 	open: boolean;
 	deviceAuth: CodexDeviceAuth | undefined;
 	authStatus: string | undefined;
+	authOutput: string | undefined;
 	error: string | undefined;
 	isStarting: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -594,7 +613,7 @@ function CodexDeviceAuthDialog({
 							<div className="border border-grayscale-4 bg-grayscale-2 p-3 text-sm text-grayscale-11">
 								Codex is connected. This agent is ready to use.
 							</div>
-						) : isStarting || waitingForDeviceAuth ? (
+						) : isStarting || (waitingForDeviceAuth && !authOutput) ? (
 							<div className="border border-grayscale-4 bg-grayscale-2 p-3 text-sm text-grayscale-11">
 								{waitingMessage}
 							</div>
@@ -626,6 +645,10 @@ function CodexDeviceAuthDialog({
 									Open Sign In
 								</a>
 							</div>
+						) : authOutput && !isFailed ? (
+							<pre className="max-h-56 overflow-auto whitespace-pre-wrap border border-grayscale-4 bg-grayscale-2 p-3 font-mono text-xs text-grayscale-11">
+								{authOutput}
+							</pre>
 						) : null}
 						{error ? (
 							<div className="flex items-center gap-1.5 text-xs text-red-11">

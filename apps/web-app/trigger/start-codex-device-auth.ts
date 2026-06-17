@@ -327,14 +327,16 @@ const findVerificationUri = (text: string) => {
 
 const findUserCode = (text: string) => {
 	const labeledCode = text.match(
-		/(?:[Uu][Ss][Ee][Rr]\s*)?[Cc][Oo][Dd][Ee][^\nA-Z0-9]*([A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,3}|[A-Z0-9]{6,12})(?![a-z])/,
+		/(?:[Uu][Ss][Ee][Rr]\s*)?[Cc][Oo][Dd][Ee][\s\S]{0,160}?([A-Z0-9]{4,6}(?:-[A-Z0-9]{4,6}){1,3}|[A-Z0-9]{6,12})(?![a-z])/,
 	)?.[1];
 
 	if (labeledCode) {
 		return labeledCode.toUpperCase();
 	}
 
-	return text.match(/\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,3}\b/)?.[0].toUpperCase();
+	return text
+		.match(/\b[A-Z0-9]{4,6}(?:-[A-Z0-9]{4,6}){1,3}\b/)?.[0]
+		.toUpperCase();
 };
 
 const findUserCodeInUrl = (url: string | undefined) => {
