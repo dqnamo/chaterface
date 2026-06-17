@@ -15,6 +15,18 @@
 		"turbo": "^2.9.16",
 		"typescript": "5.9.2"
 	},
+	"pnpm": {
+		"overrides": {
+			"@opentelemetry/core": "2.8.0",
+			"cookie": "0.7.2",
+			"dompurify": "3.4.9",
+			"hono": "4.12.25",
+			"postcss": "8.5.10",
+			"protobufjs": "7.6.3",
+			"systeminformation": "5.31.6",
+			"ws": "8.21.0"
+		}
+	},
 	"packageManager": "pnpm@9.0.0",
 	"engines": {
 		"node": ">=18"

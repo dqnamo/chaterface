@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
-import db from "@/instant.admin";
+import { authErrorResponse, authenticateServiceRequest } from "../../_lib/auth";
 
 type PreviewSession = {
 	serviceId: string;
@@ -11,21 +11,6 @@ type PreviewSession = {
 const ticketTtlMs = 60 * 1000;
 
 export async function POST(req: NextRequest) {
-	const authorizationHeader = req.headers.get("Authorization");
-	const refreshToken = authorizationHeader?.startsWith("Bearer ")
-		? authorizationHeader.slice("Bearer ".length)
-		: undefined;
-
-	if (!refreshToken) {
-		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-	}
-
-	const user = await db.auth.verifyToken(refreshToken);
-
-	if (!user) {
-		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-	}
-
 	const body = await req.json();
 	const serviceId = getNonEmptyString(body?.serviceId);
 
@@ -36,25 +21,13 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	const service = await db
-		.query({
-			services: {
-				$: {
-					where: {
-						id: serviceId,
-					},
-				},
-				task: {},
-			},
-		})
-		.then((result) => result.services[0]);
+	const authResult = await authenticateServiceRequest(req, serviceId);
 
-	if (!service) {
-		return NextResponse.json(
-			{ message: "Preview service not found" },
-			{ status: 404 },
-		);
+	if (!authResult.ok) {
+		return authErrorResponse(authResult);
 	}
+
+	const { entity: service, user } = authResult;
 
 	if (!service.e2bHost) {
 		return NextResponse.json(
