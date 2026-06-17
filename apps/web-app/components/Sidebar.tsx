@@ -31,6 +31,7 @@ import Monogram from "./Monogram";
 import { NewTaskDialog } from "./NewTaskDialog";
 import { ScrollArea } from "./ScrollArea";
 import { useSidebar } from "./SidebarContext";
+import { TaskPresenceAvatars } from "./TaskPresence";
 import TaskStatusDots from "./TaskStatusDots";
 
 type AgentSession = Pick<
@@ -812,7 +813,7 @@ const TaskSidebarItem = ({
 				/>
 				<span className="min-w-0 flex-1 truncate">{task.name}</span>
 				{isCompleted ? null : (
-					<span className="flex shrink-0 flex-row items-center gap-1.5 overflow-hidden">
+					<div className="flex shrink-0 flex-row items-center gap-1.5 overflow-hidden">
 						{agentSessions.length > 0 ? (
 							agentSessions.map((session, index) => (
 								<TaskStatusDots
@@ -824,7 +825,8 @@ const TaskSidebarItem = ({
 						) : (
 							<TaskStatusDots status={status} />
 						)}
-					</span>
+						<TaskPresenceAvatars taskId={task.id} limit={3} />
+					</div>
 				)}
 			</ContextMenu.Trigger>
 			<ContextMenu.Portal>

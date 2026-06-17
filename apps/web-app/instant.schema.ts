@@ -598,7 +598,19 @@ const _schema = i.schema({
 			},
 		},
 	},
-	rooms: {},
+	rooms: {
+		task: {
+			presence: i.entity({
+				userId: i.string().optional(),
+				name: i.string(),
+				color: i.string(),
+				shape: i.string(),
+				cursorX: i.number().optional(),
+				cursorY: i.number().optional(),
+				isTyping: i.boolean().optional(),
+			}),
+		},
+	},
 });
 
 type _AppSchema = typeof _schema;

@@ -7,16 +7,22 @@ import {
 	TrashIcon,
 	UsersIcon,
 } from "@phosphor-icons/react";
-import db from "@/instant.client";
-import type { AppSchema } from "@/instant.schema";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
 import { Input } from "@/components/Input";
 import { Select } from "@/components/Select";
+import db from "@/instant.client";
+import type { AppSchema } from "@/instant.schema";
 
 type Member = InstaQLEntity<AppSchema, "members">;
+type MemberWithUser = Member & {
+	user?: {
+		email?: string;
+		name?: string;
+	};
+};
 
 const ROLE_OPTIONS = [
 	{ value: "member", label: "Member" },
@@ -41,6 +47,7 @@ export default function OrganisationMembersPage() {
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState("member");
 	const [inviteStatus, setInviteStatus] = useState<string>();
+	const [invitePreviewUrl, setInvitePreviewUrl] = useState<string>();
 
 	const { data, isLoading, error } = db.useQuery({
 		organisations: {
@@ -49,12 +56,14 @@ export default function OrganisationMembersPage() {
 					handle: currentOrgHandle,
 				},
 			},
-			members: {},
+			members: {
+				user: {},
+			},
 		},
 	});
 
 	const organisation = data?.organisations?.[0];
-	const members = [...(organisation?.members ?? [])].sort(
+	const members = [...((organisation?.members ?? []) as MemberWithUser[])].sort(
 		(firstMember, secondMember) =>
 			new Date(firstMember.createdAt ?? 0).getTime() -
 			new Date(secondMember.createdAt ?? 0).getTime(),
@@ -62,6 +71,7 @@ export default function OrganisationMembersPage() {
 
 	const createMember = async () => {
 		setInviteStatus(undefined);
+		setInvitePreviewUrl(undefined);
 
 		if (!organisation || !email.trim()) {
 			setInviteStatus("Enter an email address.");
@@ -84,13 +94,33 @@ export default function OrganisationMembersPage() {
 		});
 
 		if (!response.ok) {
-			setInviteStatus("Member created, but invite delivery failed.");
+			const result = (await response.json().catch(() => null)) as {
+				message?: string;
+			} | null;
+			setInviteStatus(result?.message ?? "Invite delivery failed.");
 			return;
 		}
+		const result = (await response.json().catch(() => null)) as {
+			delivery?: {
+				type?: string;
+				previewUrl?: string;
+			};
+		} | null;
+		const previewUrl =
+			result?.delivery?.type === "development"
+				? result.delivery.previewUrl
+				: undefined;
 
 		setEmail("");
 		setRole("member");
-		setInviteStatus("Invite sent.");
+		setInviteStatus(
+			previewUrl ? "Development invite email created." : "Invite sent.",
+		);
+		setInvitePreviewUrl(previewUrl);
+
+		if (previewUrl) {
+			window.open(previewUrl, "_blank", "noopener,noreferrer");
+		}
 	};
 
 	const deleteMember = async (member: Member) => {
@@ -139,10 +169,17 @@ export default function OrganisationMembersPage() {
 							>
 								<div className="flex min-w-0 flex-col gap-1">
 									<p className="truncate text-sm font-medium text-grayscale-12">
-										{member.role ?? "member"}
+										{member.user?.name ??
+											member.user?.email ??
+											"Pending member"}
 									</p>
 									<p className="text-xs text-grayscale-10">
-										{member.joinedAt ? "Joined" : "Pending invite"}
+										{member.role ?? "member"} -{" "}
+										{member.joinedAt
+											? "Joined"
+											: member.inviteSentAt
+												? "Invite sent"
+												: "Invite not sent"}
 									</p>
 								</div>
 								<button
@@ -207,6 +244,16 @@ export default function OrganisationMembersPage() {
 					</div>
 					{inviteStatus ? (
 						<p className="text-xs text-grayscale-10">{inviteStatus}</p>
+					) : null}
+					{invitePreviewUrl ? (
+						<a
+							href={invitePreviewUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-xs text-accent-11 underline-offset-2 hover:underline"
+						>
+							Open development email
+						</a>
 					) : null}
 					<div className="flex justify-end">
 						<Button
