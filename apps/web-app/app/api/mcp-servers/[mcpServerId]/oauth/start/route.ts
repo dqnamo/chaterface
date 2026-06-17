@@ -43,16 +43,21 @@ export async function POST(
 	const auth = parseOAuthAuth(mcpServer.auth);
 	const redirectUri = new URL(
 		"/api/mcp-servers/oauth/callback",
-		req.url,
+		getAppOrigin(req),
 	).toString();
 
 	try {
 		const metadata = await discoverOAuthMetadata(mcpServer.url, auth);
 		const encryptionService = getEncryptionService();
+		const scope = auth.scope ?? metadata.scopesSupported?.join(" ");
 		const dynamicClient =
 			auth.clientId || !metadata.registrationUrl
 				? undefined
-				: await registerOAuthClient(metadata.registrationUrl, redirectUri);
+				: await registerOAuthClient(
+						metadata.registrationUrl,
+						redirectUri,
+						scope,
+					);
 		const clientId = auth.clientId ?? dynamicClient?.clientId;
 
 		if (!clientId) {
@@ -75,8 +80,6 @@ export async function POST(
 			createPkceChallenge(verifier),
 		);
 		authorizationUrl.searchParams.set("code_challenge_method", "S256");
-
-		const scope = auth.scope;
 
 		if (scope) {
 			authorizationUrl.searchParams.set("scope", scope);
@@ -194,6 +197,24 @@ const getEncryptionService = () => {
 	}
 
 	return createEncryptionService(encryptionKey);
+};
+
+const getAppOrigin = (req: NextRequest) => {
+	const configuredUrl = getOptionalString(process.env.NEXT_PUBLIC_APP_URL);
+
+	if (configuredUrl) {
+		return new URL(configuredUrl).origin;
+	}
+
+	const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0];
+
+	if (forwardedHost) {
+		const forwardedProto =
+			req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
+		return `${forwardedProto}://${forwardedHost.trim()}`;
+	}
+
+	return new URL(req.url).origin;
 };
 
 const getOptionalString = (value: unknown) => {

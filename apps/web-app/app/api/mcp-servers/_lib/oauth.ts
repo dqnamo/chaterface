@@ -6,6 +6,7 @@ export type OAuthMetadata = {
 	tokenUrl: string;
 	registrationUrl?: string;
 	resource?: string;
+	scopesSupported?: string[];
 };
 
 export const createPkceVerifier = () => toBase64Url(randomBytes(32));
@@ -68,6 +69,10 @@ export const discoverOAuthMetadata = async (
 		authorizationUrl,
 		tokenUrl,
 		registrationUrl,
+		scopesSupported: getStringArray(
+			protectedResourceMetadata?.scopes_supported ??
+				authorizationServerMetadata.scopes_supported,
+		),
 		resource:
 			configured.resource ??
 			getOptionalString(protectedResourceMetadata?.resource) ??
@@ -78,6 +83,7 @@ export const discoverOAuthMetadata = async (
 export const registerOAuthClient = async (
 	registrationUrl: string,
 	redirectUri: string,
+	scope?: string,
 ) => {
 	const response = await fetch(registrationUrl, {
 		method: "POST",
@@ -91,6 +97,7 @@ export const registerOAuthClient = async (
 			grant_types: ["authorization_code", "refresh_token"],
 			response_types: ["code"],
 			token_endpoint_auth_method: "none",
+			scope,
 		}),
 	});
 
@@ -168,26 +175,34 @@ export const exchangeAuthorizationCode = async ({
 
 const getProtectedResourceMetadata = async (mcpServerUrl: string) => {
 	const challengeUrl = await getProtectedResourceMetadataUrl(mcpServerUrl);
-	const fallbackUrl = new URL(
-		"/.well-known/oauth-protected-resource",
-		new URL(mcpServerUrl).origin,
-	).toString();
-	const metadataUrl = challengeUrl ?? fallbackUrl;
+	const metadataUrls = [
+		challengeUrl,
+		getWellKnownResourceMetadataUrl(mcpServerUrl),
+		new URL(
+			"/.well-known/oauth-protected-resource",
+			new URL(mcpServerUrl).origin,
+		).toString(),
+	].filter((url): url is string => Boolean(url));
 
-	try {
-		const response = await fetch(metadataUrl, {
-			headers: { Accept: "application/json" },
-		});
+	for (const metadataUrl of metadataUrls) {
+		try {
+			const response = await fetch(metadataUrl, {
+				headers: {
+					Accept: "application/json",
+					"MCP-Protocol-Version": "2025-03-26",
+				},
+			});
 
-		if (!response.ok) {
-			return undefined;
-		}
+			if (!response.ok) {
+				continue;
+			}
 
-		const body = await response.json();
-		return isRecord(body) ? body : undefined;
-	} catch {
-		return undefined;
+			const body = await response.json();
+			return isRecord(body) ? body : undefined;
+		} catch {}
 	}
+
+	return undefined;
 };
 
 const getProtectedResourceMetadataUrl = async (mcpServerUrl: string) => {
@@ -196,6 +211,7 @@ const getProtectedResourceMetadataUrl = async (mcpServerUrl: string) => {
 			method: "GET",
 			headers: {
 				Accept: "application/json, text/event-stream",
+				"MCP-Protocol-Version": "2025-03-26",
 			},
 		});
 		const challenge = response.headers.get("www-authenticate");
@@ -204,6 +220,18 @@ const getProtectedResourceMetadataUrl = async (mcpServerUrl: string) => {
 	} catch {
 		return undefined;
 	}
+};
+
+const getWellKnownResourceMetadataUrl = (mcpServerUrl: string) => {
+	const url = new URL(mcpServerUrl);
+	const pathname = url.pathname.endsWith("/")
+		? url.pathname.slice(0, -1)
+		: url.pathname;
+
+	return new URL(
+		`/.well-known/oauth-protected-resource${pathname}`,
+		url.origin,
+	).toString();
 };
 
 const getAuthorizationServerMetadata = async (issuer: string) => {
@@ -260,6 +288,11 @@ const getFirstString = (value: unknown) => {
 		? value[0]
 		: undefined;
 };
+
+const getStringArray = (value: unknown) =>
+	Array.isArray(value)
+		? value.filter((item): item is string => typeof item === "string")
+		: undefined;
 
 const getRequiredString = (value: unknown, name: string) => {
 	if (typeof value !== "string" || value.trim().length === 0) {
