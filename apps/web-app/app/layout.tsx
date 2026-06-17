@@ -14,13 +14,13 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Factoryplane",
-	description: "Manage your factories, agents, and tasks.",
-	applicationName: "Factoryplane",
+	title: "Chaterface",
+	description: "Manage your workspaces, agents, and tasks.",
+	applicationName: "Chaterface",
 	appleWebApp: {
 		capable: true,
 		statusBarStyle: "default",
-		title: "Factoryplane",
+		title: "Chaterface",
 	},
 };
 

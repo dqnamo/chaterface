@@ -86,7 +86,7 @@ export const registerOAuthClient = async (
 			Accept: "application/json",
 		},
 		body: JSON.stringify({
-			client_name: "Factoryplane",
+			client_name: "Chaterface",
 			redirect_uris: [redirectUri],
 			grant_types: ["authorization_code", "refresh_token"],
 			response_types: ["code"],

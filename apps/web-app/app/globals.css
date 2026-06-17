@@ -3,8 +3,8 @@
 @import "@xterm/xterm/css/xterm.css";
 @import "@xyflow/react/dist/style.css";
 
-@import "@radix-ui/colors/slate.css";
-@import "@radix-ui/colors/slate-dark.css";
+@import "@radix-ui/colors/gray.css";
+@import "@radix-ui/colors/gray-dark.css";
 
 @import "@radix-ui/colors/indigo.css";
 @import "@radix-ui/colors/indigo-dark.css";
@@ -14,6 +14,9 @@
 
 @import "@radix-ui/colors/green.css";
 @import "@radix-ui/colors/green-dark.css";
+
+@import "@radix-ui/colors/orange.css";
+@import "@radix-ui/colors/orange-dark.css";
 
 @import "@radix-ui/colors/blue.css";
 @import "@radix-ui/colors/blue-dark.css";
@@ -26,31 +29,31 @@
 	--font-sans: var(--font-inter);
 	--font-mono: var(--font-jetbrains-mono);
 
-	--color-grayscale-1: var(--slate-1);
-	--color-grayscale-2: var(--slate-2);
-	--color-grayscale-3: var(--slate-3);
-	--color-grayscale-4: var(--slate-4);
-	--color-grayscale-5: var(--slate-5);
-	--color-grayscale-6: var(--slate-6);
-	--color-grayscale-7: var(--slate-7);
-	--color-grayscale-8: var(--slate-8);
-	--color-grayscale-9: var(--slate-9);
-	--color-grayscale-10: var(--slate-10);
-	--color-grayscale-11: var(--slate-11);
-	--color-grayscale-12: var(--slate-12);
+	--color-grayscale-1: var(--gray-1);
+	--color-grayscale-2: var(--gray-2);
+	--color-grayscale-3: var(--gray-3);
+	--color-grayscale-4: var(--gray-4);
+	--color-grayscale-5: var(--gray-5);
+	--color-grayscale-6: var(--gray-6);
+	--color-grayscale-7: var(--gray-7);
+	--color-grayscale-8: var(--gray-8);
+	--color-grayscale-9: var(--gray-9);
+	--color-grayscale-10: var(--gray-10);
+	--color-grayscale-11: var(--gray-11);
+	--color-grayscale-12: var(--gray-12);
 
-	--color-accent-1: var(--blue-1);
-	--color-accent-2: var(--blue-2);
-	--color-accent-3: var(--blue-3);
-	--color-accent-4: var(--blue-4);
-	--color-accent-5: var(--blue-5);
-	--color-accent-6: var(--blue-6);
-	--color-accent-7: var(--blue-7);
-	--color-accent-8: var(--blue-8);
-	--color-accent-9: var(--blue-9);
-	--color-accent-10: var(--blue-10);
-	--color-accent-11: var(--blue-11);
-	--color-accent-12: var(--blue-12);
+	--color-accent-1: var(--orange-1);
+	--color-accent-2: var(--orange-2);
+	--color-accent-3: var(--orange-3);
+	--color-accent-4: var(--orange-4);
+	--color-accent-5: var(--orange-5);
+	--color-accent-6: var(--orange-6);
+	--color-accent-7: var(--orange-7);
+	--color-accent-8: var(--orange-8);
+	--color-accent-9: var(--orange-9);
+	--color-accent-10: var(--orange-10);
+	--color-accent-11: var(--orange-11);
+	--color-accent-12: var(--orange-12);
 
 	--color-red-1: var(--red-1);
 	--color-red-2: var(--red-2);
@@ -91,35 +94,35 @@
 	--color-blue-11: var(--blue-11);
 	--color-blue-12: var(--blue-12);
 
-	--color-background: var(--slate-1);
-	--color-foreground: var(--slate-12);
-	--color-card: var(--slate-1);
-	--color-card-foreground: var(--slate-12);
-	--color-muted: var(--slate-3);
-	--color-muted-foreground: var(--slate-11);
-	--color-border: var(--slate-4);
-	--color-input: var(--slate-4);
-	--color-primary: var(--indigo-9);
+	--color-background: var(--gray-1);
+	--color-foreground: var(--gray-12);
+	--color-card: var(--gray-1);
+	--color-card-foreground: var(--gray-12);
+	--color-muted: var(--gray-3);
+	--color-muted-foreground: var(--gray-11);
+	--color-border: var(--gray-4);
+	--color-input: var(--gray-4);
+	--color-primary: var(--orange-9);
 	--color-primary-foreground: white;
-	--color-sidebar: var(--slate-2);
-	--color-sidebar-foreground: var(--slate-12);
-	--color-sidebar-border: var(--slate-4);
+	--color-sidebar: var(--gray-2);
+	--color-sidebar-foreground: var(--gray-12);
+	--color-sidebar-border: var(--gray-4);
 }
 
 :root {
-	--background: var(--slate-1);
-	--foreground: var(--slate-12);
-	--card: var(--slate-1);
-	--card-foreground: var(--slate-12);
-	--muted: var(--slate-3);
-	--muted-foreground: var(--slate-11);
-	--border: var(--slate-4);
-	--input: var(--slate-4);
-	--primary: var(--indigo-9);
+	--background: var(--gray-1);
+	--foreground: var(--gray-12);
+	--card: var(--gray-1);
+	--card-foreground: var(--gray-12);
+	--muted: var(--gray-3);
+	--muted-foreground: var(--gray-11);
+	--border: var(--gray-4);
+	--input: var(--gray-4);
+	--primary: var(--orange-9);
 	--primary-foreground: white;
-	--sidebar: var(--slate-2);
-	--sidebar-foreground: var(--slate-12);
-	--sidebar-border: var(--slate-4);
+	--sidebar: var(--gray-2);
+	--sidebar-foreground: var(--gray-12);
+	--sidebar-border: var(--gray-4);
 	--radius: 0.5rem;
 }
 

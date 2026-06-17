@@ -4,9 +4,9 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import db, { id } from "@/instant.admin";
-import { createEncryptionService } from "@/encryption";
 import { type NextRequest, NextResponse } from "next/server";
+import { createEncryptionService } from "@/encryption";
+import db, { id } from "@/instant.admin";
 
 export const runtime = "nodejs";
 
@@ -747,7 +747,7 @@ const githubFetchJson = async <TResponse>(
 	const response = await fetch(url, {
 		headers: {
 			Accept: "application/vnd.github+json",
-			"User-Agent": "Factoryplane",
+			"User-Agent": "Chaterface",
 			...(token ? { Authorization: `Bearer ${token}` } : {}),
 		},
 	});

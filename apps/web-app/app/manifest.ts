@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
 	return {
-		name: "Factoryplane",
-		short_name: "Factoryplane",
-		description: "Manage your factories, agents, and tasks.",
+		name: "Chaterface",
+		short_name: "Chaterface",
+		description: "Manage your workspaces, agents, and tasks.",
 		start_url: "/",
 		scope: "/",
 		display: "standalone",

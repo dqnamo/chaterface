@@ -74,7 +74,7 @@ const loadGithubRepositories = async (accessToken: string) => {
 			headers: {
 				Accept: "application/vnd.github+json",
 				Authorization: `Bearer ${accessToken}`,
-				"User-Agent": "Factoryplane",
+				"User-Agent": "Chaterface",
 				"X-GitHub-Api-Version": "2022-11-28",
 			},
 		});

@@ -1,12 +1,12 @@
 "use client";
 
-import db from "@/instant.client";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Button } from "@/components/Button";
 import CornerCubes from "@/components/CornerCubes";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
+import db from "@/instant.client";
 
 type AuthGateProps = {
 	children: ReactNode;
@@ -72,7 +72,7 @@ export default function AuthGate({ children }: AuthGateProps) {
 			<AuthShell>
 				<div className="flex flex-col items-center gap-4">
 					<Logo size={6} />
-					<p className="text-sm text-grayscale-11">Loading Factoryplane...</p>
+					<p className="text-sm text-grayscale-11">Loading Chaterface...</p>
 				</div>
 			</AuthShell>
 		);
@@ -103,7 +103,7 @@ export default function AuthGate({ children }: AuthGateProps) {
 			<Logo size={6} />
 			<div className="flex flex-col items-center justify-center gap-px text-center">
 				<h1 className="text-lg font-medium text-grayscale-12">
-					Sign in to Factoryplane
+					Sign in to Chaterface
 				</h1>
 				<p className="text-sm text-grayscale-11">
 					Enter your email to receive a magic code.

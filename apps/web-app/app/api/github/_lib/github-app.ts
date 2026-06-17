@@ -255,7 +255,7 @@ export const createInstallationAccessToken = async (
 			headers: {
 				Accept: "application/vnd.github+json",
 				Authorization: `Bearer ${createGithubAppJwt(config)}`,
-				"User-Agent": "Factoryplane",
+				"User-Agent": "Chaterface",
 				"X-GitHub-Api-Version": GITHUB_API_VERSION,
 			},
 		},
@@ -284,7 +284,7 @@ export const getGithubAppInstallation = async (
 			headers: {
 				Accept: "application/vnd.github+json",
 				Authorization: `Bearer ${createGithubAppJwt(config)}`,
-				"User-Agent": "Factoryplane",
+				"User-Agent": "Chaterface",
 				"X-GitHub-Api-Version": GITHUB_API_VERSION,
 			},
 		},
