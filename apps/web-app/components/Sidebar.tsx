@@ -23,6 +23,7 @@ import {
 	toAgentSessionDotStatus,
 	toTaskDotStatus,
 } from "@/helpers/task-status-helper";
+import { formatWorkspaceHandle } from "@/helpers/workspace-handle-helper";
 import db from "@/instant.client";
 import type { AppSchema } from "@/instant.schema";
 import { Button } from "./Button";
@@ -501,21 +502,39 @@ const WorkspaceSwitcher = ({
 	const [workspaceHandle, setWorkspaceHandle] = useState("");
 	const triggerSeed = currentWorkspace?.name ?? currentWorkspaceHandle;
 
+	const updateWorkspaceName = (nextName: string) => {
+		const previousGeneratedHandle = formatWorkspaceHandle(workspaceName);
+
+		setWorkspaceName(nextName);
+		setWorkspaceHandle((currentHandle) =>
+			currentHandle === previousGeneratedHandle
+				? formatWorkspaceHandle(nextName)
+				: currentHandle,
+		);
+	};
+
+	const updateWorkspaceHandle = (nextHandle: string) => {
+		setWorkspaceHandle(formatWorkspaceHandle(nextHandle));
+	};
+
 	const navigateTo = (href: string) => {
 		router.push(href);
 		onNavigate();
 	};
 
 	const createWorkspace = async () => {
-		if (!user?.id) {
+		const nextName = workspaceName.trim();
+		const nextHandle = formatWorkspaceHandle(workspaceHandle);
+
+		if (!user?.id || !nextName || !nextHandle) {
 			return;
 		}
 
 		const workspaceId = id();
 		await db.transact([
 			workspaceTx(workspaceId).create({
-				name: workspaceName,
-				handle: workspaceHandle,
+				name: nextName,
+				handle: nextHandle,
 				createdAt: DateTime.now().toISO(),
 			}),
 			memberTx(id())
@@ -527,7 +546,6 @@ const WorkspaceSwitcher = ({
 				.link({ workspace: workspaceId, user: user.id }),
 		]);
 
-		const nextHandle = workspaceHandle;
 		setWorkspaceName("");
 		setWorkspaceHandle("");
 		setCreateWorkspaceOpen(false);
@@ -652,7 +670,7 @@ const WorkspaceSwitcher = ({
 									type="text"
 									placeholder="Workspace Name"
 									value={workspaceName}
-									onChange={(event) => setWorkspaceName(event.target.value)}
+									onChange={(event) => updateWorkspaceName(event.target.value)}
 								/>
 							</div>
 							<div className="flex flex-col p-3 gap-3">
@@ -661,12 +679,19 @@ const WorkspaceSwitcher = ({
 									type="text"
 									placeholder="Workspace Handle"
 									value={workspaceHandle}
-									onChange={(event) => setWorkspaceHandle(event.target.value)}
+									onChange={(event) =>
+										updateWorkspaceHandle(event.target.value)
+									}
 								/>
 							</div>
 							<div className="flex flex-row items-center justify-end gap-2 p-3">
 								<Dialog.Close>Cancel</Dialog.Close>
-								<Button type="submit">Create</Button>
+								<Button
+									type="submit"
+									disabled={!workspaceName.trim() || !workspaceHandle}
+								>
+									Create
+								</Button>
 							</div>
 						</form>
 					</Dialog.Popup>
