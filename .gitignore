@@ -29,6 +29,7 @@ apps/web-app/.trigger/
 out/
 build
 dist
+apps/web-app/.email-outbox/
 
 
 # Debug

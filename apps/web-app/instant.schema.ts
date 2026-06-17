@@ -598,7 +598,16 @@ const _schema = i.schema({
 			},
 		},
 	},
-	rooms: {},
+	rooms: {
+		task: {
+			presence: i.entity({
+				userId: i.string().optional(),
+				name: i.string(),
+				isComposerFocused: i.boolean().optional(),
+				isTyping: i.boolean().optional(),
+			}),
+		},
+	},
 });
 
 type _AppSchema = typeof _schema;

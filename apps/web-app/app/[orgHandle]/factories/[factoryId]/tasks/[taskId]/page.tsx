@@ -60,6 +60,12 @@ import { Select } from "@/components/Select";
 import { ServicePreviewFrame } from "@/components/ServicePreviewFrame";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
+import {
+	getTaskPresenceProfile,
+	TaskPresenceAvatars,
+	TaskPresenceTypingIndicator,
+	useTaskTypingPresence,
+} from "@/components/TaskPresence";
 import TaskStatusDots from "@/components/TaskStatusDots";
 import {
 	type ChatViewMode,
@@ -506,6 +512,25 @@ export default function TaskPage() {
 	const currentUserProfile = user?.id
 		? (userDisplayProfiles[user.id] ?? getAuthUserDisplayProfile(user))
 		: undefined;
+	const currentTaskPresenceProfile = useMemo(
+		() =>
+			currentUserProfile
+				? getTaskPresenceProfile({
+						userId: currentUserProfile.id,
+						name:
+							currentUserProfile.memberName ??
+							currentUserProfile.userName ??
+							currentUserProfile.email,
+						email: currentUserProfile.email,
+					})
+				: undefined,
+		[currentUserProfile],
+	);
+	const taskPresence = useTaskTypingPresence({
+		taskId: taskId as string,
+		profile: currentTaskPresenceProfile,
+		enabled: Boolean(task),
+	});
 	const agentSessions = useMemo(
 		() => (task?.agentSessions ?? []).slice().sort(compareAgentSessions),
 		[task?.agentSessions],
@@ -814,6 +839,7 @@ export default function TaskPage() {
 			const createdAt = DateTime.now().toISO();
 
 			setMessage("");
+			taskPresence.stopTyping();
 			clearFileAttachments();
 
 			await db.transact([
@@ -919,12 +945,19 @@ export default function TaskPage() {
 	}
 
 	return (
-		<div className="flex h-full min-h-0 w-full overflow-hidden">
+		<div className="relative flex h-full min-h-0 w-full overflow-hidden">
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 				<div className="flex shrink-0 flex-row items-center justify-between border-b border-grayscale-4 p-1.5">
 					<div className="flex flex-row items-center">
 						<ExpandSidebarButton />
 						<p className="text-sm text-grayscale-11 p-1">{task?.name}</p>
+						{task ? (
+							<TaskPresenceAvatars
+								taskId={task.id}
+								limit={5}
+								className="ml-2"
+							/>
+						) : null}
 					</div>
 					<div className="flex flex-row items-center gap-1.5">
 						{task?.pullRequestUrl ? (
@@ -1159,7 +1192,12 @@ export default function TaskPage() {
 										}
 										disabled={isSendingMessage || !isTaskStarted}
 										value={message}
-										onChange={(e) => setMessage(e.target.value)}
+										onBlur={taskPresence.stopTyping}
+										onFocus={taskPresence.focusComposer}
+										onChange={(e) => {
+											setMessage(e.target.value);
+											taskPresence.markTyping();
+										}}
 										onSubmit={sendMessage}
 									/>
 									<ImageAttachments
@@ -1169,6 +1207,9 @@ export default function TaskPage() {
 										onRemoveAttachment={removeFileAttachment}
 									/>
 								</div>
+								<p className="min-h-4 px-3 text-[11px] leading-4 text-grayscale-10">
+									<TaskPresenceTypingIndicator peers={taskPresence.peers} />
+								</p>
 								<div className="flex flex-row items-center justify-between p-3">
 									<div className="flex min-w-0 flex-row items-center justify-center gap-2">
 										<Select.Root
