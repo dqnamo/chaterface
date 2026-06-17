@@ -7,6 +7,10 @@ import { promisify } from "node:util";
 import { type NextRequest, NextResponse } from "next/server";
 import { createEncryptionService } from "@/encryption";
 import db, { id } from "@/instant.admin";
+import {
+	createInstallationAccessToken,
+	getGithubAppConfig,
+} from "../../../github/_lib/github-app";
 
 export const runtime = "nodejs";
 
@@ -32,6 +36,7 @@ type SkillRepositoryRecord = {
 	path?: string;
 	workspace?: {
 		id: string;
+		githubAppInstallationId?: string;
 		githubAccessTokenEncrypted?: string;
 		members?: Array<{
 			user?: {
@@ -79,6 +84,12 @@ type RepositoryFile = {
 	path: string;
 	content: string;
 	size: number;
+};
+
+type GithubAuth = {
+	token?: string;
+	source: string;
+	scope: "platform" | "workspace" | "anonymous";
 };
 
 export async function POST(
@@ -337,13 +348,37 @@ const readGithubSkillRepository = async (
 	repository: SkillRepositoryRecord,
 	githubRef: GithubRepositoryRef,
 ) => {
-	const token = await getGithubToken(repository);
-	const repositoryInfo = await githubFetchJson<{
+	const authCandidates = await getGithubAuthCandidates(repository);
+	let repositoryInfo = await githubFetchJson<{
 		default_branch?: string;
+		private?: boolean;
 	}>(
 		`https://api.github.com/repos/${githubRef.owner}/${githubRef.repo}`,
-		token,
+		authCandidates,
 	);
+	let auth = repositoryInfo.auth;
+
+	if (repositoryInfo.private && auth.scope !== "workspace") {
+		const workspaceAuthCandidates = authCandidates.filter(
+			(candidate) => candidate.scope === "workspace",
+		);
+
+		if (workspaceAuthCandidates.length === 0) {
+			throw new Error(
+				"Private skill repositories require GitHub to be connected for this workspace.",
+			);
+		}
+
+		repositoryInfo = await githubFetchJson<{
+			default_branch?: string;
+			private?: boolean;
+		}>(
+			`https://api.github.com/repos/${githubRef.owner}/${githubRef.repo}`,
+			workspaceAuthCandidates,
+		);
+		auth = repositoryInfo.auth;
+	}
+
 	const refName = repository.branch?.trim() || repositoryInfo.default_branch;
 
 	if (!refName) {
@@ -354,7 +389,7 @@ const readGithubSkillRepository = async (
 		commit?: { sha?: string };
 	}>(
 		`https://api.github.com/repos/${githubRef.owner}/${githubRef.repo}/branches/${encodeURIComponent(refName)}`,
-		token,
+		[auth],
 	);
 	const commit = branchInfo.commit?.sha;
 
@@ -367,7 +402,7 @@ const readGithubSkillRepository = async (
 		tree?: GithubTreeItem[];
 	}>(
 		`https://api.github.com/repos/${githubRef.owner}/${githubRef.repo}/git/trees/${commit}?recursive=1`,
-		token,
+		[auth],
 	);
 
 	if (treeResponse.truncated) {
@@ -383,7 +418,7 @@ const readGithubSkillRepository = async (
 	);
 	const discoveredSkills = await discoverSkillsFromGithubTree(
 		githubRef,
-		token,
+		auth,
 		tree,
 		repository.path,
 	);
@@ -526,7 +561,7 @@ const readSkillFiles = async (skillDirectoryPath: string) => {
 
 const discoverSkillsFromGithubTree = async (
 	githubRef: GithubRepositoryRef,
-	token: string | undefined,
+	auth: GithubAuth,
 	tree: Array<Required<Pick<GithubTreeItem, "path" | "sha">> & GithubTreeItem>,
 	configuredPath: string | undefined,
 ) => {
@@ -539,7 +574,7 @@ const discoverSkillsFromGithubTree = async (
 
 	const skills = await Promise.all(
 		skillDirectories.map((skillDirectory) =>
-			readGithubSkillPackage(githubRef, token, tree, skillDirectory),
+			readGithubSkillPackage(githubRef, auth, tree, skillDirectory),
 		),
 	);
 
@@ -578,7 +613,7 @@ const getGithubSkillDirectories = (
 
 const readGithubSkillPackage = async (
 	githubRef: GithubRepositoryRef,
-	token: string | undefined,
+	auth: GithubAuth,
 	tree: Array<Required<Pick<GithubTreeItem, "path" | "sha">> & GithubTreeItem>,
 	skillDirectory: string,
 ): Promise<DiscoveredSkill> => {
@@ -596,7 +631,7 @@ const readGithubSkillPackage = async (
 			throw new Error("Skill package is too large to sync.");
 		}
 
-		const content = await readGithubBlobText(githubRef, token, item.sha);
+		const content = await readGithubBlobText(githubRef, auth, item.sha);
 
 		if (content.includes("\u0000")) {
 			continue;
@@ -636,12 +671,12 @@ const readGithubSkillPackage = async (
 
 const readGithubBlobText = async (
 	githubRef: GithubRepositoryRef,
-	token: string | undefined,
+	auth: GithubAuth,
 	sha: string,
 ) => {
 	const blob = await githubFetchJson<{ content?: string; encoding?: string }>(
 		`https://api.github.com/repos/${githubRef.owner}/${githubRef.repo}/git/blobs/${sha}`,
-		token,
+		[auth],
 	);
 
 	if (blob.encoding !== "base64" || typeof blob.content !== "string") {
@@ -710,7 +745,9 @@ const getGithubAuthHeader = async (repository: SkillRepositoryRecord) => {
 		return undefined;
 	}
 
-	const token = await getGithubToken(repository);
+	const token = (await getGithubAuthCandidates(repository)).find(
+		(auth) => auth.token,
+	)?.token;
 
 	if (!token) {
 		return undefined;
@@ -723,40 +760,122 @@ const getGithubAuthHeader = async (repository: SkillRepositoryRecord) => {
 	return `Authorization: Basic ${encoded}`;
 };
 
-const getGithubToken = async (repository: SkillRepositoryRecord) => {
+const getGithubAuthCandidates = async (
+	repository: SkillRepositoryRecord,
+): Promise<GithubAuth[]> => {
+	const candidates: GithubAuth[] = [];
+	const skillsToken =
+		getNonEmptyString(process.env.SKILLS_GITHUB_TOKEN) ??
+		getNonEmptyString(process.env.GITHUB_TOKEN);
+	const skillsInstallationId = getNonEmptyString(
+		process.env.SKILLS_GITHUB_APP_INSTALLATION_ID,
+	);
+
+	if (skillsToken) {
+		candidates.push({
+			token: skillsToken,
+			source: "platform_token",
+			scope: "platform",
+		});
+	}
+
+	if (skillsInstallationId) {
+		candidates.push({
+			token: await createGithubInstallationToken(skillsInstallationId),
+			source: "platform_installation",
+			scope: "platform",
+		});
+	}
+
+	const installationId = repository.workspace?.githubAppInstallationId;
+
+	if (installationId) {
+		candidates.push({
+			token: await createGithubInstallationToken(installationId),
+			source: "workspace_installation",
+			scope: "workspace",
+		});
+	}
+
 	const encryptedToken = repository.workspace?.githubAccessTokenEncrypted;
 
-	if (!encryptedToken) {
-		return undefined;
-	}
-
-	const encryptionService = createEncryptionService(
-		process.env.SECRET_ENCRYPTION_KEY ?? "",
-	);
-	return encryptionService.decrypt(encryptedToken);
-};
-
-const githubFetchJson = async <TResponse>(
-	url: string,
-	token: string | undefined,
-): Promise<TResponse> => {
-	const response = await fetch(url, {
-		headers: {
-			Accept: "application/vnd.github+json",
-			"User-Agent": "Chaterface",
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-		},
-	});
-
-	if (!response.ok) {
-		const body = await response.text().catch(() => "");
-		throw new Error(
-			`GitHub API request failed (${response.status}): ${body || response.statusText}`,
+	if (encryptedToken) {
+		const encryptionService = createEncryptionService(
+			process.env.SECRET_ENCRYPTION_KEY ?? "",
 		);
+		candidates.push({
+			token: await encryptionService.decrypt(encryptedToken),
+			source: "legacy_workspace_token",
+			scope: "workspace",
+		});
 	}
 
-	return (await response.json()) as TResponse;
+	candidates.push({ source: "unauthenticated", scope: "anonymous" });
+
+	return candidates;
 };
+
+const createGithubInstallationToken = async (installationId: string) => {
+	const config = getGithubAppConfig();
+
+	if (!config.ok) {
+		throw new Error(config.message);
+	}
+
+	return createInstallationAccessToken(installationId, config);
+};
+
+const githubFetchJson = async <TResponse extends object>(
+	url: string,
+	authCandidates: GithubAuth[],
+): Promise<TResponse & { auth: GithubAuth }> => {
+	let lastError: GithubApiError | undefined;
+
+	for (const auth of authCandidates) {
+		const response = await fetch(url, {
+			headers: {
+				Accept: "application/vnd.github+json",
+				"User-Agent": "Chaterface",
+				"X-GitHub-Api-Version": "2022-11-28",
+				...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
+			},
+		});
+
+		if (response.ok) {
+			const result = (await response.json()) as TResponse;
+			return Object.assign(result, { auth }) as TResponse & {
+				auth: GithubAuth;
+			};
+		}
+
+		const body = await response.text().catch(() => "");
+		lastError = new GithubApiError(
+			response.status,
+			body || response.statusText,
+		);
+
+		if (!shouldTryNextGithubAuth(response.status)) {
+			break;
+		}
+	}
+
+	throw (
+		lastError ??
+		new Error("GitHub API request failed: no auth candidates were available")
+	);
+};
+
+class GithubApiError extends Error {
+	constructor(
+		readonly status: number,
+		readonly body: string,
+	) {
+		super(`GitHub API request failed (${status}): ${body}`);
+	}
+}
+
+const shouldTryNextGithubAuth = (status: number) =>
+	status === 401 || status === 403 || status === 404;
 
 const git = async (args: string[], extraHeader: string | undefined) => {
 	const gitArgs = extraHeader
