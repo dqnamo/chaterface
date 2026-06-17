@@ -371,6 +371,9 @@ export default function Sidebar() {
 									className="mt-2 flex w-full flex-row items-center justify-between rounded-md px-3 py-1 text-left transition-colors hover:bg-grayscale-2"
 								>
 									<span className="flex min-w-0 flex-row items-center gap-1.5">
+										<span className="min-w-0 truncate font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+											Completed Tasks
+										</span>
 										<CaretRightIcon
 											weight="bold"
 											className={cn(
@@ -378,9 +381,6 @@ export default function Sidebar() {
 												isCompletedTasksCollapsed ? "" : "rotate-90",
 											)}
 										/>
-										<span className="min-w-0 truncate font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-											Completed Tasks
-										</span>
 									</span>
 									<NumberFlow
 										value={completedTasks.length}
