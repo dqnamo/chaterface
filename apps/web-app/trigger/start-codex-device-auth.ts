@@ -6,7 +6,6 @@ import { E2BSandbox as Sandbox } from "./e2b-sandbox";
 const CODEX_HOME = "/home/user/.codex";
 const CODEX_AUTH_PATH = `${CODEX_HOME}/auth.json`;
 const CODEX_CONFIG_PATH = `${CODEX_HOME}/config.toml`;
-const CODEX_DEVICE_AUTH_LOG_PATH = `${CODEX_HOME}/device-auth.log`;
 const CODEX_PACKAGE = "@openai/codex@latest";
 const LOGIN_TIMEOUT_MS = 15 * 60 * 1000;
 const POLL_INTERVAL_MS = 1500;
@@ -60,10 +59,16 @@ export const startCodexDeviceAuthTask = task({
 
 		let sandbox: Sandbox | undefined;
 		let deviceAuth: CodexDeviceAuthInstructions | undefined;
+		let loginOutput = "";
 
 		try {
+			console.log("Creating Codex auth sandbox", { agentId: payload.agentId });
 			sandbox = await Sandbox.create("codex", {
 				timeoutMs: LOGIN_TIMEOUT_MS + 5 * 60 * 1000,
+			});
+			console.log("Created Codex auth sandbox", {
+				agentId: payload.agentId,
+				sandboxId: sandbox.sandboxId,
 			});
 
 			await db.transact(
@@ -78,18 +83,34 @@ export const startCodexDeviceAuthTask = task({
 				}),
 			);
 
+			console.log("Preparing Codex auth home", { agentId: payload.agentId });
 			await prepareCodexHome(sandbox);
+			console.log("Starting Codex device login command", {
+				agentId: payload.agentId,
+			});
 
 			const login = await sandbox.commands.run(buildCodexLoginCommand(), {
 				background: true,
-				timeoutMs: LOGIN_TIMEOUT_MS + 30_000,
+				timeoutMs: 30_000,
+				onStdout: (data) => {
+					loginOutput += data;
+					console.log("Codex device login stdout", {
+						agentId: payload.agentId,
+						data,
+					});
+				},
+				onStderr: (data) => {
+					loginOutput += data;
+					console.log("Codex device login stderr", {
+						agentId: payload.agentId,
+						data,
+					});
+				},
 			});
-
-			if (login.exitCode !== 0) {
-				throw new Error(
-					login.stderr || login.stdout || "Failed to start Codex device login",
-				);
-			}
+			console.log("Started Codex device login command", {
+				agentId: payload.agentId,
+				pid: login.pid,
+			});
 
 			await db.transact(
 				agentTx(payload.agentId).update({
@@ -106,11 +127,8 @@ export const startCodexDeviceAuthTask = task({
 			let lastPublishedLog = "";
 
 			while (Date.now() < deadline) {
-				const [logOutput, auth] = await Promise.all([
-					readDeviceAuthLog(sandbox),
-					readCodexAuth(sandbox),
-				]);
-				const cleanOutput = cleanLoginOutput(logOutput);
+				const auth = await readCodexAuth(sandbox);
+				const cleanOutput = cleanLoginOutput(loginOutput);
 				const nextDeviceAuth =
 					parseCodexDeviceAuthInstructions(cleanOutput) ?? deviceAuth;
 
@@ -127,6 +145,7 @@ export const startCodexDeviceAuthTask = task({
 								type: "codex_device_auth",
 								status: "waiting_for_code",
 								deviceAuth,
+								output: cleanOutput,
 								updatedAt: new Date().toISOString(),
 							},
 						}),
@@ -151,7 +170,29 @@ export const startCodexDeviceAuthTask = task({
 				}
 
 				if (!(await isProcessRunning(sandbox, login.pid))) {
-					const finalLog = cleanLoginOutput(await readDeviceAuthLog(sandbox));
+					const result = await login.wait();
+					loginOutput += result.stdout;
+					loginOutput += result.stderr;
+
+					const authAfterExit = await readCodexAuth(sandbox);
+					if (authAfterExit) {
+						await db.transact(
+							agentTx(payload.agentId).update({
+								auth: await encryptAgentAuth(authAfterExit),
+								status: "ready",
+								authState: {
+									type: "codex_device_auth",
+									status: "completed",
+									deviceAuth,
+									updatedAt: new Date().toISOString(),
+								},
+							}),
+						);
+
+						return { agentId: payload.agentId, status: "ready" };
+					}
+
+					const finalLog = cleanLoginOutput(loginOutput);
 					throw new Error(
 						getLoginFailureMessage(finalLog) ??
 							"Codex device login ended before auth.json was written.",
@@ -192,7 +233,6 @@ const prepareCodexHome = async (sandbox: Sandbox) => {
 			`mkdir -p ${shellQuote(CODEX_HOME)}`,
 			`chmod 700 ${shellQuote(CODEX_HOME)}`,
 			`printf '%s\n' ${shellQuote('cli_auth_credentials_store = "file"')} > ${shellQuote(CODEX_CONFIG_PATH)}`,
-			`: > ${shellQuote(CODEX_DEVICE_AUTH_LOG_PATH)}`,
 			`rm -f ${shellQuote(CODEX_AUTH_PATH)}`,
 		].join("\n"),
 		{ timeoutMs: 30_000 },
@@ -209,17 +249,8 @@ const buildCodexLoginCommand = () =>
 	[
 		"set -euo pipefail",
 		`export CODEX_HOME=${shellQuote(CODEX_HOME)}`,
-		`timeout ${Math.ceil(LOGIN_TIMEOUT_MS / 1000)}s npx -y ${CODEX_PACKAGE} login --device-auth 2>&1 | tee -a ${shellQuote(CODEX_DEVICE_AUTH_LOG_PATH)}`,
+		`timeout ${Math.ceil(LOGIN_TIMEOUT_MS / 1000)}s npx -y ${CODEX_PACKAGE} login --device-auth`,
 	].join("\n");
-
-const readDeviceAuthLog = async (sandbox: Sandbox) => {
-	const result = await sandbox.commands.run(
-		`cat ${shellQuote(CODEX_DEVICE_AUTH_LOG_PATH)} 2>/dev/null || true`,
-		{ timeoutMs: 30_000 },
-	);
-
-	return result.stdout;
-};
 
 const readCodexAuth = async (sandbox: Sandbox) => {
 	let raw: string;
