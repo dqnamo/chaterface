@@ -122,7 +122,6 @@ NEXT_PUBLIC_PREVIEWS_DOMAIN=
 PREVIEW_COOKIE_DOMAIN=
 PREVIEW_COOKIE_NAME=
 PREVIEW_SESSION_SECRET=
-EXPO_PUBLIC_API_URL=
 ```
 
 Keep the existing preview signing value when moving it to
@@ -151,7 +150,7 @@ traffic successfully.
 
 4. Smoke test production:
 
-- Sign in on the web app and mobile app.
+- Sign in on the web app.
 - Create a task, send a follow-up message, and confirm both appear in the task
   timeline.
 - Start and stop a preview service, then open its preview URL through
