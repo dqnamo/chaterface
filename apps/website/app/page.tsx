@@ -25,6 +25,7 @@ import Logo from "@/components/Logo";
 import MobileHeader from "@/components/MobileHeader";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
+import PixelTrail from "@/components/public/PixelTrail";
 
 export const metadata: Metadata = {
 	title: "Chaterface",
@@ -87,296 +88,233 @@ const waitlistCalConfig = JSON.stringify({ layout: "month_view" });
 
 export default function Home() {
 	return (
-		<main className="landing-page-colors flex w-full flex-col divide-y divide-grayscale-3 dark:divide-grayscale-2">
-			<Script id="cal-embed" strategy="afterInteractive">
-				{`
-					(function (C, A, L) {
-						let p = function (a, ar) { a.q.push(ar); };
-						let d = C.document;
-						C.Cal = C.Cal || function () {
-							let cal = C.Cal;
-							let ar = arguments;
-							if (!cal.loaded) {
-								cal.ns = {};
-								cal.q = cal.q || [];
-								d.head.appendChild(d.createElement("script")).src = A;
-								cal.loaded = true;
-							}
-							if (ar[0] === L) {
-								const api = function () { p(api, arguments); };
-								const namespace = ar[1];
-								api.q = api.q || [];
-								if (typeof namespace === "string") {
-									cal.ns[namespace] = cal.ns[namespace] || api;
-									p(cal.ns[namespace], ar);
-									p(cal, ["initNamespace", namespace]);
-								} else {
-									p(cal, ar);
-								}
-								return;
-							}
-							p(cal, ar);
-						};
-					})(window, "https://app.cal.com/embed/embed.js", "init");
+		<main className="landing-page-colors relative isolate flex min-h-dvh w-full flex-col overflow-hidden bg-grayscale-1">
+			<PixelTrail
+				className="pointer-events-auto absolute inset-0 z-0"
+				fadeDuration={650}
+				pixelClassName="rounded bg-accent-9"
+				pixelGap={4}
+				pixelSize={24}
+			/>
 
-					Cal("init", "${waitlistCalNamespace}", { origin: "https://cal.com" });
-					Cal.ns.${waitlistCalNamespace}("ui", { theme: "light", layout: "month_view" });
-					Cal.ns.${waitlistCalNamespace}("preload", { calLink: "${waitlistCalLink}" });
-				`}
-			</Script>
-			<MobileHeader />
+			<div className="pointer-events-none relative z-10 flex w-full flex-col divide-y divide-grayscale-3 dark:divide-grayscale-2">
+				<MobileHeader />
 
-			<div className="relative mx-auto flex w-full max-w-7xl flex-col border-x border-grayscale-3 p-4 pt-[4.5rem] dark:border-grayscale-2 md:p-8 lg:p-10">
-				<div className="flex flex-col gap-px p-2">
-					<div className="flex flex-row items-center gap-1.5">
-						<Logo className="size-9 rounded-md" />
-						<p className="text-md font-medium leading-6 text-grayscale-12">
-							Chaterface
+				<div className="relative mx-auto flex w-full max-w-7xl flex-col border-x border-grayscale-3 p-4 pt-[4.5rem] dark:border-grayscale-2 md:p-8 lg:p-10">
+					<div className="pointer-events-auto flex w-fit max-w-full flex-col gap-px p-2">
+						<div className="flex flex-row items-center gap-1.5">
+							<Logo className="size-9 rounded-md" />
+							<p className="text-md font-medium leading-6 text-grayscale-12">
+								Chaterface
+							</p>
+						</div>
+						<p className="max-w-lg text-balance text-lg font-medium leading-6 text-grayscale-12 mt-8">
+							Open source, collaborative software workspace running in the cloud
+							using your existing codex agents.
 						</p>
-					</div>
-					<p className="max-w-lg text-balance text-lg font-medium leading-6 text-grayscale-12 mt-8">
-						Open source, collaborative software workspace running in the cloud
-						using your existing codex agents.
-					</p>
-					<p className="max-w-lg text-balance text-sm leading-6 text-grayscale-11 mt-1">
-						Spin up workers in the cloud, invite supervisors, and steer the work
-						together — all from one place.
-					</p>
-					<div className="mt-4 flex flex-row flex-wrap items-center gap-2">
-						<WaitlistButton className="text-xs" variant="primary">
-							<RocketLaunchIcon size={16} weight="bold" />
-							Join waitlist
-						</WaitlistButton>
-						<Button
-							className="text-xs"
-							href="https://github.com/dqnamo/chaterface"
-							target="_blank"
-							variant="secondary"
-						>
-							<GithubLogoIcon size={16} weight="bold" />
-							GitHub repo
-						</Button>
-					</div>
-				</div>
-
-				<ChaterfaceDesktopPreview />
-				<FeatureGrid />
-
-				<div className="mt-8 flex flex-col gap-2">
-					<div className="flex flex-col gap-px p-2">
-						<h2 className="font-medium text-grayscale-12">Pricing & plans</h2>
-						<p className="text-sm text-grayscale-11">
-							Start with Builder for solo use, then move to Team when you need
-							more members and more concurrent workers.
+						<p className="max-w-lg text-balance text-sm leading-6 text-grayscale-11 mt-1">
+							Spin up workers in the cloud, invite supervisors, and steer the
+							work together — all from one place.
 						</p>
+						<div className="mt-4 flex flex-row flex-wrap items-center gap-2">
+							<Button
+								className="text-xs"
+								href="https://app.chaterface.com"
+								variant="primary"
+							>
+								<RocketLaunchIcon size={16} weight="bold" />
+								Get Started
+							</Button>
+							<Button
+								className="text-xs"
+								href="https://github.com/dqnamo/chaterface"
+								target="_blank"
+								variant="secondary"
+							>
+								<GithubLogoIcon size={16} weight="bold" />
+								GitHub repo
+							</Button>
+						</div>
 					</div>
 
-					<Card
-						layer={0}
-						className="grid grid-cols-1 gap-1.5 rounded-[16px] p-1.5 lg:grid-cols-3"
-					>
+					<ChaterfaceDesktopPreview />
+					<FeatureGrid />
+
+					<div className="pointer-events-auto mt-8 flex flex-col gap-2">
+						<div className="flex flex-col gap-px p-2">
+							<h2 className="font-medium text-grayscale-12">Pricing & plans</h2>
+							<p className="text-sm text-grayscale-11">
+								Start free with Builder for solo use, then move to Team when you
+								need more members.
+							</p>
+						</div>
+
 						<Card
 							layer={0}
-							className="p-0 bg-grayscale-1 dark:bg-grayscale-3 dark:border-grayscale-5 rounded-[13px] small-shadow"
+							className="p-1.5 grid grid-cols-3 gap-1.5 rounded-[16px]"
 						>
-							<div className="flex flex-col h-full">
-								<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
-									<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-										Open source
-									</p>
-								</div>
-								<div className="p-4">
-									<div className="flex flex-col">
-										<h3 className="text-lg font-medium text-grayscale-12">
-											Free
-										</h3>
-										<p className="text-xs text-grayscale-10">Forever</p>
-									</div>
-									<p className="text-sm text-grayscale-10 mt-4">
-										Run it yourself on your own infrastructure.
-									</p>
-								</div>
-								<div className="flex flex-row p-2 mt-auto w-full">
-									<Button
-										className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-										href="https://github.com/dqnamo/chaterface"
-										target="_blank"
-										variant="secondary"
-									>
-										View on GitHub
-										<ArrowRightIcon size={14} weight="bold" />
-									</Button>
-								</div>
-							</div>
-						</Card>
-						<Card
-							layer={0}
-							className="grid grid-cols-1 divide-y divide-grayscale-3 rounded-[13px] bg-grayscale-1 p-0 small-shadow dark:divide-grayscale-4 dark:border-grayscale-5 dark:bg-grayscale-3 md:grid-cols-2 md:divide-x md:divide-y-0 lg:col-span-2"
-						>
-							<div className="flex flex-col">
-								<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
-									<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-										Builder
-									</p>
-								</div>
-								<div className="p-4">
-									<div className="flex flex-col">
-										<h3 className="text-lg font-medium text-grayscale-12">
-											Free
-										</h3>
-										<p className="text-xs text-grayscale-10">Forever</p>
-									</div>
-
-									<div className="flex flex-col mt-4 w-full gap-1">
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												Bring your own agents
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
-										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">1 member</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
-										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												100 tasks/month
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9 "
-											/>
-										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												3 concurrent workers
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9 "
-											/>
-										</div>
-									</div>
-								</div>
-								<div className="flex flex-row p-2 w-full mt-auto">
-									<WaitlistButton
-										className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-										variant="secondary"
-									>
-										Join waitlist
-										<ArrowRightIcon size={14} weight="bold" />
-									</WaitlistButton>
-								</div>
-							</div>
-
-							<div className="flex flex-col">
-								<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
-									<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-										Team
-									</p>
-								</div>
-								<div className="p-4">
-									<div className="flex flex-col">
-										<h3 className="text-lg font-medium text-grayscale-12">
-											US$50
-										</h3>
-										<p className="text-xs text-grayscale-10">
-											Per member/month
+							<Card
+								layer={0}
+								className="p-0 bg-grayscale-1 dark:bg-grayscale-3 dark:border-grayscale-5 rounded-[13px] small-shadow"
+							>
+								<div className="flex flex-col h-full">
+									<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
+										<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
+											Open source
 										</p>
 									</div>
+									<div className="p-4">
+										<div className="flex flex-col">
+											<h3 className="text-lg font-medium text-grayscale-12">
+												Free
+											</h3>
+											<p className="text-xs text-grayscale-10">Forever</p>
+										</div>
+										<p className="text-sm text-grayscale-10 mt-4">
+											Run it yourself on your own infrastructure.
+										</p>
+									</div>
+									<div className="flex flex-row p-2 mt-auto w-full">
+										<Button
+											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
+											href="https://github.com/dqnamo/chaterface"
+											target="_blank"
+											variant="secondary"
+										>
+											View on GitHub
+											<ArrowRightIcon size={14} weight="bold" />
+										</Button>
+									</div>
+								</div>
+							</Card>
+							<Card
+								layer={0}
+								className="p-0 bg-grayscale-1 dark:bg-grayscale-3 dark:border-grayscale-5 dark:divide-grayscale-4 col-span-2 grid grid-cols-2 divide-x divide-grayscale-3 rounded-[13px] small-shadow"
+							>
+								<div className="flex flex-col">
+									<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
+										<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
+											Builder
+										</p>
+									</div>
+									<div className="p-4">
+										<div className="flex flex-col">
+											<h3 className="text-lg font-medium text-grayscale-12">
+												Free
+											</h3>
+											<p className="text-xs text-grayscale-10">Forever</p>
+										</div>
 
-									<div className="flex flex-col mt-4 w-full gap-1">
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												Bring your own agents
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
+										<div className="flex flex-col mt-4 w-full gap-1">
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">
+													Bring your own agents
+												</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9"
+												/>
+											</div>
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">1 member</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9"
+												/>
+											</div>
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">
+													Unlimited workers
+												</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9 "
+												/>
+											</div>
 										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												Unlimited members
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
-										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												Unlimited tasks
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
-										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												25 concurrent workers
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
-										</div>
+									</div>
+									<div className="flex flex-row p-2 w-full mt-auto">
+										<Button
+											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
+											href="/login"
+											variant="secondary"
+										>
+											Get Started
+											<ArrowRightIcon size={14} weight="bold" />
+										</Button>
 									</div>
 								</div>
 
-								<div className="flex flex-row p-2 w-full mt-auto">
-									<WaitlistButton
-										className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-										variant="secondary"
-									>
-										Join waitlist
-										<ArrowRightIcon size={14} weight="bold" />
-									</WaitlistButton>
+								<div className="flex flex-col">
+									<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
+										<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
+											Team
+										</p>
+									</div>
+									<div className="p-4">
+										<div className="flex flex-col">
+											<h3 className="text-lg font-medium text-grayscale-12">
+												US$50
+											</h3>
+											<p className="text-xs text-grayscale-10">
+												Per member/month
+											</p>
+										</div>
+
+										<div className="flex flex-col mt-4 w-full gap-1">
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">
+													Bring your own agents
+												</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9"
+												/>
+											</div>
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">
+													Unlimited members
+												</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9"
+												/>
+											</div>
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">
+													Unlimited workers
+												</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9"
+												/>
+											</div>
+										</div>
+									</div>
+
+									<div className="flex flex-row p-2 w-full mt-auto">
+										<Button
+											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
+											href="/login"
+											variant="secondary"
+										>
+											Start team plan
+											<ArrowRightIcon size={14} weight="bold" />
+										</Button>
+									</div>
 								</div>
-							</div>
+							</Card>
 						</Card>
-					</Card>
+					</div>
+
+					<Footer className="pointer-events-auto p-2 mt-8" />
 				</div>
-
-				<section className="mt-8 flex flex-col gap-2" id="waitlist">
-					<div className="flex flex-col gap-px p-2">
-						<p className="font-mono font-bold text-grayscale-9 text-tiny uppercase tracking-wide">
-							Waitlist
-						</p>
-						<h2 className="font-medium text-grayscale-12">
-							Book a Chaterface onboarding call
-						</h2>
-						<p className="max-w-2xl text-sm text-grayscale-11">
-							We are opening access gradually. Book a short call to join the
-							waitlist, talk through your workspace, and pick the right launch
-							plan.
-						</p>
-					</div>
-
-					<div className="flex flex-row flex-wrap items-center gap-2 p-2">
-						<WaitlistButton className="text-xs" variant="primary">
-							Join waitlist
-							<ArrowRightIcon size={14} weight="bold" />
-						</WaitlistButton>
-					</div>
-				</section>
-
-				<Footer className="p-2 mt-8" />
 			</div>
 		</main>
 	);
@@ -406,7 +344,7 @@ function WaitlistButton({
 
 function ChaterfaceDesktopPreview() {
 	return (
-		<section className="mt-8">
+		<section className="pointer-events-auto mt-8">
 			<div
 				aria-label="Chaterface desktop UI preview"
 				className="small-shadow overflow-x-auto rounded-[16px] border border-grayscale-3 bg-grayscale-2 p-1.5 dark:border-grayscale-4 dark:bg-grayscale-3"
@@ -821,7 +759,7 @@ function PreviewEvent({
 
 function FeatureGrid() {
 	return (
-		<section className="mt-8">
+		<section className="pointer-events-auto mt-8">
 			<div className="grid gap-x-8 gap-y-6 md:grid-cols-3">
 				{featureCards.map((feature) => (
 					<div

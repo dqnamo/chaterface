@@ -2,6 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createEncryptionService } from "@/encryption";
 import db from "@/instant.admin";
 import {
+	authErrorResponse,
+	authenticateMcpServerRequest,
+} from "../../../../_lib/auth";
+import {
 	createOAuthState,
 	createPkceChallenge,
 	createPkceVerifier,
@@ -26,19 +30,13 @@ export async function POST(
 	{ params }: { params: Promise<{ mcpServerId: string }> },
 ) {
 	const { mcpServerId } = await params;
+	const authResult = await authenticateMcpServerRequest(req, mcpServerId);
 
-	if (!(await authenticate(req))) {
-		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+	if (!authResult.ok) {
+		return authErrorResponse(authResult);
 	}
 
-	const mcpServer = await getMcpServer(mcpServerId);
-
-	if (!mcpServer) {
-		return NextResponse.json(
-			{ message: "MCP server not found" },
-			{ status: 404 },
-		);
-	}
+	const mcpServer = authResult.entity;
 
 	const auth = parseOAuthAuth(mcpServer.auth);
 	const redirectUri = new URL(
@@ -138,38 +136,6 @@ export async function POST(
 		);
 	}
 }
-
-const authenticate = async (req: NextRequest) => {
-	const authorizationHeader = req.headers.get("Authorization");
-	const refreshToken = authorizationHeader?.startsWith("Bearer ")
-		? authorizationHeader.slice("Bearer ".length)
-		: undefined;
-
-	if (!refreshToken) {
-		return undefined;
-	}
-
-	try {
-		return await db.auth.verifyToken(refreshToken);
-	} catch {
-		return undefined;
-	}
-};
-
-const getMcpServer = async (mcpServerId: string) => {
-	return db
-		.query({
-			mcpServers: {
-				$: {
-					where: {
-						id: mcpServerId,
-					},
-					fields: ["url", "auth"],
-				},
-			},
-		})
-		.then((data) => data.mcpServers[0]);
-};
 
 const parseOAuthAuth = (value: unknown): OAuthAuth => {
 	if (!isRecord(value) || value.type !== "oauth") {

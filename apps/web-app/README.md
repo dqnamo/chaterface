@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+# Chaterface Web App
 
-## Getting Started
+This Next.js app is the main Chaterface product interface. It handles workspace
+setup, task timelines, agent interaction, integrations, repository settings,
+secrets, preview sessions, and Trigger.dev task processing.
 
-First, run the development server:
+## Development
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+From the repository root:
+
+```sh
+pnpm --filter web-app dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app runs at <http://localhost:3001>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+For the full local workflow with the API and ngrok tunnel, use the root command:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+```sh
+pnpm dev
+```
 
-## Learn More
+Run the Trigger.dev worker locally:
 
-To learn more about Next.js, take a look at the following resources:
+```sh
+pnpm --filter web-app trigger:dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Common local variables:
 
-## Deploy on Vercel
+```sh
+NEXT_PUBLIC_API_URL=http://localhost:3002
+NEXT_PUBLIC_INSTANT_APP_ID=
+INSTANT_APP_ADMIN_TOKEN=
+SECRET_ENCRYPTION_KEY=
+TRIGGER_PROJECT_REF=
+TRIGGER_SECRET_KEY=
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Use `NEXT_PUBLIC_API_URL=https://api.interface.ngrok.pro` when running the
+default ngrok workflow.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Optional integrations include PostHog, GitHub App credentials,
+Slack OAuth/signing secrets, preview session settings, and Cloudflare email/API
+settings. See the root README for the broader setup notes.
+
+## Quality checks
+
+```sh
+pnpm --filter web-app lint
+pnpm --filter web-app check-types
+pnpm --filter web-app build
+```

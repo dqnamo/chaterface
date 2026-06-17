@@ -782,6 +782,7 @@ function CommandExecutionEvent({
 			phase={resolvedPhase}
 			source="agent"
 			subtitle={exitCode === undefined ? undefined : `exit ${exitCode}`}
+			titleFullWidth
 			title={title}
 			tone="accent"
 		>
@@ -951,6 +952,7 @@ function EventCard({
 	source = "event",
 	subtitle,
 	title,
+	titleFullWidth = false,
 	tone,
 }: {
 	actorName?: string;
@@ -962,6 +964,7 @@ function EventCard({
 	source?: EventSource;
 	subtitle?: ReactNode;
 	title?: string;
+	titleFullWidth?: boolean;
 	tone: Tone;
 }) {
 	if (source !== "agent") {
@@ -1012,6 +1015,22 @@ function EventCard({
 	}
 
 	const displayName = actorName ?? "Codex";
+	const titleRow =
+		title || subtitle ? (
+			<div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+				{title ? (
+					<p className="flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium leading-5 text-grayscale-12">
+						<PhaseIcon phase={phase} tone={tone} />
+						<span className="min-w-0 break-words">{title}</span>
+					</p>
+				) : null}
+				{subtitle ? (
+					<p className="min-w-0 max-w-full break-words font-mono text-[11px] leading-4 text-grayscale-9">
+						{subtitle}
+					</p>
+				) : null}
+			</div>
+		) : null;
 
 	return (
 		<motion.article
@@ -1035,23 +1054,10 @@ function EventCard({
 								</time>
 							) : null}
 						</div>
-						{title || subtitle ? (
-							<div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-								{title ? (
-									<p className="flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium leading-5 text-grayscale-12">
-										<PhaseIcon phase={phase} tone={tone} />
-										<span className="min-w-0 break-words">{title}</span>
-									</p>
-								) : null}
-								{subtitle ? (
-									<p className="min-w-0 max-w-full break-words font-mono text-[11px] leading-4 text-grayscale-9">
-										{subtitle}
-									</p>
-								) : null}
-							</div>
-						) : null}
+						{titleFullWidth ? null : titleRow}
 					</div>
 				</div>
+				{titleFullWidth ? titleRow : null}
 				{children ? (
 					<div
 						className={cx(

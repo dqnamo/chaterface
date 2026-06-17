@@ -10,6 +10,7 @@ import Logo from "@/components/Logo";
 import SignOutButton from "@/components/SignOutButton";
 import { getRememberedWorkspace } from "@/helpers/last-workspace-helper";
 import { captureProductEvent } from "@/helpers/posthog-helper";
+import { formatWorkspaceHandle } from "@/helpers/workspace-handle-helper";
 import db from "@/instant.client";
 import CornerBrackets from "../components/CornerBrackets";
 
@@ -49,16 +50,34 @@ export default function HomePage() {
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [workspaceHandle, setWorkspaceHandle] = useState("");
 
+	const updateWorkspaceName = (nextName: string) => {
+		const previousGeneratedHandle = formatWorkspaceHandle(workspaceName);
+
+		setWorkspaceName(nextName);
+		setWorkspaceHandle((currentHandle) =>
+			currentHandle === previousGeneratedHandle
+				? formatWorkspaceHandle(nextName)
+				: currentHandle,
+		);
+	};
+
+	const updateWorkspaceHandle = (nextHandle: string) => {
+		setWorkspaceHandle(formatWorkspaceHandle(nextHandle));
+	};
+
 	const createWorkspace = async () => {
-		if (!user?.id) {
+		const nextName = workspaceName.trim();
+		const nextHandle = formatWorkspaceHandle(workspaceHandle);
+
+		if (!user?.id || !nextName || !nextHandle) {
 			return;
 		}
 
 		const workspaceId = id();
 		await db.transact([
 			workspaceTx(workspaceId).create({
-				name: workspaceName,
-				handle: workspaceHandle,
+				name: nextName,
+				handle: nextHandle,
 				createdAt: DateTime.now().toISO(),
 			}),
 			memberTx(id())
@@ -70,7 +89,6 @@ export default function HomePage() {
 				.link({ workspace: workspaceId, user: user.id }),
 		]);
 
-		const nextHandle = workspaceHandle;
 		captureProductEvent("workspace_created", {
 			workspace_id: workspaceId,
 			workspace_handle: nextHandle,
@@ -149,7 +167,7 @@ export default function HomePage() {
 						type="text"
 						placeholder="Workspace Name"
 						value={workspaceName}
-						onChange={(e) => setWorkspaceName(e.target.value)}
+						onChange={(event) => updateWorkspaceName(event.target.value)}
 					/>
 				</div>
 				<div className="flex flex-col gap-1">
@@ -158,11 +176,12 @@ export default function HomePage() {
 						type="text"
 						placeholder="Workspace Handle"
 						value={workspaceHandle}
-						onChange={(e) => setWorkspaceHandle(e.target.value)}
+						onChange={(event) => updateWorkspaceHandle(event.target.value)}
 					/>
 				</div>
 				<button
 					type="submit"
+					disabled={!workspaceName.trim() || !workspaceHandle}
 					className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-2 mt-2 overflow-visible"
 				>
 					<CornerBrackets

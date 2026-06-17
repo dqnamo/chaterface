@@ -120,7 +120,7 @@ function Popup({ className, ...props }: ContextMenuPopupProps) {
 	return (
 		<BaseContextMenu.Popup
 			className={mergeClassName(
-				"flex min-w-[8rem] flex-col border border-grayscale-4 bg-grayscale-1 p-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"flex min-w-[8rem] flex-col rounded-md border border-grayscale-4 bg-grayscale-1 py-1 outline-none transition-all duration-150 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
 				className,
 			)}
 			{...props}
@@ -138,7 +138,7 @@ function Arrow({ className, ...props }: ContextMenuArrowProps) {
 }
 
 const itemClassName =
-	"group relative flex cursor-default flex-row items-center gap-2 overflow-visible px-3 py-1.5 text-xs text-grayscale-11 outline-none select-none transition-colors duration-100 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:text-grayscale-12";
+	"group relative mx-1 flex cursor-default flex-row items-center gap-2 overflow-visible rounded px-2 py-1.5 text-xs text-grayscale-11 outline-none select-none transition-colors duration-100 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:bg-grayscale-2 data-[highlighted]:text-grayscale-12";
 
 function Item({
 	className,

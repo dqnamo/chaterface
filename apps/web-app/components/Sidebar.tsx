@@ -2,6 +2,7 @@ import { type InstaQLEntity, id } from "@instantdb/react";
 import NumberFlow from "@number-flow/react";
 import {
 	BuildingsIcon,
+	CaretRightIcon,
 	CheckIcon,
 	GearSixIcon,
 	HeadCircuitIcon,
@@ -23,6 +24,7 @@ import {
 	toAgentSessionDotStatus,
 	toTaskDotStatus,
 } from "@/helpers/task-status-helper";
+import { formatWorkspaceHandle } from "@/helpers/workspace-handle-helper";
 import db from "@/instant.client";
 import type { AppSchema } from "@/instant.schema";
 import { Button } from "./Button";
@@ -101,13 +103,13 @@ const getActiveTaskStatusRank = (status: Task["status"]) =>
 		? ACTIVE_TASK_STATUS_RANKS[status as keyof typeof ACTIVE_TASK_STATUS_RANKS]
 		: ACTIVE_TASK_STATUS_RANKS.idle;
 
+const isCompletedTask = (task: Task) =>
+	Boolean(task.completedAt) ||
+	task.status === "complete" ||
+	task.status === "done";
+
 const isActiveTask = (task: Task) => {
-	if (
-		task.completedAt ||
-		task.status === "complete" ||
-		task.status === "done" ||
-		task.status === "todo"
-	) {
+	if (isCompletedTask(task) || task.status === "todo") {
 		return false;
 	}
 
@@ -130,6 +132,17 @@ const compareActiveTaskEntries = (
 	return rankDelta || first.index - second.index;
 };
 
+const compareCompletedTaskEntries = (
+	first: { task: Task; index: number },
+	second: { task: Task; index: number },
+) => {
+	const completedAtDelta = String(second.task.completedAt ?? "").localeCompare(
+		String(first.task.completedAt ?? ""),
+	);
+
+	return completedAtDelta || first.index - second.index;
+};
+
 export default function Sidebar() {
 	const { workspaceHandle, taskId } = useParams();
 	const pathname = usePathname();
@@ -138,6 +151,8 @@ export default function Sidebar() {
 	const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
 	const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
 	const [isWorkspaceSettingsOpen, setIsWorkspaceSettingsOpen] = useState(false);
+	const [isCompletedTasksCollapsed, setIsCompletedTasksCollapsed] =
+		useState(true);
 	const currentWorkspaceHandle =
 		typeof workspaceHandle === "string" ? workspaceHandle : "";
 	const currentTaskId = typeof taskId === "string" ? taskId : "";
@@ -191,6 +206,15 @@ export default function Sidebar() {
 				.map(({ task }) => task),
 		[tasks],
 	);
+	const completedTasks = useMemo(
+		() =>
+			tasks
+				.map((task, index) => ({ task, index }))
+				.filter(({ task }) => isCompletedTask(task))
+				.sort(compareCompletedTaskEntries)
+				.map(({ task }) => task),
+		[tasks],
+	);
 	const settingsHref = `/${currentWorkspaceHandle}/settings`;
 	const humansHref = `/${currentWorkspaceHandle}/humans`;
 	const agentsHref = `/${currentWorkspaceHandle}/agents`;
@@ -209,6 +233,9 @@ export default function Sidebar() {
 		setIsWorkspaceSettingsOpen(true);
 		closeAfterMobileNavigation();
 	}, [closeAfterMobileNavigation]);
+	const toggleCompletedTasks = useCallback(() => {
+		setIsCompletedTasksCollapsed((isCollapsed) => !isCollapsed);
+	}, []);
 
 	useHotkeys(
 		"n",
@@ -334,6 +361,69 @@ export default function Sidebar() {
 								))}
 							</AnimatePresence>
 						</div>
+						{completedTasks.length > 0 ? (
+							<>
+								<button
+									type="button"
+									aria-controls="completed-tasks-list"
+									aria-expanded={!isCompletedTasksCollapsed}
+									onClick={toggleCompletedTasks}
+									className="mt-2 flex w-full flex-row items-center justify-between rounded-md px-3 py-1 text-left transition-colors hover:bg-grayscale-2"
+								>
+									<span className="flex min-w-0 flex-row items-center gap-1.5">
+										<span className="min-w-0 truncate font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+											Completed Tasks
+										</span>
+										<CaretRightIcon
+											weight="bold"
+											className={cn(
+												"size-3 shrink-0 text-grayscale-9 transition-transform",
+												isCompletedTasksCollapsed ? "" : "rotate-90",
+											)}
+										/>
+									</span>
+									<NumberFlow
+										value={completedTasks.length}
+										className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase tabular-nums"
+									/>
+								</button>
+								<AnimatePresence initial={false}>
+									{isCompletedTasksCollapsed ? null : (
+										<motion.div
+											id="completed-tasks-list"
+											initial={{ height: 0, opacity: 0 }}
+											animate={{ height: "auto", opacity: 1 }}
+											exit={{ height: 0, opacity: 0 }}
+											transition={{ duration: 0.18, ease: "easeOut" }}
+											className="overflow-hidden"
+										>
+											<div className="flex min-w-0 max-w-full flex-col gap-px">
+												<AnimatePresence initial={false} mode="popLayout">
+													{completedTasks.map((task) => (
+														<motion.div
+															key={task.id}
+															layout="position"
+															initial={{ opacity: 0, y: 4 }}
+															animate={{ opacity: 1, y: 0 }}
+															exit={{ opacity: 0, y: -4 }}
+															transition={{ duration: 0.18, ease: "easeOut" }}
+														>
+															<TaskSidebarItem
+																href={`/${currentWorkspaceHandle}/tasks/${task.id}`}
+																fallbackHref={`/${currentWorkspaceHandle}`}
+																task={task}
+																selected={task.id === currentTaskId}
+																onNavigate={closeAfterMobileNavigation}
+															/>
+														</motion.div>
+													))}
+												</AnimatePresence>
+											</div>
+										</motion.div>
+									)}
+								</AnimatePresence>
+							</>
+						) : null}
 						<div className="sticky bottom-0 z-10 mt-auto bg-grayscale-1 pt-2">
 							<UserSidebarMenu
 								currentWorkspace={currentWorkspace}
@@ -501,21 +591,39 @@ const WorkspaceSwitcher = ({
 	const [workspaceHandle, setWorkspaceHandle] = useState("");
 	const triggerSeed = currentWorkspace?.name ?? currentWorkspaceHandle;
 
+	const updateWorkspaceName = (nextName: string) => {
+		const previousGeneratedHandle = formatWorkspaceHandle(workspaceName);
+
+		setWorkspaceName(nextName);
+		setWorkspaceHandle((currentHandle) =>
+			currentHandle === previousGeneratedHandle
+				? formatWorkspaceHandle(nextName)
+				: currentHandle,
+		);
+	};
+
+	const updateWorkspaceHandle = (nextHandle: string) => {
+		setWorkspaceHandle(formatWorkspaceHandle(nextHandle));
+	};
+
 	const navigateTo = (href: string) => {
 		router.push(href);
 		onNavigate();
 	};
 
 	const createWorkspace = async () => {
-		if (!user?.id) {
+		const nextName = workspaceName.trim();
+		const nextHandle = formatWorkspaceHandle(workspaceHandle);
+
+		if (!user?.id || !nextName || !nextHandle) {
 			return;
 		}
 
 		const workspaceId = id();
 		await db.transact([
 			workspaceTx(workspaceId).create({
-				name: workspaceName,
-				handle: workspaceHandle,
+				name: nextName,
+				handle: nextHandle,
 				createdAt: DateTime.now().toISO(),
 			}),
 			memberTx(id())
@@ -527,7 +635,6 @@ const WorkspaceSwitcher = ({
 				.link({ workspace: workspaceId, user: user.id }),
 		]);
 
-		const nextHandle = workspaceHandle;
 		setWorkspaceName("");
 		setWorkspaceHandle("");
 		setCreateWorkspaceOpen(false);
@@ -652,7 +759,7 @@ const WorkspaceSwitcher = ({
 									type="text"
 									placeholder="Workspace Name"
 									value={workspaceName}
-									onChange={(event) => setWorkspaceName(event.target.value)}
+									onChange={(event) => updateWorkspaceName(event.target.value)}
 								/>
 							</div>
 							<div className="flex flex-col p-3 gap-3">
@@ -661,12 +768,19 @@ const WorkspaceSwitcher = ({
 									type="text"
 									placeholder="Workspace Handle"
 									value={workspaceHandle}
-									onChange={(event) => setWorkspaceHandle(event.target.value)}
+									onChange={(event) =>
+										updateWorkspaceHandle(event.target.value)
+									}
 								/>
 							</div>
 							<div className="flex flex-row items-center justify-end gap-2 p-3">
 								<Dialog.Close>Cancel</Dialog.Close>
-								<Button type="submit">Create</Button>
+								<Button
+									type="submit"
+									disabled={!workspaceName.trim() || !workspaceHandle}
+								>
+									Create
+								</Button>
 							</div>
 						</form>
 					</Dialog.Popup>
@@ -691,7 +805,7 @@ const TaskSidebarItem = ({
 }) => {
 	const router = useRouter();
 	const status = toTaskDotStatus(task.status);
-	const isCompleted = Boolean(task.completedAt);
+	const isCompleted = isCompletedTask(task);
 	const agentSessions = task.agentSessions ?? [];
 
 	const toggleCompletion = async () => {
