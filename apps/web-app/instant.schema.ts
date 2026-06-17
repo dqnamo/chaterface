@@ -321,6 +321,18 @@ const _schema = i.schema({
 				label: "agentSessions",
 			},
 		},
+		agentTerminalSessions: {
+			forward: {
+				on: "agents",
+				has: "many",
+				label: "terminalSessions",
+			},
+			reverse: {
+				on: "terminalSessions",
+				has: "one",
+				label: "agent",
+			},
+		},
 		taskServices: {
 			forward: {
 				on: "tasks",

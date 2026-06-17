@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
-import db from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
+import db from "@/instant.admin";
 
 type TerminalSessionTicket = {
 	terminalSessionId: string;
@@ -49,6 +49,16 @@ export async function POST(req: NextRequest) {
 						fields: ["sandboxId"],
 					},
 				},
+				agent: {
+					$: {
+						fields: ["sandboxId"],
+					},
+					organisation: {
+						members: {
+							user: {},
+						},
+					},
+				},
 			},
 		})
 		.then((result) => result.terminalSessions[0]);
@@ -67,11 +77,21 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	if (!terminalSession.task?.sandboxId) {
+	const sandboxId =
+		terminalSession.task?.sandboxId ?? terminalSession.agent?.sandboxId;
+
+	if (!sandboxId) {
 		return NextResponse.json(
-			{ message: "Task is missing sandbox id" },
+			{ message: "Terminal session is missing sandbox id" },
 			{ status: 409 },
 		);
+	}
+
+	if (
+		terminalSession.agent &&
+		!hasAgentTerminalAccess(terminalSession.agent, user.id)
+	) {
+		return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 	}
 
 	const ticket = signValue({
@@ -105,6 +125,21 @@ const buildTerminalSessionUrl = (terminalSessionId: string, ticket: string) => {
 
 	return url.toString();
 };
+
+const hasAgentTerminalAccess = (
+	agent: {
+		organisation?: {
+			members?: Array<{
+				user?: {
+					id?: string;
+				};
+			}>;
+		};
+	},
+	userId: string,
+) =>
+	agent.organisation?.members?.some((member) => member.user?.id === userId) ??
+	false;
 
 const getTicketSecret = () => {
 	const secret =

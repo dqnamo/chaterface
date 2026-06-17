@@ -7,6 +7,7 @@ import {
 	TrashIcon,
 	WarningCircleIcon,
 } from "@phosphor-icons/react";
+import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
@@ -19,7 +20,7 @@ import {
 } from "@/codex-options";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
-import { Input, Textarea } from "@/components/Input";
+import { Input } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import db from "@/instant.client";
@@ -36,7 +37,8 @@ const PROVIDERS: {
 	{
 		value: "codex",
 		label: "Codex",
-		description: "Uses Codex CLI auth JSON and the existing Codex runner.",
+		description:
+			"Uses Codex CLI device code auth and the existing Codex runner.",
 	},
 	{
 		value: "cursor",
@@ -58,14 +60,26 @@ const agentTx = (agentId: string) => {
 const getProviderLabel = (provider: string | undefined) =>
 	provider === "cursor" ? "Cursor" : "Codex";
 
+const TerminalSessionLive = dynamic(
+	() =>
+		import("@/components/TerminalSessionLive").then(
+			(module) => module.TerminalSessionLive,
+		),
+	{ ssr: false },
+);
+
 export default function AgentsPage() {
 	const { orgHandle } = useParams();
 	const currentOrgHandle = orgHandle as string;
 	const { user } = db.useAuth();
 	const [name, setName] = useState("");
 	const [provider, setProvider] = useState<AgentProvider>("codex");
-	const [codexAuth, setCodexAuth] = useState("");
 	const [cursorApiKey, setCursorApiKey] = useState("");
+	const [pendingCodexAgentId, setPendingCodexAgentId] = useState<string>();
+	const [codexAuthTerminalSessionId, setCodexAuthTerminalSessionId] =
+		useState<string>();
+	const [isStartingCodexAuth, setIsStartingCodexAuth] = useState(false);
+	const [isCompletingCodexAuth, setIsCompletingCodexAuth] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
 	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
 		DEFAULT_CODEX_REASONING_EFFORT,
@@ -113,21 +127,15 @@ export default function AgentsPage() {
 			return;
 		}
 
-		let auth: unknown;
-		if (provider === "cursor") {
-			const apiKey = cursorApiKey.trim();
-			if (!apiKey) {
-				setFormError("Enter a Cursor API key.");
-				return;
-			}
-			auth = { apiKey };
-		} else {
-			try {
-				auth = JSON.parse(codexAuth);
-			} catch {
-				setFormError("Codex auth must be valid JSON.");
-				return;
-			}
+		if (provider === "codex") {
+			await startCodexDeviceAuth(trimmedName);
+			return;
+		}
+
+		const apiKey = cursorApiKey.trim();
+		if (!apiKey) {
+			setFormError("Enter a Cursor API key.");
+			return;
 		}
 
 		if (!user?.refresh_token) {
@@ -145,7 +153,7 @@ export default function AgentsPage() {
 				organisationId: organisation.id,
 				name: trimmedName,
 				provider,
-				auth,
+				auth: { apiKey },
 				settings: {
 					agentModel,
 					agentReasoningEffort,
@@ -167,8 +175,127 @@ export default function AgentsPage() {
 		}
 
 		setName("");
-		setCodexAuth("");
 		setCursorApiKey("");
+	};
+
+	const startCodexDeviceAuth = async (trimmedName: string) => {
+		if (!organisation) {
+			return;
+		}
+
+		if (!user?.refresh_token) {
+			setFormError("You must be signed in to create an agent.");
+			return;
+		}
+
+		setIsStartingCodexAuth(true);
+
+		try {
+			const response = await fetch("/api/agents/device-auth", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${user.refresh_token}`,
+				},
+				body: JSON.stringify({
+					organisationId: organisation.id,
+					name: trimmedName,
+					settings: {
+						agentModel,
+						agentReasoningEffort,
+						agentSpeed,
+					},
+				}),
+			});
+
+			const body = (await response.json().catch(() => ({}))) as {
+				agent?: { id?: unknown };
+				terminalSessionId?: unknown;
+				message?: unknown;
+			};
+
+			if (!response.ok) {
+				setFormError(
+					typeof body.message === "string"
+						? body.message
+						: "Failed to start Codex device auth.",
+				);
+				return;
+			}
+
+			if (
+				typeof body.agent?.id !== "string" ||
+				typeof body.terminalSessionId !== "string"
+			) {
+				setFormError("Codex device auth response was incomplete.");
+				return;
+			}
+
+			setPendingCodexAgentId(body.agent.id);
+			setCodexAuthTerminalSessionId(body.terminalSessionId);
+		} catch (error) {
+			setFormError(
+				error instanceof Error
+					? error.message
+					: "Failed to start Codex device auth.",
+			);
+		} finally {
+			setIsStartingCodexAuth(false);
+		}
+	};
+
+	const completeCodexDeviceAuth = async () => {
+		setFormError(undefined);
+
+		if (!user?.refresh_token) {
+			setFormError("You must be signed in to complete agent auth.");
+			return;
+		}
+
+		if (!pendingCodexAgentId || !codexAuthTerminalSessionId) {
+			setFormError("Start Codex device auth before completing it.");
+			return;
+		}
+
+		setIsCompletingCodexAuth(true);
+
+		try {
+			const response = await fetch("/api/agents/device-auth", {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${user.refresh_token}`,
+				},
+				body: JSON.stringify({
+					agentId: pendingCodexAgentId,
+					terminalSessionId: codexAuthTerminalSessionId,
+				}),
+			});
+			const body = (await response.json().catch(() => ({}))) as {
+				message?: unknown;
+			};
+
+			if (!response.ok) {
+				setFormError(
+					typeof body.message === "string"
+						? body.message
+						: "Failed to complete Codex device auth.",
+				);
+				return;
+			}
+
+			setName("");
+			setPendingCodexAgentId(undefined);
+			setCodexAuthTerminalSessionId(undefined);
+		} catch (error) {
+			setFormError(
+				error instanceof Error
+					? error.message
+					: "Failed to complete Codex device auth.",
+			);
+		} finally {
+			setIsCompletingCodexAuth(false);
+		}
 	};
 
 	const deleteAgent = async (agent: Agent) => {
@@ -324,13 +451,20 @@ export default function AgentsPage() {
 							/>
 						</Field>
 					) : (
-						<Field label="Codex auth JSON">
-							<Textarea
-								placeholder='{"OPENAI_API_KEY":"..."}'
-								value={codexAuth}
-								onChange={(event) => setCodexAuth(event.target.value)}
-							/>
-						</Field>
+						<div className="flex flex-col gap-2">
+							<p className="text-xs text-grayscale-10">
+								Start device auth, open the Codex login link, enter the one-time
+								code, then complete auth here.
+							</p>
+							{codexAuthTerminalSessionId ? (
+								<div className="h-72 overflow-hidden rounded-md border border-grayscale-4 bg-grayscale-12">
+									<TerminalSessionLive
+										terminalSessionId={codexAuthTerminalSessionId}
+										userToken={user?.refresh_token}
+									/>
+								</div>
+							) : null}
+						</div>
 					)}
 					{formError ? (
 						<div className="flex items-center gap-1.5 text-xs text-red-11">
@@ -339,14 +473,33 @@ export default function AgentsPage() {
 						</div>
 					) : null}
 					<div className="flex justify-end">
-						<Button
-							type="button"
-							onClick={() => {
-								void createAgent();
-							}}
-						>
-							Create Agent
-						</Button>
+						{provider === "codex" && codexAuthTerminalSessionId ? (
+							<Button
+								type="button"
+								disabled={isCompletingCodexAuth}
+								onClick={() => {
+									void completeCodexDeviceAuth();
+								}}
+							>
+								{isCompletingCodexAuth
+									? "Completing..."
+									: "Complete Codex Auth"}
+							</Button>
+						) : (
+							<Button
+								type="button"
+								disabled={isStartingCodexAuth}
+								onClick={() => {
+									void createAgent();
+								}}
+							>
+								{provider === "codex"
+									? isStartingCodexAuth
+										? "Starting..."
+										: "Start Codex Auth"
+									: "Create Agent"}
+							</Button>
+						)}
 					</div>
 				</div>
 			</section>

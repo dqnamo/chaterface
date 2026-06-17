@@ -185,6 +185,11 @@ const getTerminalSessionContext = async (
 						fields: ["sandboxId"],
 					},
 				},
+				agent: {
+					$: {
+						fields: ["sandboxId"],
+					},
+				},
 			},
 		})
 		.then((result) => result.terminalSessions[0]);
@@ -197,13 +202,16 @@ const getTerminalSessionContext = async (
 		throw new UpgradeError(409, "Terminal session is missing pid");
 	}
 
-	if (!terminalSession.task?.sandboxId) {
-		throw new UpgradeError(409, "Task is missing sandbox id");
+	const sandboxId =
+		terminalSession.task?.sandboxId ?? terminalSession.agent?.sandboxId;
+
+	if (!sandboxId) {
+		throw new UpgradeError(409, "Terminal session is missing sandbox id");
 	}
 
 	return {
 		terminalSessionId,
-		sandboxId: terminalSession.task.sandboxId,
+		sandboxId,
 		pid: terminalSession.pid,
 	};
 };
