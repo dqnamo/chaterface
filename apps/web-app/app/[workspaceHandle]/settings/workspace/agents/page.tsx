@@ -99,6 +99,7 @@ export default function AgentsPage() {
 						"authState",
 						"createdAt",
 						"provider",
+						"providerAccountId",
 						"settings",
 						"status",
 					],
@@ -714,7 +715,14 @@ function AgentListItem({
 							{getProviderLabel(agent.provider)}
 						</span>
 					</div>
-					<p className="text-xs text-grayscale-10">{agent.status ?? "idle"}</p>
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-grayscale-10">
+						<span>{agent.status ?? "idle"}</span>
+						{agent.providerAccountId ? (
+							<span className="min-w-0 truncate font-mono">
+								Account {agent.providerAccountId}
+							</span>
+						) : null}
+					</div>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
 					<ModelConfigMenu

@@ -1,5 +1,8 @@
 import { task } from "@trigger.dev/sdk";
-import { encryptAgentAuth } from "@/agent-auth-storage";
+import {
+	encryptAgentAuth,
+	getAgentAuthProviderAccountId,
+} from "@/agent-auth-storage";
 import db from "@/instant.admin";
 import { E2BSandbox as Sandbox } from "./e2b-sandbox";
 
@@ -156,6 +159,7 @@ export const startCodexDeviceAuthTask = task({
 					await db.transact(
 						agentTx(payload.agentId).update({
 							auth: await encryptAgentAuth(auth),
+							providerAccountId: getAgentAuthProviderAccountId("codex", auth),
 							status: "ready",
 							authState: {
 								type: "codex_device_auth",
@@ -179,6 +183,10 @@ export const startCodexDeviceAuthTask = task({
 						await db.transact(
 							agentTx(payload.agentId).update({
 								auth: await encryptAgentAuth(authAfterExit),
+								providerAccountId: getAgentAuthProviderAccountId(
+									"codex",
+									authAfterExit,
+								),
 								status: "ready",
 								authState: {
 									type: "codex_device_auth",
