@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "streamdown/styles.css";
-@import "@xterm/xterm/css/xterm.css";
 @import "@xyflow/react/dist/style.css";
 
 @import "@radix-ui/colors/gray.css";
