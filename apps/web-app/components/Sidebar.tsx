@@ -732,19 +732,7 @@ const FactorySwitcher = ({
 							</div>
 							<div className="flex flex-row items-center justify-end gap-2 p-3">
 								<Dialog.Close>Cancel</Dialog.Close>
-								<button
-									type="submit"
-									className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
-								>
-									<CornerBrackets
-										placement="outside"
-										spacing={4}
-										translate={6}
-										size={6}
-										color="grayscale-12"
-									/>
-									Create
-								</button>
+								<Button type="submit">Create</Button>
 							</div>
 						</form>
 					</Dialog.Popup>
@@ -819,19 +807,7 @@ const FactorySwitcher = ({
 							</div>
 							<div className="flex flex-row items-center justify-end gap-2 p-3">
 								<Dialog.Close>Cancel</Dialog.Close>
-								<button
-									type="submit"
-									className="relative group hover:scale-96 transition-transform duration-150 flex flex-row items-center justify-center gap-2 bg-grayscale-12 text-grayscale-1 text-xs font-medium px-3 py-1.5 overflow-visible"
-								>
-									<CornerBrackets
-										placement="outside"
-										spacing={4}
-										translate={6}
-										size={6}
-										color="grayscale-12"
-									/>
-									Create
-								</button>
+								<Button type="submit">Create</Button>
 							</div>
 						</form>
 					</Dialog.Popup>

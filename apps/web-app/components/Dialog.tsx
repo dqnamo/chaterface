@@ -2,7 +2,6 @@
 
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { ComponentProps } from "react";
-import CornerBrackets from "@/components/CornerBrackets";
 import { cn } from "@/helpers/classname-helper";
 
 type ClassName<TState> = string | ((state: TState) => string | undefined);
@@ -38,7 +37,7 @@ function Trigger({ className, ...props }: DialogTriggerProps) {
 	return (
 		<BaseDialog.Trigger
 			className={mergeClassName(
-				"group relative flex flex-row items-center justify-center gap-2 overflow-visible bg-grayscale-12 px-3 py-1.5 text-xs font-medium text-grayscale-1 transition-transform duration-150 hover:scale-96",
+				"group relative flex h-8 min-w-0 flex-row items-center justify-center gap-2 rounded-md border border-grayscale-12 bg-grayscale-12 px-3 text-xs font-medium whitespace-nowrap text-grayscale-1 transition-colors duration-150 hover:border-grayscale-11 hover:bg-grayscale-11 disabled:cursor-not-allowed disabled:opacity-50",
 				className,
 			)}
 			{...props}
@@ -50,7 +49,7 @@ function Backdrop({ className, ...props }: DialogBackdropProps) {
 	return (
 		<BaseDialog.Backdrop
 			className={mergeClassName(
-				"fixed inset-0 z-40 bg-grayscale-1/60 backdrop-blur-[1px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/50",
 				className,
 			)}
 			{...props}
@@ -62,21 +61,11 @@ function Popup({ className, children, ...props }: DialogPopupProps) {
 	return (
 		<BaseDialog.Popup
 			className={mergeClassName(
-				"group/popup fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col border border-grayscale-4 bg-grayscale-1 outline-none transition-all duration-200 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+				"fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-grayscale-4 bg-grayscale-1 shadow-xl shadow-black/10 outline-none transition-all duration-200 data-[ending-style]:scale-98 data-[starting-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:shadow-black/40",
 				className,
 			)}
 			{...props}
 		>
-			<div className="pointer-events-none absolute inset-0 scale-100 transition-transform duration-300 ease-out group-data-[ending-style]/popup:scale-90 group-data-[starting-style]/popup:scale-90">
-				<CornerBrackets
-					placement="outside"
-					spacing={3}
-					translate={12}
-					size={10}
-					color="var(--color-grayscale-10)"
-					active={true}
-				/>
-			</div>
 			{children}
 		</BaseDialog.Popup>
 	);
@@ -86,7 +75,7 @@ function Title({ className, ...props }: DialogTitleProps) {
 	return (
 		<BaseDialog.Title
 			className={mergeClassName(
-				"text-xs font-medium text-grayscale-12",
+				"text-sm font-medium text-grayscale-12",
 				className,
 			)}
 			{...props}
@@ -107,7 +96,7 @@ function Close({ className, ...props }: DialogCloseProps) {
 	return (
 		<BaseDialog.Close
 			className={mergeClassName(
-				"group relative flex flex-row items-center justify-center gap-2 overflow-visible border border-grayscale-4 px-3 py-1.5 text-xs font-medium text-grayscale-11 transition-colors duration-150 hover:text-grayscale-12",
+				"group relative flex h-8 min-w-0 flex-row items-center justify-center gap-2 rounded-md border border-grayscale-4 bg-grayscale-1 px-3 text-xs font-medium whitespace-nowrap text-grayscale-12 transition-colors duration-150 hover:border-grayscale-5 hover:bg-grayscale-2 disabled:cursor-not-allowed disabled:opacity-50",
 				className,
 			)}
 			{...props}
