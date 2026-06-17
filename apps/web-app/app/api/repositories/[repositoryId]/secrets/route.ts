@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { createEncryptionService } from "@/encryption";
 import db from "@/instant.admin";
+import {
+	authErrorResponse,
+	authenticateRepositoryRequest,
+} from "../../../_lib/auth";
 
 type RepositorySecret = {
 	id: string;
@@ -17,9 +21,10 @@ export async function POST(
 	{ params }: { params: Promise<{ repositoryId: string }> },
 ) {
 	const { repositoryId } = await params;
+	const authResult = await authenticateRepositoryRequest(req, repositoryId);
 
-	if (!(await authenticate(req))) {
-		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+	if (!authResult.ok) {
+		return authErrorResponse(authResult);
 	}
 
 	const body = (await req.json()) as { name?: unknown; value?: unknown };
@@ -42,14 +47,7 @@ export async function POST(
 		);
 	}
 
-	const repository = await getRepository(repositoryId);
-
-	if (!repository) {
-		return NextResponse.json(
-			{ message: "Repository not found" },
-			{ status: 404 },
-		);
-	}
+	const repository = authResult.entity;
 
 	const encryptionService = createEncryptionService(encryptionKey);
 	const secret: RepositorySecret = {
@@ -88,9 +86,10 @@ export async function DELETE(
 	{ params }: { params: Promise<{ repositoryId: string }> },
 ) {
 	const { repositoryId } = await params;
+	const authResult = await authenticateRepositoryRequest(req, repositoryId);
 
-	if (!(await authenticate(req))) {
-		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+	if (!authResult.ok) {
+		return authErrorResponse(authResult);
 	}
 
 	const body = (await req.json()) as { secretId?: unknown };
@@ -104,14 +103,7 @@ export async function DELETE(
 		);
 	}
 
-	const repository = await getRepository(repositoryId);
-
-	if (!repository) {
-		return NextResponse.json(
-			{ message: "Repository not found" },
-			{ status: 404 },
-		);
-	}
+	const repository = authResult.entity;
 
 	const nextSecrets = getRepositorySecrets(repository.secrets).filter(
 		(secret) => secret.id !== secretId,
@@ -129,38 +121,6 @@ export async function DELETE(
 
 	return NextResponse.json({ status: "deleted" });
 }
-
-const authenticate = async (req: NextRequest) => {
-	const authorizationHeader = req.headers.get("Authorization");
-	const refreshToken = authorizationHeader?.startsWith("Bearer ")
-		? authorizationHeader.slice("Bearer ".length)
-		: undefined;
-
-	if (!refreshToken) {
-		return undefined;
-	}
-
-	try {
-		return await db.auth.verifyToken(refreshToken);
-	} catch {
-		return undefined;
-	}
-};
-
-const getRepository = async (repositoryId: string) => {
-	return db
-		.query({
-			repositories: {
-				$: {
-					where: {
-						id: repositoryId,
-					},
-					fields: ["secrets"],
-				},
-			},
-		})
-		.then((data) => data.repositories[0]);
-};
 
 const getRepositorySecrets = (value: unknown): RepositorySecret[] => {
 	if (!Array.isArray(value)) {

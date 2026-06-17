@@ -72,7 +72,6 @@ export default function WorkspaceMcpServersSettingsPage() {
 					name,
 					url,
 					transport: "streamable_http",
-					auth: { type: "oauth", status: "not_connected" },
 					enabled: true,
 					createdAt: now,
 					updatedAt: now,
@@ -100,9 +99,6 @@ export default function WorkspaceMcpServersSettingsPage() {
 				name,
 				url,
 				enabled: formData.get("enabled") === "on",
-				auth: isOAuthAuth(mcpServer.auth)
-					? mcpServer.auth
-					: { type: "oauth", status: "not_connected" },
 				updatedAt: DateTime.now().toISO(),
 			}),
 		);

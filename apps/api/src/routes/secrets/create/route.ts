@@ -12,6 +12,15 @@ type AuthResult = {
 	workspaceId: string;
 };
 
+type WorkspaceWithMembers = {
+	id: string;
+	members?: Array<{
+		user?: {
+			id: string;
+		};
+	}>;
+};
+
 const secretTx = (secretId: string) => {
 	const tx = db.tx.secrets[secretId];
 
@@ -97,8 +106,14 @@ const authenticateCreateSecretRequest = async (
 	workspaceId: string | undefined,
 ): Promise<AuthResult | undefined> => {
 	if (userToken) {
-		if ((await verifyUserToken(userToken)) && workspaceId) {
-			return { workspaceId };
+		const user = await verifyUserToken(userToken);
+
+		if (user && workspaceId) {
+			const workspace = await getWorkspaceWithMembers(workspaceId);
+
+			if (workspace && hasWorkspaceAccess(workspace, user.id)) {
+				return { workspaceId: workspace.id };
+			}
 		}
 	}
 
@@ -132,11 +147,31 @@ const authenticateCreateSecretRequest = async (
 
 const verifyUserToken = async (token: string) => {
 	try {
-		return Boolean(await db.auth.verifyToken(token));
+		return await db.auth.verifyToken(token);
 	} catch {
-		return false;
+		return undefined;
 	}
 };
+
+const getWorkspaceWithMembers = async (workspaceId: string) => {
+	return db
+		.query({
+			workspaces: {
+				$: {
+					where: {
+						id: workspaceId,
+					},
+				},
+				members: {
+					user: {},
+				},
+			},
+		})
+		.then((data) => data.workspaces[0] as WorkspaceWithMembers | undefined);
+};
+
+const hasWorkspaceAccess = (workspace: WorkspaceWithMembers, userId: string) =>
+	workspace.members?.some((member) => member.user?.id === userId) ?? false;
 
 const getNonEmptyString = (value: unknown) => {
 	if (typeof value !== "string") {

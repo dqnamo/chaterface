@@ -1,5 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import db from "@/instant.admin";
+import {
+	authErrorResponse,
+	authenticateMcpServerRequest,
+} from "../../../_lib/auth";
 
 type McpAuthBody = { type: "oauth" };
 
@@ -8,9 +12,10 @@ export async function POST(
 	{ params }: { params: Promise<{ mcpServerId: string }> },
 ) {
 	const { mcpServerId } = await params;
+	const authResult = await authenticateMcpServerRequest(req, mcpServerId);
 
-	if (!(await authenticate(req))) {
-		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+	if (!authResult.ok) {
+		return authErrorResponse(authResult);
 	}
 
 	const body = parseMcpAuthBody(await req.json());
@@ -19,15 +24,6 @@ export async function POST(
 		return NextResponse.json(
 			{ message: "Only OAuth MCP auth is supported" },
 			{ status: 400 },
-		);
-	}
-
-	const mcpServer = await getMcpServer(mcpServerId);
-
-	if (!mcpServer) {
-		return NextResponse.json(
-			{ message: "MCP server not found" },
-			{ status: 404 },
 		);
 	}
 
@@ -64,38 +60,6 @@ export async function POST(
 		auth: summarizeAuth(auth),
 	});
 }
-
-const authenticate = async (req: NextRequest) => {
-	const authorizationHeader = req.headers.get("Authorization");
-	const refreshToken = authorizationHeader?.startsWith("Bearer ")
-		? authorizationHeader.slice("Bearer ".length)
-		: undefined;
-
-	if (!refreshToken) {
-		return undefined;
-	}
-
-	try {
-		return await db.auth.verifyToken(refreshToken);
-	} catch {
-		return undefined;
-	}
-};
-
-const getMcpServer = async (mcpServerId: string) => {
-	return db
-		.query({
-			mcpServers: {
-				$: {
-					where: {
-						id: mcpServerId,
-					},
-					fields: ["auth"],
-				},
-			},
-		})
-		.then((data) => data.mcpServers[0]);
-};
 
 const parseMcpAuthBody = (value: unknown): McpAuthBody | undefined => {
 	if (!isRecord(value) || typeof value.type !== "string") {
