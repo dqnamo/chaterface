@@ -520,6 +520,9 @@ const getTimestamp = (value: string | number | Date | null | undefined) => {
 	return Number.isNaN(timestamp) ? 0 : timestamp;
 };
 
+const getAttachmentFileIds = (attachments: Array<{ id: string }>) =>
+	attachments.map((attachment) => attachment.id).filter(Boolean);
+
 export default function TaskPage() {
 	const { taskId } = useParams();
 	const { user } = db.useAuth();
@@ -965,6 +968,7 @@ export default function TaskPage() {
 
 		try {
 			const attachments = await uploadFileAttachments(task.id);
+			const attachmentFileIds = getAttachmentFileIds(attachments);
 			const agentSessionId =
 				selectedAgentSession?.id ?? (await createAgentSession("Agent"));
 			const eventId = id();
@@ -992,7 +996,13 @@ export default function TaskPage() {
 						data: { content, attachments, userId: user?.id },
 						createdAt,
 					})
-					.link({ task: taskId as string, agentSession: agentSessionId }),
+					.link({
+						task: taskId as string,
+						agentSession: agentSessionId,
+						...(attachmentFileIds.length > 0
+							? { attachments: attachmentFileIds }
+							: {}),
+					}),
 			]);
 		} finally {
 			setIsSendingMessage(false);

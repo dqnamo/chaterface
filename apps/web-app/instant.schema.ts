@@ -308,6 +308,18 @@ const _schema = i.schema({
 				label: "agentSession",
 			},
 		},
+		eventAttachments: {
+			forward: {
+				on: "events",
+				has: "many",
+				label: "attachments",
+			},
+			reverse: {
+				on: "$files",
+				has: "one",
+				label: "attachmentEvent",
+			},
+		},
 		taskAgent: {
 			forward: {
 				on: "tasks",

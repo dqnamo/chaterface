@@ -37,9 +37,38 @@ type Agent = Pick<
 	"id" | "name" | "settings"
 >;
 
-type CreateTaskResult = {
-	taskId?: string;
-	message?: string;
+const DEFAULT_TASK_NAME = "New task";
+
+const taskTx = (taskId: string) => {
+	const tx = db.tx.tasks[taskId];
+
+	if (!tx) {
+		throw new Error(`Task transaction builder ${taskId} not found`);
+	}
+
+	return tx;
+};
+
+const eventTx = (eventId: string) => {
+	const tx = db.tx.events[eventId];
+
+	if (!tx) {
+		throw new Error(`Event transaction builder ${eventId} not found`);
+	}
+
+	return tx;
+};
+
+const agentSessionTx = (agentSessionId: string) => {
+	const tx = db.tx.agentSessions[agentSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Agent session transaction builder ${agentSessionId} not found`,
+		);
+	}
+
+	return tx;
 };
 
 export function NewTaskDialog({
@@ -142,7 +171,7 @@ export function NewTaskDialog({
 			return;
 		}
 
-		if (!user?.refresh_token) {
+		if (!user) {
 			setCreateError("You must be signed in to create a task.");
 			return;
 		}
@@ -153,32 +182,54 @@ export function NewTaskDialog({
 
 		try {
 			const attachments = await uploadFileAttachments(taskId);
-			const response = await fetch("/api/tasks", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${user.refresh_token}`,
-				},
-				body: JSON.stringify({
-					taskId,
-					workspaceId: currentWorkspaceId,
-					agentId: resolvedAgentId,
-					instructions:
-						instructions || buildAttachmentOnlyInstructions(attachments),
-					attachments,
-					agentModel,
-					agentReasoningEffort,
-					agentSpeed,
-				}),
-			});
+			const resolvedInstructions =
+				instructions || buildAttachmentOnlyInstructions(attachments);
+			const name =
+				getFallbackTaskName(resolvedInstructions) ?? DEFAULT_TASK_NAME;
+			const agentSessionId = id();
+			const eventId = id();
+			const createdAt = new Date().toISOString();
+			const attachmentFileIds = getAttachmentFileIds(attachments);
 
-			const result = (await response
-				.json()
-				.catch(() => null)) as CreateTaskResult | null;
-
-			if (!response.ok) {
-				throw new Error(result?.message ?? "Failed to create task.");
-			}
+			await db.transact([
+				taskTx(taskId)
+					.create({
+						name,
+						status: "in_progress",
+						instructions: resolvedInstructions,
+						createdAt,
+						agentModel,
+						agentReasoningEffort,
+						agentSpeed,
+					})
+					.link({ workspace: currentWorkspaceId, agent: resolvedAgentId }),
+				agentSessionTx(agentSessionId)
+					.create({
+						name: "Agent",
+						status: "running",
+						createdAt,
+						updatedAt: createdAt,
+					})
+					.link({ task: taskId, agent: resolvedAgentId }),
+				eventTx(eventId)
+					.create({
+						type: "factoryplane.new_task",
+						data: {
+							taskId,
+							name,
+							instructions: resolvedInstructions,
+							attachments,
+						},
+						createdAt,
+					})
+					.link({
+						task: taskId,
+						agentSession: agentSessionId,
+						...(attachmentFileIds.length > 0
+							? { attachments: attachmentFileIds }
+							: {}),
+					}),
+			]);
 
 			router.push(`/${currentWorkspaceHandle}/tasks/${taskId}`);
 
@@ -382,4 +433,34 @@ function buildAttachmentOnlyInstructions(attachments: { name: string }[]) {
 		.join("\n");
 
 	return `Use the attached file input.\n\nAttached files:\n${fileList}`;
+}
+
+function getAttachmentFileIds(attachments: { id: string }[]) {
+	return attachments.map((attachment) => attachment.id).filter(Boolean);
+}
+
+function getFallbackTaskName(instructions: string | undefined) {
+	if (!instructions) {
+		return undefined;
+	}
+
+	const firstLine = instructions.split("\n")[0] ?? "";
+	return cleanTaskName(firstLine);
+}
+
+function cleanTaskName(value: string | undefined) {
+	if (!value) {
+		return undefined;
+	}
+
+	const normalized = value
+		.trim()
+		.replace(/^["'`]+|["'`.]+$/g, "")
+		.replace(/\s+/g, " ");
+
+	if (!normalized) {
+		return undefined;
+	}
+
+	return normalized.length > 60 ? `${normalized.slice(0, 57)}...` : normalized;
 }
