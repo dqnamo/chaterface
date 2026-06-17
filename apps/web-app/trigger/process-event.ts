@@ -176,6 +176,10 @@ const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
 const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
 const REPOSITORY_SECRETS_FINGERPRINT_PATH =
 	".factoryplane/repository-secrets-fingerprint";
+const REPOSITORY_SECRETS_ENV_BLOCK_START =
+	"# >>> FACTORYPLANE REPOSITORY SECRETS";
+const REPOSITORY_SECRETS_ENV_BLOCK_END =
+	"# <<< FACTORYPLANE REPOSITORY SECRETS";
 const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
 const WORKFLOW_OUTPUT_DIR = "/tmp/factoryplane-agent-outputs";
 const HUMAN_LOOP_HANDLE_ID = "human-loop";
@@ -2057,6 +2061,7 @@ const setupTaskSandbox = async (
 		repositoryGithubEnvs,
 	);
 	await writeWorkspaceEnvironmentFiles(sandbox, task.id, workspace);
+	await writeWorkspaceRepositoryEnvFiles(sandbox, task.id, workspace);
 	await installWorkspaceSkills(sandbox, task.id, provider, workspace);
 	await writeCodexMcpConfig(sandbox, task.id, provider, workspace);
 	await runWorkspaceCommands(sandbox, task.id, workspace, "new_task", {
@@ -2255,12 +2260,12 @@ const cloneWorkspaceRepositories = async (
 
 	const workspacePath = await getSandboxWorkspacePath(sandbox);
 
-	await runOptionalSetupStep(
+	await runSetupStep(
 		taskId,
 		"repositories",
 		"Clone repositories",
-		() =>
-			sandbox.commands.run(
+		async () => {
+			const result = await sandbox.commands.run(
 				[
 					"set -e",
 					`cd ${shellQuote(workspacePath)}`,
@@ -2274,21 +2279,12 @@ const cloneWorkspaceRepositories = async (
 					),
 				].join("\n"),
 				{ timeoutMs: 10 * 60 * 1000, envs },
-			),
-		{ timeoutMs: 11 * 60 * 1000 },
-	);
+			);
 
-	await runOptionalSetupStep(
-		taskId,
-		"repository_env_files",
-		"Write repository .env files",
-		() =>
-			writeRepositoryEnvFilesAndFingerprint(
-				sandbox,
-				repositories,
-				workspacePath,
-			),
-		{ timeoutMs: 60_000 },
+			assertCommandSucceeded(result, "Clone repositories");
+			return result;
+		},
+		{ timeoutMs: 11 * 60 * 1000 },
 	);
 };
 
@@ -2810,23 +2806,55 @@ const writeRepositoryEnvFiles = async (
 ) => {
 	const envFileOperations = await Promise.all(
 		repositories.map(async (repository) => {
-			const contents = await buildRepositoryEnvFileContents(repository);
+			const secretNames = getRepositorySecrets(repository.secrets).map(
+				(secret) => secret.name,
+			);
+			const secretsBlock = await buildRepositoryEnvFileSecretsBlock(repository);
 
 			return {
 				path: `${workspacePath}/${getRepositoryPath(repository)}/.env`,
-				contents,
+				secretNames,
+				secretsBlock,
 			};
 		}),
 	);
 
 	await Promise.all(
 		envFileOperations.map((envFile) =>
-			envFile.contents === undefined
-				? sandbox.commands.run(`rm -f ${shellQuote(envFile.path)}`, {
-						timeoutMs: 30_000,
-					})
-				: sandbox.files.write(envFile.path, envFile.contents),
+			upsertRepositoryEnvFileSecretsBlock(
+				sandbox,
+				envFile.path,
+				envFile.secretsBlock,
+				envFile.secretNames,
+			),
 		),
+	);
+};
+
+const writeWorkspaceRepositoryEnvFiles = async (
+	sandbox: Sandbox,
+	taskId: string,
+	workspace: WorkspaceWithRepositories,
+) => {
+	const repositories = workspace.repositories ?? [];
+
+	if (repositories.length === 0) {
+		return;
+	}
+
+	const workspacePath = await getSandboxWorkspacePath(sandbox);
+
+	await runSetupStep(
+		taskId,
+		"repository_env_files",
+		"Write repository .env files",
+		() =>
+			writeRepositoryEnvFilesAndFingerprint(
+				sandbox,
+				repositories,
+				workspacePath,
+			),
+		{ timeoutMs: 60_000 },
 	);
 };
 
@@ -2856,7 +2884,7 @@ const syncRepositoryEnvFilesIfChanged = async (
 
 	const workspacePath = await getSandboxWorkspacePath(sandbox);
 
-	await runOptionalSetupStep(
+	await runSetupStep(
 		taskId,
 		"repository_env_files",
 		"Refresh repository .env files",
@@ -2901,9 +2929,13 @@ const writeRepositorySecretsFingerprint = async (
 	workspacePath: string,
 	fingerprint: string,
 ) => {
-	await sandbox.commands.run(
+	const result = await sandbox.commands.run(
 		`mkdir -p ${shellQuote(`${workspacePath}/.factoryplane`)}`,
 		{ timeoutMs: 30_000 },
+	);
+	assertCommandSucceeded(
+		result,
+		"Create repository secrets fingerprint directory",
 	);
 	await sandbox.files.write(
 		`${workspacePath}/${REPOSITORY_SECRETS_FINGERPRINT_PATH}`,
@@ -2929,7 +2961,7 @@ const getRepositorySecretsFingerprint = (repositories: Repository[]) => {
 	return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 };
 
-const buildRepositoryEnvFileContents = async (repository: Repository) => {
+const buildRepositoryEnvFileSecretsBlock = async (repository: Repository) => {
 	const secrets = getRepositorySecrets(repository.secrets);
 
 	if (secrets.length === 0) {
@@ -2946,8 +2978,100 @@ const buildRepositoryEnvFileContents = async (repository: Repository) => {
 		}),
 	);
 
-	return `${lines.join("\n")}\n`;
+	return [
+		REPOSITORY_SECRETS_ENV_BLOCK_START,
+		...lines,
+		REPOSITORY_SECRETS_ENV_BLOCK_END,
+		"",
+	].join("\n");
 };
+
+const upsertRepositoryEnvFileSecretsBlock = async (
+	sandbox: Sandbox,
+	path: string,
+	secretsBlock: string | undefined,
+	secretNames: string[],
+) => {
+	const currentContents = await readOptionalSandboxFile(sandbox, path);
+	const nextContents = mergeRepositoryEnvFileSecretsBlock(
+		currentContents,
+		secretsBlock,
+		secretNames,
+	);
+
+	if (nextContents === undefined) {
+		const result = await sandbox.commands.run(`rm -f ${shellQuote(path)}`, {
+			timeoutMs: 30_000,
+		});
+		assertCommandSucceeded(result, "Remove repository .env file");
+		return;
+	}
+
+	if (currentContents === nextContents) {
+		return;
+	}
+
+	await sandbox.files.write(path, nextContents);
+};
+
+const readOptionalSandboxFile = async (sandbox: Sandbox, path: string) => {
+	try {
+		return await sandbox.files.read(path);
+	} catch {
+		return undefined;
+	}
+};
+
+const mergeRepositoryEnvFileSecretsBlock = (
+	currentContents: string | undefined,
+	secretsBlock: string | undefined,
+	secretNames: string[],
+) => {
+	const baseContents = removeRepositoryEnvFileSecretLines(
+		removeRepositoryEnvFileSecretsBlock(currentContents ?? ""),
+		secretNames,
+	).trimEnd();
+
+	if (!secretsBlock) {
+		return baseContents ? `${baseContents}\n` : undefined;
+	}
+
+	return baseContents ? `${baseContents}\n\n${secretsBlock}` : secretsBlock;
+};
+
+const removeRepositoryEnvFileSecretLines = (
+	contents: string,
+	secretNames: string[],
+) => {
+	if (secretNames.length === 0) {
+		return contents;
+	}
+
+	const names = new Set(secretNames);
+
+	return contents
+		.split(/\r?\n/)
+		.filter((line) => {
+			const match = line.match(
+				/^[\t ]*(?:export[\t ]+)?([A-Za-z_][A-Za-z0-9_]*)[\t ]*=/,
+			);
+
+			return !match?.[1] || !names.has(match[1]);
+		})
+		.join("\n");
+};
+
+const removeRepositoryEnvFileSecretsBlock = (contents: string) => {
+	const pattern = new RegExp(
+		`${escapeRegExp(REPOSITORY_SECRETS_ENV_BLOCK_START)}\\r?\\n[\\s\\S]*?\\r?\\n${escapeRegExp(REPOSITORY_SECRETS_ENV_BLOCK_END)}(?:\\r?\\n)?`,
+		"g",
+	);
+
+	return contents.replace(pattern, "").replace(/\n{3,}/g, "\n\n");
+};
+
+const escapeRegExp = (value: string) =>
+	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getRepositorySecrets = (value: unknown): RepositorySecret[] => {
 	if (!Array.isArray(value)) {
