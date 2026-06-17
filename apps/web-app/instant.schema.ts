@@ -186,6 +186,8 @@ const _schema = i.schema({
 			latestDiffPath: i.string().optional(),
 			latestDiffGeneratedAt: i.date().optional(),
 			latestDiffBytes: i.number().optional(),
+			latestDiffFileCount: i.number().optional(),
+			latestDiffFiles: i.json().optional(),
 			pullRequestUrl: i.string().optional(),
 			workflowState: i.string().optional(),
 			workflowInput: i.json().optional(),

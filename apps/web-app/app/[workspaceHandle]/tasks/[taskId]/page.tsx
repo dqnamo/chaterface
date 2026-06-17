@@ -95,6 +95,23 @@ const DIFF_VIEW_OPTIONS = {
 	theme: "pierre-light",
 } as const;
 type JsonRecord = Record<string, unknown>;
+type TaskDiffFileStatus =
+	| "added"
+	| "modified"
+	| "deleted"
+	| "renamed"
+	| "copied"
+	| "typechange"
+	| "unmerged"
+	| "unknown";
+type TaskDiffFileSummary = {
+	path: string;
+	oldPath?: string;
+	status: TaskDiffFileStatus;
+	additions?: number;
+	deletions?: number;
+	binary?: boolean;
+};
 
 const FileDiff = dynamic(
 	() => import("@pierre/diffs/react").then((module) => module.FileDiff),
@@ -241,6 +258,122 @@ const getDiffHeaderIconClassName = (type: FileDiffMetadata["type"]) => {
 	}
 };
 
+const ChangedFilesList = ({
+	files,
+	message,
+}: {
+	files: TaskDiffFileSummary[];
+	message?: string;
+}) => (
+	<div className="flex min-w-full flex-col">
+		{message ? (
+			<div className="border-b border-grayscale-4 bg-grayscale-2 px-3 py-2 text-xs text-grayscale-10">
+				{message}
+			</div>
+		) : null}
+		<ul className="flex min-w-full flex-col">
+			{files.map((file) => {
+				const Icon = getDiffSummaryIcon(file.status);
+
+				return (
+					<li
+						className="flex min-w-0 items-center justify-between gap-4 border-b border-grayscale-4 px-3 py-2 font-mono text-xs"
+						key={`${file.status}-${file.oldPath ?? ""}-${file.path}`}
+					>
+						<div className="flex min-w-0 items-center gap-2">
+							<Icon
+								weight="bold"
+								className={`size-4 shrink-0 ${getDiffSummaryIconClassName(file.status)}`}
+							/>
+							<span className="shrink-0 bg-grayscale-3 px-1.5 py-px text-[9px] font-medium uppercase leading-4 text-grayscale-10">
+								{getDiffSummaryLabel(file.status)}
+							</span>
+							<div className="flex min-w-0 items-center gap-1 text-grayscale-12">
+								{file.oldPath && file.oldPath !== file.path ? (
+									<>
+										<span className="truncate text-grayscale-10">
+											{file.oldPath}
+										</span>
+										<ArrowsLeftRightIcon
+											weight="bold"
+											className="size-3 shrink-0 text-grayscale-9"
+										/>
+									</>
+								) : null}
+								<span className="truncate">{file.path}</span>
+							</div>
+						</div>
+						<div className="flex shrink-0 items-center gap-2 text-[11px]">
+							{file.binary ? (
+								<span className="text-grayscale-10">binary</span>
+							) : null}
+							{file.additions && file.additions > 0 ? (
+								<span className="text-green-10">+{file.additions}</span>
+							) : null}
+							{file.deletions && file.deletions > 0 ? (
+								<span className="text-red-10">-{file.deletions}</span>
+							) : null}
+						</div>
+					</li>
+				);
+			})}
+		</ul>
+	</div>
+);
+
+const getDiffSummaryIcon = (status: TaskDiffFileStatus) => {
+	switch (status) {
+		case "added":
+			return PlusCircleIcon;
+		case "deleted":
+			return MinusCircleIcon;
+		case "renamed":
+		case "copied":
+			return ArrowsLeftRightIcon;
+		case "modified":
+			return PencilSimpleIcon;
+		default:
+			return FileCodeIcon;
+	}
+};
+
+const getDiffSummaryIconClassName = (status: TaskDiffFileStatus) => {
+	switch (status) {
+		case "added":
+			return "text-green-9";
+		case "deleted":
+			return "text-red-9";
+		case "renamed":
+		case "copied":
+			return "text-blue-9";
+		case "modified":
+			return "text-accent-9";
+		default:
+			return "text-grayscale-10";
+	}
+};
+
+const getDiffSummaryLabel = (status: TaskDiffFileStatus) => {
+	switch (status) {
+		case "added":
+			return "add";
+		case "modified":
+			return "edit";
+		case "deleted":
+			return "delete";
+		case "renamed":
+			return "rename";
+		case "copied":
+			return "copy";
+		case "typechange":
+			return "type";
+		case "unmerged":
+			return "merge";
+		default:
+			return "change";
+	}
+};
+
 const isMinifiedTimelineNode = (node: TimelineNode) => {
 	const type = node.event.type ?? "";
 
@@ -282,6 +415,51 @@ const getOptionalString = (value: unknown) =>
 	typeof value === "string" && value.trim().length > 0
 		? value.trim()
 		: undefined;
+
+const getOptionalNumber = (value: unknown) =>
+	typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+const getTaskDiffFileSummaries = (value: unknown): TaskDiffFileSummary[] => {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	return value.flatMap((item) => {
+		const record = asJsonRecord(item);
+		const path = getOptionalString(record?.path);
+
+		if (!record || !path) {
+			return [];
+		}
+
+		return [
+			{
+				path,
+				oldPath: getOptionalString(record.oldPath),
+				status: getTaskDiffFileSummaryStatus(record.status),
+				additions: getOptionalNumber(record.additions),
+				deletions: getOptionalNumber(record.deletions),
+				binary: record.binary === true ? true : undefined,
+			},
+		];
+	});
+};
+
+const getTaskDiffFileSummaryStatus = (value: unknown): TaskDiffFileStatus => {
+	switch (value) {
+		case "added":
+		case "modified":
+		case "deleted":
+		case "renamed":
+		case "copied":
+		case "typechange":
+		case "unmerged":
+		case "unknown":
+			return value;
+		default:
+			return "unknown";
+	}
+};
 
 const getAuthUserDisplayProfile = (
 	user: unknown,
@@ -502,6 +680,10 @@ export default function TaskPage() {
 	});
 
 	const task = data?.tasks?.[0];
+	const diffFileSummaries = useMemo(
+		() => getTaskDiffFileSummaries(task?.latestDiffFiles),
+		[task?.latestDiffFiles],
+	);
 	const events = eventsData?.events;
 	const userDisplayProfiles = useMemo(
 		() => buildUserDisplayProfiles(task, user),
@@ -1516,15 +1698,6 @@ export default function TaskPage() {
 							<div className="flex h-full flex-1 items-center justify-center text-xs text-grayscale-10">
 								Loading changes...
 							</div>
-						) : patchError ? (
-							<div className="flex h-full flex-1 items-center justify-center text-xs text-grayscale-10">
-								<div className="flex flex-col items-center justify-center gap-px p-8">
-									<p className="text-sm text-red-9">Unable to load changes</p>
-									<p className="max-w-sm text-center text-xs text-grayscale-10">
-										{patchError}
-									</p>
-								</div>
-							</div>
 						) : diffFiles.length > 0 ? (
 							<div className="flex min-w-full flex-col">
 								{diffFiles.map((fileDiff, index) => (
@@ -1536,6 +1709,24 @@ export default function TaskPage() {
 										renderCustomHeader={renderDiffHeader}
 									/>
 								))}
+							</div>
+						) : diffFileSummaries.length > 0 ? (
+							<ChangedFilesList
+								files={diffFileSummaries}
+								message={
+									patchError
+										? `Diff view unavailable: ${patchError}`
+										: "Diff view is unavailable for these changes, showing changed files instead."
+								}
+							/>
+						) : patchError ? (
+							<div className="flex h-full flex-1 items-center justify-center text-xs text-grayscale-10">
+								<div className="flex flex-col items-center justify-center gap-px p-8">
+									<p className="text-sm text-red-9">Unable to load changes</p>
+									<p className="max-w-sm text-center text-xs text-grayscale-10">
+										{patchError}
+									</p>
+								</div>
 							</div>
 						) : (
 							<div className="flex h-full flex-1 items-center justify-center text-xs text-grayscale-10">

@@ -122,6 +122,23 @@ type TaskEnvironmentPackage = {
 	command: string;
 	aptPackage: string;
 };
+type TaskDiffFileStatus =
+	| "added"
+	| "modified"
+	| "deleted"
+	| "renamed"
+	| "copied"
+	| "typechange"
+	| "unmerged"
+	| "unknown";
+type TaskDiffFileSummary = {
+	path: string;
+	oldPath?: string;
+	status: TaskDiffFileStatus;
+	additions?: number;
+	deletions?: number;
+	binary?: boolean;
+};
 type ConfiguredTaskEnvironmentPackage = {
 	aptPackage: string;
 	command?: string;
@@ -3788,9 +3805,9 @@ const persistTaskDiff = async (sandbox: Sandbox, task: Task) => {
 		return;
 	}
 
-	const patch = await generateTaskPatch(sandbox, task.id, workspacePath);
+	const diff = await generateTaskPatch(sandbox, task.id, workspacePath);
 	const latestDiffPath = `tasks/${task.id}/latest.patch`;
-	const patchBuffer = Buffer.from(patch, "utf8");
+	const patchBuffer = Buffer.from(diff.patch, "utf8");
 	const { data: file } = await db.storage.uploadFile(
 		latestDiffPath,
 		patchBuffer,
@@ -3807,6 +3824,8 @@ const persistTaskDiff = async (sandbox: Sandbox, task: Task) => {
 				latestDiffPath,
 				latestDiffGeneratedAt: new Date().toISOString(),
 				latestDiffBytes: patchBuffer.byteLength,
+				latestDiffFileCount: diff.files.length,
+				latestDiffFiles: diff.files,
 			})
 			.link({ latestDiffFile: file.id }),
 	);
@@ -3817,6 +3836,9 @@ const generateTaskPatch = async (
 	taskId: string,
 	workspacePath: string,
 ) => {
+	const nameStatusMarker = "__FACTORYPLANE_DIFF_NAME_STATUS__";
+	const numstatMarker = "__FACTORYPLANE_DIFF_NUMSTAT__";
+	const patchMarker = "__FACTORYPLANE_DIFF_PATCH__";
 	const baselinePath = getTaskBaselinePath(taskId);
 	const workPath = `${DIFF_WORK_ROOT}/${taskId}`;
 	const repoPath = `${workPath}/repo`;
@@ -3835,12 +3857,141 @@ const generateTaskPatch = async (
 			"git commit --allow-empty -qm baseline",
 			`replace_factoryplane_dir ${shellQuote(workspacePath)} ${shellQuote(repoPath)}`,
 			"git add -f -A",
+			`printf '%s\\n' ${shellQuote(nameStatusMarker)}`,
+			"git diff --cached --name-status HEAD",
+			`printf '%s\\n' ${shellQuote(numstatMarker)}`,
+			"git diff --cached --numstat HEAD",
+			`printf '%s\\n' ${shellQuote(patchMarker)}`,
 			"git diff --cached --binary --full-index HEAD",
 		].join("\n"),
 		{ timeoutMs: 120_000 },
 	);
 
-	return result.stdout;
+	const sections = splitTaskDiffOutput(result.stdout, {
+		nameStatus: nameStatusMarker,
+		numstat: numstatMarker,
+		patch: patchMarker,
+	});
+
+	return {
+		patch: sections.patch,
+		files: parseTaskDiffFiles(sections.nameStatus, sections.numstat),
+	};
+};
+
+const splitTaskDiffOutput = (
+	output: string,
+	markers: { nameStatus: string; numstat: string; patch: string },
+) => {
+	const nameStatusStart = output.indexOf(`${markers.nameStatus}\n`);
+	const numstatStart = output.indexOf(`${markers.numstat}\n`);
+	const patchStart = output.indexOf(`${markers.patch}\n`);
+
+	if (nameStatusStart < 0 || numstatStart < 0 || patchStart < 0) {
+		return {
+			nameStatus: "",
+			numstat: "",
+			patch: output,
+		};
+	}
+
+	return {
+		nameStatus: output
+			.slice(nameStatusStart + markers.nameStatus.length + 1, numstatStart)
+			.trimEnd(),
+		numstat: output
+			.slice(numstatStart + markers.numstat.length + 1, patchStart)
+			.trimEnd(),
+		patch: output.slice(patchStart + markers.patch.length + 1),
+	};
+};
+
+const parseTaskDiffFiles = (
+	nameStatusText: string,
+	numstatText: string,
+): TaskDiffFileSummary[] => {
+	const files = new Map<string, TaskDiffFileSummary>();
+
+	for (const line of nameStatusText.split("\n")) {
+		if (!line.trim()) {
+			continue;
+		}
+
+		const [rawStatus, firstPath, secondPath] = line.split("\t");
+		if (!rawStatus || !firstPath) {
+			continue;
+		}
+
+		const statusCode = rawStatus.charAt(0);
+		const isRenameOrCopy = statusCode === "R" || statusCode === "C";
+		const path = isRenameOrCopy && secondPath ? secondPath : firstPath;
+		const oldPath = isRenameOrCopy ? firstPath : undefined;
+
+		files.set(path, {
+			path,
+			...(oldPath ? { oldPath } : {}),
+			status: getTaskDiffFileStatus(rawStatus),
+		});
+	}
+
+	for (const line of numstatText.split("\n")) {
+		if (!line.trim()) {
+			continue;
+		}
+
+		const [rawAdditions, rawDeletions, path] = line.split("\t");
+		if (!path) {
+			continue;
+		}
+
+		const existing = files.get(path);
+		if (!existing) {
+			continue;
+		}
+
+		const additions = parseTaskDiffLineCount(rawAdditions);
+		const deletions = parseTaskDiffLineCount(rawDeletions);
+		files.set(path, {
+			...existing,
+			...(additions === undefined ? {} : { additions }),
+			...(deletions === undefined ? {} : { deletions }),
+			binary: additions === undefined || deletions === undefined || undefined,
+		});
+	}
+
+	return Array.from(files.values()).sort((first, second) =>
+		first.path.localeCompare(second.path),
+	);
+};
+
+const parseTaskDiffLineCount = (value: string | undefined) => {
+	if (!value || value === "-") {
+		return undefined;
+	}
+
+	const parsed = Number.parseInt(value, 10);
+	return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const getTaskDiffFileStatus = (rawStatus: string): TaskDiffFileStatus => {
+	switch (rawStatus.charAt(0)) {
+		case "A":
+			return "added";
+		case "M":
+			return "modified";
+		case "D":
+			return "deleted";
+		case "R":
+			return "renamed";
+		case "C":
+			return "copied";
+		case "T":
+			return "typechange";
+		case "U":
+			return "unmerged";
+		default:
+			return "unknown";
+	}
 };
 
 const getSandboxWorkspacePath = async (sandbox: Sandbox) => {
