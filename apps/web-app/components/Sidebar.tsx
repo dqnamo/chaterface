@@ -102,13 +102,13 @@ const getActiveTaskStatusRank = (status: Task["status"]) =>
 		? ACTIVE_TASK_STATUS_RANKS[status as keyof typeof ACTIVE_TASK_STATUS_RANKS]
 		: ACTIVE_TASK_STATUS_RANKS.idle;
 
+const isCompletedTask = (task: Task) =>
+	Boolean(task.completedAt) ||
+	task.status === "complete" ||
+	task.status === "done";
+
 const isActiveTask = (task: Task) => {
-	if (
-		task.completedAt ||
-		task.status === "complete" ||
-		task.status === "done" ||
-		task.status === "todo"
-	) {
+	if (isCompletedTask(task) || task.status === "todo") {
 		return false;
 	}
 
@@ -129,6 +129,17 @@ const compareActiveTaskEntries = (
 		getActiveTaskStatusRank(second.task.status);
 
 	return rankDelta || first.index - second.index;
+};
+
+const compareCompletedTaskEntries = (
+	first: { task: Task; index: number },
+	second: { task: Task; index: number },
+) => {
+	const completedAtDelta = String(second.task.completedAt ?? "").localeCompare(
+		String(first.task.completedAt ?? ""),
+	);
+
+	return completedAtDelta || first.index - second.index;
 };
 
 export default function Sidebar() {
@@ -189,6 +200,15 @@ export default function Sidebar() {
 				.map((task, index) => ({ task, index }))
 				.filter(({ task }) => isActiveTask(task))
 				.sort(compareActiveTaskEntries)
+				.map(({ task }) => task),
+		[tasks],
+	);
+	const completedTasks = useMemo(
+		() =>
+			tasks
+				.map((task, index) => ({ task, index }))
+				.filter(({ task }) => isCompletedTask(task))
+				.sort(compareCompletedTaskEntries)
 				.map(({ task }) => task),
 		[tasks],
 	);
@@ -335,6 +355,41 @@ export default function Sidebar() {
 								))}
 							</AnimatePresence>
 						</div>
+						{completedTasks.length > 0 ? (
+							<>
+								<div className="mt-2 flex flex-row items-center justify-between px-3">
+									<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+										Completed Tasks
+									</p>
+									<NumberFlow
+										value={completedTasks.length}
+										className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase tabular-nums"
+									/>
+								</div>
+								<div className="flex min-w-0 max-w-full flex-col gap-px">
+									<AnimatePresence initial={false} mode="popLayout">
+										{completedTasks.map((task) => (
+											<motion.div
+												key={task.id}
+												layout="position"
+												initial={{ opacity: 0, y: 4 }}
+												animate={{ opacity: 1, y: 0 }}
+												exit={{ opacity: 0, y: -4 }}
+												transition={{ duration: 0.18, ease: "easeOut" }}
+											>
+												<TaskSidebarItem
+													href={`/${currentWorkspaceHandle}/tasks/${task.id}`}
+													fallbackHref={`/${currentWorkspaceHandle}`}
+													task={task}
+													selected={task.id === currentTaskId}
+													onNavigate={closeAfterMobileNavigation}
+												/>
+											</motion.div>
+										))}
+									</AnimatePresence>
+								</div>
+							</>
+						) : null}
 						<div className="sticky bottom-0 z-10 mt-auto bg-grayscale-1 pt-2">
 							<UserSidebarMenu
 								currentWorkspace={currentWorkspace}
@@ -716,7 +771,7 @@ const TaskSidebarItem = ({
 }) => {
 	const router = useRouter();
 	const status = toTaskDotStatus(task.status);
-	const isCompleted = Boolean(task.completedAt);
+	const isCompleted = isCompletedTask(task);
 	const agentSessions = task.agentSessions ?? [];
 
 	const toggleCompletion = async () => {
