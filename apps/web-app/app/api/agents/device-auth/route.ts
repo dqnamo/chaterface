@@ -56,7 +56,10 @@ export async function POST(req: NextRequest) {
 				},
 				settings: getAgentSettings(body.settings),
 			})
-			.link({ workspace: authResult.workspace.id }),
+			.link({
+				workspace: authResult.workspace.id,
+				creator: authResult.user.id,
+			}),
 	);
 
 	try {
@@ -170,7 +173,7 @@ const authenticateWorkspaceRequest = async (
 		};
 	}
 
-	return { ok: true as const, workspace };
+	return { ok: true as const, workspace, user };
 };
 
 const authenticateUser = async (req: NextRequest) => {

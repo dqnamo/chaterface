@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { encryptAgentAuth } from "@/agent-auth-storage";
+import {
+	encryptAgentAuth,
+	getAgentAuthProviderAccountId,
+} from "@/agent-auth-storage";
 import db, { id } from "@/instant.admin";
 
 type AgentProvider = "codex" | "cursor";
@@ -50,18 +53,23 @@ export async function POST(req: NextRequest) {
 
 	const agentId = id();
 	const createdAt = new Date().toISOString();
+	const providerAccountId = getAgentAuthProviderAccountId(provider, body.auth);
 
 	await db.transact(
 		agentTx(agentId)
 			.create({
 				name,
 				provider,
+				providerAccountId,
 				createdAt,
 				status: "ready",
 				auth: await encryptAgentAuth(body.auth),
 				settings: getAgentSettings(body.settings),
 			})
-			.link({ workspace: authResult.workspace.id }),
+			.link({
+				workspace: authResult.workspace.id,
+				creator: authResult.user.id,
+			}),
 	);
 
 	return NextResponse.json(
@@ -143,7 +151,7 @@ const authenticateWorkspaceRequest = async (
 		};
 	}
 
-	return { ok: true as const, workspace };
+	return { ok: true as const, workspace, user };
 };
 
 const getBearerToken = (authorizationHeader: string | null) => {

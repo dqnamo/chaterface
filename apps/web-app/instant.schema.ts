@@ -151,6 +151,7 @@ const _schema = i.schema({
 			authState: i.json().optional(),
 			createdAt: i.date().optional(),
 			provider: i.string().optional(),
+			providerAccountId: i.string().indexed().optional(),
 			settings: i.json().optional(),
 			status: i.string().optional(),
 			sandboxId: i.string().optional(),
@@ -637,6 +638,18 @@ const _schema = i.schema({
 				on: "$users",
 				has: "many",
 				label: "members",
+			},
+		},
+		agentCreators: {
+			forward: {
+				on: "$users",
+				has: "many",
+				label: "createdAgents",
+			},
+			reverse: {
+				on: "agents",
+				has: "one",
+				label: "creator",
 			},
 		},
 	},
