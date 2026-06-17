@@ -383,14 +383,8 @@ function ChaterfaceDesktopPreview() {
 								</p>
 							</div>
 							<div className="flex shrink-0 items-center gap-1.5">
-								<PreviewButton
-									variant="secondary"
-									className="h-7 border-grayscale-4 bg-grayscale-3 hover:border-green-6 hover:bg-green-3"
-								>
-									<GitPullRequestIcon
-										weight="bold"
-										className="size-4 text-green-9"
-									/>
+								<PreviewButton variant="secondary" className="h-7">
+									<GitPullRequestIcon weight="bold" className="size-4" />
 									<span>View PR</span>
 								</PreviewButton>
 								<PreviewButton variant="secondary" className="h-7">

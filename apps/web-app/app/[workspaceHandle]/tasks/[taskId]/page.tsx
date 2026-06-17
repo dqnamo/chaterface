@@ -969,19 +969,9 @@ export default function TaskPage() {
 								)}
 								nativeButton={false}
 								variant="secondary"
-								className="h-7 border-grayscale-4 bg-grayscale-3 hover:border-green-6 hover:bg-green-3"
+								className="h-7"
 							>
-								<CornerBrackets
-									placement="inside"
-									spacing={1}
-									translate={1.5}
-									size={6}
-									color="var(--color-green-9)"
-								/>
-								<GitPullRequestIcon
-									weight="bold"
-									className="size-4 text-green-9"
-								/>
+								<GitPullRequestIcon weight="bold" className="size-4" />
 								<span>View PR</span>
 								<ArrowSquareOutIcon
 									weight="bold"
