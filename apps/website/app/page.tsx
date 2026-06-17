@@ -83,7 +83,6 @@ const featureCards = [
 
 const waitlistCalLink = "interface.london/30min";
 const waitlistCalNamespace = "waitlist";
-const waitlistCalUrl = `https://cal.com/${waitlistCalLink}`;
 const waitlistCalConfig = JSON.stringify({ layout: "month_view" });
 
 export default function Home() {
@@ -167,8 +166,8 @@ export default function Home() {
 					<div className="flex flex-col gap-px p-2">
 						<h2 className="font-medium text-grayscale-12">Pricing & plans</h2>
 						<p className="text-sm text-grayscale-11">
-							Seats pay for collaboration. Sandbox time pays for the compute you
-							use after the included monthly allowance.
+							Start with Builder for solo use, then move to Team when you need
+							more members and more concurrent workers.
 						</p>
 					</div>
 
@@ -267,16 +266,6 @@ export default function Home() {
 												className="text-accent-9 "
 											/>
 										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												5 sandbox-hours/month
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9 "
-											/>
-										</div>
 									</div>
 								</div>
 								<div className="flex flex-row p-2 w-full mt-auto">
@@ -347,26 +336,6 @@ export default function Home() {
 												className="text-accent-9"
 											/>
 										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												25 sandbox-hours/seat
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
-										</div>
-										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">
-												$1 per extra sandbox-hour
-											</p>
-											<CheckCircleIcon
-												size={14}
-												weight="fill"
-												className="text-accent-9"
-											/>
-										</div>
 									</div>
 								</div>
 
@@ -382,25 +351,6 @@ export default function Home() {
 							</div>
 						</Card>
 					</Card>
-
-					<div className="grid gap-1.5 md:grid-cols-2 lg:grid-cols-4">
-						<PricingNote
-							title="Included compute"
-							description="Team includes 25 sandbox-hours per paid seat each month, pooled across the workspace."
-						/>
-						<PricingNote
-							title="Usage overages"
-							description="Extra sandbox time is billed at $1 per sandbox-hour, rounded by the minute."
-						/>
-						<PricingNote
-							title="Spend controls"
-							description="Teams get usage alerts and can set a hard monthly compute budget."
-						/>
-						<PricingNote
-							title="Idle protection"
-							description="Inactive sandboxes auto-stop so teams do not pay for forgotten workers."
-						/>
-					</div>
 				</div>
 
 				<section className="mt-8 flex flex-col gap-2" id="waitlist">
@@ -418,37 +368,11 @@ export default function Home() {
 						</p>
 					</div>
 
-					<Card layer={0} className="rounded-[16px] p-1.5">
-						<div className="flex flex-col gap-4 rounded-[13px] border border-grayscale-3 bg-grayscale-1 p-4 dark:border-grayscale-4 dark:bg-grayscale-3 md:flex-row md:items-center md:justify-between">
-							<div className="flex max-w-2xl flex-col gap-1">
-								<p className="font-medium text-grayscale-12 text-sm">
-									Join from the landing page
-								</p>
-								<p className="text-grayscale-10 text-sm leading-6">
-									The booking flow opens in a Cal.com modal, so visitors can
-									join the waitlist without leaving Chaterface.
-								</p>
-							</div>
-							<WaitlistButton
-								className="w-full justify-between md:w-auto"
-								variant="primary"
-							>
-								Join waitlist
-								<ArrowRightIcon size={14} weight="bold" />
-							</WaitlistButton>
-						</div>
-					</Card>
-
 					<div className="flex flex-row flex-wrap items-center gap-2 p-2">
-						<Button
-							className="text-xs"
-							href={waitlistCalUrl}
-							target="_blank"
-							variant="secondary"
-						>
-							Open Cal.com
+						<WaitlistButton className="text-xs" variant="primary">
+							Join waitlist
 							<ArrowRightIcon size={14} weight="bold" />
-						</Button>
+						</WaitlistButton>
 					</div>
 				</section>
 
@@ -477,21 +401,6 @@ function WaitlistButton({
 		>
 			{children}
 		</Button>
-	);
-}
-
-function PricingNote({
-	description,
-	title,
-}: {
-	description: string;
-	title: string;
-}) {
-	return (
-		<div className="rounded-lg border border-grayscale-3 bg-grayscale-1 p-4 dark:border-grayscale-4 dark:bg-grayscale-3">
-			<p className="font-medium text-grayscale-12 text-sm">{title}</p>
-			<p className="mt-1 text-grayscale-10 text-xs leading-5">{description}</p>
-		</div>
 	);
 }
 
