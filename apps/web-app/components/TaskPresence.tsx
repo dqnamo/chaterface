@@ -5,35 +5,19 @@ import { useCallback, useMemo, useRef } from "react";
 import { cn } from "@/helpers/classname-helper";
 import db from "@/instant.client";
 import type { AppSchema } from "@/instant.schema";
-
-export type PresenceShape = "circle" | "square" | "triangle" | "hexagon";
+import Monogram from "./Monogram";
 
 export type TaskPresenceProfile = {
 	userId?: string;
 	name: string;
-	color: string;
-	shape: PresenceShape;
 };
 
 type TaskPresencePeer = PresencePeer<AppSchema, "task">;
-
-const PRESENCE_SHAPES: PresenceShape[] = [
-	"circle",
-	"square",
-	"triangle",
-	"hexagon",
-];
-const DEFAULT_PRESENCE_COLOR = "#2563eb";
-const PRESENCE_COLORS = [
-	DEFAULT_PRESENCE_COLOR,
-	"#dc2626",
-	"#16a34a",
-	"#c2410c",
-	"#7c3aed",
-	"#0891b2",
-	"#ca8a04",
-	"#db2777",
-];
+type CompleteTaskPresencePeer = TaskPresencePeer & {
+	userId: string;
+	name: string;
+	isComposerFocused?: boolean;
+};
 
 const getTaskRoom = (taskId: string) => db.room("task", taskId);
 
@@ -42,15 +26,9 @@ export function getTaskPresenceProfile(input: {
 	name?: string;
 	email?: string;
 }): TaskPresenceProfile {
-	const seed = input.userId ?? input.email ?? input.name ?? "user";
-	const hash = hashString(seed);
-
 	return {
 		userId: input.userId,
 		name: input.name || input.email || "User",
-		color:
-			PRESENCE_COLORS[hash % PRESENCE_COLORS.length] ?? DEFAULT_PRESENCE_COLOR,
-		shape: PRESENCE_SHAPES[hash % PRESENCE_SHAPES.length] ?? "circle",
 	};
 }
 
@@ -58,24 +36,30 @@ export function TaskPresenceAvatars({
 	taskId,
 	limit = 4,
 	className,
+	avatarSizeClassName = "size-4",
+	avatarClassName,
 }: {
 	taskId: string;
 	limit?: number;
 	className?: string;
+	avatarSizeClassName?: string;
+	avatarClassName?: string;
 }) {
+	const { user } = db.useAuth();
+	const currentUserId = user?.id;
 	const room = useMemo(() => getTaskRoom(taskId), [taskId]);
 	const { peers } = db.rooms.usePresence(room, {
 		user: false,
-		keys: ["userId", "name", "color", "shape"],
+		keys: ["userId", "name"],
 	});
 	const presences = useMemo(
-		() => uniqueTaskPresences(Object.values(peers)),
-		[peers],
+		() => uniqueTaskPresences(Object.values(peers), currentUserId),
+		[peers, currentUserId],
 	);
 	const visiblePresences = presences.slice(0, limit);
 	const overflowCount = Math.max(0, presences.length - visiblePresences.length);
 
-	if (presences.length === 0) {
+	if (!currentUserId || presences.length === 0) {
 		return null;
 	}
 
@@ -88,10 +72,17 @@ export function TaskPresenceAvatars({
 				<TaskPresenceAvatar
 					key={presence.userId ?? presence.peerId}
 					presence={presence}
+					sizeClassName={avatarSizeClassName}
+					className={avatarClassName}
 				/>
 			))}
 			{overflowCount > 0 ? (
-				<span className="flex size-4 items-center justify-center rounded-full border border-grayscale-1 bg-grayscale-4 font-mono text-[9px] font-semibold leading-none text-grayscale-11">
+				<span
+					className={cn(
+						"flex items-center justify-center rounded-full border border-grayscale-1 bg-grayscale-4 font-mono text-[9px] font-semibold leading-none text-grayscale-11",
+						avatarSizeClassName,
+					)}
+				>
 					+{overflowCount}
 				</span>
 			) : null}
@@ -104,62 +95,54 @@ export function TaskPresenceAvatar({
 	sizeClassName = "size-4",
 	className,
 }: {
-	presence: { name: string; color: string; shape?: string };
+	presence: { name: string };
 	sizeClassName?: string;
 	className?: string;
 }) {
 	return (
-		<span
+		<Monogram
 			className={cn(
-				"inline-flex shrink-0 items-center justify-center border border-grayscale-1",
-				getPresenceShapeClassName(presence.shape),
+				"shrink-0 rounded-full [&>p]:text-[9px]",
 				sizeClassName,
 				className,
 			)}
-			style={{ backgroundColor: presence.color }}
-			title={presence.name}
-			role="img"
-			aria-label={presence.name}
+			letters={1}
+			seed={presence.name}
 		/>
 	);
 }
 
-export function TaskPresenceCursors({
+export function TaskPresenceTypingIndicator({
 	peers,
 }: {
 	peers: Record<string, TaskPresencePeer>;
 }) {
 	const presences = uniqueTaskPresences(Object.values(peers)).filter(
-		(presence) =>
-			typeof presence.cursorX === "number" &&
-			typeof presence.cursorY === "number",
+		(presence) => presence.isComposerFocused || presence.isTyping,
 	);
+	const typingText = formatTypingUsers(peers);
+
+	if (presences.length === 0) {
+		return <>&nbsp;</>;
+	}
 
 	return (
-		<div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
-			{presences.map((presence) => (
-				<div
-					key={presence.userId ?? presence.peerId}
-					className="absolute left-0 top-0 flex items-start gap-1.5 transition-transform duration-75 ease-linear"
-					style={{
-						left: `${presence.cursorX}%`,
-						top: `${presence.cursorY}%`,
-					}}
-				>
+		<span className="flex min-w-0 items-center gap-1.5">
+			<span
+				className="flex shrink-0 items-center -space-x-0.5"
+				title={presences.map((presence) => presence.name).join(", ")}
+			>
+				{presences.slice(0, 4).map((presence) => (
 					<TaskPresenceAvatar
+						key={presence.userId}
 						presence={presence}
-						sizeClassName="size-3.5"
-						className="mt-0.5 border-grayscale-1 shadow-sm shadow-grayscale-12/20"
+						sizeClassName="size-3"
+						className="[&>p]:text-[7px]"
 					/>
-					<span
-						className="max-w-40 truncate rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-4 text-white shadow-sm shadow-grayscale-12/20"
-						style={{ backgroundColor: presence.color }}
-					>
-						{presence.name}
-					</span>
-				</div>
-			))}
-		</div>
+				))}
+			</span>
+			{typingText ? <span className="truncate">{typingText}</span> : null}
+		</span>
 	);
 }
 
@@ -172,11 +155,17 @@ export function useTaskTypingPresence({
 	profile?: TaskPresenceProfile;
 	enabled?: boolean;
 }) {
+	const { user } = db.useAuth();
+	const currentUserId = user?.id;
 	const room = useMemo(() => getTaskRoom(taskId), [taskId]);
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const { peers, publishPresence } = db.rooms.usePresence(
 		room,
 		profile ? { initialPresence: profile } : {},
+	);
+	const otherPeers = useMemo(
+		() => filterTaskPresencePeers(peers, currentUserId),
+		[peers, currentUserId],
 	);
 	const publishTyping = useCallback(
 		(isTyping: boolean) => {
@@ -184,10 +173,20 @@ export function useTaskTypingPresence({
 				return;
 			}
 
-			publishPresence({ ...profile, isTyping });
+			publishPresence({ ...profile, isComposerFocused: true, isTyping });
 		},
 		[enabled, profile, publishPresence],
 	);
+	const focusComposer = useCallback(() => {
+		if (!enabled || !profile) {
+			return;
+		}
+
+		publishPresence({
+			...profile,
+			isComposerFocused: true,
+		});
+	}, [enabled, profile, publishPresence]);
 	const markTyping = useCallback(() => {
 		if (!enabled || !profile) {
 			return;
@@ -210,24 +209,21 @@ export function useTaskTypingPresence({
 			typingTimeoutRef.current = null;
 		}
 
-		publishTyping(false);
-	}, [publishTyping]);
-	const publishCursor = useCallback(
-		(cursorX: number, cursorY: number) => {
-			if (!enabled || !profile) {
-				return;
-			}
+		if (!enabled || !profile) {
+			return;
+		}
 
-			publishPresence({ ...profile, cursorX, cursorY });
-		},
-		[enabled, profile, publishPresence],
-	);
-
+		publishPresence({
+			...profile,
+			isComposerFocused: false,
+			isTyping: false,
+		});
+	}, [enabled, profile, publishPresence]);
 	return {
-		peers,
+		peers: otherPeers,
+		focusComposer,
 		markTyping,
 		stopTyping,
-		publishCursor,
 	};
 }
 
@@ -257,35 +253,44 @@ export function formatTypingUsers(peers: Record<string, TaskPresencePeer>) {
 	return `${firstTypingUser.name} and ${typingUsers.length - 1} others are typing...`;
 }
 
-const uniqueTaskPresences = (peers: TaskPresencePeer[]) => {
-	const presences = new Map<string, TaskPresencePeer>();
+const filterTaskPresencePeers = (
+	peers: Record<string, TaskPresencePeer>,
+	currentUserId?: string,
+) => {
+	if (!currentUserId) {
+		return peers;
+	}
+
+	return Object.fromEntries(
+		Object.entries(peers).filter(([, peer]) => peer.userId !== currentUserId),
+	);
+};
+
+const uniqueTaskPresences = (
+	peers: TaskPresencePeer[],
+	currentUserId?: string,
+) => {
+	const presences = new Map<string, CompleteTaskPresencePeer>();
 
 	for (const peer of peers) {
-		presences.set(peer.userId || peer.peerId, peer);
+		if (!isCompleteTaskPresencePeer(peer)) {
+			continue;
+		}
+
+		if (currentUserId && peer.userId === currentUserId) {
+			continue;
+		}
+
+		presences.set(peer.userId, peer);
 	}
 
 	return [...presences.values()];
 };
 
-const getPresenceShapeClassName = (shape: string | undefined) => {
-	switch (shape) {
-		case "square":
-			return "rounded-[2px]";
-		case "triangle":
-			return "[clip-path:polygon(50%_0,100%_100%,0_100%)]";
-		case "hexagon":
-			return "[clip-path:polygon(25%_0,75%_0,100%_50%,75%_100%,25%_100%,0_50%)]";
-		default:
-			return "rounded-full";
-	}
-};
-
-const hashString = (value: string) => {
-	let hash = 0;
-
-	for (let index = 0; index < value.length; index += 1) {
-		hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-	}
-
-	return hash;
-};
+const isCompleteTaskPresencePeer = (
+	peer: TaskPresencePeer,
+): peer is CompleteTaskPresencePeer =>
+	typeof peer.userId === "string" &&
+	peer.userId.length > 0 &&
+	typeof peer.name === "string" &&
+	peer.name.length > 0;

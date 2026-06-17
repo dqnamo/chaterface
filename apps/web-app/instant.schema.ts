@@ -603,10 +603,7 @@ const _schema = i.schema({
 			presence: i.entity({
 				userId: i.string().optional(),
 				name: i.string(),
-				color: i.string(),
-				shape: i.string(),
-				cursorX: i.number().optional(),
-				cursorY: i.number().optional(),
+				isComposerFocused: i.boolean().optional(),
 				isTyping: i.boolean().optional(),
 			}),
 		},

@@ -798,7 +798,7 @@ const TaskSidebarItem = ({
 						href={href}
 						onClick={onNavigate}
 						className={cn(
-							"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+							"group relative flex flex-col gap-1 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 							selected ? "bg-grayscale-3" : "",
 							isCompleted ? "text-grayscale-9" : "",
 						)}
@@ -811,22 +811,31 @@ const TaskSidebarItem = ({
 					size={6}
 					active={selected}
 				/>
-				<span className="min-w-0 flex-1 truncate">{task.name}</span>
+				<div className="flex min-w-0 items-center gap-2.5">
+					<span className="min-w-0 flex-1 truncate">{task.name}</span>
+					{isCompleted ? null : (
+						<div className="flex shrink-0 flex-row items-center gap-1.5 overflow-hidden">
+							{agentSessions.length > 0 ? (
+								agentSessions.map((session, index) => (
+									<TaskStatusDots
+										key={session.id}
+										status={toTaskDotStatus(session.status)}
+										label={`${session.name || `Session ${index + 1}`} status`}
+									/>
+								))
+							) : (
+								<TaskStatusDots status={status} />
+							)}
+						</div>
+					)}
+				</div>
 				{isCompleted ? null : (
-					<div className="flex shrink-0 flex-row items-center gap-1.5 overflow-hidden">
-						{agentSessions.length > 0 ? (
-							agentSessions.map((session, index) => (
-								<TaskStatusDots
-									key={session.id}
-									status={toTaskDotStatus(session.status)}
-									label={`${session.name || `Session ${index + 1}`} status`}
-								/>
-							))
-						) : (
-							<TaskStatusDots status={status} />
-						)}
-						<TaskPresenceAvatars taskId={task.id} limit={3} />
-					</div>
+					<TaskPresenceAvatars
+						taskId={task.id}
+						limit={3}
+						avatarSizeClassName="size-3"
+						avatarClassName="[&>p]:text-[7px]"
+					/>
 				)}
 			</ContextMenu.Trigger>
 			<ContextMenu.Portal>
