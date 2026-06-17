@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import {
 	ThemeProvider as NextThemesProvider,
 	type ThemeProviderProps,
@@ -10,11 +11,15 @@ const Provider = NextThemesProvider as React.ComponentType<
 >;
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+	const pathname = usePathname();
+	const isHomePage = pathname === "/";
+
 	return (
 		<Provider
 			attribute="class"
 			defaultTheme="light"
 			enableSystem
+			forcedTheme={isHomePage ? "light" : undefined}
 			disableTransitionOnChange
 		>
 			{children}

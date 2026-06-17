@@ -17,6 +17,7 @@ const VERCEL_DEPLOY_URL = `https://vercel.com/new/clone?repository-url=${encodeU
 
 function SidebarNavContent({ onNavigate }: { onNavigate?: () => void }) {
 	const pathname = usePathname();
+	const showThemeToggle = pathname !== "/";
 
 	return (
 		<>
@@ -67,21 +68,31 @@ function SidebarNavContent({ onNavigate }: { onNavigate?: () => void }) {
 				</a>
 			</div>
 
-			<div className="flex flex-col mt-8 px-2">
-				<div className="flex flex-row items-center gap-2">
-					<span className="text-xs font-mono text-grayscale-9 font-medium uppercase">
-						Dark Mode
-					</span>
-					<ThemeToggle />
+			{showThemeToggle ? (
+				<div className="flex flex-col mt-8 px-2">
+					<div className="flex flex-row items-center gap-2">
+						<span className="text-xs font-mono text-grayscale-9 font-medium uppercase">
+							Dark Mode
+						</span>
+						<ThemeToggle />
+					</div>
 				</div>
-			</div>
+			) : null}
 		</>
 	);
 }
 
 export default function Sidebar() {
+	const pathname = usePathname();
+	const isHomePage = pathname === "/";
+
 	return (
-		<aside className="fixed top-0 left-0 z-100 hidden h-full w-64 shrink-0 flex-col gap-px px-4 py-4 xl:flex">
+		<aside
+			className={cn(
+				"fixed top-0 left-0 z-100 hidden h-full w-64 shrink-0 flex-col gap-px px-4 py-4 xl:flex",
+				isHomePage ? "landing-page-colors" : "",
+			)}
+		>
 			<SidebarNavContent />
 		</aside>
 	);

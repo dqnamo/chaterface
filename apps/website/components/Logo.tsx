@@ -4,61 +4,24 @@ type LogoProps = {
 	className?: string;
 };
 
-const logoGrid = [
-	{
-		cells: [
-			{ active: false, id: "top-left" },
-			{ active: true, id: "top-center" },
-			{ active: true, id: "top-right" },
-		],
-		id: "top",
-	},
-	{
-		cells: [
-			{ active: true, id: "upper-left" },
-			{ active: false, id: "upper-center" },
-			{ active: false, id: "upper-right" },
-		],
-		id: "upper",
-	},
-	{
-		cells: [
-			{ active: false, id: "lower-left" },
-			{ active: true, id: "lower-center" },
-			{ active: false, id: "lower-right" },
-		],
-		id: "lower",
-	},
-	{
-		cells: [
-			{ active: true, id: "bottom-left" },
-			{ active: false, id: "bottom-center" },
-			{ active: false, id: "bottom-right" },
-		],
-		id: "bottom",
-	},
-];
-
 export default function Logo({ className }: LogoProps) {
 	return (
-		<div
-			className={cn(
-				"small-shadow flex w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-grayscale-3 bg-white dark:border-grayscale-4 dark:bg-grayscale-3",
-				className,
-			)}
+		<svg
+			aria-label="Chaterface logomark"
+			className={cn("block size-10 shrink-0 text-accent-9", className)}
+			fill="none"
+			role="img"
+			viewBox="0 0 629 654"
+			xmlns="http://www.w3.org/2000/svg"
 		>
-			<div className="flex flex-col">
-				{logoGrid.map((row) => (
-					<div key={row.id} className="grid grid-cols-3">
-						{row.cells.map((cell) => (
-							<div
-								key={cell.id}
-								className={`size-1.5 ${cell.active ? "bg-accent-9" : ""}`}
-							></div>
-						))}
-					</div>
-				))}
-			</div>
-		</div>
+			<path
+				d="M495 326.956H445.873V386.499C445.873 462.871 403.085 509.802 330.803 509.802V144.154C378.786 144.154 413.782 164.807 431.831 201.06L433.767 204.971L495 326.956Z"
+				className="fill-current"
+			/>
+			<path
+				d="M330.803 581.956C210.099 581.956 135 511.911 135 385.136V268.864C135 141.342 210.099 72 330.803 72V144.154C258.522 144.154 215.734 191.085 215.734 267.458V386.542C215.734 462.915 258.522 509.846 330.803 509.846V582V581.956Z"
+				className="fill-current"
+			/>
+		</svg>
 	);
 }

@@ -18,11 +18,22 @@ import {
 	UsersThreeIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
+import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import Logo from "@/components/Logo";
 import MobileHeader from "@/components/MobileHeader";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
+
+export const metadata: Metadata = {
+	title: "Chaterface",
+	applicationName: "Chaterface",
+	description:
+		"Open source, collaborative software workspace running in the cloud using your existing codex agents.",
+	appleWebApp: {
+		title: "Chaterface",
+	},
+};
 
 const featureCards = [
 	{
@@ -34,7 +45,7 @@ const featureCards = [
 	},
 	{
 		description:
-			"Invite supervisors into the same factory so product, engineering, and ops can steer the work together.",
+			"Invite supervisors into the same workspace so product, engineering, and ops can steer the work together.",
 		icon: <UsersThreeIcon size={18} weight="bold" />,
 		iconClassName: "text-green-11",
 		title: "Shared supervision",
@@ -48,14 +59,14 @@ const featureCards = [
 	},
 	{
 		description:
-			"Install reusable skills onto the factory computer so the workflows you run again and again just work.",
+			"Install reusable skills onto the workspace computer so the workflows you run again and again just work.",
 		icon: <FilesIcon size={18} weight="bold" />,
 		iconClassName: "text-orange-11",
 		title: "Skills library",
 	},
 	{
 		description:
-			"Store secrets at the factory level so every worker in the factory can use them securely.",
+			"Store secrets at the workspace level so every worker can use them securely.",
 		icon: <TextboxIcon size={18} weight="bold" />,
 		iconClassName: "text-crimson-11",
 		title: "Secret handling",
@@ -71,19 +82,19 @@ const featureCards = [
 
 export default function Home() {
 	return (
-		<main className="flex w-full flex-col divide-y divide-grayscale-3 dark:divide-grayscale-2">
+		<main className="landing-page-colors flex w-full flex-col divide-y divide-grayscale-3 dark:divide-grayscale-2">
 			<MobileHeader />
 
 			<div className="relative mx-auto flex w-full max-w-7xl flex-col border-x border-grayscale-3 p-4 pt-[4.5rem] dark:border-grayscale-2 md:p-8 lg:p-10">
 				<div className="flex flex-col gap-px p-2">
-					<div className="flex flex-row items-center gap-2">
+					<div className="flex flex-row items-center gap-1.5">
 						<Logo className="size-9 rounded-md" />
 						<p className="text-md font-medium leading-6 text-grayscale-12">
-							FactoryPlane
+							Chaterface
 						</p>
 					</div>
 					<p className="max-w-lg text-balance text-lg font-medium leading-6 text-grayscale-12 mt-8">
-						Open source, collaborative software factory running in the cloud
+						Open source, collaborative software workspace running in the cloud
 						using your existing codex agents.
 					</p>
 					<p className="max-w-lg text-balance text-sm leading-6 text-grayscale-11 mt-1">
@@ -111,15 +122,15 @@ export default function Home() {
 					</div>
 				</div>
 
-				<FactoryDesktopPreview />
+				<ChaterfaceDesktopPreview />
 				<FeatureGrid />
 
 				<div className="mt-8 flex flex-col gap-2">
 					<div className="flex flex-col gap-px p-2">
 						<h2 className="font-medium text-grayscale-12">Pricing & plans</h2>
 						<p className="text-sm text-grayscale-11">
-							Start free — self-host or use the hosted basic plan. No card
-							required.
+							Start free with Builder for solo use, then move to Team when you
+							need more members.
 						</p>
 					</div>
 
@@ -168,7 +179,7 @@ export default function Home() {
 							<div className="flex flex-col">
 								<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
 									<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-										Basic
+										Builder
 									</p>
 								</div>
 								<div className="p-4">
@@ -191,7 +202,7 @@ export default function Home() {
 											/>
 										</div>
 										<div className="flex flex-row items-center justify-between">
-											<p className="text-sm text-grayscale-10">3 supervisors</p>
+											<p className="text-sm text-grayscale-10">1 member</p>
 											<CheckCircleIcon
 												size={14}
 												weight="fill"
@@ -225,15 +236,17 @@ export default function Home() {
 							<div className="flex flex-col">
 								<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
 									<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-										Pro
+										Team
 									</p>
 								</div>
 								<div className="p-4">
 									<div className="flex flex-col">
 										<h3 className="text-lg font-medium text-grayscale-12">
-											US$15
+											US$50
 										</h3>
-										<p className="text-xs text-grayscale-10">Per user/month</p>
+										<p className="text-xs text-grayscale-10">
+											Per member/month
+										</p>
 									</div>
 
 									<div className="flex flex-col mt-4 w-full gap-1">
@@ -249,7 +262,7 @@ export default function Home() {
 										</div>
 										<div className="flex flex-row items-center justify-between">
 											<p className="text-sm text-grayscale-10">
-												Unlimited supervisors
+												Unlimited members
 											</p>
 											<CheckCircleIcon
 												size={14}
@@ -276,7 +289,7 @@ export default function Home() {
 										href="/login"
 										variant="secondary"
 									>
-										Start 7-day free trial
+										Start team plan
 										<ArrowRightIcon size={14} weight="bold" />
 									</Button>
 								</div>
@@ -291,24 +304,24 @@ export default function Home() {
 	);
 }
 
-function FactoryDesktopPreview() {
+function ChaterfaceDesktopPreview() {
 	return (
 		<section className="mt-8">
 			<div
-				aria-label="Factory platform desktop UI preview"
-				className="factory-app-preview small-shadow overflow-x-auto rounded-[16px] border border-grayscale-3 bg-grayscale-2 p-1.5 dark:border-grayscale-4 dark:bg-grayscale-3"
+				aria-label="Chaterface desktop UI preview"
+				className="small-shadow overflow-x-auto rounded-[16px] border border-grayscale-3 bg-grayscale-2 p-1.5 dark:border-grayscale-4 dark:bg-grayscale-3"
 				role="img"
 			>
 				<div className="flex h-[540px] min-w-[1080px] overflow-hidden rounded-[13px] border border-grayscale-3 bg-grayscale-1 text-[11px] leading-4 text-grayscale-12 dark:border-grayscale-4">
 					<aside className="flex w-64 shrink-0 flex-col border-grayscale-3 border-r bg-grayscale-1 p-2 dark:border-grayscale-4">
 						<div className="mb-2 flex items-start justify-between gap-2 bg-grayscale-1 pb-2">
 							<div className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1">
-								<div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-9 font-semibold text-[10px] text-white">
-									FP
+								<div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent-9 font-semibold text-[10px] text-white">
+									CF
 								</div>
 								<span className="flex min-w-0 flex-1 flex-col text-left">
 									<span className="truncate text-sm leading-tight text-grayscale-12">
-										Product Factory
+										Chaterface
 									</span>
 									<span className="truncate text-[11px] leading-tight text-grayscale-10">
 										Acme Labs
@@ -321,7 +334,7 @@ function FactoryDesktopPreview() {
 						</div>
 						<div className="flex flex-col gap-px">
 							<PreviewNavItem icon={<FadersIcon size={15} weight="bold" />}>
-								Factory Settings
+								Workspace Settings
 							</PreviewNavItem>
 							<PreviewNavItem icon={<UsersThreeIcon size={15} weight="bold" />}>
 								Personal Settings
@@ -505,17 +518,15 @@ function FactoryDesktopPreview() {
 								<div className="rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 dark:border-grayscale-4">
 									<div className="flex items-center gap-2">
 										<Logo className="size-6 rounded" />
-										<p className="font-medium text-grayscale-12">
-											FactoryPlane
-										</p>
+										<p className="font-medium text-grayscale-12">Chaterface</p>
 									</div>
 									<p className="mt-4 max-w-56 text-balance font-medium text-grayscale-12 text-sm">
-										Collaborative software factory running in the cloud.
+										Collaborative software workspace running in the cloud.
 									</p>
 									<div className="mt-4 h-24 rounded-lg border border-grayscale-3 bg-grayscale-2 p-2 dark:border-grayscale-4 dark:bg-grayscale-3">
 										<div className="mb-2 h-2 w-28 rounded bg-grayscale-5" />
 										<div className="grid grid-cols-3 gap-2">
-											<div className="h-14 rounded bg-blue-3" />
+											<div className="h-14 rounded bg-accent-3" />
 											<div className="h-14 rounded bg-green-3" />
 											<div className="h-14 rounded bg-orange-3" />
 										</div>
