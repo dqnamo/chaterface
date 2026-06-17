@@ -1,11 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import CornerCubes from "@/components/CornerCubes";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
+import {
+	captureProductEvent,
+	identifyProductUser,
+	resetProductUser,
+} from "@/helpers/posthog-helper";
 import db from "@/instant.client";
 
 type AuthGateProps = {
@@ -23,6 +28,23 @@ export default function AuthGate({ children }: AuthGateProps) {
 	const trimmedCode = code.trim();
 	const canSubmit =
 		trimmedEmail.length > 0 && (!isCodeSent || trimmedCode.length > 0);
+	const userId = user?.id;
+	const userEmail = user?.email;
+
+	useEffect(() => {
+		if (isLoading) {
+			return;
+		}
+
+		if (!userId) {
+			resetProductUser();
+			return;
+		}
+
+		identifyProductUser(userId, {
+			email: userEmail,
+		});
+	}, [isLoading, userEmail, userId]);
 
 	const sendMagicCode = async () => {
 		setError(undefined);
@@ -30,6 +52,9 @@ export default function AuthGate({ children }: AuthGateProps) {
 
 		try {
 			await db.auth.sendMagicCode({ email: trimmedEmail });
+			captureProductEvent("magic_code_requested", {
+				email_domain: getEmailDomain(trimmedEmail),
+			});
 			setIsCodeSent(true);
 		} catch (error) {
 			setError(getErrorMessage(error, "Failed to send magic code"));
@@ -46,6 +71,9 @@ export default function AuthGate({ children }: AuthGateProps) {
 			await db.auth.signInWithMagicCode({
 				email: trimmedEmail,
 				code: trimmedCode,
+			});
+			captureProductEvent("magic_code_verified", {
+				email_domain: getEmailDomain(trimmedEmail),
 			});
 		} catch (error) {
 			setError(getErrorMessage(error, "Failed to verify magic code"));
@@ -232,4 +260,9 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const getEmailDomain = (email: string) => {
+	const domain = email.split("@").at(1)?.trim().toLowerCase();
+	return domain || undefined;
 };

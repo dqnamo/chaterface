@@ -29,6 +29,7 @@ import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import { cn } from "@/helpers/classname-helper";
+import { captureProductEvent } from "@/helpers/posthog-helper";
 import db from "@/instant.client";
 import type { AppSchema } from "@/instant.schema";
 
@@ -231,6 +232,16 @@ export function NewTaskDialog({
 					}),
 			]);
 
+			captureProductEvent("task_created", {
+				task_id: taskId,
+				workspace_id: currentWorkspaceId,
+				agent_id: resolvedAgentId,
+				agent_model: agentModel,
+				agent_reasoning_effort: agentReasoningEffort,
+				agent_speed: agentSpeed,
+				has_attachments: attachments.length > 0,
+				attachment_count: attachments.length,
+			});
 			router.push(`/${currentWorkspaceHandle}/tasks/${taskId}`);
 
 			resetForm();
