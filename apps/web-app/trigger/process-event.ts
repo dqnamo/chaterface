@@ -4180,7 +4180,7 @@ const buildCodexExecCommand = (
 		args.push(...imageArgs);
 	}
 
-	args.push(shellQuote(prompt));
+	args.push("--", shellQuote(prompt));
 	return args.join(" ");
 };
 
