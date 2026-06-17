@@ -41,8 +41,6 @@ type CreateTaskResult = {
 	message?: string;
 };
 
-type SubmitMode = "start" | "todo";
-
 export function NewTaskDialog({
 	open,
 	onOpenChange,
@@ -65,7 +63,7 @@ export function NewTaskDialog({
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 	const [pendingTaskId, setPendingTaskId] = useState(() => id());
-	const [submitMode, setSubmitMode] = useState<SubmitMode>();
+	const [isCreating, setIsCreating] = useState(false);
 	const [createError, setCreateError] = useState<string>();
 	const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
 	const {
@@ -102,7 +100,6 @@ export function NewTaskDialog({
 	);
 	const noAgentsConfigured =
 		Boolean(data?.organisations?.[0]) && (agents?.length ?? 0) === 0;
-	const isCreating = Boolean(submitMode);
 	const canSubmit =
 		!isCreating &&
 		Boolean(resolvedAgentId) &&
@@ -128,7 +125,7 @@ export function NewTaskDialog({
 		setIsDraggingAttachments(false);
 	};
 
-	const submitTask = async (mode: SubmitMode) => {
+	const submitTask = async () => {
 		const instructions = taskInstructions.trim();
 
 		if (!canSubmit) {
@@ -146,7 +143,7 @@ export function NewTaskDialog({
 		}
 
 		const taskId = pendingTaskId;
-		setSubmitMode(mode);
+		setIsCreating(true);
 		setCreateError(undefined);
 
 		try {
@@ -179,12 +176,9 @@ export function NewTaskDialog({
 				throw new Error(result?.message ?? "Failed to create task.");
 			}
 
-			if (mode === "start") {
-				await startTask(taskId, user.refresh_token);
-				router.push(
-					`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${taskId}`,
-				);
-			}
+			router.push(
+				`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${taskId}`,
+			);
 
 			resetForm();
 			onOpenChange(false);
@@ -193,7 +187,7 @@ export function NewTaskDialog({
 				error instanceof Error ? error.message : "Failed to create task.",
 			);
 		} finally {
-			setSubmitMode(undefined);
+			setIsCreating(false);
 		}
 	};
 
@@ -257,13 +251,13 @@ export function NewTaskDialog({
 					<form
 						onSubmit={(event) => {
 							event.preventDefault();
-							void submitTask("start");
+							void submitTask();
 						}}
 					>
 						<div className="flex flex-col gap-1 p-3">
 							<Dialog.Title>New task</Dialog.Title>
 							<Dialog.Description>
-								Start an agent session now or add the task to todo.
+								Start an agent session with a fresh task.
 							</Dialog.Description>
 						</div>
 						<fieldset
@@ -302,7 +296,7 @@ export function NewTaskDialog({
 									placeholder="What should the agent do?"
 									value={taskInstructions}
 									onChange={(event) => setTaskInstructions(event.target.value)}
-									onSubmit={() => submitTask("start")}
+									onSubmit={() => submitTask()}
 								/>
 							</label>
 							<ImageAttachments
@@ -371,16 +365,8 @@ export function NewTaskDialog({
 							<Dialog.Close type="button" disabled={isCreating}>
 								Cancel
 							</Dialog.Close>
-							<Button
-								type="button"
-								variant="secondary"
-								disabled={!canSubmit}
-								onClick={() => submitTask("todo")}
-							>
-								{submitMode === "todo" ? "Adding..." : "Add to todo"}
-							</Button>
 							<Button type="submit" disabled={!canSubmit}>
-								{submitMode === "start" ? "Starting..." : "Start task"}
+								{isCreating ? "Starting..." : "Start task"}
 							</Button>
 						</div>
 					</form>
@@ -388,22 +374,6 @@ export function NewTaskDialog({
 			</Dialog.Portal>
 		</Dialog.Root>
 	);
-}
-
-async function startTask(taskId: string, refreshToken: string) {
-	const response = await fetch(`/api/tasks/${taskId}/start`, {
-		method: "POST",
-		headers: {
-			Authorization: `Bearer ${refreshToken}`,
-		},
-	});
-
-	if (!response.ok) {
-		const result = (await response
-			.json()
-			.catch(() => null)) as CreateTaskResult | null;
-		throw new Error(result?.message ?? "Failed to start task.");
-	}
 }
 
 function buildAttachmentOnlyInstructions(attachments: { name: string }[]) {

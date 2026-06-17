@@ -7,5 +7,5 @@ export default async function FactoryIntegrationsSettingsPage({
 }) {
 	const { orgHandle, factoryId } = await params;
 
-	redirect(`/${orgHandle}/factories/${factoryId}/integrations`);
+	redirect(`/${orgHandle}/factories/${factoryId}/settings`);
 }

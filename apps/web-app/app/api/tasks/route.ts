@@ -46,6 +46,28 @@ const taskTx = (taskId: string) => {
 	return tx;
 };
 
+const eventTx = (eventId: string) => {
+	const tx = db.tx.events[eventId];
+
+	if (!tx) {
+		throw new Error(`Event transaction builder ${eventId} not found`);
+	}
+
+	return tx;
+};
+
+const agentSessionTx = (agentSessionId: string) => {
+	const tx = db.tx.agentSessions[agentSessionId];
+
+	if (!tx) {
+		throw new Error(
+			`Agent session transaction builder ${agentSessionId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 export async function POST(req: NextRequest) {
 	const body = parseCreateTaskBody(await readJson(req));
 	const instructions =
@@ -82,14 +104,16 @@ export async function POST(req: NextRequest) {
 	}
 
 	const taskId = body.taskId ?? id();
+	const agentSessionId = id();
+	const eventId = id();
 	const createdAt = new Date().toISOString();
 	const name = body.name ?? (await generateTaskName(instructions));
 
-	await db.transact(
+	await db.transact([
 		taskTx(taskId)
 			.create({
 				name,
-				status: "todo",
+				status: "in_progress",
 				instructions,
 				createdAt,
 				agentModel: body.agentModel,
@@ -97,15 +121,35 @@ export async function POST(req: NextRequest) {
 				agentSpeed: body.agentSpeed,
 			})
 			.link({ factory: authResult.factory.id, agent: agent.id }),
-	);
+		agentSessionTx(agentSessionId)
+			.create({
+				name: "Agent",
+				status: "running",
+				createdAt,
+				updatedAt: createdAt,
+			})
+			.link({ task: taskId, agent: agent.id }),
+		eventTx(eventId)
+			.create({
+				type: "factoryplane.new_task",
+				data: {
+					taskId,
+					name,
+					instructions,
+				},
+				createdAt,
+			})
+			.link({ task: taskId, agentSession: agentSessionId }),
+	]);
 
 	return NextResponse.json(
 		{
 			taskId,
 			factoryId: authResult.factory.id,
 			agentId: agent.id,
+			agentSessionId,
 			name,
-			status: "todo",
+			status: "in_progress",
 		},
 		{ status: 201 },
 	);

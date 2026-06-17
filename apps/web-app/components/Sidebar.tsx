@@ -4,12 +4,10 @@ import {
 	BuildingsIcon,
 	CheckIcon,
 	FadersHorizontalIcon,
-	KanbanIcon,
 	MinusCircleIcon,
 	PlusCircleIcon,
 	ShapesIcon,
 	SidebarSimpleIcon,
-	SlackLogoIcon,
 	UserCircleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
@@ -198,16 +196,9 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 	);
 	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
 	const personalSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/personal-settings`;
-	const tasksHref = `/${currentOrgHandle}/factories/${currentFactoryId}/tasks`;
-	const floorHref = `/${currentOrgHandle}/factories/${currentFactoryId}/floor`;
-	const integrationsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/integrations`;
 	const organisationSettingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isPersonalSettingsSelected = pathname.startsWith(personalSettingsHref);
-	const isTasksSelected =
-		pathname === tasksHref || pathname.startsWith(`${tasksHref}/`);
-	const isFloorSelected = pathname === floorHref;
-	const isIntegrationsSelected = pathname === integrationsHref;
 	const isOrganisationSettingsSelected = pathname.startsWith(
 		organisationSettingsHref,
 	);
@@ -292,40 +283,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								</span>
 							</Link>
 							<Link
-								href={floorHref}
-								onClick={closeAfterMobileNavigation}
-								className={cn(
-									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-									isFloorSelected ? "bg-grayscale-3" : "",
-								)}
-							>
-								<CornerBrackets
-									placement="inside"
-									color={isFloorSelected ? "accent-9" : "grayscale-8"}
-									size={6}
-									active={isFloorSelected}
-								/>
-								<ShapesIcon weight="bold" className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">Factory</span>
-							</Link>
-							<Link
-								href={integrationsHref}
-								onClick={closeAfterMobileNavigation}
-								className={cn(
-									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-									isIntegrationsSelected ? "bg-grayscale-3" : "",
-								)}
-							>
-								<CornerBrackets
-									placement="inside"
-									color={isIntegrationsSelected ? "accent-9" : "grayscale-8"}
-									size={6}
-									active={isIntegrationsSelected}
-								/>
-								<SlackLogoIcon weight="bold" className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">Integrations</span>
-							</Link>
-							<Link
 								href={organisationSettingsHref}
 								onClick={closeAfterMobileNavigation}
 								className={cn(
@@ -345,27 +302,6 @@ export default function Sidebar({ onToggleCollapse }: SidebarProps) {
 								<span className="min-w-0 flex-1 truncate">
 									Organisation Settings
 								</span>
-							</Link>
-							<Link
-								href={tasksHref}
-								onClick={closeAfterMobileNavigation}
-								className={cn(
-									"group relative mt-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
-									isTasksSelected ? "bg-grayscale-3" : "",
-								)}
-							>
-								<CornerBrackets
-									placement="inside"
-									color={isTasksSelected ? "accent-9" : "grayscale-8"}
-									size={6}
-									active={isTasksSelected}
-								/>
-								<KanbanIcon weight="bold" className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">Tasks</span>
-								<NumberFlow
-									value={activeTasks.length}
-									className="shrink-0 font-mono text-[11px] leading-none font-semibold text-grayscale-10 tabular-nums"
-								/>
 							</Link>
 							<div className="mt-2">
 								<Button

@@ -19,7 +19,7 @@ export default function FactoryPage() {
 					What do you want to build?
 				</h1>
 				<p className="text-balance text-sm text-grayscale-11">
-					Create a fresh task, then start it now or add it to todo.
+					Create a fresh task and start an agent session.
 				</p>
 			</div>
 			<Button
