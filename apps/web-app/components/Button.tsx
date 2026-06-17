@@ -25,7 +25,7 @@ const baseClassName =
 
 const variantClassName: Record<ButtonVariant, string> = {
 	primary:
-		"border-grayscale-12 bg-grayscale-12 text-grayscale-1 hover:bg-grayscale-11 hover:border-grayscale-11",
+		"border-grayscale-12 bg-grayscale-12 text-grayscale-1 hover:border-grayscale-11 hover:bg-grayscale-11 dark:border-grayscale-7 dark:bg-grayscale-6 dark:text-grayscale-12 dark:hover:border-grayscale-7 dark:hover:bg-grayscale-7",
 	secondary:
 		"border-grayscale-4 bg-grayscale-1 text-grayscale-12 hover:bg-grayscale-2 hover:border-grayscale-5",
 };
@@ -53,7 +53,7 @@ export function Button({
 			tone={shortcutTone}
 			className={cn(
 				variant === "primary"
-					? "border-grayscale-11 bg-grayscale-11 text-grayscale-1 hover:bg-grayscale-11 hover:text-grayscale-1 group-hover:bg-grayscale-11 group-hover:text-grayscale-1"
+					? "border-grayscale-11 bg-grayscale-11 text-grayscale-1 hover:bg-grayscale-11 hover:text-grayscale-1 group-hover:bg-grayscale-11 group-hover:text-grayscale-1 dark:border-grayscale-7 dark:bg-grayscale-7 dark:text-grayscale-12 dark:hover:bg-grayscale-7 dark:hover:text-grayscale-12 dark:group-hover:bg-grayscale-7 dark:group-hover:text-grayscale-12"
 					: "",
 				shortcutClassName,
 			)}

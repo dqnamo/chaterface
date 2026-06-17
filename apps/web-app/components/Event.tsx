@@ -63,6 +63,12 @@ type TimelineContext = {
 	runKey: string;
 	turnKey: string;
 };
+type TimestampMeta = {
+	dateTime: string;
+	relative: string;
+	time: string;
+	title: string;
+};
 
 const OUTPUT_PREVIEW_LIMIT = 6000;
 const MESSAGE_LINK_SAFETY = { enabled: false } satisfies LinkSafetyConfig;
@@ -320,7 +326,8 @@ export default function Event({
 	const { event, phase } = node;
 	const type = event.type ?? "event";
 	const data = asRecord(event.data) ?? {};
-	const timestamp = formatTimestamp(event.createdAt);
+	const timestampMeta = formatTimestampMeta(event.createdAt);
+	const timestamp = timestampMeta?.time;
 
 	if (type === "factoryplane.new_task") {
 		return <NewTaskEvent data={data} task={task} timestamp={timestamp} />;
@@ -393,6 +400,7 @@ export default function Event({
 				data={data}
 				phase={phase}
 				timestamp={timestamp}
+				timestampMeta={timestampMeta}
 				type={type}
 			/>
 		);
@@ -668,12 +676,14 @@ function CodexItemEvent({
 	data,
 	phase,
 	timestamp,
+	timestampMeta,
 	type,
 }: {
 	agentName?: string;
 	data: JsonRecord;
 	phase?: TimelinePhase;
 	timestamp?: string;
+	timestampMeta?: TimestampMeta;
 	type: string;
 }) {
 	const item = asRecord(data.item);
@@ -700,7 +710,7 @@ function CodexItemEvent({
 			<AgentMessage
 				agentName={agentName}
 				text={getString(item, "text") ?? "No message text"}
-				timestamp={timestamp}
+				timestampMeta={timestampMeta}
 			/>
 		);
 	}
@@ -842,11 +852,11 @@ function FileChangeEvent({
 function AgentMessage({
 	agentName,
 	text,
-	timestamp,
+	timestampMeta,
 }: {
 	agentName?: string;
 	text: string;
-	timestamp?: string;
+	timestampMeta?: TimestampMeta;
 }) {
 	const displayName = agentName ?? "Codex";
 
@@ -858,19 +868,30 @@ function AgentMessage({
 			layout="position"
 			transition={{ duration: 0.18, ease: "easeOut" }}
 		>
-			<div className="flex min-w-0 max-w-full flex-col gap-1 px-3">
-				<div className="flex min-w-0 items-center gap-2">
-					<TimelineAvatar glyph="AI" logo source="agent" />
-					<p className="min-w-0 truncate text-[13px] font-medium leading-5 text-grayscale-12">
-						{displayName}
-					</p>
-					{timestamp ? (
-						<time className="shrink-0 text-[11px] leading-4 text-grayscale-9">
-							{timestamp}
+			<div className="flex min-w-0 max-w-full flex-col gap-1.5 px-3">
+				<div className="flex min-w-0 items-center justify-between gap-3">
+					<div className="flex min-w-0 items-center gap-2">
+						<TimelineAvatar glyph="AI" logo source="agent" />
+						<p className="min-w-0 truncate text-[13px] font-medium leading-5 text-grayscale-12">
+							{displayName}
+						</p>
+					</div>
+					{timestampMeta ? (
+						<time
+							className="shrink-0 text-right text-[11px] leading-4 text-grayscale-8"
+							dateTime={timestampMeta.dateTime}
+							suppressHydrationWarning
+							title={timestampMeta.title}
+						>
+							{timestampMeta.time}
+							<span className="text-grayscale-7"> · </span>
+							<span>{timestampMeta.relative}</span>
 						</time>
 					) : null}
 				</div>
-				<MessageBubble text={text} />
+				<div className="ml-9 min-w-0 max-w-full">
+					<MessageBubble text={text} />
+				</div>
 			</div>
 		</motion.article>
 	);
@@ -1062,11 +1083,7 @@ function SystemEventIcon({
 	}
 
 	if (logo) {
-		return (
-			<span className="mt-1 flex size-3.5 shrink-0 items-center justify-center text-accent-11">
-				<Logo size={1.35} />
-			</span>
-		);
+		return <Logo className="mt-0.5 size-4 text-accent-11" />;
 	}
 
 	return (
@@ -1087,25 +1104,19 @@ function TimelineAvatar({
 }) {
 	if (source === "agent") {
 		return (
-			<div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-grayscale-12 text-grayscale-1">
-				<Image
-					alt=""
-					aria-hidden="true"
-					className="size-4 object-contain invert"
-					height={16}
-					src="/codex-logo.png"
-					width={16}
-				/>
-			</div>
+			<Image
+				alt=""
+				aria-hidden="true"
+				className="mt-0.5 size-4 shrink-0 object-contain dark:invert"
+				height={16}
+				src="/codex.svg"
+				width={16}
+			/>
 		);
 	}
 
 	if (source === "factoryplane" || logo) {
-		return (
-			<div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-grayscale-3 bg-grayscale-1 text-accent-11">
-				<Logo size={2} />
-			</div>
-		);
+		return <Logo className="mt-0.5 size-4 text-accent-11" />;
 	}
 
 	return (
@@ -1389,7 +1400,7 @@ function formatContentType(value: string) {
 	return value.replace(/^image\//, "").toUpperCase();
 }
 
-function formatTimestamp(value: unknown): string | undefined {
+function formatTimestampMeta(value: unknown): TimestampMeta | undefined {
 	const time = parseTimestamp(value);
 
 	if (Number.isNaN(time)) {
@@ -1398,10 +1409,54 @@ function formatTimestamp(value: unknown): string | undefined {
 
 	const date = new Date(time);
 
-	return date.toLocaleTimeString([], {
-		hour: "2-digit",
-		minute: "2-digit",
+	return {
+		dateTime: date.toISOString(),
+		relative: formatRelativeTimestamp(time),
+		time: date.toLocaleTimeString([], {
+			hour: "2-digit",
+			minute: "2-digit",
+		}),
+		title: date.toLocaleString([], {
+			dateStyle: "medium",
+			timeStyle: "short",
+		}),
+	};
+}
+
+function formatRelativeTimestamp(time: number) {
+	const diffSeconds = Math.round((time - Date.now()) / 1000);
+	const absoluteSeconds = Math.abs(diffSeconds);
+
+	if (absoluteSeconds < 45) {
+		return "just now";
+	}
+
+	const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+		["minute", 60],
+		["hour", 60 * 60],
+		["day", 60 * 60 * 24],
+		["week", 60 * 60 * 24 * 7],
+		["month", 60 * 60 * 24 * 30],
+		["year", 60 * 60 * 24 * 365],
+	];
+	const formatter = new Intl.RelativeTimeFormat(undefined, {
+		numeric: "auto",
+		style: "narrow",
 	});
+
+	for (let index = 0; index < units.length; index += 1) {
+		const [unit, unitSeconds] = units[index] ?? ["year", 60 * 60 * 24 * 365];
+		const nextUnitSeconds = units[index + 1]?.[1];
+
+		if (!nextUnitSeconds || absoluteSeconds < nextUnitSeconds) {
+			return formatter.format(Math.round(diffSeconds / unitSeconds), unit);
+		}
+	}
+
+	return formatter.format(
+		Math.round(diffSeconds / (60 * 60 * 24 * 365)),
+		"year",
+	);
 }
 
 function getUserDisplayName(profile: UserDisplayProfile | undefined) {

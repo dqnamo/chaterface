@@ -37,7 +37,7 @@ function Trigger({ className, ...props }: DialogTriggerProps) {
 	return (
 		<BaseDialog.Trigger
 			className={mergeClassName(
-				"group relative flex h-8 min-w-0 flex-row items-center justify-center gap-2 rounded-md border border-grayscale-12 bg-grayscale-12 px-3 text-xs font-medium whitespace-nowrap text-grayscale-1 transition-colors duration-150 hover:border-grayscale-11 hover:bg-grayscale-11 disabled:cursor-not-allowed disabled:opacity-50",
+				"group relative flex h-8 min-w-0 flex-row items-center justify-center gap-2 rounded-md border border-grayscale-12 bg-grayscale-12 px-3 text-xs font-medium whitespace-nowrap text-grayscale-1 transition-colors duration-150 hover:border-grayscale-11 hover:bg-grayscale-11 disabled:cursor-not-allowed disabled:opacity-50 dark:border-grayscale-7 dark:bg-grayscale-6 dark:text-grayscale-12 dark:hover:border-grayscale-7 dark:hover:bg-grayscale-7",
 				className,
 			)}
 			{...props}

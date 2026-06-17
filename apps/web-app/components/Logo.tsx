@@ -1,14 +1,18 @@
 type LogoProps = {
+	className?: string;
 	size?: number;
 };
 
-export default function Logo({ size = 4 }: LogoProps) {
-	const dimension = size * 3.5;
+export default function Logo({ className, size = 4 }: LogoProps) {
+	const dimension = className?.includes("size-") ? undefined : size * 3.5;
+	const resolvedClassName = ["block shrink-0 text-accent-9", className]
+		.filter(Boolean)
+		.join(" ");
 
 	return (
 		<svg
 			aria-hidden="true"
-			className="block shrink-0 text-accent-9"
+			className={resolvedClassName}
 			fill="none"
 			height={dimension}
 			viewBox="0 0 629 654"
