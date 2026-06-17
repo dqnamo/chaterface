@@ -1,32 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
-import { createEncryptionService } from "@/encryption";
 import db from "@/instant.admin";
 
-type McpAuthBody =
-	| { type: "none" }
-	| { type: "bearer"; token: string }
-	| { type: "headers"; headers: Array<{ name: string; value: string }> }
-	| {
-			type: "oauth";
-			issuer?: string;
-			authorizationUrl?: string;
-			tokenUrl?: string;
-			clientId?: string;
-			clientSecret?: string;
-			scope?: string;
-			resource?: string;
-	  }
-	| {
-			type: "client_credentials";
-			tokenUrl: string;
-			clientId: string;
-			clientSecret: string;
-			scope?: string;
-			resource?: string;
-	  };
-
-const HTTP_HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+type McpAuthBody = { type: "oauth" };
 
 export async function POST(
 	req: NextRequest,
@@ -42,7 +17,7 @@ export async function POST(
 
 	if (!body) {
 		return NextResponse.json(
-			{ message: "A valid MCP auth configuration is required" },
+			{ message: "Only OAuth MCP auth is supported" },
 			{ status: 400 },
 		);
 	}
@@ -127,206 +102,28 @@ const parseMcpAuthBody = (value: unknown): McpAuthBody | undefined => {
 		return undefined;
 	}
 
-	if (value.type === "none") {
-		return { type: "none" };
-	}
-
-	if (value.type === "bearer" && typeof value.token === "string") {
-		return { type: "bearer", token: value.token };
-	}
-
-	if (value.type === "headers" && Array.isArray(value.headers)) {
-		const headers = value.headers.flatMap((header) => {
-			if (!isRecord(header)) {
-				return [];
-			}
-
-			const name = getHeaderName(header.name);
-
-			if (!name || typeof header.value !== "string") {
-				return [];
-			}
-
-			return [{ name, value: header.value }];
-		});
-
-		return headers.length > 0 ? { type: "headers", headers } : undefined;
-	}
-
 	if (value.type === "oauth") {
-		return {
-			type: "oauth",
-			issuer: getOptionalString(value.issuer),
-			authorizationUrl: getOptionalUrl(value.authorizationUrl),
-			tokenUrl: getOptionalUrl(value.tokenUrl),
-			clientId: getOptionalString(value.clientId),
-			clientSecret:
-				typeof value.clientSecret === "string" && value.clientSecret.length > 0
-					? value.clientSecret
-					: undefined,
-			scope: getOptionalString(value.scope),
-			resource: getOptionalString(value.resource),
-		};
-	}
-
-	if (value.type === "client_credentials") {
-		const tokenUrl = getOptionalUrl(value.tokenUrl);
-		const clientId = getOptionalString(value.clientId);
-		const clientSecret =
-			typeof value.clientSecret === "string" && value.clientSecret.length > 0
-				? value.clientSecret
-				: undefined;
-
-		if (!tokenUrl || !clientId || !clientSecret) {
-			return undefined;
-		}
-
-		return {
-			type: "client_credentials",
-			tokenUrl,
-			clientId,
-			clientSecret,
-			scope: getOptionalString(value.scope),
-			resource: getOptionalString(value.resource),
-		};
+		return { type: "oauth" };
 	}
 
 	return undefined;
 };
 
-const buildMcpAuth = async (body: McpAuthBody) => {
+const buildMcpAuth = (_body: McpAuthBody) => {
 	const now = new Date().toISOString();
 
-	if (body.type === "none") {
-		return { type: "none" };
-	}
-
-	if (body.type === "oauth") {
-		const encryptionService = getEncryptionService();
-
-		return {
-			type: "oauth",
-			status: "not_connected",
-			issuer: body.issuer,
-			authorizationUrl: body.authorizationUrl,
-			tokenUrl: body.tokenUrl,
-			clientId: body.clientId,
-			clientSecretEncrypted: body.clientSecret
-				? await encryptionService.encrypt(body.clientSecret)
-				: undefined,
-			scope: body.scope,
-			resource: body.resource,
-			updatedAt: now,
-		};
-	}
-
-	if (body.type === "client_credentials") {
-		const encryptionService = getEncryptionService();
-
-		return {
-			type: "client_credentials",
-			status: "configured",
-			tokenUrl: body.tokenUrl,
-			clientId: body.clientId,
-			clientSecretEncrypted: await encryptionService.encrypt(body.clientSecret),
-			scope: body.scope,
-			resource: body.resource,
-			updatedAt: now,
-		};
-	}
-
-	const encryptionService = getEncryptionService();
-
-	if (body.type === "bearer") {
-		return {
-			type: "bearer",
-			tokenEncrypted: await encryptionService.encrypt(body.token),
-			updatedAt: now,
-		};
-	}
-
 	return {
-		type: "headers",
-		headers: await Promise.all(
-			body.headers.map(async (header) => ({
-				id: randomUUID(),
-				name: header.name,
-				valueEncrypted: await encryptionService.encrypt(header.value),
-				createdAt: now,
-			})),
-		),
+		type: "oauth",
+		status: "not_connected",
 		updatedAt: now,
 	};
 };
 
-const summarizeAuth = (auth: Awaited<ReturnType<typeof buildMcpAuth>>) => {
-	if (auth.type === "bearer") {
-		return { type: "bearer", configured: true };
-	}
-
-	if (auth.type === "headers") {
-		return {
-			type: "headers",
-			headers: (auth.headers ?? []).map((header) => ({
-				id: header.id,
-				name: header.name,
-				createdAt: header.createdAt,
-			})),
-		};
-	}
-
+const summarizeAuth = (auth: ReturnType<typeof buildMcpAuth>) => {
 	return {
 		type: auth.type,
-		status: "status" in auth ? auth.status : undefined,
+		status: auth.status,
 	};
-};
-
-const getEncryptionService = () => {
-	const encryptionKey = process.env.SECRET_ENCRYPTION_KEY;
-
-	if (!encryptionKey) {
-		throw new Error("Secret encryption key is not configured");
-	}
-
-	return createEncryptionService(encryptionKey);
-};
-
-const getHeaderName = (value: unknown) => {
-	if (typeof value !== "string") {
-		return undefined;
-	}
-
-	const trimmed = value.trim();
-	return HTTP_HEADER_NAME_PATTERN.test(trimmed) ? trimmed : undefined;
-};
-
-const getOptionalString = (value: unknown) => {
-	if (typeof value !== "string") {
-		return undefined;
-	}
-
-	const trimmed = value.trim();
-	return trimmed.length > 0 ? trimmed : undefined;
-};
-
-const getOptionalUrl = (value: unknown) => {
-	const trimmed = getOptionalString(value);
-
-	if (!trimmed) {
-		return undefined;
-	}
-
-	try {
-		const url = new URL(trimmed);
-
-		if (url.protocol !== "https:" && url.protocol !== "http:") {
-			return undefined;
-		}
-
-		return url.toString();
-	} catch {
-		return undefined;
-	}
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {

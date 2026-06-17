@@ -314,7 +314,7 @@ curl {{FACTORYPLANE_API_URL}}/mcp-servers \
 
 Use this when the user asks you to add an HTTP MCP server to future task sandboxes. `name` must use letters, numbers, `_`, or `-` and start with a letter or number.
 
-Supported auth types are `none`, `bearer`, `headers`, `oauth`, and `client_credentials`. OAuth MCPs are connected from the Factoryplane settings UI because the user must complete a browser authorization flow.
+OAuth is the only supported MCP auth type. OAuth MCPs are connected from the Factoryplane settings UI because the user must complete a browser authorization flow.
 
 **Endpoint:** `POST /mcp-servers`
 
@@ -323,42 +323,15 @@ Supported auth types are `none`, `bearer`, `headers`, `oauth`, and `client_crede
 - `name` — short MCP server name, e.g. `"linear"`
 - `url` — Streamable HTTP MCP endpoint, e.g. `"https://mcp.example.com/mcp"`
 - `enabled` — optional boolean, defaults to `true`
-- `auth` — optional auth object
+- `auth` — optional auth object; only `{"type":"oauth"}` is supported
 
-**Bearer token example:**
-
-```bash
-curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
-  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"linear","url":"https://mcp.example.com/mcp","auth":{"type":"bearer","token":"token-value"}}'
-```
-
-**Header auth example:**
+**Example:**
 
 ```bash
 curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
   -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"name":"custom","url":"https://mcp.example.com/mcp","auth":{"type":"headers","headers":[{"name":"X-API-Key","value":"token-value"}]}}'
-```
-
-**OAuth metadata example:**
-
-```bash
-curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
-  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"oauth-mcp","url":"https://mcp.example.com/mcp","auth":{"type":"oauth","clientId":"client-id","scope":"read write"}}'
-```
-
-**Client credentials example:**
-
-```bash
-curl -X POST {{FACTORYPLANE_API_URL}}/mcp-servers \
-  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"service-mcp","url":"https://mcp.example.com/mcp","auth":{"type":"client_credentials","tokenUrl":"https://auth.example.com/oauth/token","clientId":"client-id","clientSecret":"client-secret","scope":"read write"}}'
+  -d '{"name":"linear","url":"https://mcp.example.com/mcp","auth":{"type":"oauth"}}'
 ```
 
 ### Update an MCP server

@@ -13,7 +13,7 @@ type UpdateMcpServerBody = {
 	name?: string;
 	url?: string;
 	enabled?: boolean;
-	auth?: { type: "none" | "oauth" | "client_credentials" };
+	auth?: { type: "oauth" };
 };
 
 const mcpServerTx = (mcpServerId: string) => {
@@ -233,29 +233,15 @@ const parseMetadataOnlyAuth = (
 		return undefined;
 	}
 
-	if (
-		value.type === "none" ||
-		value.type === "oauth" ||
-		value.type === "client_credentials"
-	) {
+	if (value.type === "oauth") {
 		return { type: value.type };
 	}
 
 	return undefined;
 };
 
-const createMetadataOnlyAuth = (value: {
-	type: "none" | "oauth" | "client_credentials";
-}) => {
-	if (value.type === "oauth") {
-		return { type: "oauth", status: "not_connected" };
-	}
-
-	if (value.type === "client_credentials") {
-		return { type: "client_credentials", status: "not_configured" };
-	}
-
-	return { type: "none" };
+const createMetadataOnlyAuth = (_value: { type: "oauth" }) => {
+	return { type: "oauth", status: "not_connected" };
 };
 
 const getMcpServerName = (value: unknown) => {
