@@ -1,15 +1,22 @@
 import {
 	ArrowRightIcon,
-	ChatsTeardropIcon,
 	CheckCircleIcon,
+	CornersOutIcon,
 	DesktopTowerIcon,
 	FadersIcon,
+	FileCodeIcon,
 	FilesIcon,
 	GithubLogoIcon,
+	GitPullRequestIcon,
+	PaperclipIcon,
+	PlayCircleIcon,
 	PlugsConnectedIcon,
 	RocketLaunchIcon,
+	SidebarSimpleIcon,
+	TerminalWindowIcon,
 	TextboxIcon,
 	UsersThreeIcon,
+	XCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Footer } from "@/components/Footer";
 import Logo from "@/components/Logo";
@@ -67,7 +74,7 @@ export default function Home() {
 		<main className="flex w-full flex-col divide-y divide-grayscale-3 dark:divide-grayscale-2">
 			<MobileHeader />
 
-			<div className="relative mx-auto max-w-4xl flex w-full flex-col border-x border-grayscale-3 p-4 pt-[4.5rem] dark:border-grayscale-2 md:p-8 lg:p-10">
+			<div className="relative mx-auto flex w-full max-w-7xl flex-col border-x border-grayscale-3 p-4 pt-[4.5rem] dark:border-grayscale-2 md:p-8 lg:p-10">
 				<div className="flex flex-col gap-px p-2">
 					<div className="flex flex-row items-center gap-2">
 						<Logo className="size-9 rounded-md" />
@@ -289,157 +296,420 @@ function FactoryDesktopPreview() {
 		<section className="mt-8">
 			<div
 				aria-label="Factory platform desktop UI preview"
-				className="small-shadow overflow-x-auto rounded-[16px] border border-grayscale-3 bg-grayscale-2 p-1.5 dark:border-grayscale-4 dark:bg-grayscale-3"
+				className="factory-app-preview small-shadow overflow-x-auto rounded-[16px] border border-grayscale-3 bg-grayscale-2 p-1.5 dark:border-grayscale-4 dark:bg-grayscale-3"
 				role="img"
 			>
-				<div className="flex h-[330px] min-w-[700px] overflow-hidden rounded-[13px] border border-grayscale-3 bg-grayscale-1 text-[11px] text-grayscale-12 leading-4 dark:border-grayscale-4">
-					<aside className="flex w-12 shrink-0 flex-col justify-between border-grayscale-3 border-r p-1.5 dark:border-grayscale-4">
-						<div className="flex flex-col gap-1.5">
-							<div className="flex size-9 items-center justify-center rounded-lg border border-b-2 border-grayscale-3 bg-white text-grayscale-11 dark:border-grayscale-4 dark:bg-grayscale-3">
-								<span className="text-sm">+</span>
-							</div>
-							<div className="relative flex size-9 items-center justify-center rounded-lg bg-orange-9 font-semibold text-[11px] text-white">
-								FP
-								<span className="-right-1 -top-1 absolute flex size-4 items-center justify-center rounded-md border-2 border-grayscale-1 bg-blue-9 font-mono text-[10px]">
-									3
+				<div className="flex h-[540px] min-w-[1080px] overflow-hidden rounded-[13px] border border-grayscale-3 bg-grayscale-1 text-[11px] leading-4 text-grayscale-12 dark:border-grayscale-4">
+					<aside className="flex w-64 shrink-0 flex-col border-grayscale-3 border-r bg-grayscale-1 p-2 dark:border-grayscale-4">
+						<div className="mb-2 flex items-start justify-between gap-2 bg-grayscale-1 pb-2">
+							<div className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1">
+								<div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-9 font-semibold text-[10px] text-white">
+									FP
+								</div>
+								<span className="flex min-w-0 flex-1 flex-col text-left">
+									<span className="truncate text-sm leading-tight text-grayscale-12">
+										Product Factory
+									</span>
+									<span className="truncate text-[11px] leading-tight text-grayscale-10">
+										Acme Labs
+									</span>
 								</span>
 							</div>
-							<div className="flex size-9 items-center justify-center rounded-lg bg-cyan-9 font-semibold text-[11px] text-white opacity-60">
-								DX
-							</div>
+							<span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-grayscale-2 text-grayscale-11">
+								<SidebarSimpleIcon size={16} weight="bold" />
+							</span>
 						</div>
-						<div className="flex size-8 items-center justify-center rounded-full bg-grayscale-3 font-semibold text-[10px] text-grayscale-11">
-							JP
+						<div className="flex flex-col gap-px">
+							<PreviewNavItem icon={<FadersIcon size={15} weight="bold" />}>
+								Factory Settings
+							</PreviewNavItem>
+							<PreviewNavItem icon={<UsersThreeIcon size={15} weight="bold" />}>
+								Personal Settings
+							</PreviewNavItem>
+							<PreviewNavItem
+								icon={<DesktopTowerIcon size={15} weight="bold" />}
+							>
+								Organisation Settings
+							</PreviewNavItem>
 						</div>
-					</aside>
-
-					<aside className="flex w-12 shrink-0 flex-col items-center gap-1 border-grayscale-3 border-r p-1.5 dark:border-grayscale-4">
-						<span className="flex size-9 items-center justify-center rounded-lg bg-grayscale-3 text-grayscale-12">
-							<ChatsTeardropIcon size={16} weight="bold" />
-						</span>
-						<span className="flex size-9 items-center justify-center rounded-lg text-grayscale-11">
-							<UsersThreeIcon size={16} weight="bold" />
-						</span>
-						<span className="flex size-9 items-center justify-center rounded-lg text-grayscale-11">
-							<DesktopTowerIcon size={16} weight="bold" />
-						</span>
-						<span className="flex size-9 items-center justify-center rounded-lg text-grayscale-11">
-							<FadersIcon size={16} weight="bold" />
-						</span>
-					</aside>
-
-					<aside className="flex w-52 shrink-0 flex-col border-grayscale-3 border-r p-1.5 dark:border-grayscale-4">
-						<div className="rounded-lg border border-black bg-grayscale-12 px-2 py-1.5 font-medium text-grayscale-2 text-xs dark:border-grayscale-6 dark:bg-grayscale-5 dark:text-grayscale-11">
-							New worker
+						<PreviewButton className="mt-2 w-full justify-start" shortcut="N">
+							<PlayCircleIcon weight="bold" className="size-4 shrink-0" />
+							<p className="min-w-0 flex-1 truncate text-current">New Task</p>
+						</PreviewButton>
+						<div className="mt-3 flex items-center justify-between px-3">
+							<p className="font-mono font-semibold text-[11px] leading-none text-grayscale-10 uppercase">
+								Active Tasks
+							</p>
+							<p className="font-mono font-semibold text-[11px] leading-none text-grayscale-10 uppercase">
+								4
+							</p>
 						</div>
-						<div className="mt-3">
-							<div className="flex items-center justify-between px-2 pb-1 font-mono font-semibold text-[10px] text-grayscale-10 uppercase">
-								<span>Active workers</span>
-								<span>3</span>
-							</div>
-							<div className="flex flex-col gap-px">
-								<PreviewWorker
-									active
-									age="2m ago"
-									name="Ship settings page"
-									status="running"
-								/>
-								<PreviewWorker
-									age="18m ago"
-									name="Add billing webhook tests"
-									status="idle"
-								/>
-								<PreviewWorker
-									age="44m ago"
-									name="Review MCP scopes"
-									status="queued"
-								/>
-							</div>
-						</div>
-						<div className="mt-3">
-							<div className="flex items-center justify-between px-2 pb-1 font-mono font-semibold text-[10px] text-grayscale-10 uppercase">
-								<span>Retired workers</span>
-								<span>1</span>
-							</div>
-							<PreviewWorker
-								age="Yesterday"
-								name="Prototype login flow"
-								status="retired"
+						<div className="mt-2 flex min-w-0 flex-col gap-px">
+							<PreviewTask
+								active
+								name="Refresh homepage preview"
+								status="running"
+							/>
+							<PreviewTask name="Wire Slack install callback" status="idle" />
+							<PreviewTask name="Review MCP server scopes" status="queued" />
+							<PreviewTask
+								name="Polish secrets settings copy"
+								status="complete"
 							/>
 						</div>
 					</aside>
 
-					<section className="flex min-w-0 flex-1 items-center justify-center px-6 py-5">
-						<div className="flex w-full max-w-sm flex-col items-center gap-4">
-							<div className="flex flex-col items-center">
-								<Logo className="size-8" />
-								<h3 className="mt-3 font-medium text-grayscale-12 text-sm">
-									Spawn a new worker
-								</h3>
-								<p className="max-w-64 text-center text-[11px] text-grayscale-11 leading-4">
-									Describe the task and a fresh worker will be spawned in the
-									factory to do it.
+					<section className="flex min-w-0 flex-1 flex-col overflow-hidden">
+						<div className="flex shrink-0 items-center justify-between border-grayscale-4 border-b p-1.5">
+							<div className="flex min-w-0 flex-row items-center">
+								<span className="flex size-6 shrink-0 items-center justify-center text-grayscale-11">
+									<SidebarSimpleIcon size={16} weight="bold" />
+								</span>
+								<p className="truncate p-1 text-grayscale-11 text-sm">
+									Refresh homepage preview
 								</p>
 							</div>
-
-							<div className="small-shadow w-full overflow-hidden rounded-xl border border-grayscale-3 bg-white dark:border-grayscale-4 dark:bg-grayscale-2">
-								<div className="min-h-20 p-3 text-[11px] text-grayscale-10 leading-4">
-									Build the new homepage preview and feature grid, then verify
-									it on mobile and desktop.
-								</div>
-								<div className="flex items-center justify-between border-grayscale-3 border-t p-2 dark:border-grayscale-4">
-									<div className="flex items-center gap-2">
-										<span className="rounded-lg border border-grayscale-3 bg-white px-2 py-1 text-[10px] text-grayscale-11 dark:border-grayscale-4 dark:bg-grayscale-3">
-											Attach image
-										</span>
-										<span className="rounded-lg bg-grayscale-3 px-2 py-1 font-mono text-grayscale-10 text-[10px] uppercase">
-											Codex
-										</span>
+							<div className="flex shrink-0 items-center gap-1.5">
+								<PreviewButton
+									variant="secondary"
+									className="h-7 border-grayscale-4 bg-grayscale-3 hover:border-green-6 hover:bg-green-3"
+								>
+									<GitPullRequestIcon
+										weight="bold"
+										className="size-4 text-green-9"
+									/>
+									<span>View PR</span>
+								</PreviewButton>
+								<PreviewButton variant="secondary" className="h-7">
+									<CheckCircleIcon weight="bold" className="size-4 shrink-0" />
+									Mark as complete
+								</PreviewButton>
+							</div>
+						</div>
+						<div className="flex shrink-0 items-center gap-2 border-grayscale-4 border-b px-3 py-1.5">
+							<div className="relative flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-x-auto rounded-md">
+								<PreviewSession active label="Codex" status="running" />
+								<PreviewSession label="Review" status="idle" />
+							</div>
+							<PreviewButton variant="secondary" className="h-7 shrink-0">
+								<PlayCircleIcon weight="bold" className="size-4" />
+								Add session
+							</PreviewButton>
+							<PreviewTabs active="Minified" items={["Minified", "Full"]} />
+						</div>
+						<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+							<div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+								<div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+									<PreviewEvent
+										label="You"
+										text="Make the landing-page preview match the current task workspace and give the page more room."
+									/>
+									<PreviewEvent
+										label="Codex"
+										tone="agent"
+										text="Updated the website hero mock to show the task sidebar, session tabs, composer, and preview panel."
+									/>
+									<div className="rounded-lg border border-grayscale-3 bg-grayscale-2 p-3 dark:border-grayscale-4">
+										<div className="mb-2 flex items-center gap-2">
+											<FileCodeIcon
+												size={15}
+												weight="bold"
+												className="text-accent-9"
+											/>
+											<p className="font-mono text-[11px] text-grayscale-11">
+												app/page.tsx
+											</p>
+											<p className="ml-auto font-mono text-[11px] text-green-10">
+												+214
+											</p>
+										</div>
+										<div className="space-y-1 font-mono text-[10px]">
+											<div className="rounded bg-green-3 px-2 py-1 text-green-11">
+												+ &lt;PreviewSession active label=&quot;Codex&quot;
+												/&gt;
+											</div>
+											<div className="rounded bg-red-3 px-2 py-1 text-red-11">
+												- &lt;h3&gt;Spawn a new worker&lt;/h3&gt;
+											</div>
+										</div>
 									</div>
-									<span className="rounded-lg bg-grayscale-12 px-2 py-1 font-medium text-[10px] text-grayscale-2 dark:bg-grayscale-5 dark:text-grayscale-11">
-										Start worker
-									</span>
+								</div>
+							</div>
+							<div className="shrink-0 px-2">
+								<div className="mx-auto w-full max-w-3xl rounded-t-xl border border-grayscale-3 bg-grayscale-2 px-1.5 pt-1.5 dark:border-grayscale-4">
+									<div className="overflow-hidden rounded-t-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-5 dark:bg-grayscale-3">
+										<div className="min-h-20 p-3 text-grayscale-10 text-sm">
+											Tighten the mobile spacing and verify the new preview on
+											desktop.
+										</div>
+										<div className="flex items-center justify-between p-3">
+											<div className="flex items-center gap-2">
+												<PreviewButton variant="secondary" className="h-7">
+													<PaperclipIcon weight="bold" className="size-4" />
+													Attach
+												</PreviewButton>
+												<span className="group relative flex flex-row items-center justify-between gap-2 rounded-md border border-grayscale-6 bg-grayscale-1 px-2 py-1.5 text-grayscale-11 text-xs opacity-100 outline-none transition-colors duration-150">
+													GPT-5 Codex
+												</span>
+											</div>
+											<PreviewButton>Send Message</PreviewButton>
+										</div>
+									</div>
 								</div>
 							</div>
 						</div>
 					</section>
+
+					<aside className="flex w-[390px] shrink-0 flex-col border-grayscale-4 border-l bg-grayscale-1">
+						<div className="flex items-center gap-1.5 border-grayscale-4 border-b p-1.5">
+							<PreviewTabs
+								active="Previews"
+								items={["Previews", "PRs", "Changes", "Terminal"]}
+							/>
+							<span className="ml-auto flex size-6 items-center justify-center text-grayscale-11">
+								<SidebarSimpleIcon
+									size={16}
+									weight="bold"
+									className="-scale-x-100"
+								/>
+							</span>
+						</div>
+						<div className="flex items-center justify-between gap-2 border-grayscale-4 border-b p-2">
+							<p className="truncate text-grayscale-10 text-xs">
+								pnpm --filter web-app dev
+							</p>
+							<div className="flex shrink-0 gap-1.5">
+								<span className="group relative flex flex-row items-center gap-2 bg-grayscale-3 p-1.5 px-3 text-grayscale-12 text-xs hover:bg-accent-3">
+									<CornersOutIcon
+										weight="bold"
+										className="size-4 text-accent-9"
+									/>
+									Fullscreen
+								</span>
+								<span className="group relative flex flex-row items-center gap-2 bg-grayscale-3 p-1.5 px-3 text-grayscale-12 text-xs hover:bg-red-3">
+									<XCircleIcon weight="bold" className="size-4 text-red-9" />
+									Stop
+								</span>
+							</div>
+						</div>
+						<div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-grayscale-2">
+							<div className="flex h-8 items-center gap-2 border-grayscale-3 border-b bg-grayscale-2 px-3 dark:border-grayscale-4 dark:bg-grayscale-3">
+								<span className="size-2 rounded-full bg-red-9" />
+								<span className="size-2 rounded-full bg-amber-9" />
+								<span className="size-2 rounded-full bg-green-9" />
+								<p className="ml-2 truncate font-mono text-[10px] text-grayscale-10">
+									localhost:3001
+								</p>
+							</div>
+							<div className="flex flex-1 flex-col overflow-hidden p-3">
+								<div className="rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 dark:border-grayscale-4">
+									<div className="flex items-center gap-2">
+										<Logo className="size-6 rounded" />
+										<p className="font-medium text-grayscale-12">
+											FactoryPlane
+										</p>
+									</div>
+									<p className="mt-4 max-w-56 text-balance font-medium text-grayscale-12 text-sm">
+										Collaborative software factory running in the cloud.
+									</p>
+									<div className="mt-4 h-24 rounded-lg border border-grayscale-3 bg-grayscale-2 p-2 dark:border-grayscale-4 dark:bg-grayscale-3">
+										<div className="mb-2 h-2 w-28 rounded bg-grayscale-5" />
+										<div className="grid grid-cols-3 gap-2">
+											<div className="h-14 rounded bg-blue-3" />
+											<div className="h-14 rounded bg-green-3" />
+											<div className="h-14 rounded bg-orange-3" />
+										</div>
+									</div>
+								</div>
+								<div className="mt-3 grid grid-cols-2 gap-2">
+									<div className="rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 dark:border-grayscale-4">
+										<GitPullRequestIcon
+											size={16}
+											weight="bold"
+											className="text-green-9"
+										/>
+										<p className="mt-2 text-grayscale-12 text-xs">PR ready</p>
+										<p className="text-[11px] text-grayscale-10">2 files</p>
+									</div>
+									<div className="rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 dark:border-grayscale-4">
+										<TerminalWindowIcon
+											size={16}
+											weight="bold"
+											className="text-accent-9"
+										/>
+										<p className="mt-2 text-grayscale-12 text-xs">Terminal</p>
+										<p className="text-[11px] text-grayscale-10">running</p>
+									</div>
+								</div>
+							</div>
+						</div>
+					</aside>
 				</div>
 			</div>
 		</section>
 	);
 }
 
-function PreviewWorker({
+function PreviewNavItem({
+	children,
+	icon,
+}: {
+	children: React.ReactNode;
+	icon: React.ReactNode;
+}) {
+	return (
+		<div className="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-grayscale-11 text-sm">
+			<span className="shrink-0">{icon}</span>
+			<span className="min-w-0 flex-1 truncate">{children}</span>
+		</div>
+	);
+}
+
+function PreviewButton({
+	children,
+	className = "",
+	shortcut,
+	variant = "primary",
+}: {
+	children: React.ReactNode;
+	className?: string;
+	shortcut?: string;
+	variant?: "primary" | "secondary";
+}) {
+	const variantClassName = {
+		primary:
+			"border-grayscale-12 bg-grayscale-12 text-grayscale-1 hover:border-grayscale-11 hover:bg-grayscale-11",
+		secondary:
+			"border-grayscale-4 bg-grayscale-1 text-grayscale-12 hover:border-grayscale-5 hover:bg-grayscale-2",
+	};
+
+	return (
+		<span
+			className={`group relative flex h-8 min-w-0 flex-row items-center justify-center gap-2 rounded-md border px-3 font-medium text-xs whitespace-nowrap transition-colors duration-150 [&>svg]:shrink-0 ${variantClassName[variant]} ${shortcut ? "pr-1.5" : ""} ${className}`}
+		>
+			{children}
+			{shortcut ? (
+				<kbd className="hidden min-h-5 min-w-5 shrink-0 items-center justify-center rounded border border-grayscale-11 bg-grayscale-11 px-1.5 py-1 font-mono font-medium text-[11px] text-grayscale-1 leading-none uppercase transition-colors sm:inline-flex">
+					{shortcut}
+				</kbd>
+			) : null}
+		</span>
+	);
+}
+
+function PreviewTabs({ active, items }: { active: string; items: string[] }) {
+	return (
+		<div className="relative flex flex-row items-center gap-1.5 overflow-x-auto rounded-md">
+			{items.map((item) => (
+				<span
+					className={`group relative z-10 shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-xs transition-colors duration-150 ${item === active ? "bg-grayscale-3 text-grayscale-12" : "text-grayscale-10"}`}
+					key={item}
+				>
+					<span className="relative z-10">{item}</span>
+				</span>
+			))}
+		</div>
+	);
+}
+
+function PreviewTask({
 	active = false,
-	age,
 	name,
 	status,
 }: {
 	active?: boolean;
-	age: string;
 	name: string;
-	status: "idle" | "queued" | "retired" | "running";
+	status: "complete" | "idle" | "queued" | "running";
 }) {
-	const statusClasses = {
-		idle: "bg-green-9",
-		queued: "bg-amber-9",
-		retired: "bg-grayscale-8",
-		running: "bg-blue-9",
-	};
+	return (
+		<div
+			className={`relative rounded-md px-3 py-1.5 text-sm text-grayscale-11 ${active ? "bg-grayscale-3 text-grayscale-12" : ""}`}
+		>
+			<span className="flex min-w-0 items-center gap-2.5">
+				<span className="min-w-0 flex-1 truncate">{name}</span>
+				{status === "complete" ? null : (
+					<PreviewTaskStatusDots
+						status={status === "running" ? "running" : "idle"}
+					/>
+				)}
+			</span>
+		</div>
+	);
+}
+
+function PreviewSession({
+	active = false,
+	label,
+	status,
+}: {
+	active?: boolean;
+	label: string;
+	status: "idle" | "running";
+}) {
+	return (
+		<span
+			className={`group relative z-10 shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-grayscale-10 text-xs transition-colors duration-150 ${active ? "bg-grayscale-3 text-grayscale-12" : ""}`}
+		>
+			<span className="relative z-10 flex min-w-0 items-center gap-2">
+				<PreviewTaskStatusDots status={status} />
+				<span className="truncate">{label}</span>
+			</span>
+		</span>
+	);
+}
+
+function PreviewTaskStatusDots({
+	status,
+}: {
+	status: "failed" | "idle" | "running";
+}) {
+	const dotIndexes = [0, 1, 2, 3, 4, 5];
 
 	return (
-		<div className={`rounded-lg p-2 ${active ? "bg-grayscale-3" : ""}`}>
-			<span className="flex min-w-0 items-start gap-2">
-				<span className="min-w-0 flex-1">
-					<span className="block truncate">{name}</span>
-					<span className="block truncate text-[10px] text-grayscale-10">
-						{age}
-					</span>
-				</span>
-				<span
-					className={`mt-1.5 size-2 shrink-0 rounded-full ${statusClasses[status]}`}
-				/>
-			</span>
+		<span className="grid w-max shrink-0 grid-cols-2 gap-px" role="status">
+			{dotIndexes.map((index) => {
+				const isRunning = status === "running";
+
+				return (
+					<span
+						className={`task-status-dot size-[3px] rounded-[1px] ${
+							status === "failed"
+								? "bg-red-9"
+								: isRunning
+									? "task-status-dot--running bg-accent-9"
+									: "bg-green-9"
+						}`}
+						key={`preview-task-status-dot-${status}-${index}`}
+						style={
+							isRunning ? { animationDelay: `${index * 0.12}s` } : undefined
+						}
+					/>
+				);
+			})}
+		</span>
+	);
+}
+
+function PreviewEvent({
+	label,
+	text,
+	tone = "user",
+}: {
+	label: string;
+	text: string;
+	tone?: "agent" | "user";
+}) {
+	return (
+		<div className="flex items-start gap-2">
+			<div
+				className={`flex size-6 shrink-0 items-center justify-center rounded-md font-semibold text-[10px] text-white ${tone === "agent" ? "bg-accent-9" : "bg-orange-9"}`}
+			>
+				{label.slice(0, 2).toUpperCase()}
+			</div>
+			<div className="min-w-0 flex-1 rounded-lg border border-grayscale-3 bg-grayscale-1 p-3 text-grayscale-11 text-xs dark:border-grayscale-4">
+				<p className="mb-1 font-medium text-grayscale-12">{label}</p>
+				<p>{text}</p>
+			</div>
 		</div>
 	);
 }
