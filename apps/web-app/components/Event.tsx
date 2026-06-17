@@ -889,7 +889,7 @@ function AgentMessage({
 						</time>
 					) : null}
 				</div>
-				<div className="ml-9 min-w-0 max-w-full">
+				<div className="min-w-0 max-w-full">
 					<MessageBubble text={text} />
 				</div>
 			</div>
