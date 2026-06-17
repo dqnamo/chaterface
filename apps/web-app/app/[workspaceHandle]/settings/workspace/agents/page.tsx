@@ -77,7 +77,6 @@ export default function AgentsPage() {
 	const [codexAuthStatus, setCodexAuthStatus] = useState<string>();
 	const [codexAuthModalOpen, setCodexAuthModalOpen] = useState(false);
 	const [isStartingCodexAuth, setIsStartingCodexAuth] = useState(false);
-	const [isCompletingCodexAuth, setIsCompletingCodexAuth] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
 	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
 		DEFAULT_CODEX_REASONING_EFFORT,
@@ -128,15 +127,18 @@ export default function AgentsPage() {
 		}
 
 		const deviceAuth = getCodexDeviceAuth(pendingCodexAgent?.authState);
+		const authStatus = getCodexAuthStatus(pendingCodexAgent?.authState);
 
 		if (deviceAuth) {
 			setCodexDeviceAuth(deviceAuth);
-			setCodexAuthStatus("pending");
+			setFormError(undefined);
+		}
+
+		if (pendingCodexAgent?.status === "ready" || authStatus === "completed") {
+			setCodexAuthStatus("completed");
 			setFormError(undefined);
 			return;
 		}
-
-		const authStatus = getCodexAuthStatus(pendingCodexAgent?.authState);
 
 		if (authStatus) {
 			setCodexAuthStatus(authStatus);
@@ -147,7 +149,11 @@ export default function AgentsPage() {
 		if (authError) {
 			setFormError(authError);
 		}
-	}, [pendingCodexAgentId, pendingCodexAgent?.authState]);
+	}, [
+		pendingCodexAgentId,
+		pendingCodexAgent?.authState,
+		pendingCodexAgent?.status,
+	]);
 
 	const createAgent = async () => {
 		setFormError(undefined);
@@ -283,58 +289,15 @@ export default function AgentsPage() {
 		}
 	};
 
-	const completeCodexDeviceAuth = async () => {
-		setFormError(undefined);
+	const closeCodexAuthDialog = () => {
+		setCodexAuthModalOpen(false);
 
-		if (!user?.refresh_token) {
-			setFormError("You must be signed in to complete agent auth.");
-			return;
-		}
-
-		if (!pendingCodexAgentId) {
-			setFormError("Start Codex device auth before completing it.");
-			return;
-		}
-
-		setIsCompletingCodexAuth(true);
-
-		try {
-			const response = await fetch("/api/agents/device-auth", {
-				method: "PATCH",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${user.refresh_token}`,
-				},
-				body: JSON.stringify({
-					agentId: pendingCodexAgentId,
-				}),
-			});
-			const body = (await response.json().catch(() => ({}))) as {
-				message?: unknown;
-			};
-
-			if (!response.ok) {
-				setFormError(
-					typeof body.message === "string"
-						? body.message
-						: "Failed to complete Codex device auth.",
-				);
-				return;
-			}
-
+		if (codexAuthStatus === "completed" || codexAuthStatus === "failed") {
 			setName("");
 			setPendingCodexAgentId(undefined);
 			setCodexDeviceAuth(undefined);
 			setCodexAuthStatus(undefined);
-			setCodexAuthModalOpen(false);
-		} catch (error) {
-			setFormError(
-				error instanceof Error
-					? error.message
-					: "Failed to complete Codex device auth.",
-			);
-		} finally {
-			setIsCompletingCodexAuth(false);
+			setFormError(undefined);
 		}
 	};
 
@@ -527,9 +490,14 @@ export default function AgentsPage() {
 				authStatus={codexAuthStatus}
 				error={formError}
 				isStarting={isStartingCodexAuth}
-				isCompleting={isCompletingCodexAuth}
-				onOpenChange={setCodexAuthModalOpen}
-				onComplete={completeCodexDeviceAuth}
+				onOpenChange={(open) => {
+					if (open) {
+						setCodexAuthModalOpen(true);
+						return;
+					}
+
+					closeCodexAuthDialog();
+				}}
 			/>
 		</div>
 	);
@@ -588,20 +556,18 @@ function CodexDeviceAuthDialog({
 	authStatus,
 	error,
 	isStarting,
-	isCompleting,
 	onOpenChange,
-	onComplete,
 }: {
 	open: boolean;
 	deviceAuth: CodexDeviceAuth | undefined;
 	authStatus: string | undefined;
 	error: string | undefined;
 	isStarting: boolean;
-	isCompleting: boolean;
 	onOpenChange: (open: boolean) => void;
-	onComplete: () => Promise<void>;
 }) {
-	const busy = isStarting || isCompleting;
+	const busy = isStarting;
+	const isCompleted = authStatus === "completed";
+	const isFailed = authStatus === "failed" || Boolean(error);
 	const waitingForDeviceAuth = !deviceAuth && !error;
 	const waitingMessage = getCodexAuthWaitingMessage(authStatus);
 
@@ -624,11 +590,15 @@ function CodexDeviceAuthDialog({
 						</Dialog.Description>
 					</div>
 					<div className="flex flex-col gap-3 p-3">
-						{isStarting || waitingForDeviceAuth ? (
+						{isCompleted ? (
+							<div className="border border-grayscale-4 bg-grayscale-2 p-3 text-sm text-grayscale-11">
+								Codex is connected. This agent is ready to use.
+							</div>
+						) : isStarting || waitingForDeviceAuth ? (
 							<div className="border border-grayscale-4 bg-grayscale-2 p-3 text-sm text-grayscale-11">
 								{waitingMessage}
 							</div>
-						) : deviceAuth ? (
+						) : deviceAuth && !isFailed ? (
 							<div className="grid gap-3 border border-grayscale-4 bg-grayscale-2 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
 								<div className="flex min-w-0 flex-col gap-1">
 									<p className="text-xs font-medium text-grayscale-12">
@@ -666,17 +636,8 @@ function CodexDeviceAuthDialog({
 					</div>
 					<div className="flex justify-end gap-2 border-t border-grayscale-4 p-3">
 						<Dialog.Close type="button" disabled={busy}>
-							Close
+							{isCompleted ? "Done" : "Close"}
 						</Dialog.Close>
-						<Button
-							type="button"
-							disabled={!deviceAuth || busy}
-							onClick={() => {
-								void onComplete();
-							}}
-						>
-							{isCompleting ? "Completing..." : "Complete Codex Auth"}
-						</Button>
 					</div>
 				</Dialog.Popup>
 			</Dialog.Portal>

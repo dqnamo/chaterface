@@ -1,11 +1,14 @@
-import { randomUUID } from "node:crypto";
 import { task } from "@trigger.dev/sdk";
+import { encryptAgentAuth } from "@/agent-auth-storage";
 import db from "@/instant.admin";
 import { E2BSandbox as Sandbox } from "./e2b-sandbox";
 
 const CODEX_HOME = "/home/user/.codex";
+const CODEX_AUTH_PATH = `${CODEX_HOME}/auth.json`;
+const CODEX_CONFIG_PATH = `${CODEX_HOME}/config.toml`;
+const CODEX_DEVICE_AUTH_LOG_PATH = `${CODEX_HOME}/device-auth.log`;
 const CODEX_PACKAGE = "@openai/codex@latest";
-const LOGIN_TIMEOUT_SECONDS = 15 * 60;
+const LOGIN_TIMEOUT_MS = 15 * 60 * 1000;
 const POLL_INTERVAL_MS = 1500;
 
 type CodexDeviceAuthInstructions = {
@@ -55,11 +58,13 @@ export const startCodexDeviceAuthTask = task({
 			throw new Error("Cursor agents do not use Codex device auth");
 		}
 
+		let sandbox: Sandbox | undefined;
+		let deviceAuth: CodexDeviceAuthInstructions | undefined;
+
 		try {
-			const sandbox = await Sandbox.create("codex", {
-				timeoutMs: 20 * 60 * 1000,
+			sandbox = await Sandbox.create("codex", {
+				timeoutMs: LOGIN_TIMEOUT_MS + 5 * 60 * 1000,
 			});
-			const sessionId = randomUUID();
 
 			await db.transact(
 				agentTx(payload.agentId).update({
@@ -73,98 +78,92 @@ export const startCodexDeviceAuthTask = task({
 				}),
 			);
 
-			const start = await sandbox.commands.run(
-				buildStartLoginCommand(sessionId),
-				{
-					timeoutMs: 30_000,
-				},
-			);
+			await prepareCodexHome(sandbox);
 
-			if (start.exitCode !== 0) {
+			const login = await sandbox.commands.run(buildCodexLoginCommand(), {
+				background: true,
+				timeoutMs: LOGIN_TIMEOUT_MS + 30_000,
+			});
+
+			if (login.exitCode !== 0) {
 				throw new Error(
-					start.stderr || start.stdout || "Failed to start Codex device login",
+					login.stderr || login.stdout || "Failed to start Codex device login",
 				);
 			}
 
 			await db.transact(
 				agentTx(payload.agentId).update({
+					status: "auth_pending",
 					authState: {
 						type: "codex_device_auth",
 						status: "waiting_for_code",
-						sessionId,
 						updatedAt: new Date().toISOString(),
 					},
 				}),
 			);
 
-			const deadline = Date.now() + LOGIN_TIMEOUT_SECONDS * 1000;
-			let lastOutput = "";
-			let lastDeviceAuth: CodexDeviceAuthInstructions | undefined;
+			const deadline = Date.now() + LOGIN_TIMEOUT_MS;
+			let lastPublishedLog = "";
 
 			while (Date.now() < deadline) {
-				const poll = await sandbox.commands.run(buildPollCommand(sessionId), {
-					timeoutMs: 30_000,
-				});
-				const output = poll.stdout;
-				const cleanOutput = cleanLoginOutput(output);
-				const deviceAuth = parseCodexDeviceAuthInstructions(cleanOutput);
-				const deviceAuthChanged =
-					JSON.stringify(deviceAuth) !== JSON.stringify(lastDeviceAuth);
+				const [logOutput, auth] = await Promise.all([
+					readDeviceAuthLog(sandbox),
+					readCodexAuth(sandbox),
+				]);
+				const cleanOutput = cleanLoginOutput(logOutput);
+				const nextDeviceAuth =
+					parseCodexDeviceAuthInstructions(cleanOutput) ?? deviceAuth;
 
-				if (deviceAuth) {
-					lastDeviceAuth = deviceAuth;
-				}
+				if (
+					cleanOutput !== lastPublishedLog ||
+					JSON.stringify(nextDeviceAuth) !== JSON.stringify(deviceAuth)
+				) {
+					lastPublishedLog = cleanOutput;
+					deviceAuth = nextDeviceAuth;
 
-				if (cleanOutput !== lastOutput || deviceAuthChanged) {
-					lastOutput = cleanOutput;
 					await db.transact(
 						agentTx(payload.agentId).update({
 							authState: {
 								type: "codex_device_auth",
 								status: "waiting_for_code",
-								sessionId,
 								deviceAuth,
-								output: cleanOutput,
 								updatedAt: new Date().toISOString(),
 							},
 						}),
 					);
 				}
 
-				if (output.includes("__CODEX_AUTH_READY__")) {
+				if (auth) {
 					await db.transact(
 						agentTx(payload.agentId).update({
-							status: "auth_pending",
+							auth: await encryptAgentAuth(auth),
+							status: "ready",
 							authState: {
 								type: "codex_device_auth",
-								status: "pending",
-								sessionId,
-								deviceAuth: lastDeviceAuth,
-								output: cleanOutput,
+								status: "completed",
+								deviceAuth,
 								updatedAt: new Date().toISOString(),
 							},
 						}),
 					);
 
-					return { agentId: payload.agentId, authReady: true };
+					return { agentId: payload.agentId, status: "ready" };
 				}
 
-				const exitCode = getExitMarker(output);
-
-				if (exitCode !== undefined && exitCode !== 0) {
+				if (!(await isProcessRunning(sandbox, login.pid))) {
+					const finalLog = cleanLoginOutput(await readDeviceAuthLog(sandbox));
 					throw new Error(
-						`Codex device login failed with exit code ${exitCode}`,
+						getLoginFailureMessage(finalLog) ??
+							"Codex device login ended before auth.json was written.",
 					);
-				}
-
-				if (exitCode === 0 && !output.includes("__CODEX_LOGIN_RUNNING__")) {
-					throw new Error("Codex device login ended without writing auth.json");
 				}
 
 				await delay(POLL_INTERVAL_MS);
 			}
 
-			throw new Error("Codex device login timed out");
+			throw new Error(
+				"Codex device login timed out before auth.json was written.",
+			);
 		} catch (error) {
 			const message = getErrorMessage(error);
 
@@ -174,6 +173,7 @@ export const startCodexDeviceAuthTask = task({
 					authState: {
 						type: "codex_device_auth",
 						status: "failed",
+						deviceAuth,
 						error: message,
 						updatedAt: new Date().toISOString(),
 					},
@@ -185,68 +185,83 @@ export const startCodexDeviceAuthTask = task({
 	},
 });
 
-const buildStartLoginCommand = (sessionId: string) => {
-	const configBase64 = Buffer.from(
-		'cli_auth_credentials_store = "file"\n',
-	).toString("base64");
-	const logPath = getLoginLogPath(sessionId);
-	const scriptPath = getLoginScriptPath(sessionId);
-	const pidPath = getLoginPidPath(sessionId);
-	const script = [
-		"#!/bin/sh",
-		"set -eu",
-		"set +e",
-		`CODEX_HOME=${shellQuote(CODEX_HOME)} timeout ${LOGIN_TIMEOUT_SECONDS}s npx -y ${CODEX_PACKAGE} login --device-auth`,
-		"status=$?",
-		"set -e",
-		`printf '\\n__CODEX_LOGIN_EXIT__:%s\\n' "$status" >> ${shellQuote(logPath)}`,
-		'exit "$status"',
-	].join("\n");
-	const scriptBase64 = Buffer.from(script).toString("base64");
+const prepareCodexHome = async (sandbox: Sandbox) => {
+	const result = await sandbox.commands.run(
+		[
+			"set -euo pipefail",
+			`mkdir -p ${shellQuote(CODEX_HOME)}`,
+			`chmod 700 ${shellQuote(CODEX_HOME)}`,
+			`printf '%s\n' ${shellQuote('cli_auth_credentials_store = "file"')} > ${shellQuote(CODEX_CONFIG_PATH)}`,
+			`: > ${shellQuote(CODEX_DEVICE_AUTH_LOG_PATH)}`,
+			`rm -f ${shellQuote(CODEX_AUTH_PATH)}`,
+		].join("\n"),
+		{ timeoutMs: 30_000 },
+	);
 
-	return [
-		"set -eu",
-		`mkdir -p ${shellQuote(CODEX_HOME)} ${shellQuote(`${CODEX_HOME}/device-login`)}`,
-		`chmod 700 ${shellQuote(CODEX_HOME)}`,
-		"umask 077",
-		`printf %s ${shellQuote(configBase64)} | base64 -d > ${shellQuote(`${CODEX_HOME}/config.toml`)}`,
-		`printf %s ${shellQuote(scriptBase64)} | base64 -d > ${shellQuote(scriptPath)}`,
-		`chmod 700 ${shellQuote(scriptPath)}`,
-		`: > ${shellQuote(logPath)}`,
-		`nohup ${shellQuote(scriptPath)} >> ${shellQuote(logPath)} 2>&1 & echo "$!" > ${shellQuote(pidPath)}`,
-	].join("\n");
+	if (result.exitCode !== 0) {
+		throw new Error(
+			result.stderr || result.stdout || "Failed to prepare Codex auth home",
+		);
+	}
 };
 
-const buildPollCommand = (sessionId: string) => {
-	const logPath = getLoginLogPath(sessionId);
-	const pidPath = getLoginPidPath(sessionId);
-
-	return [
-		`cat ${shellQuote(logPath)} 2>/dev/null || true`,
-		`if test -s ${shellQuote(`${CODEX_HOME}/auth.json`)}; then echo "__CODEX_AUTH_READY__"; fi`,
-		`if test -s ${shellQuote(pidPath)} && kill -0 "$(cat ${shellQuote(pidPath)})" 2>/dev/null; then echo "__CODEX_LOGIN_RUNNING__"; fi`,
+const buildCodexLoginCommand = () =>
+	[
+		"set -euo pipefail",
+		`export CODEX_HOME=${shellQuote(CODEX_HOME)}`,
+		`timeout ${Math.ceil(LOGIN_TIMEOUT_MS / 1000)}s npx -y ${CODEX_PACKAGE} login --device-auth 2>&1 | tee -a ${shellQuote(CODEX_DEVICE_AUTH_LOG_PATH)}`,
 	].join("\n");
+
+const readDeviceAuthLog = async (sandbox: Sandbox) => {
+	const result = await sandbox.commands.run(
+		`cat ${shellQuote(CODEX_DEVICE_AUTH_LOG_PATH)} 2>/dev/null || true`,
+		{ timeoutMs: 30_000 },
+	);
+
+	return result.stdout;
 };
 
-const getLoginLogPath = (sessionId: string) =>
-	`${CODEX_HOME}/device-login/${sessionId}.log`;
+const readCodexAuth = async (sandbox: Sandbox) => {
+	let raw: string;
 
-const getLoginScriptPath = (sessionId: string) =>
-	`${CODEX_HOME}/device-login/${sessionId}.sh`;
+	try {
+		raw = await sandbox.files.read(CODEX_AUTH_PATH);
+	} catch {
+		return undefined;
+	}
 
-const getLoginPidPath = (sessionId: string) =>
-	`${CODEX_HOME}/device-login/${sessionId}.pid`;
+	let auth: unknown;
 
-const getExitMarker = (output: string) => {
-	const match = output.match(/__CODEX_LOGIN_EXIT__:(\d+)/);
-	return match ? Number(match[1]) : undefined;
+	try {
+		auth = JSON.parse(raw);
+	} catch {
+		return undefined;
+	}
+
+	return isRecord(auth) && Object.keys(auth).length > 0 ? auth : undefined;
 };
 
-const cleanLoginOutput = (output: string) =>
-	stripAnsi(output)
-		.replace(/__CODEX_AUTH_READY__\n?/g, "")
-		.replace(/__CODEX_LOGIN_RUNNING__\n?/g, "")
-		.replace(/__CODEX_LOGIN_EXIT__:\d+\n?/g, "");
+const isProcessRunning = async (sandbox: Sandbox, pid: number) => {
+	const result = await sandbox.commands.run(`kill -0 ${pid}`, {
+		timeoutMs: 30_000,
+	});
+
+	return result.exitCode === 0;
+};
+
+const getLoginFailureMessage = (output: string) => {
+	if (!output.trim()) {
+		return undefined;
+	}
+
+	if (!parseCodexDeviceAuthInstructions(output)) {
+		return "Codex did not print a device-code sign-in link. Make sure device code login is enabled for the ChatGPT account or workspace.";
+	}
+
+	return undefined;
+};
+
+const cleanLoginOutput = (output: string) => stripAnsi(output).trim();
 
 const parseCodexDeviceAuthInstructions = (
 	output: string,
@@ -320,6 +335,9 @@ const stripAnsi = (value: string) =>
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
 
 const getErrorMessage = (error: unknown) =>
 	error instanceof Error ? error.message : String(error);
