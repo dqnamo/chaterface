@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
-	authenticateFactoryRequest,
+	authenticateWorkspaceRequest,
 	createGithubAppState,
 	getGithubAppConfig,
 	getNonEmptyString,
@@ -10,9 +10,9 @@ import {
 
 export async function POST(req: NextRequest) {
 	const body = await readJson(req);
-	const factoryId = getNonEmptyString(body.factoryId);
+	const workspaceId = getNonEmptyString(body.workspaceId);
 	const redirectPath = getNonEmptyString(body.redirectPath) ?? "/";
-	const authResult = await authenticateFactoryRequest(req, factoryId);
+	const authResult = await authenticateWorkspaceRequest(req, workspaceId);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 	}
 
 	const state = createGithubAppState({
-		factoryId: authResult.factory.id,
+		workspaceId: authResult.workspace.id,
 		userId: authResult.user.id,
 		redirectPath,
 	});

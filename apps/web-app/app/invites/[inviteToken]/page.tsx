@@ -16,7 +16,7 @@ type InviteMember = {
 	user?: {
 		email?: string;
 	};
-	organisation?: {
+	workspace?: {
 		name?: string;
 		handle?: string;
 	};
@@ -37,7 +37,7 @@ export default function InvitePage() {
 				},
 			},
 			user: {},
-			organisation: {},
+			workspace: {},
 		},
 	});
 	const member = data?.members?.[0] as InviteMember | undefined;
@@ -99,11 +99,11 @@ export default function InvitePage() {
 				/>
 				<div className="flex flex-col gap-1 border-b border-grayscale-4 p-3">
 					<p className="font-mono text-[11px] font-semibold text-grayscale-10 uppercase">
-						Organisation invite
+						Workspace invite
 					</p>
 					<h1 className="text-lg font-medium text-grayscale-12">
-						{member?.organisation?.name
-							? `Join ${member.organisation.name}`
+						{member?.workspace?.name
+							? `Join ${member.workspace.name}`
 							: "Join Factoryplane"}
 					</h1>
 				</div>
@@ -154,7 +154,7 @@ export default function InvitePage() {
 						) : (
 							<ArrowRightIcon weight="bold" className="size-4" />
 						)}
-						{isAccepting ? "Joining..." : "Join organisation"}
+						{isAccepting ? "Joining..." : "Join workspace"}
 					</Button>
 				</div>
 			</section>

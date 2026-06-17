@@ -141,48 +141,48 @@
 	animation: task-status-dot-spin 0.9s ease-in-out infinite;
 }
 
-.factory-floor-flow .react-flow__edge-path,
-.factory-floor-flow .react-flow__connection-path {
+.workspace-floor-flow .react-flow__edge-path,
+.workspace-floor-flow .react-flow__connection-path {
 	stroke: var(--color-grayscale-8);
 	stroke-width: 1.5;
 }
 
-.factory-floor-flow .react-flow__edge.selected .react-flow__edge-path,
-.factory-floor-flow .react-flow__edge:focus .react-flow__edge-path {
+.workspace-floor-flow .react-flow__edge.selected .react-flow__edge-path,
+.workspace-floor-flow .react-flow__edge:focus .react-flow__edge-path {
 	stroke: var(--color-accent-9);
 }
 
-.factory-floor-flow .react-flow__selection {
+.workspace-floor-flow .react-flow__selection {
 	border-color: var(--color-accent-9);
 	background-color: color-mix(in srgb, var(--color-accent-9) 12%, transparent);
 }
 
-.dark .factory-floor-flow .factory-floor-node-card,
-.dark .factory-floor-inspector,
-.dark .factory-floor-popover {
+.dark .workspace-floor-flow .workspace-floor-node-card,
+.dark .workspace-floor-inspector,
+.dark .workspace-floor-popover {
 	background-color: var(--color-grayscale-2);
 	color: var(--color-grayscale-12);
 }
 
-.dark .factory-floor-flow .factory-floor-node-shell,
-.dark .factory-floor-panel {
+.dark .workspace-floor-flow .workspace-floor-node-shell,
+.dark .workspace-floor-panel {
 	background-color: var(--color-grayscale-3);
 	border-color: var(--color-grayscale-5);
 	color: var(--color-grayscale-12);
 }
 
-.dark .factory-floor-flow .factory-floor-node-inset {
+.dark .workspace-floor-flow .workspace-floor-node-inset {
 	background-color: var(--color-grayscale-3);
 	border-color: var(--color-grayscale-5);
 }
 
-.dark .factory-floor-flow .factory-floor-node-strip {
+.dark .workspace-floor-flow .workspace-floor-node-strip {
 	background-color: var(--color-grayscale-3);
 	border-color: var(--color-grayscale-5);
 }
 
-.dark .factory-floor-inspector input,
-.dark .factory-floor-inspector textarea {
+.dark .workspace-floor-inspector input,
+.dark .workspace-floor-inspector textarea {
 	background-color: var(--color-grayscale-2);
 	border-color: var(--color-grayscale-6);
 	color: var(--color-grayscale-12);

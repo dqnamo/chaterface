@@ -4,7 +4,7 @@ import db, { id } from "@/instant.admin";
 
 type AgentProvider = "codex" | "cursor";
 
-type AuthenticatedOrganisation = {
+type AuthenticatedWorkspace = {
 	id: string;
 	members?: Array<{
 		user?: {
@@ -25,10 +25,10 @@ const agentTx = (agentId: string) => {
 
 export async function POST(req: NextRequest) {
 	const body = await readJson(req);
-	const organisationId = getNonEmptyString(body.organisationId);
+	const workspaceId = getNonEmptyString(body.workspaceId);
 	const name = getNonEmptyString(body.name);
 	const provider = getAgentProvider(body.provider);
-	const authResult = await authenticateOrganisationRequest(req, organisationId);
+	const authResult = await authenticateWorkspaceRequest(req, workspaceId);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 				auth: await encryptAgentAuth(body.auth),
 				settings: getAgentSettings(body.settings),
 			})
-			.link({ organisation: authResult.organisation.id }),
+			.link({ workspace: authResult.workspace.id }),
 	);
 
 	return NextResponse.json(
@@ -78,15 +78,15 @@ export async function POST(req: NextRequest) {
 	);
 }
 
-const authenticateOrganisationRequest = async (
+const authenticateWorkspaceRequest = async (
 	req: NextRequest,
-	organisationId: string | undefined,
+	workspaceId: string | undefined,
 ) => {
-	if (!organisationId) {
+	if (!workspaceId) {
 		return {
 			ok: false as const,
 			status: 400,
-			message: "organisationId is required",
+			message: "workspaceId is required",
 		};
 	}
 
@@ -110,12 +110,12 @@ const authenticateOrganisationRequest = async (
 		};
 	}
 
-	const organisation = await db
+	const workspace = await db
 		.query({
-			organisations: {
+			workspaces: {
 				$: {
 					where: {
-						id: organisationId,
+						id: workspaceId,
 					},
 				},
 				members: {
@@ -124,19 +124,18 @@ const authenticateOrganisationRequest = async (
 			},
 		})
 		.then(
-			(result) =>
-				result.organisations[0] as AuthenticatedOrganisation | undefined,
+			(result) => result.workspaces[0] as AuthenticatedWorkspace | undefined,
 		);
 
-	if (!organisation) {
+	if (!workspace) {
 		return {
 			ok: false as const,
 			status: 404,
-			message: "Organisation not found",
+			message: "Workspace not found",
 		};
 	}
 
-	if (!hasOrganisationAccess(organisation, user.id)) {
+	if (!hasWorkspaceAccess(workspace, user.id)) {
 		return {
 			ok: false as const,
 			status: 403,
@@ -144,7 +143,7 @@ const authenticateOrganisationRequest = async (
 		};
 	}
 
-	return { ok: true as const, organisation };
+	return { ok: true as const, workspace };
 };
 
 const getBearerToken = (authorizationHeader: string | null) => {
@@ -157,11 +156,10 @@ const getBearerToken = (authorizationHeader: string | null) => {
 	return token;
 };
 
-const hasOrganisationAccess = (
-	organisation: AuthenticatedOrganisation,
+const hasWorkspaceAccess = (
+	workspace: AuthenticatedWorkspace,
 	userId: string,
-) =>
-	organisation.members?.some((member) => member.user?.id === userId) ?? false;
+) => workspace.members?.some((member) => member.user?.id === userId) ?? false;
 
 const readJson = async (req: NextRequest) => {
 	try {

@@ -211,7 +211,7 @@ const authenticateRepositoryRequest = async (
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return {
 			ok: false as const,
 			status: 401 as const,
@@ -219,7 +219,7 @@ const authenticateRepositoryRequest = async (
 		};
 	}
 
-	const repository = task.factory.repositories?.find(
+	const repository = task.workspace.repositories?.find(
 		(repository) => repository.id === repositoryId,
 	);
 

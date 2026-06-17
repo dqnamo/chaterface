@@ -1,6 +1,7 @@
 "use client";
 
 import { type InstaQLEntity, id } from "@instantdb/react";
+import { ArrowRightIcon, RobotIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -24,7 +25,7 @@ import {
 	ImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
-import { Input, Textarea } from "@/components/Input";
+import { Textarea } from "@/components/Input";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import { cn } from "@/helpers/classname-helper";
@@ -49,12 +50,10 @@ export function NewTaskDialog({
 	onOpenChange: (open: boolean) => void;
 }) {
 	const router = useRouter();
-	const { orgHandle, factoryId } = useParams();
-	const currentOrgHandle = orgHandle as string;
-	const currentFactoryId = factoryId as string;
+	const { workspaceHandle } = useParams();
+	const currentWorkspaceHandle = workspaceHandle as string;
 	const { user } = db.useAuth();
 
-	const [taskName, setTaskName] = useState("");
 	const [taskInstructions, setTaskInstructions] = useState("");
 	const [agentId, setAgentId] = useState("");
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
@@ -78,10 +77,10 @@ export function NewTaskDialog({
 	});
 
 	const { data } = db.useQuery({
-		organisations: {
+		workspaces: {
 			$: {
 				where: {
-					handle: currentOrgHandle,
+					handle: currentWorkspaceHandle,
 				},
 			},
 			agents: {
@@ -92,14 +91,16 @@ export function NewTaskDialog({
 		},
 	});
 
-	const agents = data?.organisations?.[0]?.agents as Agent[] | undefined;
+	const workspace = data?.workspaces?.[0];
+	const currentWorkspaceId = workspace?.id;
+	const agents = workspace?.agents as Agent[] | undefined;
 	const resolvedAgentId = agentId || agents?.[0]?.id;
 	const selectedAgent = useMemo(
 		() => agents?.find((agent) => agent.id === resolvedAgentId),
 		[agents, resolvedAgentId],
 	);
 	const noAgentsConfigured =
-		Boolean(data?.organisations?.[0]) && (agents?.length ?? 0) === 0;
+		Boolean(data?.workspaces?.[0]) && (agents?.length ?? 0) === 0;
 	const canSubmit =
 		!isCreating &&
 		Boolean(resolvedAgentId) &&
@@ -119,7 +120,6 @@ export function NewTaskDialog({
 	const resetForm = () => {
 		clearFileAttachments();
 		setPendingTaskId(id());
-		setTaskName("");
 		setTaskInstructions("");
 		setCreateError(undefined);
 		setIsDraggingAttachments(false);
@@ -134,6 +134,11 @@ export function NewTaskDialog({
 
 		if (!resolvedAgentId) {
 			setCreateError("Create an agent before creating a task.");
+			return;
+		}
+
+		if (!currentWorkspaceId) {
+			setCreateError("Workspace is still loading.");
 			return;
 		}
 
@@ -156,9 +161,8 @@ export function NewTaskDialog({
 				},
 				body: JSON.stringify({
 					taskId,
-					factoryId: currentFactoryId,
+					workspaceId: currentWorkspaceId,
 					agentId: resolvedAgentId,
-					name: taskName.trim() || undefined,
 					instructions:
 						instructions || buildAttachmentOnlyInstructions(attachments),
 					attachments,
@@ -176,9 +180,7 @@ export function NewTaskDialog({
 				throw new Error(result?.message ?? "Failed to create task.");
 			}
 
-			router.push(
-				`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${taskId}`,
-			);
+			router.push(`/${currentWorkspaceHandle}/tasks/${taskId}`);
 
 			resetForm();
 			onOpenChange(false);
@@ -272,33 +274,16 @@ export function NewTaskDialog({
 							onDrop={handleComposerDrop}
 							onPaste={handleComposerPaste}
 						>
-							<label className="flex flex-col gap-1.5" htmlFor="task-name">
-								<span className="text-xs text-grayscale-11">
-									Name <span className="text-grayscale-9">(optional)</span>
-								</span>
-								<Input
-									autoFocus
-									id="task-name"
-									placeholder="Generated from instructions"
-									type="text"
-									value={taskName}
-									onChange={(event) => setTaskName(event.target.value)}
-								/>
-							</label>
-							<label
-								className="flex flex-col gap-1.5"
-								htmlFor="task-instructions"
-							>
-								<span className="text-xs text-grayscale-11">Instructions</span>
-								<Textarea
-									id="task-instructions"
-									className="min-h-32 text-sm"
-									placeholder="What should the agent do?"
-									value={taskInstructions}
-									onChange={(event) => setTaskInstructions(event.target.value)}
-									onSubmit={() => submitTask()}
-								/>
-							</label>
+							<Textarea
+								aria-label="Task instructions"
+								autoFocus
+								id="task-instructions"
+								className="min-h-32 text-sm"
+								placeholder="What should the agent do?"
+								value={taskInstructions}
+								onChange={(event) => setTaskInstructions(event.target.value)}
+								onSubmit={() => submitTask()}
+							/>
 							<ImageAttachments
 								attachments={fileAttachments}
 								disabled={isCreating}
@@ -350,15 +335,26 @@ export function NewTaskDialog({
 								</p>
 							) : null}
 							{noAgentsConfigured ? (
-								<p className="rounded-md border border-amber-6 bg-amber-2 px-2 py-1.5 text-xs text-amber-11">
-									Create an agent before creating tasks.{" "}
+								<div className="flex flex-col gap-3 rounded-md border border-amber-5 bg-amber-2 p-3 text-sm text-amber-12 sm:flex-row sm:items-center sm:justify-between">
+									<div className="flex min-w-0 items-start gap-2">
+										<span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-amber-6 bg-amber-3 text-amber-11">
+											<RobotIcon weight="bold" className="size-3.5" />
+										</span>
+										<div className="min-w-0">
+											<p className="font-medium">No agents configured</p>
+											<p className="mt-0.5 text-xs text-amber-11">
+												Add an agent before starting a task in this workspace.
+											</p>
+										</div>
+									</div>
 									<Link
-										className="font-medium underline underline-offset-2"
-										href={`/${currentOrgHandle}/factories/${currentFactoryId}/organisation/settings/agents`}
+										className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-amber-6 bg-grayscale-1 px-3 text-xs font-medium text-amber-12 transition-colors hover:bg-amber-3"
+										href={`/${currentWorkspaceHandle}/agents`}
 									>
 										Open agents
+										<ArrowRightIcon weight="bold" className="size-3.5" />
 									</Link>
-								</p>
+								</div>
 							) : null}
 						</fieldset>
 						<div className="flex flex-wrap items-center justify-end gap-2 border-t border-grayscale-4 p-3">

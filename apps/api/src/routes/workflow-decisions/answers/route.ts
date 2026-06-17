@@ -72,7 +72,7 @@ export const POST: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
@@ -97,7 +97,7 @@ export const POST: RouteHandler = async (c) => {
 
 	const workflowSnapshot = workflowInput.workflowSnapshot;
 	const workflow = parseFloorWorkflow(
-		workflowSnapshot ?? task.factory.floorWorkflow,
+		workflowSnapshot ?? task.workspace.floorWorkflow,
 	);
 	const decisionNode = workflow.nodes.find(
 		(node) => node.id === pendingDecision.workflowNodeId,

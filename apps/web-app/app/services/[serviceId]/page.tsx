@@ -1,11 +1,11 @@
 "use client";
 
 import { ArrowLeftIcon } from "@phosphor-icons/react";
-import db from "@/instant.client";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import CornerBrackets from "@/components/CornerBrackets";
 import { ServicePreviewFrame } from "@/components/ServicePreviewFrame";
+import db from "@/instant.client";
 
 export default function FullscreenServicePreviewPage() {
 	const { serviceId } = useParams();
@@ -19,20 +19,15 @@ export default function FullscreenServicePreviewPage() {
 				},
 			},
 			task: {
-				factory: {
-					organisation: {},
-				},
+				workspace: {},
 			},
 		},
 	});
 	const service = data?.services?.[0];
 	const task = service?.task;
-	const factory = task?.factory;
-	const organisation = factory?.organisation;
+	const workspace = task?.workspace;
 	const taskHref =
-		task && factory && organisation
-			? `/${organisation.handle}/factories/${factory.id}/tasks/${task.id}`
-			: undefined;
+		task && workspace ? `/${workspace.handle}/tasks/${task.id}` : undefined;
 
 	if (isLoading) {
 		return (

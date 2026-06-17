@@ -21,16 +21,14 @@ type TaskForStart = {
 	agentSpeed?: string;
 	agent?: Agent;
 	agentSessions?: Array<{ id: string }>;
-	factory?: {
+	workspace?: {
 		id: string;
-		organisation?: {
-			agents?: Agent[];
-			members?: Array<{
-				user?: {
-					id: string;
-				};
-			}>;
-		};
+		agents?: Agent[];
+		members?: Array<{
+			user?: {
+				id: string;
+			};
+		}>;
 	};
 };
 
@@ -78,7 +76,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	}
 
 	const { task } = authResult;
-	const agent = task.agent ?? task.factory?.organisation?.agents?.[0];
+	const agent = task.agent ?? task.workspace?.agents?.[0];
 
 	if (!agent) {
 		return NextResponse.json(
@@ -188,17 +186,15 @@ const authenticateTaskRequest = async (req: NextRequest, taskId: string) => {
 				},
 				agent: {},
 				agentSessions: {},
-				factory: {
-					organisation: {
-						agents: {},
-						members: {
-							user: {},
-						},
+				workspace: {
+					agents: {},
+					members: {
+						user: {},
 					},
 				},
 			},
 		})
-		.then((result) => result.tasks[0] as TaskForStart | undefined);
+		.then((result) => result.tasks?.[0] as TaskForStart | undefined);
 
 	if (!task) {
 		return {
@@ -230,6 +226,5 @@ const getBearerToken = (authorizationHeader: string | null) => {
 };
 
 const hasTaskAccess = (task: TaskForStart, userId: string) =>
-	task.factory?.organisation?.members?.some(
-		(member) => member.user?.id === userId,
-	) ?? false;
+	task.workspace?.members?.some((member) => member.user?.id === userId) ??
+	false;

@@ -25,14 +25,14 @@ const pirataOne = Pirata_One({
 });
 
 export const metadata: Metadata = {
-	title: "Factory",
+	title: "Workspace",
 	description: "A Next.js starter using Chord UI, InstantDB, and Trigger.dev",
-	applicationName: "FactoryPlane",
+	applicationName: "WorkspacePlane",
 	manifest: "/manifest.webmanifest",
 	appleWebApp: {
 		capable: true,
 		statusBarStyle: "black-translucent",
-		title: "FactoryPlane",
+		title: "WorkspacePlane",
 	},
 	formatDetection: {
 		telephone: false,

@@ -32,32 +32,26 @@ const rules = {
 				"auth.id != null && auth.id == data.id && request.modifiedFields.all(field, field in ['name'])",
 		},
 	},
-	organisations: {
+	workspaces: {
 		allow: {
 			view: "auth.id != null && auth.id in data.ref('members.user.id')",
-		},
-	},
-	factories: {
-		allow: {
-			view: "auth.id != null && auth.id in data.ref('organisation.members.user.id')",
-			update:
-				"auth.id != null && auth.id in data.ref('organisation.members.user.id')",
+			update: "auth.id != null && auth.id in data.ref('members.user.id')",
 		},
 	},
 	webhooks: {
 		allow: {
-			view: "auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+			view: "auth.id != null && auth.id in data.ref('workspace.members.user.id')",
 			create:
-				"auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+				"auth.id != null && auth.id in data.ref('workspace.members.user.id')",
 			update:
-				"auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+				"auth.id != null && auth.id in data.ref('workspace.members.user.id')",
 			delete:
-				"auth.id != null && auth.id in data.ref('factory.organisation.members.user.id')",
+				"auth.id != null && auth.id in data.ref('workspace.members.user.id')",
 		},
 	},
 	members: {
 		allow: {
-			view: "auth.id != null && (auth.id in data.ref('user.id') || auth.id in data.ref('organisation.members.user.id'))",
+			view: "auth.id != null && (auth.id in data.ref('user.id') || auth.id in data.ref('workspace.members.user.id'))",
 			update:
 				"auth.id != null && auth.id in data.ref('user.id') && request.modifiedFields.all(field, field in ['name'])",
 		},

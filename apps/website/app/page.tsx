@@ -104,7 +104,7 @@ export default function Home() {
 					<div className="mt-4 flex flex-row flex-wrap items-center gap-2">
 						<Button
 							className="text-xs"
-							href="https://app.factoryplane.com/factories"
+							href="https://app.factoryplane.com"
 							variant="primary"
 						>
 							<RocketLaunchIcon size={16} weight="bold" />
@@ -342,7 +342,7 @@ function ChaterfaceDesktopPreview() {
 							<PreviewNavItem
 								icon={<DesktopTowerIcon size={15} weight="bold" />}
 							>
-								Organisation Settings
+								Workspace Settings
 							</PreviewNavItem>
 						</div>
 						<PreviewButton className="mt-2 w-full justify-start" shortcut="N">

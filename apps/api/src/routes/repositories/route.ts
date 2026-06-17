@@ -37,12 +37,12 @@ export const GET: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
 	return c.json({
-		repositories: task.factory.repositories ?? [],
+		repositories: task.workspace.repositories ?? [],
 	});
 };
 
@@ -67,7 +67,7 @@ export const POST: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
@@ -81,7 +81,7 @@ export const POST: RouteHandler = async (c) => {
 				branch: body.branch,
 				createdAt: new Date().toISOString(),
 			})
-			.link({ factory: task.factory.id }),
+			.link({ workspace: task.workspace.id }),
 		eventTx(id())
 			.create({
 				type: "factoryplane.repository_created",

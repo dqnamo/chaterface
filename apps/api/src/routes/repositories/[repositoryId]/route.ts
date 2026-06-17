@@ -56,11 +56,11 @@ export const PATCH: RouteHandler = async (c) => {
 	}
 
 	const task = await getTaskForAgentToken(token);
-	const repository = task?.factory?.repositories?.find(
+	const repository = task?.workspace?.repositories?.find(
 		(repository) => repository.id === repositoryId,
 	);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
@@ -102,11 +102,11 @@ export const DELETE: RouteHandler = async (c) => {
 	}
 
 	const task = await getTaskForAgentToken(token);
-	const repository = task?.factory?.repositories?.find(
+	const repository = task?.workspace?.repositories?.find(
 		(repository) => repository.id === repositoryId,
 	);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 

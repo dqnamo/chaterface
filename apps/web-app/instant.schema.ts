@@ -20,8 +20,9 @@ const _schema = i.schema({
 			name: i.string().indexed().optional(),
 			type: i.string().optional(),
 		}),
-		factories: i.entity({
+		workspaces: i.entity({
 			name: i.string().indexed(),
+			handle: i.string().unique().indexed(),
 			createdAt: i.date().optional(),
 			githubAppInstallationAccountLogin: i.string().optional(),
 			githubAppInstallationAccountType: i.string().optional(),
@@ -34,6 +35,18 @@ const _schema = i.schema({
 			floorWorkflowUpdatedAt: i.date().optional(),
 			newTaskSetupScript: i.string().optional(),
 			newTurnSetupScript: i.string().optional(),
+		}),
+		commands: i.entity({
+			command: i.string(),
+			runOnNewTask: i.boolean().optional(),
+			runOnNewTurn: i.boolean().optional(),
+			createdAt: i.date().optional(),
+			updatedAt: i.date().optional(),
+		}),
+		sandboxPackages: i.entity({
+			name: i.string().indexed(),
+			createdAt: i.date().optional(),
+			updatedAt: i.date().optional(),
 		}),
 		repositories: i.entity({
 			url: i.string().indexed(),
@@ -146,11 +159,6 @@ const _schema = i.schema({
 			workflowNodeId: i.string().optional(),
 			workflowSessionKey: i.string().optional(),
 		}),
-		organisations: i.entity({
-			name: i.string().indexed(),
-			handle: i.string().unique().indexed(),
-			createdAt: i.date().optional(),
-		}),
 		members: i.entity({
 			createdAt: i.date().optional(),
 			inviteSentAt: i.date().optional(),
@@ -248,16 +256,16 @@ const _schema = i.schema({
 				label: "linkedGuestUsers",
 			},
 		},
-		factoryTasks: {
+		workspaceTasks: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "tasks",
 			},
 			reverse: {
 				on: "tasks",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 			},
 		},
 		taskEvents: {
@@ -381,67 +389,93 @@ const _schema = i.schema({
 				label: "diffTask",
 			},
 		},
-		factorySecrets: {
+		workspaceSecrets: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "secrets",
 			},
 			reverse: {
 				on: "secrets",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 			},
 		},
-		factoryRepositories: {
+		workspaceRepositories: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "repositories",
 			},
 			reverse: {
 				on: "repositories",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
-		factoryMcpServers: {
+		workspaceCommands: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
+				has: "many",
+				label: "commands",
+			},
+			reverse: {
+				on: "commands",
+				has: "one",
+				label: "workspace",
+				onDelete: "cascade",
+			},
+		},
+		workspaceSandboxPackages: {
+			forward: {
+				on: "workspaces",
+				has: "many",
+				label: "sandboxPackages",
+			},
+			reverse: {
+				on: "sandboxPackages",
+				has: "one",
+				label: "workspace",
+				onDelete: "cascade",
+			},
+		},
+		workspaceMcpServers: {
+			forward: {
+				on: "workspaces",
 				has: "many",
 				label: "mcpServers",
 			},
 			reverse: {
 				on: "mcpServers",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
-		factorySkillRepositories: {
+		workspaceSkillRepositories: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "skillRepositories",
 			},
 			reverse: {
 				on: "skillRepositories",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
-		factorySkills: {
+		workspaceSkills: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "skills",
 			},
 			reverse: {
 				on: "skills",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
@@ -458,55 +492,55 @@ const _schema = i.schema({
 				onDelete: "cascade",
 			},
 		},
-		factoryEnvironmentFiles: {
+		workspaceEnvironmentFiles: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "environmentFiles",
 			},
 			reverse: {
 				on: "environmentFiles",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
-		factoryApiKeys: {
+		workspaceApiKeys: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "apiKeys",
 			},
 			reverse: {
 				on: "apiKeys",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
-		factoryWebhooks: {
+		workspaceWebhooks: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "webhooks",
 			},
 			reverse: {
 				on: "webhooks",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
-		factoryIntegrationTriggerSubscriptions: {
+		workspaceIntegrationTriggerSubscriptions: {
 			forward: {
-				on: "factories",
+				on: "workspaces",
 				has: "many",
 				label: "integrationTriggerSubscriptions",
 			},
 			reverse: {
 				on: "integrationTriggerSubscriptions",
 				has: "one",
-				label: "factory",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},
@@ -536,52 +570,40 @@ const _schema = i.schema({
 				onDelete: "cascade",
 			},
 		},
-		organisationFactories: {
+		workspaceMembers: {
 			forward: {
-				on: "organisations",
-				has: "many",
-				label: "factories",
-			},
-			reverse: {
-				on: "factories",
-				has: "one",
-				label: "organisation",
-			},
-		},
-		organisationMembers: {
-			forward: {
-				on: "organisations",
+				on: "workspaces",
 				has: "many",
 				label: "members",
 			},
 			reverse: {
 				on: "members",
 				has: "one",
-				label: "organisation",
+				label: "workspace",
 			},
 		},
-		organisationAgents: {
+		workspaceAgents: {
 			forward: {
-				on: "organisations",
+				on: "workspaces",
 				has: "many",
 				label: "agents",
 			},
 			reverse: {
 				on: "agents",
 				has: "one",
-				label: "organisation",
+				label: "workspace",
 			},
 		},
-		organisationIntegrationConnections: {
+		workspaceIntegrationConnections: {
 			forward: {
-				on: "organisations",
+				on: "workspaces",
 				has: "many",
 				label: "integrationConnections",
 			},
 			reverse: {
 				on: "integrationConnections",
 				has: "one",
-				label: "organisation",
+				label: "workspace",
 				onDelete: "cascade",
 			},
 		},

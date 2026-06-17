@@ -1,17 +1,13 @@
 # Factoryplane
 
-Factoryplane helps teams configure factories and run agent tasks inside them.
+Factoryplane helps teams configure workspaces and run agent tasks inside them.
 
 ## Language
 
-**Organisation**:
-A group of members that owns factories and shared operational resources.
-_Avoid_: Team, workspace, account
-
-**Factory**:
-A workspace inside an Organisation where tasks are created and run.
-_Avoid_: Project, repo, environment
+**Workspace**:
+A collaborative space where members, agents, repositories, secrets, setup commands, integrations, and tasks live.
+_Avoid_: Organisation, Factory, Team, account
 
 **Context Switcher**:
-The product control for changing the active Factory or Organisation context.
-_Avoid_: Factory picker, workspace picker
+The product control for changing the active Workspace context.
+_Avoid_: Organisation picker, factory picker

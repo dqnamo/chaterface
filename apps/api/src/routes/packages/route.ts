@@ -8,11 +8,23 @@ type UpdatePackagesBody = {
 
 const APT_PACKAGE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9+._:-]*$/;
 
-const factoryTx = (factoryId: string) => {
-	const tx = db.tx.factories[factoryId];
+const workspaceTx = (workspaceId: string) => {
+	const tx = db.tx.workspaces[workspaceId];
 
 	if (!tx) {
-		throw new Error(`Factory transaction builder ${factoryId} not found`);
+		throw new Error(`Workspace transaction builder ${workspaceId} not found`);
+	}
+
+	return tx;
+};
+
+const sandboxPackageTx = (sandboxPackageId: string) => {
+	const tx = db.tx.sandboxPackages[sandboxPackageId];
+
+	if (!tx) {
+		throw new Error(
+			`Sandbox package transaction builder ${sandboxPackageId} not found`,
+		);
 	}
 
 	return tx;
@@ -37,12 +49,12 @@ export const GET: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
 	return c.json({
-		packages: parseEnvironmentPackages(task.factory.environmentPackages),
+		packages: getWorkspacePackageNames(task.workspace),
 	});
 };
 
@@ -67,17 +79,28 @@ export const PUT: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
-	const environmentPackages =
-		body.packages.length > 0 ? body.packages : undefined;
+	const workspaceId = task.workspace.id;
+	const existingPackages = task.workspace.sandboxPackages ?? [];
+	const now = new Date().toISOString();
 
 	await db.transact([
-		factoryTx(task.factory.id).update({
-			environmentPackages,
+		workspaceTx(workspaceId).update({
+			environmentPackages: undefined,
 		}),
+		...existingPackages.map((pkg) => sandboxPackageTx(pkg.id).delete()),
+		...body.packages.map((packageName) =>
+			sandboxPackageTx(id())
+				.create({
+					name: packageName,
+					createdAt: now,
+					updatedAt: now,
+				})
+				.link({ workspace: workspaceId }),
+		),
 		eventTx(id())
 			.create({
 				type: "factoryplane.packages_updated",
@@ -115,21 +138,35 @@ export const POST: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
+	const workspaceId = task.workspace.id;
 	const packages = mergePackageLists(
-		parseEnvironmentPackages(task.factory.environmentPackages),
+		getWorkspacePackageNames(task.workspace),
 		body.packages,
 	);
-
-	const environmentPackages = packages.length > 0 ? packages : undefined;
+	const existingPackageNames = new Set(
+		(task.workspace.sandboxPackages ?? []).map((pkg) => pkg.name),
+	);
+	const now = new Date().toISOString();
 
 	await db.transact([
-		factoryTx(task.factory.id).update({
-			environmentPackages,
+		workspaceTx(workspaceId).update({
+			environmentPackages: undefined,
 		}),
+		...packages
+			.filter((packageName) => !existingPackageNames.has(packageName))
+			.map((packageName) =>
+				sandboxPackageTx(id())
+					.create({
+						name: packageName,
+						createdAt: now,
+						updatedAt: now,
+					})
+					.link({ workspace: workspaceId }),
+			),
 		eventTx(id())
 			.create({
 				type: "factoryplane.packages_updated",
@@ -145,6 +182,31 @@ export const POST: RouteHandler = async (c) => {
 	return c.json({
 		packages,
 	});
+};
+
+const getWorkspacePackageNames = (workspace: {
+	environmentPackages?: unknown;
+	sandboxPackages?: Array<{ name: string }>;
+}) => {
+	const names = new Set<string>();
+	const packages: string[] = [];
+
+	for (const pkg of workspace.sandboxPackages ?? []) {
+		const packageName = pkg.name.trim();
+
+		if (!APT_PACKAGE_NAME_PATTERN.test(packageName) || names.has(packageName)) {
+			continue;
+		}
+
+		names.add(packageName);
+		packages.push(packageName);
+	}
+
+	if (packages.length > 0) {
+		return packages;
+	}
+
+	return parseEnvironmentPackages(workspace.environmentPackages);
 };
 
 const parseUpdatePackagesBody = (

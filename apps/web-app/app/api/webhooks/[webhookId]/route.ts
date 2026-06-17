@@ -1,5 +1,5 @@
-import db, { id } from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
+import db, { id } from "@/instant.admin";
 
 type RouteContext = {
 	params: Promise<{
@@ -16,7 +16,7 @@ type WorkflowNode = {
 	};
 };
 
-type FactoryWithWorkflow = {
+type WorkspaceWithWorkflow = {
 	id: string;
 	floorWorkflow?: {
 		nodes?: WorkflowNode[];
@@ -30,7 +30,7 @@ type WorkflowWebhook = {
 	nodeId?: string;
 	secret?: string;
 	enabled?: boolean;
-	factory?: FactoryWithWorkflow;
+	workspace?: WorkspaceWithWorkflow;
 };
 
 const taskTx = (taskId: string) => {
@@ -76,12 +76,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
 						publicId: webhookId,
 					},
 				},
-				factory: {},
+				workspace: {},
 			},
 		})
 		.then((result) => result.webhooks[0] as WorkflowWebhook | undefined);
 
-	if (!webhook?.factory || webhook.enabled === false) {
+	if (!webhook?.workspace || webhook.enabled === false) {
 		return NextResponse.json({ message: "Webhook not found" }, { status: 404 });
 	}
 
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 		return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 	}
 
-	const webhookNode = webhook.factory.floorWorkflow?.nodes?.find(
+	const webhookNode = webhook.workspace.floorWorkflow?.nodes?.find(
 		(node) =>
 			node.id === webhook.nodeId &&
 			node.data?.blockType === "webhook" &&
@@ -116,12 +116,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
 				workflowInput: input,
 				workflowNodeId: webhookNode.id,
 			})
-			.link({ factory: webhook.factory.id }),
+			.link({ workspace: webhook.workspace.id }),
 		eventTx(eventId)
 			.create({
 				type: "factoryplane.workflow.webhook_received",
 				data: {
-					factoryId: webhook.factory.id,
+					workspaceId: webhook.workspace.id,
 					taskId,
 					webhookId: webhook.id,
 					webhookNodeId: webhookNode.id,
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	return NextResponse.json(
 		{
 			taskId,
-			factoryId: webhook.factory.id,
+			workspaceId: webhook.workspace.id,
 			webhookId: webhook.id,
 			workflowState: "webhook_received",
 		},

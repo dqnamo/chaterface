@@ -11,20 +11,18 @@ export const GITHUB_APP_STATE_COOKIE = "factoryplane_github_app_state";
 const GITHUB_APP_STATE_TTL_SECONDS = 10 * 60;
 const GITHUB_API_VERSION = "2022-11-28";
 
-export type AuthenticatedFactory = {
+export type AuthenticatedWorkspace = {
 	id: string;
 	githubAppInstallationId?: string;
-	organisation?: {
-		members?: Array<{
-			user?: {
-				id: string;
-			};
-		}>;
-	};
+	members?: Array<{
+		user?: {
+			id: string;
+		};
+	}>;
 };
 
 export type GithubAppState = {
-	factoryId: string;
+	workspaceId: string;
 	userId: string;
 	redirectPath: string;
 	nonce: string;
@@ -37,15 +35,15 @@ export type GithubAppConfig = {
 	privateKey: string;
 };
 
-export const authenticateFactoryRequest = async (
+export const authenticateWorkspaceRequest = async (
 	req: NextRequest,
-	factoryId: string | undefined,
+	workspaceId: string | undefined,
 ) => {
-	if (!factoryId) {
+	if (!workspaceId) {
 		return {
 			ok: false as const,
 			status: 400,
-			message: "factoryId is required",
+			message: "workspaceId is required",
 		};
 	}
 
@@ -69,17 +67,17 @@ export const authenticateFactoryRequest = async (
 		};
 	}
 
-	const factory = await getAuthenticatedFactory(factoryId);
+	const workspace = await getAuthenticatedWorkspace(workspaceId);
 
-	if (!factory) {
+	if (!workspace) {
 		return {
 			ok: false as const,
 			status: 404,
-			message: "Factory not found",
+			message: "Workspace not found",
 		};
 	}
 
-	if (!hasFactoryAccess(factory, user.id)) {
+	if (!hasWorkspaceAccess(workspace, user.id)) {
 		return {
 			ok: false as const,
 			status: 403,
@@ -87,44 +85,42 @@ export const authenticateFactoryRequest = async (
 		};
 	}
 
-	return { ok: true as const, user, factory };
+	return { ok: true as const, user, workspace };
 };
 
-export const getAuthenticatedFactory = async (factoryId: string) => {
+export const getAuthenticatedWorkspace = async (workspaceId: string) => {
 	return await db
 		.query({
-			factories: {
+			workspaces: {
 				$: {
 					where: {
-						id: factoryId,
+						id: workspaceId,
 					},
 				},
-				organisation: {
-					members: {
-						user: {},
-					},
+				members: {
+					user: {},
 				},
 			},
 		})
-		.then((result) => result.factories[0] as AuthenticatedFactory | undefined);
+		.then(
+			(result) => result.workspaces?.[0] as AuthenticatedWorkspace | undefined,
+		);
 };
 
-export const factoryTx = (factoryId: string) => {
-	const tx = db.tx.factories[factoryId];
+export const workspaceTx = (workspaceId: string) => {
+	const tx = db.tx.workspaces[workspaceId];
 
 	if (!tx) {
-		throw new Error(`Factory transaction builder ${factoryId} not found`);
+		throw new Error(`Workspace transaction builder ${workspaceId} not found`);
 	}
 
 	return tx;
 };
 
-export const hasFactoryAccess = (
-	factory: AuthenticatedFactory,
+export const hasWorkspaceAccess = (
+	workspace: AuthenticatedWorkspace,
 	userId: string,
-) =>
-	factory.organisation?.members?.some((member) => member.user?.id === userId) ??
-	false;
+) => workspace.members?.some((member) => member.user?.id === userId) ?? false;
 
 export const getGithubAppConfig = () => {
 	const appId = process.env.GITHUB_APP_ID?.trim();
@@ -147,7 +143,7 @@ export const getGithubAppConfig = () => {
 };
 
 export const createGithubAppState = (
-	input: Pick<GithubAppState, "factoryId" | "userId" | "redirectPath">,
+	input: Pick<GithubAppState, "workspaceId" | "userId" | "redirectPath">,
 ) => {
 	const state: GithubAppState = {
 		...input,
@@ -178,7 +174,7 @@ export const verifyGithubAppState = (signedState: string) => {
 		) as Partial<GithubAppState>;
 
 		if (
-			typeof parsed.factoryId !== "string" ||
+			typeof parsed.workspaceId !== "string" ||
 			typeof parsed.userId !== "string" ||
 			typeof parsed.redirectPath !== "string" ||
 			typeof parsed.nonce !== "string" ||
@@ -189,7 +185,7 @@ export const verifyGithubAppState = (signedState: string) => {
 		}
 
 		return {
-			factoryId: parsed.factoryId,
+			workspaceId: parsed.workspaceId,
 			userId: parsed.userId,
 			redirectPath: normalizeRedirectPath(parsed.redirectPath),
 			nonce: parsed.nonce,

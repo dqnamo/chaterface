@@ -2,23 +2,21 @@
 
 import { id } from "@instantdb/react";
 import { BuildingsIcon } from "@phosphor-icons/react";
-import db from "@/instant.client";
 import { DateTime } from "luxon";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
 import SignOutButton from "@/components/SignOutButton";
-import { getRememberedFactory } from "@/helpers/last-factory-helper";
+import { getRememberedWorkspace } from "@/helpers/last-workspace-helper";
+import db from "@/instant.client";
 import CornerBrackets from "../components/CornerBrackets";
 
-const organisationTx = (organisationId: string) => {
-	const tx = db.tx.organisations[organisationId];
+const workspaceTx = (workspaceId: string) => {
+	const tx = db.tx.workspaces[workspaceId];
 
 	if (!tx) {
-		throw new Error(
-			`Organisation transaction builder ${organisationId} not found`,
-		);
+		throw new Error(`Workspace transaction builder ${workspaceId} not found`);
 	}
 
 	return tx;
@@ -39,28 +37,27 @@ export default function HomePage() {
 	const { user } = db.useAuth();
 	const currentUserId = user?.id ?? "__unauthenticated__";
 	const { data } = db.useQuery({
-		organisations: {
+		workspaces: {
 			$: {
 				where: {
 					"members.user.id": currentUserId,
 				},
 			},
-			factories: {},
 		},
 	});
-	const [organisationName, setOrganisationName] = useState("");
-	const [organisationHandle, setOrganisationHandle] = useState("");
+	const [workspaceName, setWorkspaceName] = useState("");
+	const [workspaceHandle, setWorkspaceHandle] = useState("");
 
-	const createOrganisation = async () => {
+	const createWorkspace = async () => {
 		if (!user?.id) {
 			return;
 		}
 
-		const organisationId = id();
+		const workspaceId = id();
 		await db.transact([
-			organisationTx(organisationId).create({
-				name: organisationName,
-				handle: organisationHandle,
+			workspaceTx(workspaceId).create({
+				name: workspaceName,
+				handle: workspaceHandle,
 				createdAt: DateTime.now().toISO(),
 			}),
 			memberTx(id())
@@ -69,48 +66,40 @@ export default function HomePage() {
 					joinedAt: DateTime.now().toISO(),
 					role: "owner",
 				})
-				.link({ organisation: organisationId, user: user.id }),
+				.link({ workspace: workspaceId, user: user.id }),
 		]);
 
-		const nextHandle = organisationHandle;
-		setOrganisationName("");
-		setOrganisationHandle("");
-		router.push(`/${nextHandle}/factories`);
+		const nextHandle = workspaceHandle;
+		setWorkspaceName("");
+		setWorkspaceHandle("");
+		router.push(`/${nextHandle}`);
 	};
 
-	const organisations = data?.organisations;
+	const workspaces = data?.workspaces;
 	const redirectHref = useMemo(() => {
-		if (!user?.id || !organisations) {
+		if (!user?.id || !workspaces) {
 			return;
 		}
 
-		const rememberedFactory = getRememberedFactory(user.id);
-		const accessibleFactories = organisations.flatMap((organisation) =>
-			(organisation.factories ?? []).map((factory) => ({
-				factoryId: factory.id,
-				orgHandle: organisation.handle,
-			})),
-		);
-		const targetFactory =
-			accessibleFactories.find(
-				(factory) =>
-					rememberedFactory &&
-					factory.factoryId === rememberedFactory.factoryId &&
-					factory.orgHandle === rememberedFactory.orgHandle,
-			) ?? accessibleFactories.at(0);
+		const rememberedWorkspace = getRememberedWorkspace(user.id);
+		const accessibleWorkspaces = workspaces.map((workspace) => ({
+			workspaceId: workspace.id,
+			workspaceHandle: workspace.handle,
+		}));
+		const targetWorkspace =
+			accessibleWorkspaces.find(
+				(workspace) =>
+					rememberedWorkspace &&
+					workspace.workspaceId === rememberedWorkspace.workspaceId &&
+					workspace.workspaceHandle === rememberedWorkspace.workspaceHandle,
+			) ?? accessibleWorkspaces.at(0);
 
-		if (!targetFactory) {
-			const targetOrganisation = organisations.at(0);
-
-			if (!targetOrganisation) {
-				return;
-			}
-
-			return `/${targetOrganisation.handle}/factories`;
+		if (!targetWorkspace) {
+			return;
 		}
 
-		return `/${targetFactory.orgHandle}/factories/${targetFactory.factoryId}`;
-	}, [organisations, user?.id]);
+		return `/${targetWorkspace.workspaceHandle}`;
+	}, [workspaces, user?.id]);
 
 	useEffect(() => {
 		if (redirectHref) {
@@ -118,7 +107,7 @@ export default function HomePage() {
 		}
 	}, [redirectHref, router]);
 
-	if (!organisations || organisations.length > 0) {
+	if (!workspaces || workspaces.length > 0) {
 		return (
 			<div className="h-full w-full flex flex-col items-center justify-center">
 				<Logo size={8} />
@@ -131,10 +120,10 @@ export default function HomePage() {
 			<Logo size={8} />
 			<div className="flex flex-col gap-px items-center justify-center mt-8">
 				<h1 className="text-md font-medium text-grayscale-12">
-					Create Organisation
+					Create Workspace
 				</h1>
 				<p className="text-sm text-grayscale-11">
-					Create an organisation to manage your factories
+					Create a workspace to manage your tasks
 				</p>
 				<SignOutButton className="mt-3" />
 			</div>
@@ -142,8 +131,8 @@ export default function HomePage() {
 				className="mt-8 flex w-full max-w-md flex-col gap-3 px-4"
 				onSubmit={(event) => {
 					event.preventDefault();
-					void createOrganisation().catch((error) => {
-						console.error("Failed to create organisation", {
+					void createWorkspace().catch((error) => {
+						console.error("Failed to create workspace", {
 							error: error instanceof Error ? error.message : String(error),
 						});
 					});
@@ -153,18 +142,18 @@ export default function HomePage() {
 					<p className="text-xs text-grayscale-11">Name</p>
 					<Input
 						type="text"
-						placeholder="Organisation Name"
-						value={organisationName}
-						onChange={(e) => setOrganisationName(e.target.value)}
+						placeholder="Workspace Name"
+						value={workspaceName}
+						onChange={(e) => setWorkspaceName(e.target.value)}
 					/>
 				</div>
 				<div className="flex flex-col gap-1">
 					<p className="text-xs text-grayscale-11">Handle</p>
 					<Input
 						type="text"
-						placeholder="Organisation Handle"
-						value={organisationHandle}
-						onChange={(e) => setOrganisationHandle(e.target.value)}
+						placeholder="Workspace Handle"
+						value={workspaceHandle}
+						onChange={(e) => setWorkspaceHandle(e.target.value)}
 					/>
 				</div>
 				<button
@@ -179,7 +168,7 @@ export default function HomePage() {
 						color="grayscale-12"
 					/>
 					<BuildingsIcon weight="bold" className="size-4" />
-					Create Organisation
+					Create Workspace
 				</button>
 			</form>
 		</div>

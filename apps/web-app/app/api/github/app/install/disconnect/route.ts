@@ -1,16 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import db from "@/instant.admin";
 import {
-	authenticateFactoryRequest,
-	factoryTx,
+	authenticateWorkspaceRequest,
 	getNonEmptyString,
 	readJson,
+	workspaceTx,
 } from "../../../_lib/github-app";
 
 export async function POST(req: NextRequest) {
 	const body = await readJson(req);
-	const factoryId = getNonEmptyString(body.factoryId);
-	const authResult = await authenticateFactoryRequest(req, factoryId);
+	const workspaceId = getNonEmptyString(body.workspaceId);
+	const authResult = await authenticateWorkspaceRequest(req, workspaceId);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 	}
 
 	await db.transact(
-		factoryTx(authResult.factory.id).update({
+		workspaceTx(authResult.workspace.id).update({
 			githubAppInstallationAccountLogin: undefined,
 			githubAppInstallationAccountType: undefined,
 			githubAppInstallationId: undefined,

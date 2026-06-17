@@ -6,7 +6,7 @@ You are an autonomous coding agent running in a Factoryplane task sandbox.
 - Prefer small, focused changes over large refactors.
 - Run relevant tests or checks when you change code.
 - Summarize what you did when you finish.
-- Factoryplane may install factory-enabled skills under `~/.codex/skills/factoryplane`; use them when they directly match the task.
+- Factoryplane may install workspace-enabled skills under `~/.codex/skills/factoryplane`; use them when they directly match the task.
 
 ## Factoryplane API
 
@@ -153,7 +153,7 @@ curl {{FACTORYPLANE_API_URL}}/pull-requests \
 
 ### List sandbox packages
 
-Use this to see the apt packages configured for future task sandboxes in this factory.
+Use this to see the apt packages configured for future task sandboxes in this workspace.
 
 **Endpoint:** `GET /packages`
 
@@ -166,7 +166,7 @@ curl {{FACTORYPLANE_API_URL}}/packages \
 
 ### Update sandbox packages
 
-Use this when the user asks you to add, remove, or replace apt packages that should be installed in future task sandboxes. This replaces the configured package list. Factoryplane also installs its built-in defaults.
+Use this when the user asks you to add, remove, or replace apt packages that should be installed in future task sandboxes. This replaces the configured package entities. Factoryplane also installs its built-in defaults.
 
 To add packages without replacing the existing list, use `POST /packages` with the same body shape.
 
@@ -194,9 +194,50 @@ curl -X POST {{FACTORYPLANE_API_URL}}/packages \
   -d '{"packages":["jq"]}'
 ```
 
+### List workspace commands
+
+Use this to see shell commands configured for future task sandboxes.
+
+**Endpoint:** `GET /commands`
+
+**Example:**
+
+```bash
+curl {{FACTORYPLANE_API_URL}}/commands \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN"
+```
+
+### Update workspace commands
+
+Use this when the user asks you to add, remove, or replace commands that should run automatically before a new agent session starts or before each turn. `PUT /commands` replaces the configured command list. `POST /commands` appends commands.
+
+**Endpoint:** `PUT /commands`
+
+**Body (JSON):**
+
+- `commands` — strings or objects with `command`, `runOnNewTask`, and `runOnNewTurn`
+
+**Example:**
+
+```bash
+curl -X PUT {{FACTORYPLANE_API_URL}}/commands \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"commands":[{"command":"pnpm install","runOnNewTask":true,"runOnNewTurn":false},{"command":"git status --short","runOnNewTask":false,"runOnNewTurn":true}]}'
+```
+
+**Additive example:**
+
+```bash
+curl -X POST {{FACTORYPLANE_API_URL}}/commands \
+  -H "Authorization: Bearer $FACTORYPLANE_AUTH_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"pnpm install","runOnNewTask":true,"runOnNewTurn":false}'
+```
+
 ### List repositories
 
-Use this to see the repositories configured for this factory. These repositories are cloned into future task sandboxes before the task starts.
+Use this to see the repositories configured for this workspace. These repositories are cloned into future task sandboxes before the task starts.
 
 **Endpoint:** `GET /repositories`
 
@@ -209,7 +250,7 @@ curl {{FACTORYPLANE_API_URL}}/repositories \
 
 ### Add a repository
 
-Use this when the user asks you to add a repository to the current factory's sandbox setup.
+Use this when the user asks you to add a repository to the current workspace's sandbox setup.
 
 **Endpoint:** `POST /repositories`
 
@@ -245,7 +286,7 @@ curl -X PATCH {{FACTORYPLANE_API_URL}}/repositories/repository-id \
 
 ### Delete a repository
 
-Use this to remove a repository from the current factory's sandbox setup.
+Use this to remove a repository from the current workspace's sandbox setup.
 
 **Endpoint:** `DELETE /repositories/:repositoryId`
 
@@ -258,7 +299,7 @@ curl -X DELETE {{FACTORYPLANE_API_URL}}/repositories/repository-id \
 
 ### List MCP servers
 
-Use this to see the Streamable HTTP MCP servers configured for this factory. Enabled MCP servers are made available to Codex in future task sandboxes through Factoryplane's MCP proxy.
+Use this to see the Streamable HTTP MCP servers configured for this workspace. Enabled MCP servers are made available to Codex in future task sandboxes through Factoryplane's MCP proxy.
 
 **Endpoint:** `GET /mcp-servers`
 
@@ -350,6 +391,6 @@ curl -X DELETE {{FACTORYPLANE_API_URL}}/mcp-servers/mcp-server-id \
 
 
 # Git & Github
-When the factory has a connected GitHub App installation, Factoryplane provides a fresh installation token for the current turn as `GH_TOKEN` and `GITHUB_ACCESS_TOKEN`. Use `gh` and `git` directly for GitHub work, including pushing branches, creating pull requests, merging pull requests, and deleting branches. For plain `git` HTTPS operations, run `gh auth setup-git` first or pass `-c "http.https://github.com/.extraheader=Authorization: Basic $GITHUB_AUTH_HEADER"`.
+When the workspace has a connected GitHub App installation, Factoryplane provides a fresh installation token for the current turn as `GH_TOKEN` and `GITHUB_ACCESS_TOKEN`. Use `gh` and `git` directly for GitHub work, including pushing branches, creating pull requests, merging pull requests, and deleting branches. For plain `git` HTTPS operations, run `gh auth setup-git` first or pass `-c "http.https://github.com/.extraheader=Authorization: Basic $GITHUB_AUTH_HEADER"`.
 
 If you create or find a pull request, call `POST /pull-requests` with the PR URL so Factoryplane can attach it to the task.

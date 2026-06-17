@@ -1,7 +1,7 @@
 import db, { id } from "@repo/db/admin";
 import { getBearerToken } from "../../lib/agent-auth.js";
-import { getFactoryForApiKey } from "../../lib/factory-api-key-auth.js";
 import type { RouteHandler } from "../../lib/file-router.js";
+import { getWorkspaceForApiKey } from "../../lib/workspace-api-key-auth.js";
 
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
 const DEFAULT_CODEX_REASONING_EFFORT = "medium";
@@ -12,7 +12,7 @@ const DEFAULT_TASK_NAME = "New task";
 type CreateTaskBody = {
 	name?: string;
 	instructions?: string;
-	factoryId?: string;
+	workspaceId?: string;
 	agentId?: string;
 	agentModel: string;
 	agentReasoningEffort: string;
@@ -23,10 +23,8 @@ type Agent = {
 	id: string;
 };
 
-type FactoryWithAgents = {
-	organisation?: {
-		agents?: Agent[];
-	};
+type WorkspaceWithAgents = {
+	agents?: Agent[];
 };
 
 const taskTx = (taskId: string) => {
@@ -56,7 +54,7 @@ export const POST: RouteHandler = async (c) => {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
-	const authResult = await getFactoryForApiKey(token);
+	const authResult = await getWorkspaceForApiKey(token);
 
 	if (!authResult) {
 		return c.json({ error: "Unauthorized" }, 401);
@@ -68,17 +66,17 @@ export const POST: RouteHandler = async (c) => {
 		return c.json(
 			{
 				error:
-					"Expected name or instructions when creating a task. Optional fields: factoryId, agentId, agentModel, agentReasoningEffort, agentSpeed.",
+					"Expected name or instructions when creating a task. Optional fields: workspaceId, agentId, agentModel, agentReasoningEffort, agentSpeed.",
 			},
 			400,
 		);
 	}
 
-	if (body.factoryId && body.factoryId !== authResult.factoryId) {
-		return c.json({ error: "API key is not scoped to this factory" }, 403);
+	if (body.workspaceId && body.workspaceId !== authResult.workspaceId) {
+		return c.json({ error: "API key is not scoped to this workspace" }, 403);
 	}
 
-	const agent = await resolveAgent(authResult.factoryId, body.agentId);
+	const agent = await resolveAgent(authResult.workspaceId, body.agentId);
 
 	if (!agent) {
 		return c.json(
@@ -107,7 +105,7 @@ export const POST: RouteHandler = async (c) => {
 				agentReasoningEffort: body.agentReasoningEffort,
 				agentSpeed: body.agentSpeed,
 			})
-			.link({ factory: authResult.factoryId, agent: agent.id }),
+			.link({ workspace: authResult.workspaceId, agent: agent.id }),
 		eventTx(eventId)
 			.create({
 				type: "factoryplane.new_task",
@@ -125,7 +123,7 @@ export const POST: RouteHandler = async (c) => {
 	return c.json(
 		{
 			taskId,
-			factoryId: authResult.factoryId,
+			workspaceId: authResult.workspaceId,
 			agentId: agent.id,
 			name,
 			status: "in_progress",
@@ -149,7 +147,7 @@ const parseCreateTaskBody = (value: unknown): CreateTaskBody | undefined => {
 	return {
 		name: providedName,
 		instructions,
-		factoryId: getOptionalString(value.factoryId),
+		workspaceId: getOptionalString(value.workspaceId),
 		agentId: getOptionalString(value.agentId),
 		agentModel: getOptionalString(value.agentModel) ?? DEFAULT_CODEX_MODEL,
 		agentReasoningEffort:
@@ -159,23 +157,26 @@ const parseCreateTaskBody = (value: unknown): CreateTaskBody | undefined => {
 	};
 };
 
-const resolveAgent = async (factoryId: string, agentId: string | undefined) => {
+const resolveAgent = async (
+	workspaceId: string,
+	agentId: string | undefined,
+) => {
 	const agents = await db
 		.query({
-			factories: {
+			workspaces: {
 				$: {
 					where: {
-						id: factoryId,
+						id: workspaceId,
 					},
 				},
-				organisation: {
-					agents: {},
-				},
+				agents: {},
 			},
 		})
 		.then((result) => {
-			const factory = result.factories[0] as FactoryWithAgents | undefined;
-			return factory?.organisation?.agents ?? [];
+			const workspace = result.workspaces?.[0] as
+				| WorkspaceWithAgents
+				| undefined;
+			return workspace?.agents ?? [];
 		});
 
 	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];

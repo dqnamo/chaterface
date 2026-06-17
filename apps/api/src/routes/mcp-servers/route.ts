@@ -68,12 +68,12 @@ export const GET: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
 	return c.json({
-		mcpServers: (task.factory.mcpServers ?? []).map((server) => ({
+		mcpServers: (task.workspace.mcpServers ?? []).map((server) => ({
 			id: server.id,
 			name: server.name,
 			url: server.url,
@@ -107,7 +107,7 @@ export const POST: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
@@ -126,7 +126,7 @@ export const POST: RouteHandler = async (c) => {
 				createdAt: now,
 				updatedAt: now,
 			})
-			.link({ factory: task.factory.id }),
+			.link({ workspace: task.workspace.id }),
 		eventTx(id())
 			.create({
 				type: "factoryplane.mcp_server_created",

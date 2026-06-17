@@ -25,7 +25,6 @@ import {
 	PaperPlaneTilt,
 	PlusCircle,
 	Robot,
-	Shapes,
 	SignOut,
 	UserCircle,
 	XCircle,
@@ -63,32 +62,23 @@ import db from "./src/db/client";
 import { colors, spacing } from "./src/theme";
 import { nowIso } from "./src/utils/date";
 import {
-	getRememberedFactory,
-	rememberLastFactory,
-} from "./src/utils/last-factory";
+	getRememberedWorkspace,
+	rememberLastWorkspace,
+} from "./src/utils/last-workspace";
 import { toTaskDotStatus } from "./src/utils/task-status";
 
 type RootStackParamList = {
 	Home: undefined;
-	Factories: { orgHandle: string };
-	Factory: { orgHandle: string; factoryId: string };
-	Task: { orgHandle: string; factoryId: string; taskId: string };
-	NewOrganisation: undefined;
-	NewFactory: {
-		orgHandle: string;
-		organisationId: string;
-		organisationName: string;
-	};
-	FactoryMenu: { orgHandle: string; factoryId: string };
-	FactorySettings: { orgHandle: string; factoryId: string };
+	Workspace: { workspaceHandle: string; workspaceId: string };
+	Task: { workspaceHandle: string; workspaceId: string; taskId: string };
+	NewWorkspace: undefined;
+	WorkspaceMenu: { workspaceHandle: string; workspaceId: string };
+	WorkspaceSettings: { workspaceHandle: string; workspaceId: string };
 };
 
-type Organisation = InstaQLEntity<AppSchema, "organisations"> & {
-	factories?: Factory[];
+type Workspace = InstaQLEntity<AppSchema, "workspaces"> & {
 	agents?: Agent[];
 	members?: Member[];
-};
-type Factory = InstaQLEntity<AppSchema, "factories"> & {
 	tasks?: Task[];
 	repositories?: Repository[];
 	environmentFiles?: EnvironmentFile[];
@@ -150,19 +140,14 @@ export default function App() {
 							options={{ title: "Factoryplane" }}
 						/>
 						<Stack.Screen
-							name="Factories"
-							component={FactoriesScreen}
-							options={{ title: "Factories" }}
-						/>
-						<Stack.Screen
-							name="Factory"
-							component={FactoryScreen}
+							name="Workspace"
+							component={WorkspaceScreen}
 							options={({ navigation, route }) => ({
 								title: "New Task",
 								headerRight: () => (
 									<Pressable
 										onPress={() =>
-											navigation.navigate("FactoryMenu", route.params)
+											navigation.navigate("WorkspaceMenu", route.params)
 										}
 										style={styles.headerButton}
 									>
@@ -179,9 +164,9 @@ export default function App() {
 								headerRight: () => (
 									<Pressable
 										onPress={() =>
-											navigation.navigate("FactoryMenu", {
-												orgHandle: route.params.orgHandle,
-												factoryId: route.params.factoryId,
+											navigation.navigate("WorkspaceMenu", {
+												workspaceHandle: route.params.workspaceHandle,
+												workspaceId: route.params.workspaceId,
 											})
 										}
 										style={styles.headerButton}
@@ -196,32 +181,24 @@ export default function App() {
 							})}
 						/>
 						<Stack.Screen
-							name="NewOrganisation"
-							component={NewOrganisationScreen}
+							name="NewWorkspace"
+							component={NewWorkspaceScreen}
 							options={{
-								title: "New Organisation",
+								title: "New Workspace",
 								presentation: Platform.OS === "ios" ? "formSheet" : "modal",
 							}}
 						/>
 						<Stack.Screen
-							name="NewFactory"
-							component={NewFactoryScreen}
+							name="WorkspaceMenu"
+							component={WorkspaceMenuScreen}
 							options={{
-								title: "New Factory",
+								title: "Workspace",
 								presentation: Platform.OS === "ios" ? "formSheet" : "modal",
 							}}
 						/>
 						<Stack.Screen
-							name="FactoryMenu"
-							component={FactoryMenuScreen}
-							options={{
-								title: "Factory",
-								presentation: Platform.OS === "ios" ? "formSheet" : "modal",
-							}}
-						/>
-						<Stack.Screen
-							name="FactorySettings"
-							component={FactorySettingsScreen}
+							name="WorkspaceSettings"
+							component={WorkspaceSettingsScreen}
 							options={{
 								title: "Settings",
 								presentation: Platform.OS === "ios" ? "formSheet" : "modal",
@@ -384,54 +361,51 @@ function HomeScreen({
 	const { user } = db.useAuth();
 	const currentUserId = user?.id ?? "__unauthenticated__";
 	const { data, isLoading, error } = db.useQuery({
-		organisations: {
+		workspaces: {
 			$: {
 				where: {
 					"members.user.id": currentUserId,
 				},
 			},
-			factories: {},
 		},
 	});
-	const organisations = (data?.organisations ?? []) as Organisation[];
+	const workspaces = (data?.workspaces ?? []) as Workspace[];
 
 	useEffect(() => {
-		if (!user?.id || organisations.length === 0) {
+		if (!user?.id || workspaces.length === 0) {
 			return;
 		}
 
 		let cancelled = false;
 
-		const routeToRememberedFactory = async () => {
-			const remembered = await getRememberedFactory(user.id);
-			const accessibleFactories = organisations.flatMap((organisation) =>
-				(organisation.factories ?? []).map((factory) => ({
-					factoryId: factory.id,
-					orgHandle: organisation.handle,
-				})),
-			);
+		const routeToRememberedWorkspace = async () => {
+			const remembered = await getRememberedWorkspace(user.id);
+			const accessibleWorkspaces = workspaces.map((workspace) => ({
+				workspaceId: workspace.id,
+				workspaceHandle: workspace.handle,
+			}));
 			const target =
-				accessibleFactories.find(
-					(factory) =>
+				accessibleWorkspaces.find(
+					(workspace) =>
 						remembered &&
-						factory.factoryId === remembered.factoryId &&
-						factory.orgHandle === remembered.orgHandle,
-				) ?? accessibleFactories[0];
+						workspace.workspaceId === remembered.workspaceId &&
+						workspace.workspaceHandle === remembered.workspaceHandle,
+				) ?? accessibleWorkspaces[0];
 
 			if (!cancelled && target) {
-				navigation.replace("Factory", target);
+				navigation.replace("Workspace", target);
 			}
 		};
 
-		void routeToRememberedFactory();
+		void routeToRememberedWorkspace();
 
 		return () => {
 			cancelled = true;
 		};
-	}, [navigation, organisations, user?.id]);
+	}, [navigation, workspaces, user?.id]);
 
 	if (isLoading) {
-		return <LoadingState label="Loading organisations..." />;
+		return <LoadingState label="Loading workspaces..." />;
 	}
 
 	if (error) {
@@ -443,9 +417,9 @@ function HomeScreen({
 			<ScrollView contentContainerStyle={styles.listScreen}>
 				<Logo size={8} />
 				<View style={styles.centeredBlock}>
-					<Text style={textStyles.heading}>Your Organisations</Text>
+					<Text style={textStyles.heading}>Your Workspaces</Text>
 					<Text style={styles.centeredCopy}>
-						Select your organisation to manage your factories
+						Select a workspace to manage your tasks
 					</Text>
 				</View>
 				<Button
@@ -456,158 +430,48 @@ function HomeScreen({
 					Sign out
 				</Button>
 				<View style={styles.list}>
-					{organisations.map((organisation) => (
+					{workspaces.map((workspace) => (
 						<ListRow
-							key={organisation.id}
-							icon={<Monogram seed={organisation.name} letters={1} />}
+							key={workspace.id}
+							icon={<Monogram seed={workspace.name} letters={1} />}
 							onPress={() =>
-								navigation.navigate("Factories", {
-									orgHandle: organisation.handle,
+								navigation.navigate("Workspace", {
+									workspaceHandle: workspace.handle,
+									workspaceId: workspace.id,
 								})
 							}
 						>
-							<Text style={textStyles.heading}>{organisation.name}</Text>
-							<Text style={textStyles.caption}>{organisation.handle}</Text>
+							<Text style={textStyles.heading}>{workspace.name}</Text>
+							<Text style={textStyles.caption}>{workspace.handle}</Text>
 						</ListRow>
 					))}
 				</View>
 				<Button
 					icon={<Buildings color={colors.grayscale1} size={16} weight="bold" />}
-					onPress={() => navigation.navigate("NewOrganisation")}
+					onPress={() => navigation.navigate("NewWorkspace")}
 				>
-					New Organisation
+					New Workspace
 				</Button>
 			</ScrollView>
 		</Screen>
 	);
 }
 
-function FactoriesScreen({
+function WorkspaceScreen({
 	navigation,
 	route,
-}: NativeStackScreenProps<RootStackParamList, "Factories">) {
-	const { user } = db.useAuth();
-	const currentUserId = user?.id ?? "__unauthenticated__";
-	const { orgHandle } = route.params;
-	const { data, isLoading, error } = db.useQuery({
-		organisations: {
-			$: {
-				where: {
-					handle: orgHandle,
-					"members.user.id": currentUserId,
-				},
-			},
-			factories: {},
-		},
-	});
-	const organisation = data?.organisations?.[0] as Organisation | undefined;
-	const factories = organisation?.factories ?? [];
-
-	useEffect(() => {
-		if (!user?.id || factories.length === 0) {
-			return;
-		}
-
-		let cancelled = false;
-
-		const routeToRememberedFactory = async () => {
-			const remembered = await getRememberedFactory(user.id);
-			const target =
-				factories.find(
-					(factory) =>
-						remembered &&
-						factory.id === remembered.factoryId &&
-						remembered.orgHandle === orgHandle,
-				) ?? factories[0];
-
-			if (!cancelled && target) {
-				navigation.replace("Factory", {
-					orgHandle,
-					factoryId: target.id,
-				});
-			}
-		};
-
-		void routeToRememberedFactory();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [factories, navigation, orgHandle, user?.id]);
-
-	if (isLoading) {
-		return <LoadingState label="Loading factories..." />;
-	}
-
-	if (error) {
-		return <ErrorState message={error.message} />;
-	}
-
-	return (
-		<Screen>
-			<ScrollView contentContainerStyle={styles.listScreen}>
-				<Logo size={8} />
-				<View style={styles.centeredBlock}>
-					<Text style={textStyles.heading}>
-						{organisation?.name ?? orgHandle}
-					</Text>
-					<Text style={styles.centeredCopy}>
-						Select a factory to manage your tasks
-					</Text>
-				</View>
-				<View style={styles.list}>
-					{factories.map((factory) => (
-						<ListRow
-							key={factory.id}
-							icon={<Monogram seed={factory.name} letters={2} />}
-							onPress={() =>
-								navigation.navigate("Factory", {
-									orgHandle,
-									factoryId: factory.id,
-								})
-							}
-						>
-							<Text style={textStyles.heading}>{factory.name}</Text>
-							{factory.gitAuthorName ? (
-								<Text style={textStyles.caption}>{factory.gitAuthorName}</Text>
-							) : null}
-						</ListRow>
-					))}
-				</View>
-				{organisation ? (
-					<Button
-						icon={<Shapes color={colors.grayscale1} size={16} weight="bold" />}
-						onPress={() =>
-							navigation.navigate("NewFactory", {
-								orgHandle,
-								organisationId: organisation.id,
-								organisationName: organisation.name,
-							})
-						}
-					>
-						New Factory
-					</Button>
-				) : null}
-			</ScrollView>
-		</Screen>
-	);
-}
-
-function FactoryScreen({
-	navigation,
-	route,
-}: NativeStackScreenProps<RootStackParamList, "Factory">) {
-	const { orgHandle, factoryId } = route.params;
+}: NativeStackScreenProps<RootStackParamList, "Workspace">) {
+	const { workspaceHandle, workspaceId } = route.params;
 	const { user } = db.useAuth();
 	const [taskName, setTaskName] = useState("");
 	const [instructions, setInstructions] = useState("");
 	const [agentId, setAgentId] = useState("");
 	const [isCreating, setIsCreating] = useState(false);
 	const { data, isLoading, error } = db.useQuery({
-		organisations: {
+		workspaces: {
 			$: {
 				where: {
-					handle: orgHandle,
+					id: workspaceId,
 				},
 			},
 			agents: {
@@ -615,25 +479,21 @@ function FactoryScreen({
 					fields: ["name", "provider", "settings"],
 				},
 			},
-		},
-		factories: {
-			$: {
-				where: {
-					id: factoryId,
-				},
+			members: {
+				user: {},
 			},
+			tasks: {},
 		},
 		tasks: {
 			$: {
 				where: {
-					factory: factoryId,
+					workspace: workspaceId,
 				},
 			},
 		},
 	});
-	const organisation = data?.organisations?.[0] as Organisation | undefined;
-	const factory = data?.factories?.[0] as Factory | undefined;
-	const agents = organisation?.agents ?? [];
+	const workspace = data?.workspaces?.[0] as Workspace | undefined;
+	const agents = workspace?.agents ?? [];
 	const tasks = ((data?.tasks ?? []) as Task[]).sort((first, second) =>
 		String(second.createdAt ?? "").localeCompare(String(first.createdAt ?? "")),
 	);
@@ -646,12 +506,12 @@ function FactoryScreen({
 			return;
 		}
 
-		void rememberLastFactory({
-			factoryId,
-			orgHandle,
+		void rememberLastWorkspace({
+			workspaceId,
+			workspaceHandle,
 			userId: user.id,
 		});
-	}, [factoryId, orgHandle, user?.id]);
+	}, [workspaceId, workspaceHandle, user?.id]);
 
 	const createTask = async () => {
 		if (!resolvedAgentId || isCreating || !taskName.trim()) {
@@ -670,7 +530,7 @@ function FactoryScreen({
 						instructions,
 						createdAt: nowIso(),
 					})
-					.link({ factory: factoryId, agent: resolvedAgentId }),
+					.link({ workspace: workspaceId, agent: resolvedAgentId }),
 			);
 			await db.transact(
 				tx("events", id())
@@ -688,7 +548,7 @@ function FactoryScreen({
 			);
 			setTaskName("");
 			setInstructions("");
-			navigation.navigate("Task", { orgHandle, factoryId, taskId });
+			navigation.navigate("Task", { workspaceHandle, workspaceId, taskId });
 		} catch (nextError) {
 			Alert.alert("Failed to create task", getErrorMessage(nextError));
 		} finally {
@@ -697,7 +557,7 @@ function FactoryScreen({
 	};
 
 	if (isLoading) {
-		return <LoadingState label="Loading factory..." />;
+		return <LoadingState label="Loading workspace..." />;
 	}
 
 	if (error) {
@@ -714,7 +574,7 @@ function FactoryScreen({
 					<Logo size={8} />
 					<View style={styles.centeredBlock}>
 						<Text style={textStyles.title}>What do you want to build?</Text>
-						<Text style={styles.centeredCopy}>{factory?.name}</Text>
+						<Text style={styles.centeredCopy}>{workspace?.name}</Text>
 					</View>
 					<Panel style={styles.composerPanel}>
 						<View style={styles.formBlock}>
@@ -793,8 +653,8 @@ function FactoryScreen({
 							title="Tasks"
 							count={activeTasks.length}
 							tasks={activeTasks}
-							orgHandle={orgHandle}
-							factoryId={factoryId}
+							workspaceHandle={workspaceHandle}
+							workspaceId={workspaceId}
 							navigation={navigation}
 						/>
 						{completedTasks.length > 0 ? (
@@ -802,8 +662,8 @@ function FactoryScreen({
 								title="Completed Tasks"
 								count={completedTasks.length}
 								tasks={completedTasks}
-								orgHandle={orgHandle}
-								factoryId={factoryId}
+								workspaceHandle={workspaceHandle}
+								workspaceId={workspaceId}
 								navigation={navigation}
 							/>
 						) : null}
@@ -818,15 +678,15 @@ function TaskList({
 	title,
 	count,
 	tasks,
-	orgHandle,
-	factoryId,
+	workspaceHandle,
+	workspaceId,
 	navigation,
 }: {
 	title: string;
 	count: number;
 	tasks: Task[];
-	orgHandle: string;
-	factoryId: string;
+	workspaceHandle: string;
+	workspaceId: string;
 	navigation: NavigationProp<RootStackParamList>;
 }) {
 	return (
@@ -842,8 +702,8 @@ function TaskList({
 						icon={<TaskStatusDots status={toTaskDotStatus(task.status)} />}
 						onPress={() =>
 							navigation.navigate("Task", {
-								orgHandle,
-								factoryId,
+								workspaceHandle,
+								workspaceId,
 								taskId: task.id,
 							})
 						}
@@ -1139,15 +999,15 @@ function EventCard({ event }: { event: EventEntity }) {
 	);
 }
 
-function NewOrganisationScreen({
+function NewWorkspaceScreen({
 	navigation,
-}: NativeStackScreenProps<RootStackParamList, "NewOrganisation">) {
+}: NativeStackScreenProps<RootStackParamList, "NewWorkspace">) {
 	const { user } = db.useAuth();
 	const [name, setName] = useState("");
 	const [handle, setHandle] = useState("");
 	const [isCreating, setIsCreating] = useState(false);
 
-	const createOrganisation = async () => {
+	const createWorkspace = async () => {
 		if (!user?.id || isCreating || !name.trim() || !handle.trim()) {
 			return;
 		}
@@ -1155,9 +1015,9 @@ function NewOrganisationScreen({
 		setIsCreating(true);
 
 		try {
-			const organisationId = id();
+			const workspaceId = id();
 			await db.transact([
-				tx("organisations", organisationId).create({
+				tx("workspaces", workspaceId).create({
 					name: name.trim(),
 					handle: handle.trim(),
 					createdAt: nowIso(),
@@ -1168,11 +1028,14 @@ function NewOrganisationScreen({
 						joinedAt: nowIso(),
 						role: "owner",
 					})
-					.link({ organisation: organisationId, user: user.id }),
+					.link({ workspace: workspaceId, user: user.id }),
 			]);
-			navigation.replace("Factories", { orgHandle: handle.trim() });
+			navigation.replace("Workspace", {
+				workspaceHandle: handle.trim(),
+				workspaceId,
+			});
 		} catch (nextError) {
-			Alert.alert("Failed to create organisation", getErrorMessage(nextError));
+			Alert.alert("Failed to create workspace", getErrorMessage(nextError));
 		} finally {
 			setIsCreating(false);
 		}
@@ -1182,25 +1045,22 @@ function NewOrganisationScreen({
 		<FormSheet>
 			<Panel>
 				<View style={styles.formBlock}>
-					<SectionLabel
-						label="Name"
-						description="The name of the organisation."
-					/>
+					<SectionLabel label="Name" description="The name of the workspace." />
 					<Field
 						onChangeText={setName}
-						placeholder="Organisation Name"
+						placeholder="Workspace Name"
 						value={name}
 					/>
 				</View>
 				<View style={styles.formBlock}>
 					<SectionLabel
 						label="Handle"
-						description="A unique handle used by this organisation."
+						description="A unique handle used by this workspace."
 					/>
 					<Field
 						autoCapitalize="none"
 						onChangeText={setHandle}
-						placeholder="Organisation Handle"
+						placeholder="Workspace Handle"
 						value={handle}
 					/>
 				</View>
@@ -1210,7 +1070,7 @@ function NewOrganisationScreen({
 					</Button>
 					<Button
 						disabled={isCreating || !name.trim() || !handle.trim()}
-						onPress={createOrganisation}
+						onPress={createWorkspace}
 					>
 						Create
 					</Button>
@@ -1220,153 +1080,28 @@ function NewOrganisationScreen({
 	);
 }
 
-function NewFactoryScreen({
+function WorkspaceMenuScreen({
 	navigation,
 	route,
-}: NativeStackScreenProps<RootStackParamList, "NewFactory">) {
-	const { orgHandle, organisationId, organisationName } = route.params;
-	const { user } = db.useAuth();
-	const [name, setName] = useState("");
-	const [githubToken, setGithubToken] = useState("");
-	const [gitAuthorName, setGitAuthorName] = useState("");
-	const [gitAuthorEmail, setGitAuthorEmail] = useState("");
-	const [isCreating, setIsCreating] = useState(false);
-
-	const createFactory = async () => {
-		if (!user?.id || isCreating || !name.trim()) {
-			return;
-		}
-
-		setIsCreating(true);
-
-		try {
-			const factoryId = id();
-			await db.transact(
-				tx("factories", factoryId)
-					.create({
-						name: name.trim(),
-						createdAt: nowIso(),
-						gitAuthorName: gitAuthorName.trim() || undefined,
-						gitAuthorEmail: gitAuthorEmail.trim() || undefined,
-					})
-					.link({ organisation: organisationId }),
-			);
-
-			if (githubToken.trim() && API_BASE_URL) {
-				await fetch(`${API_BASE_URL}/api/factories/saveGithub`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${user.refresh_token}`,
-					},
-					body: JSON.stringify({
-						factoryId,
-						githubAccessToken: githubToken.trim(),
-						gitAuthorName: gitAuthorName.trim(),
-						gitAuthorEmail: gitAuthorEmail.trim(),
-					}),
-				});
-			}
-
-			await rememberLastFactory({
-				factoryId,
-				orgHandle,
-				userId: user.id,
-			});
-			navigation.replace("Factory", { orgHandle, factoryId });
-		} catch (nextError) {
-			Alert.alert("Failed to create factory", getErrorMessage(nextError));
-		} finally {
-			setIsCreating(false);
-		}
-	};
-
-	return (
-		<FormSheet>
-			<Panel>
-				<View style={styles.formBlock}>
-					<SectionLabel
-						label="Name"
-						description={`Set up a new factory for ${organisationName}.`}
-					/>
-					<Field
-						onChangeText={setName}
-						placeholder="Factory Name"
-						value={name}
-					/>
-				</View>
-				<View style={styles.formBlock}>
-					<SectionLabel
-						label="GitHub Access Token"
-						description="Used to authenticate with your repositories."
-					/>
-					<Field
-						autoCapitalize="none"
-						onChangeText={setGithubToken}
-						placeholder="GitHub Access Token"
-						secureTextEntry
-						value={githubToken}
-					/>
-				</View>
-				<View style={styles.formBlock}>
-					<SectionLabel
-						label="Git Author Name"
-						description="The name used for commits made by this factory."
-					/>
-					<Field
-						onChangeText={setGitAuthorName}
-						placeholder="Git Author Name"
-						value={gitAuthorName}
-					/>
-				</View>
-				<View style={styles.formBlock}>
-					<SectionLabel
-						label="Git Author Email"
-						description="The email used for commits made by this factory."
-					/>
-					<Field
-						autoCapitalize="none"
-						keyboardType="email-address"
-						onChangeText={setGitAuthorEmail}
-						placeholder="Git Author Email"
-						value={gitAuthorEmail}
-					/>
-				</View>
-				<View style={styles.formActions}>
-					<Button variant="ghost" onPress={() => navigation.goBack()}>
-						Cancel
-					</Button>
-					<Button disabled={isCreating || !name.trim()} onPress={createFactory}>
-						Create
-					</Button>
-				</View>
-			</Panel>
-		</FormSheet>
-	);
-}
-
-function FactoryMenuScreen({
-	navigation,
-	route,
-}: NativeStackScreenProps<RootStackParamList, "FactoryMenu">) {
-	const { orgHandle, factoryId } = route.params;
+}: NativeStackScreenProps<RootStackParamList, "WorkspaceMenu">) {
+	const { workspaceHandle, workspaceId } = route.params;
 	const { data, isLoading, error } = db.useQuery({
-		factories: {
+		workspaces: {
 			$: {
 				where: {
-					id: factoryId,
+					id: workspaceId,
 				},
 			},
 		},
 		tasks: {
 			$: {
 				where: {
-					factory: factoryId,
+					workspace: workspaceId,
 				},
 			},
 		},
 	});
-	const factory = data?.factories?.[0] as Factory | undefined;
+	const workspace = data?.workspaces?.[0] as Workspace | undefined;
 	const tasks = ((data?.tasks ?? []) as Task[]).sort((first, second) =>
 		String(second.createdAt ?? "").localeCompare(String(first.createdAt ?? "")),
 	);
@@ -1383,14 +1118,17 @@ function FactoryMenuScreen({
 		<FormSheet>
 			<View style={styles.sheetHeader}>
 				<View>
-					<Text style={textStyles.title}>{factory?.name}</Text>
-					<Text style={textStyles.caption}>{orgHandle}</Text>
+					<Text style={textStyles.title}>{workspace?.name}</Text>
+					<Text style={textStyles.caption}>{workspaceHandle}</Text>
 				</View>
 				<Button
 					variant="secondary"
 					icon={<GearSix color={colors.grayscale11} size={16} weight="bold" />}
 					onPress={() =>
-						navigation.navigate("FactorySettings", { orgHandle, factoryId })
+						navigation.navigate("WorkspaceSettings", {
+							workspaceHandle,
+							workspaceId,
+						})
 					}
 				>
 					Settings
@@ -1398,7 +1136,9 @@ function FactoryMenuScreen({
 			</View>
 			<Button
 				icon={<PlusCircle color={colors.grayscale1} size={16} weight="bold" />}
-				onPress={() => navigation.navigate("Factory", { orgHandle, factoryId })}
+				onPress={() =>
+					navigation.navigate("Workspace", { workspaceHandle, workspaceId })
+				}
 			>
 				New Task
 			</Button>
@@ -1414,8 +1154,8 @@ function FactoryMenuScreen({
 							icon={<TaskStatusDots status={toTaskDotStatus(task.status)} />}
 							onPress={() =>
 								navigation.navigate("Task", {
-									orgHandle,
-									factoryId,
+									workspaceHandle,
+									workspaceId,
 									taskId: task.id,
 								})
 							}
@@ -1430,10 +1170,10 @@ function FactoryMenuScreen({
 	);
 }
 
-function FactorySettingsScreen({
+function WorkspaceSettingsScreen({
 	route,
-}: NativeStackScreenProps<RootStackParamList, "FactorySettings">) {
-	const { orgHandle, factoryId } = route.params;
+}: NativeStackScreenProps<RootStackParamList, "WorkspaceSettings">) {
+	const { workspaceId } = route.params;
 	const [repositoryUrl, setRepositoryUrl] = useState("");
 	const [repositoryPath, setRepositoryPath] = useState("");
 	const [environmentPath, setEnvironmentPath] = useState("");
@@ -1441,23 +1181,16 @@ function FactorySettingsScreen({
 	const [secretName, setSecretName] = useState("");
 	const [secretValue, setSecretValue] = useState("");
 	const { data, isLoading, error } = db.useQuery({
-		factories: {
+		workspaces: {
 			$: {
 				where: {
-					id: factoryId,
+					id: workspaceId,
 				},
 			},
 			repositories: {},
 			environmentFiles: {},
 			secrets: {},
 			apiKeys: {},
-		},
-		organisations: {
-			$: {
-				where: {
-					handle: orgHandle,
-				},
-			},
 			agents: {
 				$: {
 					fields: ["name", "provider", "settings"],
@@ -1468,8 +1201,7 @@ function FactorySettingsScreen({
 			},
 		},
 	});
-	const factory = data?.factories?.[0] as Factory | undefined;
-	const organisation = data?.organisations?.[0] as Organisation | undefined;
+	const workspace = data?.workspaces?.[0] as Workspace | undefined;
 
 	const addRepository = async () => {
 		if (!repositoryUrl.trim()) {
@@ -1483,7 +1215,7 @@ function FactorySettingsScreen({
 					path: repositoryPath.trim() || undefined,
 					createdAt: nowIso(),
 				})
-				.link({ factory: factoryId }),
+				.link({ workspace: workspaceId }),
 		);
 		setRepositoryUrl("");
 		setRepositoryPath("");
@@ -1501,7 +1233,7 @@ function FactorySettingsScreen({
 					content: environmentContent,
 					createdAt: nowIso(),
 				})
-				.link({ factory: factoryId }),
+				.link({ workspace: workspaceId }),
 		);
 		setEnvironmentPath("");
 		setEnvironmentContent("");
@@ -1519,7 +1251,7 @@ function FactorySettingsScreen({
 					valueEncrypted: secretValue,
 					createdAt: nowIso(),
 				})
-				.link({ factory: factoryId }),
+				.link({ workspace: workspaceId }),
 		);
 		setSecretName("");
 		setSecretValue("");
@@ -1537,24 +1269,24 @@ function FactorySettingsScreen({
 		<FormSheet>
 			<View style={styles.sheetHeader}>
 				<View>
-					<Text style={textStyles.title}>{factory?.name}</Text>
-					<Text style={textStyles.caption}>Factory Settings</Text>
+					<Text style={textStyles.title}>{workspace?.name}</Text>
+					<Text style={textStyles.caption}>Workspace Settings</Text>
 				</View>
 			</View>
 			<SettingsSection
 				icon={<GearSix color={colors.grayscale11} size={17} weight="bold" />}
 				title="GitHub"
 				description={
-					factory?.gitAuthorName || factory?.gitAuthorEmail
-						? [factory.gitAuthorName, factory.gitAuthorEmail]
+					workspace?.gitAuthorName || workspace?.gitAuthorEmail
+						? [workspace.gitAuthorName, workspace.gitAuthorEmail]
 								.filter(Boolean)
 								.join(" · ")
-						: "Configure GitHub token from web or during factory creation."
+						: "Configure GitHub token from web or during workspace creation."
 				}
 			/>
 			<SettingsEditor
 				title="Repositories"
-				rows={(factory?.repositories ?? []).map((repository) => ({
+				rows={(workspace?.repositories ?? []).map((repository) => ({
 					id: repository.id,
 					title: repository.url,
 					subtitle: repository.path || repository.branch || "Default checkout",
@@ -1580,7 +1312,7 @@ function FactorySettingsScreen({
 			</SettingsEditor>
 			<SettingsEditor
 				title="Environment Files"
-				rows={(factory?.environmentFiles ?? []).map((file) => ({
+				rows={(workspace?.environmentFiles ?? []).map((file) => ({
 					id: file.id,
 					title: file.path,
 					subtitle: "Synced before task setup",
@@ -1605,7 +1337,7 @@ function FactorySettingsScreen({
 			</SettingsEditor>
 			<SettingsEditor
 				title="Secrets"
-				rows={(factory?.secrets ?? []).map((secret) => ({
+				rows={(workspace?.secrets ?? []).map((secret) => ({
 					id: secret.id,
 					title: secret.name,
 					subtitle: "Stored value",
@@ -1631,12 +1363,12 @@ function FactorySettingsScreen({
 			<SettingsSection
 				icon={<Robot color={colors.grayscale11} size={17} weight="bold" />}
 				title="Agents"
-				description={`${organisation?.agents?.length ?? 0} configured`}
+				description={`${workspace?.agents?.length ?? 0} configured`}
 			/>
 			<SettingsSection
 				icon={<UserCircle color={colors.grayscale11} size={17} weight="bold" />}
 				title="Members"
-				description={`${organisation?.members?.length ?? 0} members`}
+				description={`${workspace?.members?.length ?? 0} members`}
 			/>
 		</FormSheet>
 	);
@@ -1726,7 +1458,7 @@ function FormSheet({ children }: { children: React.ReactNode }) {
 }
 
 async function signOut() {
-	await AsyncStorage.removeItem("factoryplane:last-factory");
+	await AsyncStorage.removeItem("factoryplane:last-workspace");
 	await db.auth.signOut();
 }
 

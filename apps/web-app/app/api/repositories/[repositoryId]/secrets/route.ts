@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import db from "@/instant.admin";
-import { createEncryptionService } from "@/encryption";
 import { type NextRequest, NextResponse } from "next/server";
+import { createEncryptionService } from "@/encryption";
+import db from "@/instant.admin";
 
 type RepositorySecret = {
 	id: string;

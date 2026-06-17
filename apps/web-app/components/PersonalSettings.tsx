@@ -140,15 +140,15 @@ function SettingsSection({
 }
 
 function ProfileNameSetting() {
-	const { orgHandle } = useParams();
-	const currentOrgHandle = orgHandle as string;
+	const { workspaceHandle } = useParams();
+	const currentWorkspaceHandle = workspaceHandle as string;
 	const { user } = db.useAuth();
 	const currentUserId = user?.id ?? "__unauthenticated__";
 	const { data } = db.useQuery({
-		organisations: {
+		workspaces: {
 			$: {
 				where: {
-					handle: currentOrgHandle,
+					handle: currentWorkspaceHandle,
 				},
 			},
 			members: {
@@ -156,7 +156,7 @@ function ProfileNameSetting() {
 			},
 		},
 	});
-	const member = data?.organisations?.[0]?.members?.find(
+	const member = data?.workspaces?.[0]?.members?.find(
 		(member) => member.user?.id === currentUserId,
 	);
 	const userRecord = member?.user;
@@ -213,7 +213,7 @@ function ProfileNameSetting() {
 				</Field>
 				<Field label="Member name">
 					<Input
-						placeholder="Organisation display name"
+						placeholder="Workspace display name"
 						value={memberName}
 						onChange={(event) => setMemberName(event.target.value)}
 						onSubmit={saveProfile}
@@ -222,7 +222,7 @@ function ProfileNameSetting() {
 			</div>
 			<div className="flex items-center justify-between gap-3">
 				<p className="min-w-0 text-xs text-grayscale-10">
-					{status ?? "Member name overrides user name in this organisation."}
+					{status ?? "Member name overrides user name in this workspace."}
 				</p>
 				<Button
 					type="button"

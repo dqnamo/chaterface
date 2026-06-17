@@ -3,7 +3,7 @@ import { encryptAgentAuth } from "@/agent-auth-storage";
 import db, { id } from "@/instant.admin";
 import { E2BSandbox as Sandbox } from "@/trigger/e2b-sandbox";
 
-type AuthenticatedOrganisation = {
+type AuthenticatedWorkspace = {
 	id: string;
 	members?: Array<{
 		user?: {
@@ -16,10 +16,16 @@ type AuthenticatedAgent = {
 	id: string;
 	provider?: string;
 	sandboxId?: string;
-	organisation?: AuthenticatedOrganisation;
+	workspace?: AuthenticatedWorkspace;
 };
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
+const DEVICE_AUTH_OUTPUT_TIMEOUT_MS = 120_000;
+
+type CodexDeviceAuthInstructions = {
+	verificationUri: string;
+	userCode: string;
+};
 
 const agentTx = (agentId: string) => {
 	const tx = db.tx.agents[agentId];
@@ -31,23 +37,11 @@ const agentTx = (agentId: string) => {
 	return tx;
 };
 
-const terminalSessionTx = (terminalSessionId: string) => {
-	const tx = db.tx.terminalSessions[terminalSessionId];
-
-	if (!tx) {
-		throw new Error(
-			`Terminal session transaction builder ${terminalSessionId} not found`,
-		);
-	}
-
-	return tx;
-};
-
 export async function POST(req: NextRequest) {
 	const body = await readJson(req);
-	const organisationId = getNonEmptyString(body.organisationId);
+	const workspaceId = getNonEmptyString(body.workspaceId);
 	const name = getNonEmptyString(body.name);
-	const authResult = await authenticateOrganisationRequest(req, organisationId);
+	const authResult = await authenticateWorkspaceRequest(req, workspaceId);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -64,10 +58,9 @@ export async function POST(req: NextRequest) {
 		timeoutMs: 10 * 60 * 1000,
 	});
 	const agentId = id();
-	const terminalSessionId = id();
 	const createdAt = new Date().toISOString();
 
-	await db.transact([
+	await db.transact(
 		agentTx(agentId)
 			.create({
 				name,
@@ -77,26 +70,19 @@ export async function POST(req: NextRequest) {
 				sandboxId: sandbox.sandboxId,
 				settings: getAgentSettings(body.settings),
 			})
-			.link({ organisation: authResult.organisation.id }),
-		terminalSessionTx(terminalSessionId)
-			.create({
-				name: "Codex device auth",
-				command: "codex login --device-auth",
-				cwd: "/home/user",
-				status: "starting",
-				startedAt: createdAt,
-				lastActivityAt: createdAt,
-			})
-			.link({ agent: agentId }),
-	]);
+			.link({ workspace: authResult.workspace.id }),
+	);
 
 	try {
+		const output = new DeviceAuthOutputBuffer();
 		const process = await sandbox.pty.create({
 			cols: 80,
 			rows: 24,
 			cwd: "/home/user",
 			timeoutMs: 0,
-			onData: () => {},
+			onData: (data) => {
+				output.append(data);
+			},
 		});
 		await sandbox.pty.sendInput(
 			process.pid,
@@ -104,15 +90,10 @@ export async function POST(req: NextRequest) {
 				`exec bash -lc ${shellQuote(buildCodexDeviceAuthCommand())}\n`,
 			),
 		);
-		await process.disconnect();
-
-		await db.transact(
-			terminalSessionTx(terminalSessionId).update({
-				pid: process.pid,
-				status: "running",
-				lastActivityAt: new Date().toISOString(),
-			}),
+		const deviceAuth = await output.waitForInstructions(
+			DEVICE_AUTH_OUTPUT_TIMEOUT_MS,
 		);
+		await process.disconnect();
 
 		return NextResponse.json(
 			{
@@ -123,23 +104,16 @@ export async function POST(req: NextRequest) {
 					createdAt,
 					status: "auth_pending",
 				},
-				terminalSessionId,
+				deviceAuth,
 			},
 			{ status: 201 },
 		);
 	} catch (error) {
-		const now = new Date().toISOString();
 		const message = getErrorMessage(error);
 
 		await db.transact([
 			agentTx(agentId).update({
 				status: "auth_failed",
-			}),
-			terminalSessionTx(terminalSessionId).update({
-				status: "failed",
-				error: message,
-				stoppedAt: now,
-				lastActivityAt: now,
 			}),
 		]);
 
@@ -153,7 +127,6 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
 	const body = await readJson(req);
 	const agentId = getNonEmptyString(body.agentId);
-	const terminalSessionId = getNonEmptyString(body.terminalSessionId);
 	const authResult = await authenticateAgentRequest(req, agentId);
 
 	if (!authResult.ok) {
@@ -193,21 +166,12 @@ export async function PATCH(req: NextRequest) {
 		);
 	}
 
-	await db.transact([
+	await db.transact(
 		agentTx(authResult.agent.id).update({
 			auth: await encryptAgentAuth(auth),
 			status: "ready",
 		}),
-		...(terminalSessionId
-			? [
-					terminalSessionTx(terminalSessionId).update({
-						status: "completed",
-						stoppedAt: new Date().toISOString(),
-						lastActivityAt: new Date().toISOString(),
-					}),
-				]
-			: []),
-	]);
+	);
 
 	return NextResponse.json({
 		agent: {
@@ -217,15 +181,15 @@ export async function PATCH(req: NextRequest) {
 	});
 }
 
-const authenticateOrganisationRequest = async (
+const authenticateWorkspaceRequest = async (
 	req: NextRequest,
-	organisationId: string | undefined,
+	workspaceId: string | undefined,
 ) => {
-	if (!organisationId) {
+	if (!workspaceId) {
 		return {
 			ok: false as const,
 			status: 400,
-			message: "organisationId is required",
+			message: "workspaceId is required",
 		};
 	}
 
@@ -239,12 +203,12 @@ const authenticateOrganisationRequest = async (
 		};
 	}
 
-	const organisation = await db
+	const workspace = await db
 		.query({
-			organisations: {
+			workspaces: {
 				$: {
 					where: {
-						id: organisationId,
+						id: workspaceId,
 					},
 				},
 				members: {
@@ -253,19 +217,18 @@ const authenticateOrganisationRequest = async (
 			},
 		})
 		.then(
-			(result) =>
-				result.organisations[0] as AuthenticatedOrganisation | undefined,
+			(result) => result.workspaces[0] as AuthenticatedWorkspace | undefined,
 		);
 
-	if (!organisation) {
+	if (!workspace) {
 		return {
 			ok: false as const,
 			status: 404,
-			message: "Organisation not found",
+			message: "Workspace not found",
 		};
 	}
 
-	if (!hasOrganisationAccess(organisation, user.id)) {
+	if (!hasWorkspaceAccess(workspace, user.id)) {
 		return {
 			ok: false as const,
 			status: 403,
@@ -273,7 +236,7 @@ const authenticateOrganisationRequest = async (
 		};
 	}
 
-	return { ok: true as const, organisation };
+	return { ok: true as const, workspace };
 };
 
 const authenticateAgentRequest = async (
@@ -307,7 +270,7 @@ const authenticateAgentRequest = async (
 						id: agentId,
 					},
 				},
-				organisation: {
+				workspace: {
 					members: {
 						user: {},
 					},
@@ -324,10 +287,7 @@ const authenticateAgentRequest = async (
 		};
 	}
 
-	if (
-		!agent.organisation ||
-		!hasOrganisationAccess(agent.organisation, user.id)
-	) {
+	if (!agent.workspace || !hasWorkspaceAccess(agent.workspace, user.id)) {
 		return {
 			ok: false as const,
 			status: 403,
@@ -384,11 +344,10 @@ const buildCodexDeviceAuthCommand = () =>
 		"codex login --device-auth",
 	].join("\n");
 
-const hasOrganisationAccess = (
-	organisation: AuthenticatedOrganisation,
+const hasWorkspaceAccess = (
+	workspace: AuthenticatedWorkspace,
 	userId: string,
-) =>
-	organisation.members?.some((member) => member.user?.id === userId) ?? false;
+) => workspace.members?.some((member) => member.user?.id === userId) ?? false;
 
 const getBearerToken = (authorizationHeader: string | null) => {
 	const [scheme, token] = authorizationHeader?.split(" ") ?? [];
@@ -427,6 +386,140 @@ const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 
 const getErrorMessage = (error: unknown) =>
 	error instanceof Error ? error.message : String(error);
+
+class DeviceAuthOutputBuffer {
+	private readonly decoder = new TextDecoder();
+	private output = "";
+	private instructions: CodexDeviceAuthInstructions | undefined;
+	private rejected = false;
+	private resolve:
+		| ((instructions: CodexDeviceAuthInstructions) => void)
+		| undefined;
+
+	append(data: unknown) {
+		if (this.rejected || this.instructions) {
+			return;
+		}
+
+		this.output += decodePtyData(data, this.decoder);
+
+		const instructions = parseCodexDeviceAuthInstructions(this.output);
+
+		if (!instructions) {
+			return;
+		}
+
+		this.instructions = instructions;
+		this.resolve?.(instructions);
+	}
+
+	waitForInstructions(timeoutMs: number) {
+		if (this.instructions) {
+			return Promise.resolve(this.instructions);
+		}
+
+		return new Promise<CodexDeviceAuthInstructions>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				this.rejected = true;
+				reject(
+					new Error(
+						"Codex device auth did not print a sign-in link and code before timing out.",
+					),
+				);
+			}, timeoutMs);
+
+			this.resolve = (instructions) => {
+				clearTimeout(timeout);
+				resolve(instructions);
+			};
+		});
+	}
+}
+
+const parseCodexDeviceAuthInstructions = (
+	output: string,
+): CodexDeviceAuthInstructions | undefined => {
+	const text = stripAnsi(output);
+	const verificationUri = findVerificationUri(text);
+	const userCode = findUserCode(text) ?? findUserCodeInUrl(verificationUri);
+
+	if (!verificationUri || !userCode) {
+		return undefined;
+	}
+
+	return {
+		verificationUri,
+		userCode,
+	};
+};
+
+const findVerificationUri = (text: string) => {
+	const urls = [...text.matchAll(/https?:\/\/[^\s"'<>]+/gi)]
+		.map((match) => cleanUrl(match[0]))
+		.filter(Boolean);
+
+	return (
+		urls.find((url) =>
+			/(^https?:\/\/([^/]+\.)?(openai|chatgpt)\.com\b|device|verify|activate|login|oauth)/i.test(
+				url,
+			),
+		) ?? urls.at(-1)
+	);
+};
+
+const findUserCode = (text: string) => {
+	const labeledCode = text.match(
+		/(?:[Uu][Ss][Ee][Rr]\s*)?[Cc][Oo][Dd][Ee][^\nA-Z0-9]*([A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,3}|[A-Z0-9]{6,12})(?![a-z])/,
+	)?.[1];
+
+	if (labeledCode) {
+		return labeledCode.toUpperCase();
+	}
+
+	return text.match(/\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,3}\b/)?.[0].toUpperCase();
+};
+
+const findUserCodeInUrl = (url: string | undefined) => {
+	if (!url) {
+		return undefined;
+	}
+
+	try {
+		const parsed = new URL(url);
+		return (
+			parsed.searchParams.get("user_code") ??
+			parsed.searchParams.get("code") ??
+			undefined
+		)?.toUpperCase();
+	} catch {
+		return undefined;
+	}
+};
+
+const decodePtyData = (data: unknown, decoder: TextDecoder) => {
+	if (typeof data === "string") {
+		return data;
+	}
+
+	if (data instanceof Uint8Array) {
+		return decoder.decode(data, { stream: true });
+	}
+
+	if (isRecord(data) && typeof data.data === "string") {
+		return data.data;
+	}
+
+	return "";
+};
+
+const cleanUrl = (value: string) => value.replace(/[),.;\]]+$/g, "").trim();
+
+const stripAnsi = (value: string) =>
+	value.replace(
+		// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape parsing requires control characters.
+		/[\u001b\u009b][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[a-zA-Z\d]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g,
+		"",
+	);
 
 class ResponseError extends Error {
 	constructor(

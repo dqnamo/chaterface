@@ -30,16 +30,14 @@ type SkillRepositoryRecord = {
 	url: string;
 	branch?: string;
 	path?: string;
-	factory?: {
+	workspace?: {
 		id: string;
 		githubAccessTokenEncrypted?: string;
-		organisation?: {
-			members?: Array<{
-				user?: {
-					id: string;
-				};
-			}>;
-		};
+		members?: Array<{
+			user?: {
+				id: string;
+			};
+		}>;
 	};
 	skills?: SkillRecord[];
 };
@@ -156,7 +154,7 @@ export async function POST(
 					updatedAt: startedAt,
 				})
 				.link({
-					factory: authResult.factoryId,
+					workspace: authResult.workspaceId,
 					skillRepository: repository.id,
 				});
 		});
@@ -275,11 +273,9 @@ const authenticateSkillRepositoryRequest = async (
 						id: skillRepositoryId,
 					},
 				},
-				factory: {
-					organisation: {
-						members: {
-							user: {},
-						},
+				workspace: {
+					members: {
+						user: {},
 					},
 				},
 				skills: {},
@@ -290,7 +286,7 @@ const authenticateSkillRepositoryRequest = async (
 				result.skillRepositories[0] as SkillRepositoryRecord | undefined,
 		);
 
-	if (!repository?.factory) {
+	if (!repository?.workspace) {
 		return {
 			ok: false as const,
 			status: 404,
@@ -298,7 +294,7 @@ const authenticateSkillRepositoryRequest = async (
 		};
 	}
 
-	if (!hasFactoryAccess(repository.factory, user.id)) {
+	if (!hasWorkspaceAccess(repository.workspace, user.id)) {
 		return {
 			ok: false as const,
 			status: 403,
@@ -309,7 +305,7 @@ const authenticateSkillRepositoryRequest = async (
 	return {
 		ok: true as const,
 		repository,
-		factoryId: repository.factory.id,
+		workspaceId: repository.workspace.id,
 	};
 };
 
@@ -728,7 +724,7 @@ const getGithubAuthHeader = async (repository: SkillRepositoryRecord) => {
 };
 
 const getGithubToken = async (repository: SkillRepositoryRecord) => {
-	const encryptedToken = repository.factory?.githubAccessTokenEncrypted;
+	const encryptedToken = repository.workspace?.githubAccessTokenEncrypted;
 
 	if (!encryptedToken) {
 		return undefined;
@@ -821,12 +817,10 @@ const getBearerToken = (authorizationHeader: string | null) => {
 	return token;
 };
 
-const hasFactoryAccess = (
-	factory: NonNullable<SkillRepositoryRecord["factory"]>,
+const hasWorkspaceAccess = (
+	workspace: NonNullable<SkillRepositoryRecord["workspace"]>,
 	userId: string,
-) =>
-	factory.organisation?.members?.some((member) => member.user?.id === userId) ??
-	false;
+) => workspace.members?.some((member) => member.user?.id === userId) ?? false;
 
 const getGithubRepositoryRef = (
 	url: string,

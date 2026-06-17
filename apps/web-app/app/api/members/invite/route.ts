@@ -6,7 +6,7 @@ import { getDevelopmentEmailOutboxDirectory } from "@/helpers/dev-email-outbox";
 import db, { id } from "@/instant.admin";
 
 type InviteMemberBody = {
-	organisationId?: unknown;
+	workspaceId?: unknown;
 	memberId?: unknown;
 	email?: unknown;
 	role?: unknown;
@@ -23,7 +23,7 @@ type InviteMember = {
 	user?: InviteUser;
 };
 
-type InviteOrganisation = {
+type InviteWorkspace = {
 	id: string;
 	name: string;
 	handle: string;
@@ -59,15 +59,12 @@ export async function POST(req: NextRequest) {
 
 	if (!body) {
 		return NextResponse.json(
-			{ message: "organisationId, memberId, email, and role are required" },
+			{ message: "workspaceId, memberId, email, and role are required" },
 			{ status: 400 },
 		);
 	}
 
-	const authResult = await authenticateOrganisationRequest(
-		req,
-		body.organisationId,
-	);
+	const authResult = await authenticateWorkspaceRequest(req, body.workspaceId);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -76,13 +73,13 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	const existingMember = authResult.organisation.members?.find(
+	const existingMember = authResult.workspace.members?.find(
 		(member) => normalizeEmail(member.user?.email) === body.email,
 	);
 
 	if (existingMember?.user?.email) {
 		return NextResponse.json(
-			{ message: "That email is already a member of this organisation" },
+			{ message: "That email is already a member of this workspace" },
 			{ status: 409 },
 		);
 	}
@@ -99,7 +96,7 @@ export async function POST(req: NextRequest) {
 				role: body.role,
 			})
 			.link({
-				organisation: body.organisationId,
+				workspace: body.workspaceId,
 				user: invitedUser.id,
 			}),
 	);
@@ -111,7 +108,7 @@ export async function POST(req: NextRequest) {
 		delivery = await deliverInviteEmail({
 			email: body.email,
 			inviteUrl: inviteUrl.toString(),
-			organisationName: authResult.organisation.name,
+			workspaceName: authResult.workspace.name,
 			origin: req.nextUrl.origin,
 		});
 
@@ -139,9 +136,9 @@ export async function POST(req: NextRequest) {
 	);
 }
 
-const authenticateOrganisationRequest = async (
+const authenticateWorkspaceRequest = async (
 	req: NextRequest,
-	organisationId: string,
+	workspaceId: string,
 ) => {
 	const refreshToken = req.headers.get("Authorization")?.split(" ")[1];
 	const user = refreshToken ? await db.auth.verifyToken(refreshToken) : null;
@@ -154,12 +151,12 @@ const authenticateOrganisationRequest = async (
 		};
 	}
 
-	const organisation = await db
+	const workspace = await db
 		.query({
-			organisations: {
+			workspaces: {
 				$: {
 					where: {
-						id: organisationId,
+						id: workspaceId,
 					},
 				},
 				members: {
@@ -167,21 +164,18 @@ const authenticateOrganisationRequest = async (
 				},
 			},
 		})
-		.then(
-			(result) => result.organisations[0] as InviteOrganisation | undefined,
-		);
+		.then((result) => result.workspaces[0] as InviteWorkspace | undefined);
 
-	if (!organisation) {
+	if (!workspace) {
 		return {
 			ok: false as const,
 			status: 404,
-			message: "Organisation not found",
+			message: "Workspace not found",
 		};
 	}
 
 	const isMember =
-		organisation.members?.some((member) => member.user?.id === user.id) ??
-		false;
+		workspace.members?.some((member) => member.user?.id === user.id) ?? false;
 
 	if (!isMember) {
 		return {
@@ -191,7 +185,7 @@ const authenticateOrganisationRequest = async (
 		};
 	}
 
-	return { ok: true as const, organisation, user };
+	return { ok: true as const, workspace, user };
 };
 
 const getOrCreateUserForEmail = async (email: string) => {
@@ -225,19 +219,19 @@ const getOrCreateUserForEmail = async (email: string) => {
 const deliverInviteEmail = async ({
 	email,
 	inviteUrl,
-	organisationName,
+	workspaceName,
 	origin,
 }: {
 	email: string;
 	inviteUrl: string;
-	organisationName: string;
+	workspaceName: string;
 	origin: string;
 }) => {
 	if (shouldUseDevelopmentEmailDelivery()) {
 		return writeDevelopmentInviteEmail({
 			email,
 			inviteUrl,
-			organisationName,
+			workspaceName,
 			origin,
 		});
 	}
@@ -257,7 +251,7 @@ const deliverInviteEmail = async ({
 		email,
 		from,
 		inviteUrl,
-		organisationName,
+		workspaceName,
 	});
 	const response = await fetch(
 		`https://api.cloudflare.com/client/v4/accounts/${accountId}/email/sending/send`,
@@ -291,19 +285,19 @@ const deliverInviteEmail = async ({
 const writeDevelopmentInviteEmail = async ({
 	email,
 	inviteUrl,
-	organisationName,
+	workspaceName,
 	origin,
 }: {
 	email: string;
 	inviteUrl: string;
-	organisationName: string;
+	workspaceName: string;
 	origin: string;
 }) => {
 	const emailId = randomBytes(12).toString("hex");
 	const message = buildInviteEmailMessage({
 		email,
 		inviteUrl,
-		organisationName,
+		workspaceName,
 		from: "dev@factoryplane.local",
 	});
 	const outboxDirectory = getDevelopmentEmailOutboxDirectory();
@@ -337,28 +331,28 @@ const buildInviteEmailMessage = ({
 	email,
 	from,
 	inviteUrl,
-	organisationName,
+	workspaceName,
 }: {
 	email: string;
 	from: string;
 	inviteUrl: string;
-	organisationName: string;
+	workspaceName: string;
 }) => {
-	const safeOrganisationName = escapeHtml(organisationName);
+	const safeWorkspaceName = escapeHtml(workspaceName);
 	const safeInviteUrl = escapeHtml(inviteUrl);
 
 	return {
 		to: email,
 		from,
-		subject: `Join ${organisationName} on Factoryplane`,
+		subject: `Join ${workspaceName} on Factoryplane`,
 		html: [
-			`<p>You have been invited to join <strong>${safeOrganisationName}</strong> on Factoryplane.</p>`,
+			`<p>You have been invited to join <strong>${safeWorkspaceName}</strong> on Factoryplane.</p>`,
 			`<p><a href="${safeInviteUrl}">Accept your invite</a></p>`,
 			`<p>If the button does not work, copy and paste this URL into your browser:</p>`,
 			`<p>${safeInviteUrl}</p>`,
 		].join(""),
 		text: [
-			`You have been invited to join ${organisationName} on Factoryplane.`,
+			`You have been invited to join ${workspaceName} on Factoryplane.`,
 			"",
 			`Accept your invite: ${inviteUrl}`,
 		].join("\n"),
@@ -381,17 +375,17 @@ const getAppOrigin = (req: NextRequest) => {
 
 const parseInviteMemberBody = (body: unknown) => {
 	const record = isRecord(body) ? (body as InviteMemberBody) : {};
-	const organisationId = getNonEmptyString(record.organisationId);
+	const workspaceId = getNonEmptyString(record.workspaceId);
 	const memberId = getNonEmptyString(record.memberId);
 	const email = normalizeEmail(record.email);
 	const role = getNonEmptyString(record.role) ?? "member";
 
-	if (!organisationId || !memberId || !email || !VALID_ROLES.has(role)) {
+	if (!workspaceId || !memberId || !email || !VALID_ROLES.has(role)) {
 		return null;
 	}
 
 	return {
-		organisationId,
+		workspaceId,
 		memberId,
 		email,
 		role,

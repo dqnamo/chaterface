@@ -2,13 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import db from "@/instant.admin";
 import {
 	clearGithubAppStateCookie,
-	factoryTx,
 	GITHUB_APP_STATE_COOKIE,
-	getAuthenticatedFactory,
+	getAuthenticatedWorkspace,
 	getGithubAppConfig,
 	getGithubAppInstallation,
-	hasFactoryAccess,
+	hasWorkspaceAccess,
 	verifyGithubAppState,
+	workspaceTx,
 } from "../../../_lib/github-app";
 
 export async function GET(req: NextRequest) {
@@ -45,9 +45,9 @@ export async function GET(req: NextRequest) {
 		);
 	}
 
-	const factory = await getAuthenticatedFactory(verifiedState.factoryId);
+	const workspace = await getAuthenticatedWorkspace(verifiedState.workspaceId);
 
-	if (!factory || !hasFactoryAccess(factory, verifiedState.userId)) {
+	if (!workspace || !hasWorkspaceAccess(workspace, verifiedState.userId)) {
 		return redirectWithStatus(req, redirectPath, "github_error", "forbidden");
 	}
 
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
 		installation = await getGithubAppInstallation(installationId, config);
 	} catch (error) {
 		console.error("Failed to load GitHub App installation", {
-			factoryId: factory.id,
+			workspaceId: workspace.id,
 			installationId,
 			error: error instanceof Error ? error.message : String(error),
 		});
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
 
 	try {
 		await db.transact(
-			factoryTx(factory.id).update({
+			workspaceTx(workspace.id).update({
 				githubAppInstallationAccountLogin: installation.account?.login,
 				githubAppInstallationAccountType: installation.account?.type,
 				githubAppInstallationId: installationId,
@@ -91,13 +91,13 @@ export async function GET(req: NextRequest) {
 			}),
 		);
 
-		const updatedFactory = await getAuthenticatedFactory(factory.id);
+		const updatedWorkspace = await getAuthenticatedWorkspace(workspace.id);
 
-		if (updatedFactory?.githubAppInstallationId !== installationId) {
+		if (updatedWorkspace?.githubAppInstallationId !== installationId) {
 			console.error("GitHub App installation did not persist", {
-				factoryId: factory.id,
+				workspaceId: workspace.id,
 				installationId,
-				persistedInstallationId: updatedFactory?.githubAppInstallationId,
+				persistedInstallationId: updatedWorkspace?.githubAppInstallationId,
 			});
 
 			return redirectWithStatus(
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
 		}
 	} catch (error) {
 		console.error("Failed to save GitHub App installation", {
-			factoryId: factory.id,
+			workspaceId: workspace.id,
 			installationId,
 			error: error instanceof Error ? error.message : String(error),
 		});

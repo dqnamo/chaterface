@@ -1,5 +1,5 @@
-import db from "@/instant.admin";
 import { type NextRequest, NextResponse } from "next/server";
+import db from "@/instant.admin";
 
 export async function GET(
 	req: NextRequest,

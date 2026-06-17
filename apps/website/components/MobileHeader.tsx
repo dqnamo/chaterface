@@ -14,7 +14,7 @@ export default function MobileHeader() {
 	const pathname = usePathname();
 	const isHomePage = pathname === "/";
 	const showThemeToggle = !isHomePage;
-	const brandName = isHomePage ? "Chaterface" : "Factory";
+	const brandName = isHomePage ? "Chaterface" : "Workspace";
 	const landingColorClassName = isHomePage ? "landing-page-colors" : "";
 
 	return (

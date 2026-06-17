@@ -27,6 +27,8 @@ const normalizeApiUrl = (value: string | undefined) => {
 	return trimmed.replace(/\/+$/, "");
 };
 
-export const formatCodexDeveloperInstructionsConfig = (instructions: string) => {
+export const formatCodexDeveloperInstructionsConfig = (
+	instructions: string,
+) => {
 	return `developer_instructions="""\n${instructions}\n"""`;
 };

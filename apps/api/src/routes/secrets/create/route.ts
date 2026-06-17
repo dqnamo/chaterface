@@ -3,13 +3,13 @@ import { createEncryptionService } from "@repo/encryption";
 import type { RouteHandler } from "../../../lib/file-router.js";
 
 type CreateSecretBody = {
-	factoryId?: string;
+	workspaceId?: string;
 	name: string;
 	value: string;
 };
 
 type AuthResult = {
-	factoryId: string;
+	workspaceId: string;
 };
 
 const secretTx = (secretId: string) => {
@@ -37,7 +37,7 @@ export const POST: RouteHandler = async (c) => {
 	const authResult = await authenticateCreateSecretRequest(
 		c.req.header("token"),
 		c.req.header("Authorization")?.split(" ")[1],
-		body.factoryId,
+		body.workspaceId,
 	);
 
 	if (!authResult) {
@@ -61,7 +61,7 @@ export const POST: RouteHandler = async (c) => {
 				valueEncrypted,
 				createdAt: new Date().toISOString(),
 			})
-			.link({ factory: authResult.factoryId }),
+			.link({ workspace: authResult.workspaceId }),
 	);
 
 	return c.json({
@@ -76,7 +76,7 @@ const parseCreateSecretBody = (
 		return undefined;
 	}
 
-	const factoryId = getNonEmptyString(value.factoryId);
+	const workspaceId = getNonEmptyString(value.workspaceId);
 	const name = getNonEmptyString(value.name);
 	const secretValue = getSecretValue(value.value);
 
@@ -85,7 +85,7 @@ const parseCreateSecretBody = (
 	}
 
 	return {
-		...(factoryId ? { factoryId } : {}),
+		...(workspaceId ? { workspaceId } : {}),
 		name,
 		value: secretValue,
 	};
@@ -94,11 +94,11 @@ const parseCreateSecretBody = (
 const authenticateCreateSecretRequest = async (
 	userToken: string | undefined,
 	agentToken: string | undefined,
-	factoryId: string | undefined,
+	workspaceId: string | undefined,
 ): Promise<AuthResult | undefined> => {
 	if (userToken) {
-		if ((await verifyUserToken(userToken)) && factoryId) {
-			return { factoryId };
+		if ((await verifyUserToken(userToken)) && workspaceId) {
+			return { workspaceId };
 		}
 	}
 
@@ -114,20 +114,20 @@ const authenticateCreateSecretRequest = async (
 						agentToken,
 					},
 				},
-				factory: {},
+				workspace: {},
 			},
 		})
 		.then((data) => data.tasks[0]);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return undefined;
 	}
 
-	if (factoryId && task.factory.id !== factoryId) {
+	if (workspaceId && task.workspace.id !== workspaceId) {
 		return undefined;
 	}
 
-	return { factoryId: task.factory.id };
+	return { workspaceId: task.workspace.id };
 };
 
 const verifyUserToken = async (token: string) => {

@@ -1,5 +1,1 @@
-export const monogramColors = [
-	"red",
-	"green",
-	"blue",
-] as const;
+export const monogramColors = ["red", "green", "blue"] as const;

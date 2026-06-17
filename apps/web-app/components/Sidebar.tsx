@@ -5,10 +5,8 @@ import {
 	CheckIcon,
 	GearSixIcon,
 	HeadCircuitIcon,
-	IdentificationCardIcon,
 	MinusCircleIcon,
 	PlusCircleIcon,
-	ShapesIcon,
 	SignOutIcon,
 	TerminalWindowIcon,
 	UsersIcon,
@@ -35,26 +33,31 @@ import { Input } from "./Input";
 import { Menu } from "./Menu";
 import Monogram from "./Monogram";
 import { NewTaskDialog } from "./NewTaskDialog";
-import { OrganisationSettingsContent } from "./OrganisationSettings";
 import { PersonalSettingsContent } from "./PersonalSettings";
 import { ScrollArea } from "./ScrollArea";
 import { useSidebar } from "./SidebarContext";
 import { getUserProfileDisplayName, TaskPresenceAvatars } from "./TaskPresence";
 import TaskStatusDots from "./TaskStatusDots";
+import { WorkspaceSettingsContent } from "./WorkspaceSettings";
 
 type AgentSession = Pick<
 	InstaQLEntity<AppSchema, "agentSessions">,
 	"id" | "name" | "status"
 >;
+
 type Task = InstaQLEntity<AppSchema, "tasks"> & {
 	agentSessions?: AgentSession[];
 };
-type Factory = Pick<InstaQLEntity<AppSchema, "factories">, "id" | "name">;
-type Organisation = Pick<
-	InstaQLEntity<AppSchema, "organisations">,
+
+type Workspace = Pick<
+	InstaQLEntity<AppSchema, "workspaces">,
 	"id" | "name" | "handle"
 > & {
-	factories?: Factory[];
+	tasks?: Task[];
+	members?: Array<{
+		user?: Pick<InstaQLEntity<AppSchema, "$users">, "id" | "name">;
+		name?: string;
+	}>;
 };
 
 const taskTx = (taskId: string) => {
@@ -67,13 +70,11 @@ const taskTx = (taskId: string) => {
 	return tx;
 };
 
-const organisationTx = (organisationId: string) => {
-	const tx = db.tx.organisations[organisationId];
+const workspaceTx = (workspaceId: string) => {
+	const tx = db.tx.workspaces[workspaceId];
 
 	if (!tx) {
-		throw new Error(
-			`Organisation transaction builder ${organisationId} not found`,
-		);
+		throw new Error(`Workspace transaction builder ${workspaceId} not found`);
 	}
 
 	return tx;
@@ -84,16 +85,6 @@ const memberTx = (memberId: string) => {
 
 	if (!tx) {
 		throw new Error(`Member transaction builder ${memberId} not found`);
-	}
-
-	return tx;
-};
-
-const factoryTx = (factoryId: string) => {
-	const tx = db.tx.factories[factoryId];
-
-	if (!tx) {
-		throw new Error(`Factory transaction builder ${factoryId} not found`);
 	}
 
 	return tx;
@@ -140,16 +131,17 @@ const compareActiveTaskEntries = (
 };
 
 export default function Sidebar() {
-	const { orgHandle, factoryId, taskId } = useParams();
+	const { workspaceHandle, taskId } = useParams();
 	const pathname = usePathname();
+	const { user } = db.useAuth();
 	const { isMobile, collapse } = useSidebar();
 	const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
 	const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-	const [isOrganisationSettingsOpen, setIsOrganisationSettingsOpen] =
-		useState(false);
-	const currentOrgHandle = orgHandle as string;
-	const currentFactoryId = factoryId as string;
-	const currentTaskId = taskId as string;
+	const [isWorkspaceSettingsOpen, setIsWorkspaceSettingsOpen] = useState(false);
+	const currentWorkspaceHandle =
+		typeof workspaceHandle === "string" ? workspaceHandle : "";
+	const currentTaskId = typeof taskId === "string" ? taskId : "";
+	const currentUserId = user?.id ?? "__unauthenticated__";
 	const closeAfterMobileNavigation = useCallback(() => {
 		if (isMobile) {
 			collapse();
@@ -157,41 +149,38 @@ export default function Sidebar() {
 	}, [collapse, isMobile]);
 
 	const { data } = db.useQuery({
-		tasks: {
+		workspaces: {
 			$: {
 				where: {
-					factory: currentFactoryId,
+					handle: currentWorkspaceHandle,
 				},
 			},
-			agentSessions: {},
+			tasks: {
+				agentSessions: {},
+			},
+			members: {
+				user: {},
+			},
 		},
 	});
 	const { data: switcherData } = db.useQuery({
-		organisations: {
-			factories: {},
+		workspaces: {
+			$: {
+				where: {
+					"members.user.id": currentUserId,
+				},
+			},
 		},
 	});
-	const tasks = data?.tasks ?? [];
-	const organisations = useMemo(
+	const currentWorkspace = data?.workspaces?.[0] as Workspace | undefined;
+	const tasks = currentWorkspace?.tasks ?? [];
+	const workspaces = useMemo(
 		() =>
-			(switcherData?.organisations ?? [])
-				.map((organisation) => ({
-					id: organisation.id,
-					name: organisation.name,
-					handle: organisation.handle,
-					factories: [...(organisation.factories ?? [])]
-						.map((factory) => ({
-							id: factory.id,
-							name: factory.name,
-						}))
-						.sort((firstFactory, secondFactory) =>
-							firstFactory.name.localeCompare(secondFactory.name),
-						),
-				}))
-				.sort((firstOrganisation, secondOrganisation) =>
-					firstOrganisation.name.localeCompare(secondOrganisation.name),
-				),
-		[switcherData?.organisations],
+			[...((switcherData?.workspaces ?? []) as Workspace[])].sort(
+				(firstWorkspace, secondWorkspace) =>
+					firstWorkspace.name.localeCompare(secondWorkspace.name),
+			),
+		[switcherData?.workspaces],
 	);
 	const activeTasks = useMemo(
 		() =>
@@ -202,9 +191,9 @@ export default function Sidebar() {
 				.map(({ task }) => task),
 		[tasks],
 	);
-	const settingsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/settings`;
-	const humansHref = `/${currentOrgHandle}/factories/${currentFactoryId}/humans`;
-	const agentsHref = `/${currentOrgHandle}/factories/${currentFactoryId}/agents`;
+	const settingsHref = `/${currentWorkspaceHandle}/settings`;
+	const humansHref = `/${currentWorkspaceHandle}/humans`;
+	const agentsHref = `/${currentWorkspaceHandle}/agents`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isHumansSelected = pathname.startsWith(humansHref);
 	const isAgentsSelected = pathname.startsWith(agentsHref);
@@ -216,8 +205,8 @@ export default function Sidebar() {
 		setIsAccountSettingsOpen(true);
 		closeAfterMobileNavigation();
 	}, [closeAfterMobileNavigation]);
-	const openOrganisationSettings = useCallback(() => {
-		setIsOrganisationSettingsOpen(true);
+	const openWorkspaceSettings = useCallback(() => {
+		setIsWorkspaceSettingsOpen(true);
 		closeAfterMobileNavigation();
 	}, [closeAfterMobileNavigation]);
 
@@ -237,12 +226,12 @@ export default function Sidebar() {
 				<ScrollArea.Viewport>
 					<ScrollArea.Content className="flex min-h-full w-full min-w-0 max-w-full flex-col gap-2 px-2 py-2">
 						<div className="sticky top-0 z-20 mb-1 flex min-w-0 max-w-full flex-row items-start bg-grayscale-1 pb-1">
-							<FactorySwitcher
-								organisations={organisations}
-								currentOrgHandle={currentOrgHandle}
-								currentFactoryId={currentFactoryId}
+							<WorkspaceSwitcher
+								workspaces={workspaces}
+								currentWorkspace={currentWorkspace}
+								currentWorkspaceHandle={currentWorkspaceHandle}
 								onNavigate={closeAfterMobileNavigation}
-								onOpenOrganisationSettings={openOrganisationSettings}
+								onOpenWorkspaceSettings={openWorkspaceSettings}
 							/>
 						</div>
 						<div className="min-w-0 max-w-full">
@@ -335,8 +324,8 @@ export default function Sidebar() {
 										transition={{ duration: 0.18, ease: "easeOut" }}
 									>
 										<TaskSidebarItem
-											href={`/${currentOrgHandle}/factories/${currentFactoryId}/tasks/${task.id}`}
-											fallbackHref={`/${currentOrgHandle}/factories/${currentFactoryId}`}
+											href={`/${currentWorkspaceHandle}/tasks/${task.id}`}
+											fallbackHref={`/${currentWorkspaceHandle}`}
 											task={task}
 											selected={task.id === currentTaskId}
 											onNavigate={closeAfterMobileNavigation}
@@ -347,7 +336,8 @@ export default function Sidebar() {
 						</div>
 						<div className="sticky bottom-0 z-10 mt-auto bg-grayscale-1 pt-2">
 							<UserSidebarMenu
-								currentOrgHandle={currentOrgHandle}
+								currentWorkspace={currentWorkspace}
+								currentUserId={currentUserId}
 								onOpenAccountSettings={openAccountSettings}
 							/>
 						</div>
@@ -376,20 +366,18 @@ export default function Sidebar() {
 				</Dialog.Portal>
 			</Dialog.Root>
 			<Dialog.Root
-				open={isOrganisationSettingsOpen}
-				onOpenChange={setIsOrganisationSettingsOpen}
+				open={isWorkspaceSettingsOpen}
+				onOpenChange={setIsWorkspaceSettingsOpen}
 			>
 				<Dialog.Portal>
 					<Dialog.Backdrop />
 					<Dialog.Popup className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden">
-						<Dialog.Title className="sr-only">
-							Organisation Settings
-						</Dialog.Title>
+						<Dialog.Title className="sr-only">Workspace Settings</Dialog.Title>
 						<Dialog.Description className="sr-only">
-							Manage organisation details.
+							Manage workspace details.
 						</Dialog.Description>
 						<div className="overflow-y-auto p-4 md:p-6">
-							<OrganisationSettingsContent />
+							<WorkspaceSettingsContent />
 						</div>
 					</Dialog.Popup>
 				</Dialog.Portal>
@@ -399,28 +387,17 @@ export default function Sidebar() {
 }
 
 const UserSidebarMenu = ({
-	currentOrgHandle,
+	currentWorkspace,
+	currentUserId,
 	onOpenAccountSettings,
 }: {
-	currentOrgHandle: string;
+	currentWorkspace: Workspace | undefined;
+	currentUserId: string;
 	onOpenAccountSettings: () => void;
 }) => {
 	const { user } = db.useAuth();
-	const currentUserId = user?.id ?? "__unauthenticated__";
 	const [isSigningOut, setIsSigningOut] = useState(false);
-	const { data } = db.useQuery({
-		organisations: {
-			$: {
-				where: {
-					handle: currentOrgHandle,
-				},
-			},
-			members: {
-				user: {},
-			},
-		},
-	});
-	const member = data?.organisations?.[0]?.members?.find(
+	const member = currentWorkspace?.members?.find(
 		(member) => member.user?.id === currentUserId,
 	);
 	const userRecord = member?.user;
@@ -504,54 +481,41 @@ const UserSidebarMenu = ({
 	);
 };
 
-const FactorySwitcher = ({
-	organisations,
-	currentOrgHandle,
-	currentFactoryId,
+const WorkspaceSwitcher = ({
+	workspaces,
+	currentWorkspace,
+	currentWorkspaceHandle,
 	onNavigate,
-	onOpenOrganisationSettings,
+	onOpenWorkspaceSettings,
 }: {
-	organisations: Organisation[];
-	currentOrgHandle: string;
-	currentFactoryId: string;
+	workspaces: Workspace[];
+	currentWorkspace: Workspace | undefined;
+	currentWorkspaceHandle: string;
 	onNavigate: () => void;
-	onOpenOrganisationSettings: () => void;
+	onOpenWorkspaceSettings: () => void;
 }) => {
 	const router = useRouter();
 	const { user } = db.useAuth();
-	const [createOrganisationOpen, setCreateOrganisationOpen] = useState(false);
-	const [createFactoryOrganisation, setCreateFactoryOrganisation] =
-		useState<Organisation>();
-	const [organisationName, setOrganisationName] = useState("");
-	const [organisationHandle, setOrganisationHandle] = useState("");
-	const [factoryName, setFactoryName] = useState("");
-	const [githubAccessToken, setGithubAccessToken] = useState("");
-	const [gitAuthorName, setGitAuthorName] = useState("");
-	const [gitAuthorEmail, setGitAuthorEmail] = useState("");
-	const currentOrganisation = organisations.find(
-		(organisation) => organisation.handle === currentOrgHandle,
-	);
-	const currentFactory = currentOrganisation?.factories?.find(
-		(factory) => factory.id === currentFactoryId,
-	);
-	const triggerSeed =
-		currentFactory?.name ?? currentOrganisation?.name ?? currentOrgHandle;
+	const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+	const [workspaceName, setWorkspaceName] = useState("");
+	const [workspaceHandle, setWorkspaceHandle] = useState("");
+	const triggerSeed = currentWorkspace?.name ?? currentWorkspaceHandle;
 
 	const navigateTo = (href: string) => {
 		router.push(href);
 		onNavigate();
 	};
 
-	const createOrganisation = async () => {
+	const createWorkspace = async () => {
 		if (!user?.id) {
 			return;
 		}
 
-		const organisationId = id();
+		const workspaceId = id();
 		await db.transact([
-			organisationTx(organisationId).create({
-				name: organisationName,
-				handle: organisationHandle,
+			workspaceTx(workspaceId).create({
+				name: workspaceName,
+				handle: workspaceHandle,
 				createdAt: DateTime.now().toISO(),
 			}),
 			memberTx(id())
@@ -560,64 +524,14 @@ const FactorySwitcher = ({
 					joinedAt: DateTime.now().toISO(),
 					role: "owner",
 				})
-				.link({ organisation: organisationId, user: user.id }),
+				.link({ workspace: workspaceId, user: user.id }),
 		]);
 
-		const nextHandle = organisationHandle;
-		setOrganisationName("");
-		setOrganisationHandle("");
-		setCreateOrganisationOpen(false);
-		navigateTo(`/${nextHandle}/factories`);
-	};
-
-	const createFactory = async () => {
-		if (!createFactoryOrganisation || !user?.id) {
-			return;
-		}
-
-		const factoryId = id();
-		const trimmedGithubAccessToken = githubAccessToken.trim();
-
-		await db.transact(
-			factoryTx(factoryId)
-				.create({
-					name: factoryName,
-					createdAt: DateTime.now().toISO(),
-					gitAuthorName: gitAuthorName.trim() || undefined,
-					gitAuthorEmail: gitAuthorEmail.trim() || undefined,
-				})
-				.link({ organisation: createFactoryOrganisation.id }),
-		);
-
-		if (trimmedGithubAccessToken) {
-			const response = await fetch("/api/factories/saveGithub", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${user.refresh_token}`,
-				},
-				body: JSON.stringify({
-					factoryId,
-					githubAccessToken: trimmedGithubAccessToken,
-					gitAuthorName: gitAuthorName.trim(),
-					gitAuthorEmail: gitAuthorEmail.trim(),
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error(
-					`Failed to save GitHub credentials: ${response.status}`,
-				);
-			}
-		}
-
-		const nextOrgHandle = createFactoryOrganisation.handle;
-		setFactoryName("");
-		setGithubAccessToken("");
-		setGitAuthorName("");
-		setGitAuthorEmail("");
-		setCreateFactoryOrganisation(undefined);
-		navigateTo(`/${nextOrgHandle}/factories/${factoryId}`);
+		const nextHandle = workspaceHandle;
+		setWorkspaceName("");
+		setWorkspaceHandle("");
+		setCreateWorkspaceOpen(false);
+		navigateTo(`/${nextHandle}`);
 	};
 
 	return (
@@ -626,15 +540,15 @@ const FactorySwitcher = ({
 				<Menu.Trigger className="w-full min-w-0 rounded-md border-0 bg-transparent px-1.5 py-1 hover:bg-grayscale-2 data-[popup-open]:bg-grayscale-2">
 					<Monogram
 						seed={triggerSeed}
-						letters={currentFactory ? 2 : 1}
+						letters={1}
 						className="size-7 shrink-0"
 					/>
 					<span className="flex min-w-0 flex-1 flex-col text-left">
 						<span className="truncate text-sm leading-tight text-grayscale-12">
-							{currentFactory?.name ?? currentOrganisation?.name ?? "Factories"}
+							{currentWorkspace?.name ?? "Workspaces"}
 						</span>
 						<span className="truncate text-[11px] leading-tight text-grayscale-10">
-							{currentOrganisation?.name ?? currentOrgHandle}
+							/{currentWorkspaceHandle}
 						</span>
 					</span>
 					<Menu.TriggerIcon />
@@ -644,143 +558,71 @@ const FactorySwitcher = ({
 						<Menu.Popup className="max-h-[min(34rem,calc(100vh-1rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto">
 							<div className="flex flex-col gap-0.5 px-3 py-2">
 								<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-									Switch context
-								</p>
-								<p className="truncate text-xs text-grayscale-11">
-									Factories and organisations
+									Switch workspace
 								</p>
 							</div>
 							<Menu.Separator />
-							{organisations.length ? (
-								organisations.map((organisation, organisationIndex) => {
-									const organisationSelected =
-										organisation.handle === currentOrgHandle;
+							{workspaces.length ? (
+								workspaces.map((workspace) => {
+									const selected = workspace.handle === currentWorkspaceHandle;
 
 									return (
-										<Menu.Group key={organisation.id}>
-											<Menu.Item
-												onClick={() =>
-													navigateTo(`/${organisation.handle}/factories`)
-												}
-												className={cn(
-													"items-start py-2",
-													organisationSelected
-														? "bg-grayscale-2 text-grayscale-12"
-														: "",
-												)}
-											>
-												<BuildingsIcon
-													weight="bold"
-													className="mt-0.5 size-4 shrink-0"
-												/>
-												<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-													<span className="truncate text-xs font-medium">
-														{organisation.name}
-													</span>
-													<span className="truncate font-mono text-[11px] text-grayscale-10">
-														/{organisation.handle}
-														{organisationSelected ? " - current org" : ""}
-													</span>
-												</span>
-											</Menu.Item>
-											{organisation.factories?.length ? (
-												organisation.factories.map((factory) => {
-													const selected =
-														organisationSelected &&
-														factory.id === currentFactoryId;
-
-													return (
-														<Menu.Item
-															key={factory.id}
-															onClick={() =>
-																navigateTo(
-																	`/${organisation.handle}/factories/${factory.id}`,
-																)
-															}
-															className={cn(
-																"ml-6 mr-1",
-																selected
-																	? "bg-grayscale-2 text-grayscale-12"
-																	: "",
-															)}
-														>
-															<ShapesIcon
-																weight="bold"
-																className="size-4 shrink-0"
-															/>
-															<span className="min-w-0 flex-1 truncate">
-																{factory.name}
-															</span>
-															{selected ? (
-																<CheckIcon
-																	size={14}
-																	weight="bold"
-																	className="shrink-0 text-accent-9"
-																/>
-															) : null}
-														</Menu.Item>
-													);
-												})
-											) : (
-												<Menu.Item
-													disabled={true}
-													className="ml-6 mr-1 text-grayscale-9"
-												>
-													<span className="min-w-0 flex-1 truncate">
-														No factories
-													</span>
-												</Menu.Item>
+										<Menu.Item
+											key={workspace.id}
+											onClick={() => navigateTo(`/${workspace.handle}`)}
+											className={cn(
+												"items-start py-2",
+												selected ? "bg-grayscale-2 text-grayscale-12" : "",
 											)}
-											{organisationIndex < organisations.length - 1 ? (
-												<Menu.Separator />
+										>
+											<BuildingsIcon
+												weight="bold"
+												className="mt-0.5 size-4 shrink-0"
+											/>
+											<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+												<span className="truncate text-xs font-medium">
+													{workspace.name}
+												</span>
+												<span className="truncate font-mono text-[11px] text-grayscale-10">
+													/{workspace.handle}
+												</span>
+											</span>
+											{selected ? (
+												<CheckIcon
+													size={14}
+													weight="bold"
+													className="shrink-0 text-accent-9"
+												/>
 											) : null}
-										</Menu.Group>
+										</Menu.Item>
 									);
 								})
 							) : (
 								<Menu.Item disabled={true} className="text-grayscale-9">
-									<span className="min-w-0 flex-1 truncate">
-										No organisations
-									</span>
+									<span className="min-w-0 flex-1 truncate">No workspaces</span>
 								</Menu.Item>
 							)}
 							<Menu.Separator />
 							<Menu.Item
-								disabled={!currentOrganisation}
-								onClick={onOpenOrganisationSettings}
+								disabled={!currentWorkspace}
+								onClick={onOpenWorkspaceSettings}
 							>
-								<IdentificationCardIcon
-									weight="bold"
-									className="size-4 shrink-0"
-								/>
+								<GearSixIcon weight="bold" className="size-4 shrink-0" />
 								<span className="min-w-0 flex-1 truncate">
-									Organisation settings
+									Workspace settings
 								</span>
 							</Menu.Item>
-							<Menu.Item
-								disabled={!currentOrganisation}
-								onClick={() => {
-									if (currentOrganisation) {
-										setCreateFactoryOrganisation(currentOrganisation);
-									}
-								}}
-							>
-								<ShapesIcon weight="bold" className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">New factory</span>
-							</Menu.Item>
-							<Menu.Item onClick={() => setCreateOrganisationOpen(true)}>
-								<BuildingsIcon weight="bold" className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">
-									New organisation
-								</span>
+							<Menu.Item onClick={() => setCreateWorkspaceOpen(true)}>
+								<PlusCircleIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">New workspace</span>
 							</Menu.Item>
 						</Menu.Popup>
 					</Menu.Positioner>
 				</Menu.Portal>
 			</Menu.Root>
 			<Dialog.Root
-				open={createOrganisationOpen}
-				onOpenChange={setCreateOrganisationOpen}
+				open={createWorkspaceOpen}
+				onOpenChange={setCreateWorkspaceOpen}
 			>
 				<Dialog.Portal>
 					<Dialog.Backdrop />
@@ -788,8 +630,8 @@ const FactorySwitcher = ({
 						<form
 							onSubmit={(event) => {
 								event.preventDefault();
-								void createOrganisation().catch((error) => {
-									console.error("Failed to create organisation", {
+								void createWorkspace().catch((error) => {
+									console.error("Failed to create workspace", {
 										error:
 											error instanceof Error ? error.message : String(error),
 									});
@@ -798,9 +640,9 @@ const FactorySwitcher = ({
 						>
 							<div className="flex flex-col p-3 gap-3">
 								<div className="flex flex-col">
-									<Dialog.Title>Create Organisation</Dialog.Title>
+									<Dialog.Title>Create Workspace</Dialog.Title>
 									<Dialog.Description>
-										Create a new organisation to manage factories.
+										Create a new workspace.
 									</Dialog.Description>
 								</div>
 							</div>
@@ -808,95 +650,18 @@ const FactorySwitcher = ({
 								<p className="text-xs text-grayscale-11">Name</p>
 								<Input
 									type="text"
-									placeholder="Organisation Name"
-									value={organisationName}
-									onChange={(event) => setOrganisationName(event.target.value)}
+									placeholder="Workspace Name"
+									value={workspaceName}
+									onChange={(event) => setWorkspaceName(event.target.value)}
 								/>
 							</div>
 							<div className="flex flex-col p-3 gap-3">
 								<p className="text-xs text-grayscale-11">Handle</p>
 								<Input
 									type="text"
-									placeholder="Organisation Handle"
-									value={organisationHandle}
-									onChange={(event) =>
-										setOrganisationHandle(event.target.value)
-									}
-								/>
-							</div>
-							<div className="flex flex-row items-center justify-end gap-2 p-3">
-								<Dialog.Close>Cancel</Dialog.Close>
-								<Button type="submit">Create</Button>
-							</div>
-						</form>
-					</Dialog.Popup>
-				</Dialog.Portal>
-			</Dialog.Root>
-			<Dialog.Root
-				open={Boolean(createFactoryOrganisation)}
-				onOpenChange={(open) => {
-					if (!open) {
-						setCreateFactoryOrganisation(undefined);
-					}
-				}}
-			>
-				<Dialog.Portal>
-					<Dialog.Backdrop />
-					<Dialog.Popup>
-						<form
-							onSubmit={(event) => {
-								event.preventDefault();
-								void createFactory().catch((error) => {
-									console.error("Failed to create factory", {
-										error:
-											error instanceof Error ? error.message : String(error),
-									});
-								});
-							}}
-						>
-							<div className="flex flex-col p-3 gap-3">
-								<div className="flex flex-col">
-									<Dialog.Title>Create Factory</Dialog.Title>
-									<Dialog.Description>
-										Set up a new factory for{" "}
-										{createFactoryOrganisation?.name ?? "this organisation"}.
-									</Dialog.Description>
-								</div>
-							</div>
-							<div className="flex flex-col p-3 gap-3">
-								<p className="text-xs text-grayscale-11">Name</p>
-								<Input
-									type="text"
-									placeholder="Factory Name"
-									value={factoryName}
-									onChange={(event) => setFactoryName(event.target.value)}
-								/>
-							</div>
-							<div className="flex flex-col p-3 gap-3">
-								<p className="text-xs text-grayscale-11">GitHub Access Token</p>
-								<Input
-									type="text"
-									placeholder="GitHub Access Token"
-									value={githubAccessToken}
-									onChange={(event) => setGithubAccessToken(event.target.value)}
-								/>
-							</div>
-							<div className="flex flex-col p-3 gap-3">
-								<p className="text-xs text-grayscale-11">Git Author Name</p>
-								<Input
-									type="text"
-									placeholder="Git Author Name"
-									value={gitAuthorName}
-									onChange={(event) => setGitAuthorName(event.target.value)}
-								/>
-							</div>
-							<div className="flex flex-col p-3 gap-3">
-								<p className="text-xs text-grayscale-11">Git Author Email</p>
-								<Input
-									type="email"
-									placeholder="Git Author Email"
-									value={gitAuthorEmail}
-									onChange={(event) => setGitAuthorEmail(event.target.value)}
+									placeholder="Workspace Handle"
+									value={workspaceHandle}
+									onChange={(event) => setWorkspaceHandle(event.target.value)}
 								/>
 							</div>
 							<div className="flex flex-row items-center justify-end gap-2 p-3">

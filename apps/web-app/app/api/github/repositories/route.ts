@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
-	authenticateFactoryRequest,
+	authenticateWorkspaceRequest,
 	createInstallationAccessToken,
 	getGithubAppConfig,
 	getNonEmptyString,
@@ -19,10 +19,10 @@ type GithubRepositoriesResponse = {
 };
 
 export async function GET(req: NextRequest) {
-	const factoryId = getNonEmptyString(
-		req.nextUrl.searchParams.get("factoryId"),
+	const workspaceId = getNonEmptyString(
+		req.nextUrl.searchParams.get("workspaceId"),
 	);
-	const authResult = await authenticateFactoryRequest(req, factoryId);
+	const authResult = await authenticateWorkspaceRequest(req, workspaceId);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -31,11 +31,11 @@ export async function GET(req: NextRequest) {
 		);
 	}
 
-	const installationId = authResult.factory.githubAppInstallationId;
+	const installationId = authResult.workspace.githubAppInstallationId;
 
 	if (!installationId) {
 		return NextResponse.json(
-			{ message: "GitHub is not connected for this factory" },
+			{ message: "GitHub is not connected for this workspace" },
 			{ status: 409 },
 		);
 	}

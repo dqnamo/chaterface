@@ -11,10 +11,13 @@ const handlers = combineHandlers(
 			{ scope: "global" },
 		);
 
-    if(record.after.type !== "factoryplane.new_user_message" && record.after.type !== "factoryplane.new_task") {
-      console.log("Skipping event", record.after.type);
-      return;
-    }
+		if (
+			record.after.type !== "factoryplane.new_user_message" &&
+			record.after.type !== "factoryplane.new_task"
+		) {
+			console.log("Skipping event", record.after.type);
+			return;
+		}
 
 		const handle = await tasks.trigger<typeof processEventTask>(
 			"process-event",
@@ -30,7 +33,6 @@ const handlers = combineHandlers(
 );
 
 export async function POST(req: Request) {
-
 	await db.webhooks.processRequest(handlers, req);
 	return new Response("ok");
 }

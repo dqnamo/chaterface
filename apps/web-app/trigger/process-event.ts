@@ -36,21 +36,23 @@ type AgentSession = InstaQLEntity<AppSchema, "agentSessions"> & {
 type EventWithAgentSession = Event & {
 	agentSession?: AgentSession;
 };
-type Factory = InstaQLEntity<AppSchema, "factories">;
+type Workspace = InstaQLEntity<AppSchema, "workspaces">;
 type Repository = InstaQLEntity<AppSchema, "repositories">;
 type EnvironmentFile = InstaQLEntity<AppSchema, "environmentFiles">;
 type Skill = InstaQLEntity<AppSchema, "skills">;
 type McpServer = InstaQLEntity<AppSchema, "mcpServers">;
+type Command = InstaQLEntity<AppSchema, "commands">;
+type SandboxPackage = InstaQLEntity<AppSchema, "sandboxPackages">;
 type IntegrationConnection = InstaQLEntity<AppSchema, "integrationConnections">;
-type FactoryWithRepositories = Factory & {
+type WorkspaceWithRepositories = Workspace & {
 	repositories?: Repository[];
 	environmentFiles?: EnvironmentFile[];
 	skills?: Skill[];
 	mcpServers?: McpServer[];
-	organisation?: {
-		agents?: Agent[];
-		integrationConnections?: IntegrationConnection[];
-	};
+	commands?: Command[];
+	sandboxPackages?: SandboxPackage[];
+	agents?: Agent[];
+	integrationConnections?: IntegrationConnection[];
 };
 type WorkflowNode = {
 	id: string;
@@ -129,7 +131,7 @@ type CodexEvent = {
 	data: unknown;
 };
 type AgentProvider = "codex" | "cursor";
-type FactorySetupScriptKind = "new_task" | "new_turn";
+type WorkspaceSetupScriptKind = "new_task" | "new_turn";
 type Attachment = {
 	id: string;
 	path: string;
@@ -177,7 +179,7 @@ const REPOSITORY_SECRETS_FINGERPRINT_PATH =
 const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
 const WORKFLOW_OUTPUT_DIR = "/tmp/factoryplane-agent-outputs";
 const HUMAN_LOOP_HANDLE_ID = "human-loop";
-const FACTORY_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
+const WORKSPACE_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
 const GITHUB_AUTH_VALIDATION_TIMEOUT_MS = 120_000;
 const GITHUB_AUTH_SETUP_STEP_TIMEOUT_MS =
 	GITHUB_AUTH_VALIDATION_TIMEOUT_MS + 10_000;
@@ -354,27 +356,27 @@ export const processEventTask = task({
 					},
 					task: {
 						agent: {},
-						factory: {
+						workspace: {
 							repositories: {},
 							environmentFiles: {},
 							skills: {},
 							mcpServers: {},
-							organisation: {
-								agents: {},
-								integrationConnections: {},
-							},
+							commands: {},
+							sandboxPackages: {},
+							agents: {},
+							integrationConnections: {},
 						},
 					},
 				},
 			})
-			.then((result) => result.events[0]);
+			.then((result) => result.events?.[0]);
 
 		const task = event?.task;
 		const agent = task?.agent;
-		const factory = task?.factory;
+		const workspace = task?.workspace;
 
-		if (!event || !task || !agent || !factory) {
-			console.log("Skipping event without task, agent, or factory", payload);
+		if (!event || !task || !agent || !workspace) {
+			console.log("Skipping event without task, agent, or workspace", payload);
 			return;
 		}
 
@@ -384,14 +386,14 @@ export const processEventTask = task({
 					event as Event,
 					agent as Agent,
 					task as Task,
-					factory as FactoryWithRepositories,
+					workspace as WorkspaceWithRepositories,
 				);
 			} else if (event?.type === "factoryplane.new_user_message") {
 				await processNewUserMessage(
 					event as Event,
 					task as Task,
 					agent as Agent,
-					factory as FactoryWithRepositories,
+					workspace as WorkspaceWithRepositories,
 				);
 			}
 		} catch (error) {
@@ -408,14 +410,14 @@ const processNewTask = async (
 	event: Event,
 	agent: Agent,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
 	const { sandbox, diffWorkspacePath } = await setupTaskSandbox(
 		agent,
 		task,
-		factory,
+		workspace,
 	);
-	const agentSession = await resolveAgentSession(event, task, agent, factory);
+	const agentSession = await resolveAgentSession(event, task, agent, workspace);
 	const attachments = getAttachments(event.data, task.id);
 	const message = buildNewTaskPrompt(task, attachments);
 
@@ -423,7 +425,7 @@ const processNewTask = async (
 		sandbox,
 		{ ...task, diffWorkspacePath },
 		agent,
-		factory,
+		workspace,
 		message,
 		{ agentSession, attachments },
 	);
@@ -432,7 +434,7 @@ const processNewTask = async (
 		await enqueueWorkflowContinuation(
 			sandbox,
 			{ ...task, diffWorkspacePath },
-			factory,
+			workspace,
 			agentSession,
 		);
 	}
@@ -442,7 +444,7 @@ const processNewUserMessage = async (
 	event: Event,
 	task: Task,
 	agent: Agent,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
 	const content = getStringDataValue(event.data, "content");
 	const attachments = getAttachments(event.data, task.id);
@@ -460,19 +462,19 @@ const processNewUserMessage = async (
 	}
 
 	const sandbox = await Sandbox.connect(task.sandboxId);
-	const agentSession = await resolveAgentSession(event, task, agent, factory);
+	const agentSession = await resolveAgentSession(event, task, agent, workspace);
 	const provider = getAgentProvider(agent);
 	const canResumeAgentSession =
 		provider === "codex" ? Boolean(agentSession.agentThreadId) : true;
 	const userPrompt = content ?? "Please use the attached file input.";
 	await killTaskAgentProcess(sandbox, task, agentSession);
-	await setupSandboxGitIdentity(sandbox, task.id, factory);
-	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, factory);
+	await setupSandboxGitIdentity(sandbox, task.id, workspace);
+	await syncRepositoryEnvFilesIfChanged(sandbox, task.id, workspace);
 	const completed = await runAgentExec(
 		sandbox,
 		task,
 		agent,
-		factory,
+		workspace,
 		userPrompt,
 		{
 			agentSession,
@@ -482,7 +484,7 @@ const processNewUserMessage = async (
 	);
 
 	if (completed) {
-		await enqueueWorkflowContinuation(sandbox, task, factory, agentSession);
+		await enqueueWorkflowContinuation(sandbox, task, workspace, agentSession);
 	}
 };
 
@@ -490,7 +492,7 @@ const resolveAgentSession = async (
 	event: Event,
 	task: Task,
 	agent: Agent,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ): Promise<AgentSession> => {
 	const linkedSession = (event as Event & { agentSession?: AgentSession })
 		.agentSession;
@@ -499,7 +501,7 @@ const resolveAgentSession = async (
 		return linkedSession;
 	}
 
-	const sessionKey = getWorkflowSessionKeyForTask(task, factory);
+	const sessionKey = getWorkflowSessionKeyForTask(task, workspace);
 	const existingSession = await db
 		.query({
 			agentSessions: {
@@ -667,9 +669,9 @@ const getOrCreateAgentSessionForStep = async (
 
 const getWorkflowSessionKeyForTask = (
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
-	const workflow = getTaskFloorWorkflow(task, factory);
+	const workflow = getTaskFloorWorkflow(task, workspace);
 	const workflowNode = workflow.nodes.find(
 		(node) => node.id === task.workflowNodeId,
 	);
@@ -690,13 +692,13 @@ const getAgentSessionName = (sessionKey: string | undefined) =>
 const enqueueWorkflowContinuation = async (
 	sandbox: Sandbox,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	agentSession: AgentSession | undefined,
 ) => {
 	const currentTask = await getLatestWorkflowTask(task.id).then(
 		(latestTask) => latestTask ?? task,
 	);
-	const workflow = getTaskFloorWorkflow(currentTask, factory);
+	const workflow = getTaskFloorWorkflow(currentTask, workspace);
 	const decisionNextNode = findAnsweredAgentDecisionNextNode(
 		workflow,
 		currentTask,
@@ -706,7 +708,7 @@ const enqueueWorkflowContinuation = async (
 		await continueWorkflowFromNode(
 			sandbox,
 			currentTask,
-			factory,
+			workspace,
 			workflow,
 			decisionNextNode,
 			{
@@ -722,7 +724,7 @@ const enqueueWorkflowContinuation = async (
 		await continueWorkflowFromNode(
 			sandbox,
 			currentTask,
-			factory,
+			workspace,
 			workflow,
 			nextNode,
 			{
@@ -761,12 +763,12 @@ const getLatestWorkflowTask = async (taskId: string) =>
 
 const getTaskFloorWorkflow = (
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ): Required<FloorWorkflow> => {
 	const workflowInput = getWorkflowInput(task.workflowInput);
 	const workflowSnapshot = workflowInput.workflowSnapshot;
 
-	return parseFloorWorkflow(workflowSnapshot ?? factory.floorWorkflow);
+	return parseFloorWorkflow(workflowSnapshot ?? workspace.floorWorkflow);
 };
 
 const waitForHumanInAgentSession = async (
@@ -793,7 +795,7 @@ const waitForHumanInAgentSession = async (
 const continueWorkflowFromNode = async (
 	sandbox: Sandbox,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	workflow: Required<FloorWorkflow>,
 	nextNode: WorkflowNode,
 	options: {
@@ -824,7 +826,7 @@ const continueWorkflowFromNode = async (
 		await routeConditionalWorkflowNode(
 			sandbox,
 			task,
-			factory,
+			workspace,
 			workflow,
 			nextNode,
 			options,
@@ -836,7 +838,7 @@ const continueWorkflowFromNode = async (
 		await routeYesNoClassifierNode(
 			sandbox,
 			task,
-			factory,
+			workspace,
 			workflow,
 			nextNode,
 			options,
@@ -848,7 +850,7 @@ const continueWorkflowFromNode = async (
 		await continueFromInstructionNode(
 			sandbox,
 			task,
-			factory,
+			workspace,
 			workflow,
 			nextNode,
 			options,
@@ -860,7 +862,7 @@ const continueWorkflowFromNode = async (
 		await routeAgentDecisionNode(
 			sandbox,
 			task,
-			factory,
+			workspace,
 			workflow,
 			nextNode,
 			options,
@@ -872,7 +874,7 @@ const continueWorkflowFromNode = async (
 		await continueFromIntegrationActionNode(
 			sandbox,
 			task,
-			factory,
+			workspace,
 			workflow,
 			nextNode,
 			options,
@@ -885,7 +887,7 @@ const continueWorkflowFromNode = async (
 	}
 
 	const requestedAgentId = getOptionalDataString(nextNode.data.agentId);
-	const agent = resolveWorkflowAgent(factory, requestedAgentId);
+	const agent = resolveWorkflowAgent(workspace, requestedAgentId);
 
 	if (!agent) {
 		throw new Error(
@@ -946,7 +948,7 @@ const continueWorkflowFromNode = async (
 const routeYesNoClassifierNode = async (
 	sandbox: Sandbox,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	workflow: Required<FloorWorkflow>,
 	classifierNode: WorkflowNode,
 	options: {
@@ -956,7 +958,7 @@ const routeYesNoClassifierNode = async (
 ) => {
 	const workflowInput = getWorkflowInput(task.workflowInput);
 	const requestedAgentId = getOptionalDataString(classifierNode.data?.agentId);
-	const agent = resolveWorkflowAgent(factory, requestedAgentId);
+	const agent = resolveWorkflowAgent(workspace, requestedAgentId);
 
 	if (!agent) {
 		throw new Error(
@@ -980,7 +982,7 @@ const routeYesNoClassifierNode = async (
 		sandbox,
 		task,
 		agent,
-		factory,
+		workspace,
 		buildYesNoClassifierPrompt(renderedPrompt, workflowInput),
 		classifierNode.id,
 	);
@@ -1052,7 +1054,7 @@ const routeYesNoClassifierNode = async (
 	await continueWorkflowFromNode(
 		sandbox,
 		task,
-		factory,
+		workspace,
 		workflow,
 		nextNode,
 		options,
@@ -1062,7 +1064,7 @@ const routeYesNoClassifierNode = async (
 const routeConditionalWorkflowNode = async (
 	sandbox: Sandbox,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	workflow: Required<FloorWorkflow>,
 	routerNode: WorkflowNode,
 	options: {
@@ -1127,7 +1129,7 @@ const routeConditionalWorkflowNode = async (
 	await continueWorkflowFromNode(
 		sandbox,
 		task,
-		factory,
+		workspace,
 		workflow,
 		nextNode,
 		options,
@@ -1137,7 +1139,7 @@ const routeConditionalWorkflowNode = async (
 const continueFromInstructionNode = async (
 	sandbox: Sandbox,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	workflow: Required<FloorWorkflow>,
 	instructionNode: WorkflowNode,
 	options: {
@@ -1182,7 +1184,7 @@ const continueFromInstructionNode = async (
 		return;
 	}
 
-	await continueWorkflowFromNode(sandbox, task, factory, workflow, nextNode, {
+	await continueWorkflowFromNode(sandbox, task, workspace, workflow, nextNode, {
 		...options,
 		prompt,
 	});
@@ -1191,7 +1193,7 @@ const continueFromInstructionNode = async (
 const continueFromIntegrationActionNode = async (
 	sandbox: Sandbox,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	workflow: Required<FloorWorkflow>,
 	actionNode: WorkflowNode,
 	options: {
@@ -1209,7 +1211,7 @@ const continueFromIntegrationActionNode = async (
 	const workflowInput = getWorkflowInput(task.workflowInput);
 	const connectionId = getOptionalDataString(actionNode.data.connectionId);
 	const channelId = getOptionalDataString(actionNode.data.channelId);
-	const connection = resolveIntegrationConnection(factory, connectionId);
+	const connection = resolveIntegrationConnection(workspace, connectionId);
 
 	if (!connection) {
 		throw new Error(
@@ -1296,7 +1298,7 @@ const continueFromIntegrationActionNode = async (
 		return;
 	}
 
-	await continueWorkflowFromNode(sandbox, task, factory, workflow, nextNode, {
+	await continueWorkflowFromNode(sandbox, task, workspace, workflow, nextNode, {
 		...options,
 		prompt: options.prompt,
 	});
@@ -1305,7 +1307,7 @@ const continueFromIntegrationActionNode = async (
 const routeAgentDecisionNode = async (
 	_sandbox: Sandbox,
 	task: Task,
-	_factory: FactoryWithRepositories,
+	_workspace: WorkspaceWithRepositories,
 	_workflow: Required<FloorWorkflow>,
 	decisionNode: WorkflowNode,
 	options: {
@@ -1639,18 +1641,18 @@ const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
 	(typeof value.target === "string" || value.target === undefined);
 
 const resolveWorkflowAgent = (
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	agentId: string | undefined,
 ) => {
-	const agents = factory.organisation?.agents ?? [];
+	const agents = workspace.agents ?? [];
 	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
 };
 
 const resolveIntegrationConnection = (
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	connectionId: string | undefined,
 ) => {
-	const connections = factory.organisation?.integrationConnections ?? [];
+	const connections = workspace.integrationConnections ?? [];
 	return connectionId
 		? connections.find(
 				(connection) =>
@@ -1982,10 +1984,10 @@ const getOptionalDataString = (value: unknown) =>
 const setupTaskSandbox = async (
 	agent: Agent,
 	task: Task,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
-	if (!factory) {
-		throw new Error(`Agent ${agent.id} is missing factory`);
+	if (!workspace) {
+		throw new Error(`Agent ${agent.id} is missing workspace`);
 	}
 
 	const agentAuth = await getAgentAuth(agent);
@@ -2040,34 +2042,27 @@ const setupTaskSandbox = async (
 		console.log(codexUpdate);
 	}
 
-	await installTaskEnvironmentPackages(sandbox, task.id, factory);
-	await setupSandboxGitIdentity(sandbox, task.id, factory);
+	await installTaskEnvironmentPackages(sandbox, task.id, workspace);
+	await setupSandboxGitIdentity(sandbox, task.id, workspace);
 
 	const repositoryGithubEnvs = await setupRepositoryGithubAuth(
 		sandbox,
 		task.id,
-		factory,
+		workspace,
 	);
-	await cloneFactoryRepositories(
+	await cloneWorkspaceRepositories(
 		sandbox,
 		task.id,
-		factory,
+		workspace,
 		repositoryGithubEnvs,
 	);
-	await writeFactoryEnvironmentFiles(sandbox, task.id, factory);
-	await installFactorySkills(sandbox, task.id, provider, factory);
-	await writeCodexMcpConfig(sandbox, task.id, provider, factory);
-	await runFactorySetupScript(
-		sandbox,
-		task.id,
-		factory,
-		"new_task",
-		factory.newTaskSetupScript,
-		{
-			...getAgentSafeBaseEnvs(),
-			...repositoryGithubEnvs,
-		},
-	);
+	await writeWorkspaceEnvironmentFiles(sandbox, task.id, workspace);
+	await installWorkspaceSkills(sandbox, task.id, provider, workspace);
+	await writeCodexMcpConfig(sandbox, task.id, provider, workspace);
+	await runWorkspaceCommands(sandbox, task.id, workspace, "new_task", {
+		...getAgentSafeBaseEnvs(),
+		...repositoryGithubEnvs,
+	});
 
 	const diffWorkspacePath = await runSetupStep(
 		task.id,
@@ -2087,11 +2082,11 @@ const setupTaskSandbox = async (
 const setupSandboxGitIdentity = async (
 	sandbox: Sandbox,
 	taskId: string,
-	factory: Factory,
+	workspace: Workspace,
 ) => {
 	const commands: string[] = [];
-	const gitAuthorName = factory.gitAuthorName?.trim();
-	const gitAuthorEmail = factory.gitAuthorEmail?.trim();
+	const gitAuthorName = workspace.gitAuthorName?.trim();
+	const gitAuthorEmail = workspace.gitAuthorEmail?.trim();
 
 	if (gitAuthorName) {
 		commands.push(`git config --global user.name ${shellQuote(gitAuthorName)}`);
@@ -2122,9 +2117,9 @@ const setupSandboxGitIdentity = async (
 const installTaskEnvironmentPackages = async (
 	sandbox: Sandbox,
 	taskId: string,
-	factory: Factory,
+	workspace: Workspace,
 ) => {
-	const packages = getTaskEnvironmentPackages(factory);
+	const packages = getTaskEnvironmentPackages(workspace);
 
 	if (packages.length === 0) {
 		return;
@@ -2143,7 +2138,7 @@ const installTaskEnvironmentPackages = async (
 };
 
 const getTaskEnvironmentPackages = (
-	factory: Factory,
+	workspace: Workspace,
 ): ConfiguredTaskEnvironmentPackage[] => {
 	const packages = new Map<string, ConfiguredTaskEnvironmentPackage>();
 
@@ -2151,16 +2146,40 @@ const getTaskEnvironmentPackages = (
 		packages.set(pkg.aptPackage, pkg);
 	}
 
-	for (const aptPackage of parseFactoryEnvironmentPackages(
-		factory.environmentPackages,
+	for (const aptPackage of parseWorkspaceEnvironmentPackages(
+		workspace.environmentPackages,
 	)) {
+		packages.set(aptPackage, { aptPackage });
+	}
+
+	for (const aptPackage of getWorkspaceSandboxPackageNames(workspace)) {
 		packages.set(aptPackage, { aptPackage });
 	}
 
 	return [...packages.values()];
 };
 
-const parseFactoryEnvironmentPackages = (value: unknown): string[] => {
+const getWorkspaceSandboxPackageNames = (workspace: Workspace) => {
+	const packages =
+		(workspace as WorkspaceWithRepositories).sandboxPackages ?? [];
+	const names: string[] = [];
+	const seen = new Set<string>();
+
+	for (const pkg of packages) {
+		const packageName = pkg.name.trim();
+
+		if (!APT_PACKAGE_NAME_PATTERN.test(packageName) || seen.has(packageName)) {
+			continue;
+		}
+
+		seen.add(packageName);
+		names.push(packageName);
+	}
+
+	return names;
+};
+
+const parseWorkspaceEnvironmentPackages = (value: unknown): string[] => {
 	if (!Array.isArray(value)) {
 		return [];
 	}
@@ -2222,13 +2241,13 @@ const buildInstallEnvironmentPackagesCommand = (
 	].join("\n");
 };
 
-const cloneFactoryRepositories = async (
+const cloneWorkspaceRepositories = async (
 	sandbox: Sandbox,
 	taskId: string,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 	envs: Record<string, string>,
 ) => {
-	const repositories = factory.repositories ?? [];
+	const repositories = workspace.repositories ?? [];
 
 	if (repositories.length === 0) {
 		return;
@@ -2273,12 +2292,14 @@ const cloneFactoryRepositories = async (
 	);
 };
 
-const writeFactoryEnvironmentFiles = async (
+const writeWorkspaceEnvironmentFiles = async (
 	sandbox: Sandbox,
 	taskId: string,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
-	const environmentFiles = getFactoryEnvironmentFiles(factory.environmentFiles);
+	const environmentFiles = getWorkspaceEnvironmentFiles(
+		workspace.environmentFiles,
+	);
 
 	if (environmentFiles.length === 0) {
 		return;
@@ -2307,7 +2328,7 @@ const writeFactoryEnvironmentFiles = async (
 	);
 };
 
-const getFactoryEnvironmentFiles = (
+const getWorkspaceEnvironmentFiles = (
 	files: EnvironmentFile[] | undefined,
 ): Array<{ path: string; content: string }> => {
 	if (!files) {
@@ -2336,17 +2357,17 @@ const getFactoryEnvironmentFiles = (
 	return [...environmentFiles.values()];
 };
 
-const installFactorySkills = async (
+const installWorkspaceSkills = async (
 	sandbox: Sandbox,
 	taskId: string,
 	provider: AgentProvider,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
 	if (provider !== "codex") {
 		return;
 	}
 
-	const skills = getFactorySkills(factory.skills);
+	const skills = getWorkspaceSkills(workspace.skills);
 
 	if (skills.length === 0) {
 		return;
@@ -2354,8 +2375,8 @@ const installFactorySkills = async (
 
 	await runSetupStep(
 		taskId,
-		"factory_skills",
-		"Install factory skills",
+		"workspace_skills",
+		"Install workspace skills",
 		async () => {
 			await Promise.all(
 				skills.map(async (skill) => {
@@ -2387,7 +2408,7 @@ const installFactorySkills = async (
 	);
 };
 
-const getFactorySkills = (
+const getWorkspaceSkills = (
 	skills: Skill[] | undefined,
 ): Array<{
 	slug: string;
@@ -2425,13 +2446,13 @@ const writeCodexMcpConfig = async (
 	sandbox: Sandbox,
 	taskId: string,
 	provider: AgentProvider,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
 	if (provider !== "codex") {
 		return;
 	}
 
-	const mcpServers = getFactoryMcpServers(factory.mcpServers);
+	const mcpServers = getWorkspaceMcpServers(workspace.mcpServers);
 
 	if (mcpServers.length === 0) {
 		return;
@@ -2451,7 +2472,7 @@ const writeCodexMcpConfig = async (
 	);
 };
 
-const getFactoryMcpServers = (
+const getWorkspaceMcpServers = (
 	mcpServers: McpServer[] | undefined,
 ): Array<{ id: string; name: string; proxyUrl: string }> => {
 	if (!mcpServers) {
@@ -2573,9 +2594,9 @@ const normalizeSkillFilePath = (value: string) => {
 const setupRepositoryGithubAuth = async (
 	sandbox: Sandbox,
 	taskId: string,
-	factory: Factory,
+	workspace: Workspace,
 ) => {
-	const envs = await getFactoryGithubAuthEnvs(factory);
+	const envs = await getWorkspaceGithubAuthEnvs(workspace);
 
 	if (!envs.GITHUB_ACCESS_TOKEN) {
 		return envs;
@@ -2598,7 +2619,7 @@ const setupRepositoryGithubAuth = async (
 const buildGithubAuthNoticeCommand = () =>
 	[
 		'if [ -z "$GITHUB_ACCESS_TOKEN" ]; then',
-		'  printf "No factory GitHub App installation configured; private GitHub repositories will fail to clone. Connect GitHub in factory settings.\\n" >&2',
+		'  printf "No workspace GitHub App installation configured; private GitHub repositories will fail to clone. Connect GitHub in workspace settings.\\n" >&2',
 		"fi",
 	].join("\n");
 
@@ -2609,17 +2630,17 @@ const buildGithubAuthHeaderCommand = () =>
 		"fi",
 	].join("\n");
 
-const getFactoryGithubAuthEnvs = async (
-	factory: Factory,
+const getWorkspaceGithubAuthEnvs = async (
+	workspace: Workspace,
 ): Promise<Record<string, string>> => {
-	if (!factory.githubAppInstallationId) {
+	if (!workspace.githubAppInstallationId) {
 		return {
 			GIT_TERMINAL_PROMPT: "0",
 		};
 	}
 
 	const githubAccessToken = await createGithubAppInstallationAccessToken(
-		factory.githubAppInstallationId,
+		workspace.githubAppInstallationId,
 	);
 
 	return {
@@ -2728,7 +2749,7 @@ const validateGithubToken = async (
 				'repository_count="$(gh api installation/repositories --jq .total_count 2>&1)"',
 				"status=$?",
 				'if [ "$status" -ne 0 ]; then',
-				'  printf "GitHub CLI auth failed while validating factory GitHub App installation:\\n%s\\n" "$repository_count" >&2',
+				'  printf "GitHub CLI auth failed while validating workspace GitHub App installation:\\n%s\\n" "$repository_count" >&2',
 				'  exit "$status"',
 				"fi",
 				'printf "Authenticated GitHub App installation with access to %s repositories\\n" "$repository_count"',
@@ -2825,9 +2846,9 @@ const writeRepositoryEnvFilesAndFingerprint = async (
 const syncRepositoryEnvFilesIfChanged = async (
 	sandbox: Sandbox,
 	taskId: string,
-	factory: FactoryWithRepositories,
+	workspace: WorkspaceWithRepositories,
 ) => {
-	const repositories = factory.repositories ?? [];
+	const repositories = workspace.repositories ?? [];
 
 	if (repositories.length === 0) {
 		return;
@@ -3024,14 +3045,14 @@ const normalizeEnvironmentFilePath = (value: string | undefined) => {
 	return segments.length > 0 ? segments.join("/") : undefined;
 };
 
-const runFactorySetupScript = async (
+const runWorkspaceCommands = async (
 	sandbox: Sandbox,
 	taskId: string,
-	factory: Factory,
-	kind: FactorySetupScriptKind,
-	script: string | undefined | null,
+	workspace: Workspace,
+	kind: WorkspaceSetupScriptKind,
 	envs: Record<string, string>,
 ) => {
+	const script = getWorkspaceCommandScript(workspace, kind);
 	const scriptContent = script?.trim();
 
 	if (!scriptContent) {
@@ -3041,13 +3062,11 @@ const runFactorySetupScript = async (
 	const workspacePath = await getSandboxWorkspacePath(sandbox);
 	const scriptPath = `${FACTORYPLANE_SCRIPT_DIR}/${kind}-${taskId}.sh`;
 	const title =
-		kind === "new_task"
-			? "Run new task setup script"
-			: "Run new turn setup script";
+		kind === "new_task" ? "Run new task commands" : "Run new turn commands";
 
 	await runSetupStep(
 		taskId,
-		`factory_${kind}_setup_script`,
+		`workspace_${kind}_commands`,
 		title,
 		async () => {
 			await sandbox.commands.run(
@@ -3057,23 +3076,61 @@ const runFactorySetupScript = async (
 			await sandbox.files.write(scriptPath, scriptContent);
 
 			return sandbox.commands.run(
-				buildRunFactorySetupScriptCommand(scriptPath, workspacePath),
+				buildRunWorkspaceSetupScriptCommand(scriptPath, workspacePath),
 				{
-					timeoutMs: FACTORY_SETUP_SCRIPT_TIMEOUT_MS,
+					timeoutMs: WORKSPACE_SETUP_SCRIPT_TIMEOUT_MS,
 					envs: {
 						...envs,
-						FACTORYPLANE_FACTORY_ID: factory.id,
+						FACTORYPLANE_WORKSPACE_ID: workspace.id,
 						FACTORYPLANE_TASK_ID: taskId,
 						FACTORYPLANE_WORKSPACE: workspacePath,
 					},
 				},
 			);
 		},
-		{ timeoutMs: FACTORY_SETUP_SCRIPT_TIMEOUT_MS + 30_000 },
+		{ timeoutMs: WORKSPACE_SETUP_SCRIPT_TIMEOUT_MS + 30_000 },
 	);
 };
 
-const buildRunFactorySetupScriptCommand = (
+const getWorkspaceCommandScript = (
+	workspace: Workspace,
+	kind: WorkspaceSetupScriptKind,
+) => {
+	const commands = getWorkspaceCommandsForKind(workspace, kind);
+
+	if (commands.length > 0) {
+		return commands.join("\n\n");
+	}
+
+	if (kind === "new_task") {
+		return workspace.newTaskSetupScript;
+	}
+
+	return workspace.newTurnSetupScript;
+};
+
+const getWorkspaceCommandsForKind = (
+	workspace: Workspace,
+	kind: WorkspaceSetupScriptKind,
+) => {
+	const commands = (workspace as WorkspaceWithRepositories).commands ?? [];
+	const selected = commands.filter((command) =>
+		kind === "new_task"
+			? (command.runOnNewTask ?? false)
+			: (command.runOnNewTurn ?? false),
+	);
+
+	return selected
+		.sort(
+			(a, b) =>
+				new Date(a.createdAt ?? 0).getTime() -
+				new Date(b.createdAt ?? 0).getTime(),
+		)
+		.map((command) => command.command.trim())
+		.filter((command) => command.length > 0);
+};
+
+const buildRunWorkspaceSetupScriptCommand = (
 	scriptPath: string,
 	workspacePath: string,
 ) =>
@@ -3096,7 +3153,7 @@ const runAgentExec = async (
 	sandbox: Sandbox,
 	task: Task,
 	agent: Agent,
-	factory: Factory,
+	workspace: Workspace,
 	prompt: string,
 	options: RunCodexExecOptions = {},
 ): Promise<boolean> => {
@@ -3116,7 +3173,7 @@ const runAgentExec = async (
 		provider,
 	);
 	await prepareAgentAuthForRun(sandbox, task.id, agent);
-	const { envs, agentToken } = await setupRun(sandbox, task, agent, factory);
+	const { envs, agentToken } = await setupRun(sandbox, task, agent, workspace);
 	const agentSession = options.agentSession;
 	const shouldResumeRun =
 		options.resumeLast &&
@@ -3236,7 +3293,7 @@ const runYesNoClassifier = async (
 	sandbox: Sandbox,
 	task: Task,
 	agent: Agent,
-	factory: Factory,
+	workspace: Workspace,
 	prompt: string,
 	workflowNodeId: string,
 ): Promise<{ answer: "yes" | "no"; reason?: string } | undefined> => {
@@ -3289,7 +3346,7 @@ const runYesNoClassifier = async (
 		sandbox,
 		taskForClassifier,
 		agent,
-		factory,
+		workspace,
 	);
 	const output = createAgentOutputHandler(task.id, "codex", undefined);
 
@@ -3704,7 +3761,7 @@ const setupRun = async (
 	sandbox: Sandbox,
 	task: Task,
 	agent: Agent,
-	factory: Factory,
+	workspace: Workspace,
 ) => {
 	const agentToken = randomUUID();
 	await db.transact(
@@ -3716,7 +3773,7 @@ const setupRun = async (
 	const envs: Record<string, string> = {
 		FACTORYPLANE_AUTH_TOKEN: agentToken,
 		...getAgentSafeBaseEnvs(),
-		...(await getFactoryGithubAuthEnvs(factory)),
+		...(await getWorkspaceGithubAuthEnvs(workspace)),
 	};
 
 	if (getAgentProvider(agent) === "cursor") {
@@ -3724,14 +3781,7 @@ const setupRun = async (
 	}
 
 	try {
-		await runFactorySetupScript(
-			sandbox,
-			task.id,
-			factory,
-			"new_turn",
-			factory.newTurnSetupScript,
-			envs,
-		);
+		await runWorkspaceCommands(sandbox, task.id, workspace, "new_turn", envs);
 	} catch (error) {
 		await clearTaskAgentToken(task.id, agentToken);
 		throw error;

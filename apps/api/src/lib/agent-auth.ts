@@ -20,7 +20,7 @@ export const getTaskForAgentToken = async (agentToken: string) => {
 					},
 					fields: ["workflowInput"],
 				},
-				factory: {
+				workspace: {
 					$: {
 						fields: [
 							"environmentPackages",
@@ -28,6 +28,22 @@ export const getTaskForAgentToken = async (agentToken: string) => {
 							"newTaskSetupScript",
 							"newTurnSetupScript",
 						],
+					},
+					commands: {
+						$: {
+							fields: [
+								"command",
+								"runOnNewTask",
+								"runOnNewTurn",
+								"createdAt",
+								"updatedAt",
+							],
+						},
+					},
+					sandboxPackages: {
+						$: {
+							fields: ["name", "createdAt", "updatedAt"],
+						},
 					},
 					repositories: {
 						$: {

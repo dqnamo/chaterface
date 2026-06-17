@@ -149,7 +149,7 @@ const authenticateMcpServerRequest = async (
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return {
 			ok: false as const,
 			status: 401 as const,
@@ -157,7 +157,7 @@ const authenticateMcpServerRequest = async (
 		};
 	}
 
-	const mcpServer = task.factory.mcpServers?.find(
+	const mcpServer = task.workspace.mcpServers?.find(
 		(server) => server.id === mcpServerId,
 	);
 

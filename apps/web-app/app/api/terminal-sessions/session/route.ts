@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 					$: {
 						fields: ["sandboxId"],
 					},
-					organisation: {
+					workspace: {
 						members: {
 							user: {},
 						},
@@ -128,7 +128,7 @@ const buildTerminalSessionUrl = (terminalSessionId: string, ticket: string) => {
 
 const hasAgentTerminalAccess = (
 	agent: {
-		organisation?: {
+		workspace?: {
 			members?: Array<{
 				user?: {
 					id?: string;
@@ -138,7 +138,7 @@ const hasAgentTerminalAccess = (
 	},
 	userId: string,
 ) =>
-	agent.organisation?.members?.some((member) => member.user?.id === userId) ??
+	agent.workspace?.members?.some((member) => member.user?.id === userId) ??
 	false;
 
 const getTicketSecret = () => {

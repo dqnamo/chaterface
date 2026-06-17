@@ -14,7 +14,7 @@ type IntegrationConnection = {
 	provider?: string;
 	status?: string;
 	auth?: unknown;
-	organisation?: {
+	workspace?: {
 		members?: Array<{
 			user?: {
 				id: string;
@@ -101,7 +101,7 @@ const authenticateConnectionRequest = async (
 						provider: SLACK_PROVIDER,
 					},
 				},
-				organisation: {
+				workspace: {
 					members: {
 						user: {},
 					},
@@ -144,9 +144,8 @@ const hasConnectionAccess = (
 	connection: IntegrationConnection,
 	userId: string,
 ) =>
-	connection.organisation?.members?.some(
-		(member) => member.user?.id === userId,
-	) ?? false;
+	connection.workspace?.members?.some((member) => member.user?.id === userId) ??
+	false;
 
 const getBearerToken = (authorizationHeader: string | null) => {
 	const [scheme, token] = authorizationHeader?.split(" ") ?? [];

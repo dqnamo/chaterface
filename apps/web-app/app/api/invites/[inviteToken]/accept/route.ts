@@ -14,11 +14,8 @@ type InviteMember = {
 		id: string;
 		email?: string;
 	};
-	organisation?: {
+	workspace?: {
 		handle?: string;
-		factories?: Array<{
-			id: string;
-		}>;
 	};
 };
 
@@ -52,9 +49,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 					},
 				},
 				user: {},
-				organisation: {
-					factories: {},
-				},
+				workspace: {},
 			},
 		})
 		.then((result) => result.members[0] as InviteMember | undefined);
@@ -66,7 +61,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	if (member.joinedAt) {
 		return NextResponse.json({
 			message: "Invite already accepted",
-			redirectTo: getOrganisationRedirectPath(member),
+			redirectTo: getWorkspaceRedirectPath(member),
 		});
 	}
 
@@ -92,7 +87,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
 	return NextResponse.json({
 		message: "Invite accepted",
-		redirectTo: getOrganisationRedirectPath(member),
+		redirectTo: getWorkspaceRedirectPath(member),
 	});
 }
 
@@ -110,20 +105,14 @@ const doesAuthUserMatchInvite = (
 	return Boolean(authEmail && inviteEmail && authEmail === inviteEmail);
 };
 
-const getOrganisationRedirectPath = (member: InviteMember) => {
-	const orgHandle = member.organisation?.handle;
+const getWorkspaceRedirectPath = (member: InviteMember) => {
+	const workspaceHandle = member.workspace?.handle;
 
-	if (!orgHandle) {
+	if (!workspaceHandle) {
 		return "/";
 	}
 
-	const factoryId = member.organisation?.factories?.[0]?.id;
-
-	if (factoryId) {
-		return `/${orgHandle}/factories/${factoryId}`;
-	}
-
-	return `/${orgHandle}/factories`;
+	return `/${workspaceHandle}`;
 };
 
 const normalizeEmail = (value: unknown) =>

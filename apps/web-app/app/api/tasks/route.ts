@@ -9,7 +9,7 @@ const DEFAULT_TASK_NAME = "New task";
 
 type CreateTaskBody = {
 	taskId?: string;
-	factoryId?: string;
+	workspaceId?: string;
 	agentId?: string;
 	name?: string;
 	instructions?: string;
@@ -24,16 +24,14 @@ type Agent = {
 	id: string;
 };
 
-type AuthenticatedFactory = {
+type AuthenticatedWorkspace = {
 	id: string;
-	organisation?: {
-		agents?: Agent[];
-		members?: Array<{
-			user?: {
-				id: string;
-			};
-		}>;
-	};
+	agents?: Agent[];
+	members?: Array<{
+		user?: {
+			id: string;
+		};
+	}>;
 };
 
 const taskTx = (taskId: string) => {
@@ -74,14 +72,14 @@ export async function POST(req: NextRequest) {
 		body?.instructions ||
 		buildAttachmentOnlyInstructions(body?.attachments, body?.images);
 
-	if (!body?.factoryId || !instructions) {
+	if (!body?.workspaceId || !instructions) {
 		return NextResponse.json(
-			{ message: "factoryId and instructions or attachments are required" },
+			{ message: "workspaceId and instructions or attachments are required" },
 			{ status: 400 },
 		);
 	}
 
-	const authResult = await authenticateFactoryRequest(req, body.factoryId);
+	const authResult = await authenticateWorkspaceRequest(req, body.workspaceId);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -90,7 +88,7 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	const agent = resolveAgent(authResult.factory, body.agentId);
+	const agent = resolveAgent(authResult.workspace, body.agentId);
 
 	if (!agent) {
 		return NextResponse.json(
@@ -120,7 +118,7 @@ export async function POST(req: NextRequest) {
 				agentReasoningEffort: body.agentReasoningEffort,
 				agentSpeed: body.agentSpeed,
 			})
-			.link({ factory: authResult.factory.id, agent: agent.id }),
+			.link({ workspace: authResult.workspace.id, agent: agent.id }),
 		agentSessionTx(agentSessionId)
 			.create({
 				name: "Agent",
@@ -145,7 +143,7 @@ export async function POST(req: NextRequest) {
 	return NextResponse.json(
 		{
 			taskId,
-			factoryId: authResult.factory.id,
+			workspaceId: authResult.workspace.id,
 			agentId: agent.id,
 			agentSessionId,
 			name,
@@ -155,9 +153,9 @@ export async function POST(req: NextRequest) {
 	);
 }
 
-const authenticateFactoryRequest = async (
+const authenticateWorkspaceRequest = async (
 	req: NextRequest,
-	factoryId: string,
+	workspaceId: string,
 ) => {
 	const refreshToken = getBearerToken(req.headers.get("Authorization"));
 
@@ -179,37 +177,37 @@ const authenticateFactoryRequest = async (
 		};
 	}
 
-	const factory = await db
+	const workspace = await db
 		.query({
-			factories: {
+			workspaces: {
 				$: {
 					where: {
-						id: factoryId,
+						id: workspaceId,
 					},
 				},
-				organisation: {
-					agents: {
-						$: {
-							fields: ["name"],
-						},
+				agents: {
+					$: {
+						fields: ["name"],
 					},
-					members: {
-						user: {},
-					},
+				},
+				members: {
+					user: {},
 				},
 			},
 		})
-		.then((result) => result.factories[0] as AuthenticatedFactory | undefined);
+		.then(
+			(result) => result.workspaces?.[0] as AuthenticatedWorkspace | undefined,
+		);
 
-	if (!factory) {
+	if (!workspace) {
 		return {
 			ok: false as const,
 			status: 404,
-			message: "Factory not found",
+			message: "Workspace not found",
 		};
 	}
 
-	if (!hasFactoryAccess(factory, user.id)) {
+	if (!hasWorkspaceAccess(workspace, user.id)) {
 		return {
 			ok: false as const,
 			status: 403,
@@ -217,14 +215,14 @@ const authenticateFactoryRequest = async (
 		};
 	}
 
-	return { ok: true as const, factory };
+	return { ok: true as const, workspace };
 };
 
 const resolveAgent = (
-	factory: AuthenticatedFactory,
+	workspace: AuthenticatedWorkspace,
 	agentId: string | undefined,
 ) => {
-	const agents = factory.organisation?.agents ?? [];
+	const agents = workspace.agents ?? [];
 	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
 };
 
@@ -374,7 +372,7 @@ const parseCreateTaskBody = (
 	value: Record<string, unknown>,
 ): CreateTaskBody => ({
 	taskId: getOptionalString(value.taskId),
-	factoryId: getOptionalString(value.factoryId),
+	workspaceId: getOptionalString(value.workspaceId),
 	agentId: getOptionalString(value.agentId),
 	name: getOptionalString(value.name),
 	instructions: getOptionalString(value.instructions),
@@ -397,9 +395,10 @@ const getBearerToken = (authorizationHeader: string | null) => {
 	return token;
 };
 
-const hasFactoryAccess = (factory: AuthenticatedFactory, userId: string) =>
-	factory.organisation?.members?.some((member) => member.user?.id === userId) ??
-	false;
+const hasWorkspaceAccess = (
+	workspace: AuthenticatedWorkspace,
+	userId: string,
+) => workspace.members?.some((member) => member.user?.id === userId) ?? false;
 
 const readJson = async (req: NextRequest) => {
 	try {

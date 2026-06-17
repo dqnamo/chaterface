@@ -48,11 +48,11 @@ const proxyMcpRequest: RouteHandler = async (c) => {
 
 	const task = await getTaskForAgentToken(token);
 
-	if (!task?.factory) {
+	if (!task?.workspace) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 
-	const mcpServer = task.factory.mcpServers?.find(
+	const mcpServer = task.workspace.mcpServers?.find(
 		(server) => server.id === mcpServerId,
 	);
 

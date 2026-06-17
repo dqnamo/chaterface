@@ -9,16 +9,13 @@ import {
 
 export const runtime = "nodejs";
 
-type AuthenticatedFactory = {
+type AuthenticatedWorkspace = {
 	id: string;
-	organisation?: {
-		id: string;
-		members?: Array<{
-			user?: {
-				id: string;
-			};
-		}>;
-	};
+	members?: Array<{
+		user?: {
+			id: string;
+		};
+	}>;
 };
 
 const integrationConnectionTx = (connectionId: string) => {
@@ -33,16 +30,19 @@ const integrationConnectionTx = (connectionId: string) => {
 
 export async function POST(req: NextRequest) {
 	const body = await readJson(req);
-	const factoryId = getOptionalString(body.factoryId);
+	const requestedWorkspaceId = getOptionalString(body.workspaceId);
 
-	if (!factoryId) {
+	if (!requestedWorkspaceId) {
 		return NextResponse.json(
-			{ message: "factoryId is required" },
+			{ message: "workspaceId is required" },
 			{ status: 400 },
 		);
 	}
 
-	const authResult = await authenticateFactoryRequest(req, factoryId);
+	const authResult = await authenticateWorkspaceRequest(
+		req,
+		requestedWorkspaceId,
+	);
 
 	if (!authResult.ok) {
 		return NextResponse.json(
@@ -51,11 +51,11 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	const organisationId = authResult.factory.organisation?.id;
+	const workspaceId = authResult.workspace.id;
 
-	if (!organisationId) {
+	if (!workspaceId) {
 		return NextResponse.json(
-			{ message: "Factory organisation was not found" },
+			{ message: "Workspace was not found" },
 			{ status: 404 },
 		);
 	}
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 				createdAt: now,
 				updatedAt: now,
 			})
-			.link({ organisation: organisationId }),
+			.link({ workspace: workspaceId }),
 	);
 
 	const authorizationUrl = new URL("https://slack.com/oauth/v2/authorize");
@@ -114,9 +114,9 @@ export async function POST(req: NextRequest) {
 	});
 }
 
-const authenticateFactoryRequest = async (
+const authenticateWorkspaceRequest = async (
 	req: NextRequest,
-	factoryId: string,
+	workspaceId: string,
 ) => {
 	const refreshToken = getBearerToken(req.headers.get("Authorization"));
 
@@ -138,32 +138,32 @@ const authenticateFactoryRequest = async (
 		};
 	}
 
-	const factory = await db
+	const workspace = await db
 		.query({
-			factories: {
+			workspaces: {
 				$: {
 					where: {
-						id: factoryId,
+						id: workspaceId,
 					},
 				},
-				organisation: {
-					members: {
-						user: {},
-					},
+				members: {
+					user: {},
 				},
 			},
 		})
-		.then((result) => result.factories[0] as AuthenticatedFactory | undefined);
+		.then(
+			(result) => result.workspaces?.[0] as AuthenticatedWorkspace | undefined,
+		);
 
-	if (!factory) {
+	if (!workspace) {
 		return {
 			ok: false as const,
 			status: 404,
-			message: "Factory not found",
+			message: "Workspace not found",
 		};
 	}
 
-	if (!hasFactoryAccess(factory, user.id)) {
+	if (!hasWorkspaceAccess(workspace, user.id)) {
 		return {
 			ok: false as const,
 			status: 403,
@@ -171,12 +171,13 @@ const authenticateFactoryRequest = async (
 		};
 	}
 
-	return { ok: true as const, factory };
+	return { ok: true as const, workspace };
 };
 
-const hasFactoryAccess = (factory: AuthenticatedFactory, userId: string) =>
-	factory.organisation?.members?.some((member) => member.user?.id === userId) ??
-	false;
+const hasWorkspaceAccess = (
+	workspace: AuthenticatedWorkspace,
+	userId: string,
+) => workspace.members?.some((member) => member.user?.id === userId) ?? false;
 
 const getBearerToken = (authorizationHeader: string | null) => {
 	const [scheme, token] = authorizationHeader?.split(" ") ?? [];

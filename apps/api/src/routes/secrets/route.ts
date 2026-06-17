@@ -17,7 +17,7 @@ export const GET: RouteHandler = async (c) => {
 					},
 				},
 				services: {},
-				factory: {
+				workspace: {
 					secrets: {},
 				},
 			},
@@ -29,6 +29,6 @@ export const GET: RouteHandler = async (c) => {
 	}
 
 	return c.json({
-		secrets: task.factory?.secrets ?? [],
+		secrets: task.workspace?.secrets ?? [],
 	});
 };

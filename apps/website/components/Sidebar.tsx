@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/helpers/classname-helper";
 
-const GITHUB_REPO_URL = "https://github.com/dqnamo/factory";
+const GITHUB_REPO_URL = "https://github.com/dqnamo/workspace";
 const VERCEL_DEPLOY_URL = `https://vercel.com/new/clone?repository-url=${encodeURIComponent(
 	GITHUB_REPO_URL,
 )}`;

@@ -50,12 +50,10 @@ type Subscription = {
 		id: string;
 		externalId?: string;
 	};
-	factory?: {
+	workspace?: {
 		id: string;
 		floorWorkflow?: FloorWorkflow;
-		organisation?: {
-			agents?: Agent[];
-		};
+		agents?: Agent[];
 	};
 };
 
@@ -252,10 +250,8 @@ const getMatchingSubscriptions = async (teamId: string, channelId: string) => {
 					},
 				},
 				integrationConnection: {},
-				factory: {
-					organisation: {
-						agents: {},
-					},
+				workspace: {
+					agents: {},
 				},
 			},
 		})
@@ -273,8 +269,8 @@ const startWorkflowForSubscription = async (
 	envelope: SlackEventEnvelope,
 	slackEvent: NonNullable<SlackEventEnvelope["event"]>,
 ) => {
-	const factory = subscription.factory;
-	const workflow = parseWorkflow(factory?.floorWorkflow);
+	const workspace = subscription.workspace;
+	const workflow = parseWorkflow(workspace?.floorWorkflow);
 	const triggerNode = workflow.nodes.find(
 		(node) =>
 			node.id === subscription.nodeId &&
@@ -283,7 +279,7 @@ const startWorkflowForSubscription = async (
 			node.data.trigger === SLACK_MESSAGE_RECEIVED_TRIGGER,
 	);
 
-	if (!factory || !triggerNode) {
+	if (!workspace || !triggerNode) {
 		return;
 	}
 
@@ -320,7 +316,7 @@ const startWorkflowForSubscription = async (
 	}
 
 	const requestedAgentId = getOptionalString(start.agentRunNode.data?.agentId);
-	const agent = resolveAgent(factory, requestedAgentId);
+	const agent = resolveAgent(workspace, requestedAgentId);
 
 	if (!agent) {
 		return;
@@ -352,7 +348,7 @@ const startWorkflowForSubscription = async (
 				workflowInput,
 				workflowNodeId: start.agentRunNode.id,
 			})
-			.link({ factory: factory.id, agent: agent.id }),
+			.link({ workspace: workspace.id, agent: agent.id }),
 		agentSessionTx(agentSessionId)
 			.create({
 				name: getAgentSessionName(workflowSessionKey),
@@ -367,7 +363,7 @@ const startWorkflowForSubscription = async (
 			.create({
 				type: "factoryplane.workflow.integration_triggered",
 				data: {
-					factoryId: factory.id,
+					workspaceId: workspace.id,
 					taskId,
 					provider: SLACK_PROVIDER,
 					trigger: SLACK_MESSAGE_RECEIVED_TRIGGER,
@@ -504,10 +500,10 @@ const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
 	(typeof value.target === "string" || value.target === undefined);
 
 const resolveAgent = (
-	factory: NonNullable<Subscription["factory"]>,
+	workspace: NonNullable<Subscription["workspace"]>,
 	agentId: string | undefined,
 ) => {
-	const agents = factory.organisation?.agents ?? [];
+	const agents = workspace.agents ?? [];
 	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
 };
 
