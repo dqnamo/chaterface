@@ -2,9 +2,11 @@
 
 import { BuildingsIcon } from "@phosphor-icons/react";
 import { useParams, usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import CornerBrackets from "@/components/CornerBrackets";
 import { Input } from "@/components/Input";
+import { formatWorkspaceHandle } from "@/helpers/workspace-handle-helper";
 import db from "@/instant.client";
 
 const workspaceTx = (workspaceId: string) => {
@@ -27,6 +29,8 @@ export function WorkspaceSettingsContent() {
 	const pathname = usePathname();
 	const { workspaceHandle } = useParams();
 	const currentWorkspaceHandle = workspaceHandle as string;
+	const [workspaceName, setWorkspaceName] = useState("");
+	const [workspaceHandleValue, setWorkspaceHandleValue] = useState("");
 
 	const { data, error } = db.useQuery({
 		workspaces: {
@@ -40,6 +44,26 @@ export function WorkspaceSettingsContent() {
 
 	const workspace = data?.workspaces?.[0];
 
+	useEffect(() => {
+		setWorkspaceName(workspace?.name ?? "");
+		setWorkspaceHandleValue(workspace?.handle ?? currentWorkspaceHandle);
+	}, [workspace?.handle, workspace?.name, currentWorkspaceHandle]);
+
+	const updateWorkspaceNameValue = (nextName: string) => {
+		const previousGeneratedHandle = formatWorkspaceHandle(workspaceName);
+
+		setWorkspaceName(nextName);
+		setWorkspaceHandleValue((currentHandle) =>
+			currentHandle === previousGeneratedHandle
+				? formatWorkspaceHandle(nextName)
+				: currentHandle,
+		);
+	};
+
+	const updateWorkspaceHandleValue = (nextHandle: string) => {
+		setWorkspaceHandleValue(formatWorkspaceHandle(nextHandle));
+	};
+
 	const updateWorkspace = async (form: HTMLFormElement) => {
 		if (!workspace) {
 			return;
@@ -47,7 +71,7 @@ export function WorkspaceSettingsContent() {
 
 		const formData = new FormData(form);
 		const name = getFormString(formData, "name");
-		const handle = getFormString(formData, "handle");
+		const handle = formatWorkspaceHandle(getFormString(formData, "handle"));
 
 		if (!name || !handle) {
 			return;
@@ -111,7 +135,10 @@ export function WorkspaceSettingsContent() {
 								name="name"
 								type="text"
 								placeholder="Workspace name"
-								defaultValue={workspace?.name ?? ""}
+								value={workspaceName}
+								onChange={(event) =>
+									updateWorkspaceNameValue(event.target.value)
+								}
 							/>
 						</Field>
 						<Field label="Handle">
@@ -119,7 +146,10 @@ export function WorkspaceSettingsContent() {
 								name="handle"
 								type="text"
 								placeholder="workspace-handle"
-								defaultValue={workspace?.handle ?? currentWorkspaceHandle}
+								value={workspaceHandleValue}
+								onChange={(event) =>
+									updateWorkspaceHandleValue(event.target.value)
+								}
 							/>
 						</Field>
 					</div>
