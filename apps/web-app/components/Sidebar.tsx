@@ -2,6 +2,7 @@ import { type InstaQLEntity, id } from "@instantdb/react";
 import NumberFlow from "@number-flow/react";
 import {
 	BuildingsIcon,
+	CaretRightIcon,
 	CheckIcon,
 	GearSixIcon,
 	HeadCircuitIcon,
@@ -150,6 +151,8 @@ export default function Sidebar() {
 	const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
 	const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
 	const [isWorkspaceSettingsOpen, setIsWorkspaceSettingsOpen] = useState(false);
+	const [isCompletedTasksCollapsed, setIsCompletedTasksCollapsed] =
+		useState(true);
 	const currentWorkspaceHandle =
 		typeof workspaceHandle === "string" ? workspaceHandle : "";
 	const currentTaskId = typeof taskId === "string" ? taskId : "";
@@ -230,6 +233,9 @@ export default function Sidebar() {
 		setIsWorkspaceSettingsOpen(true);
 		closeAfterMobileNavigation();
 	}, [closeAfterMobileNavigation]);
+	const toggleCompletedTasks = useCallback(() => {
+		setIsCompletedTasksCollapsed((isCollapsed) => !isCollapsed);
+	}, []);
 
 	useHotkeys(
 		"n",
@@ -357,37 +363,65 @@ export default function Sidebar() {
 						</div>
 						{completedTasks.length > 0 ? (
 							<>
-								<div className="mt-2 flex flex-row items-center justify-between px-3">
-									<p className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
-										Completed Tasks
-									</p>
+								<button
+									type="button"
+									aria-controls="completed-tasks-list"
+									aria-expanded={!isCompletedTasksCollapsed}
+									onClick={toggleCompletedTasks}
+									className="mt-2 flex w-full flex-row items-center justify-between rounded-md px-3 py-1 text-left transition-colors hover:bg-grayscale-2"
+								>
+									<span className="flex min-w-0 flex-row items-center gap-1.5">
+										<CaretRightIcon
+											weight="bold"
+											className={cn(
+												"size-3 shrink-0 text-grayscale-9 transition-transform",
+												isCompletedTasksCollapsed ? "" : "rotate-90",
+											)}
+										/>
+										<span className="min-w-0 truncate font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase">
+											Completed Tasks
+										</span>
+									</span>
 									<NumberFlow
 										value={completedTasks.length}
 										className="font-mono text-[11px] leading-none font-semibold text-grayscale-10 uppercase tabular-nums"
 									/>
-								</div>
-								<div className="flex min-w-0 max-w-full flex-col gap-px">
-									<AnimatePresence initial={false} mode="popLayout">
-										{completedTasks.map((task) => (
-											<motion.div
-												key={task.id}
-												layout="position"
-												initial={{ opacity: 0, y: 4 }}
-												animate={{ opacity: 1, y: 0 }}
-												exit={{ opacity: 0, y: -4 }}
-												transition={{ duration: 0.18, ease: "easeOut" }}
-											>
-												<TaskSidebarItem
-													href={`/${currentWorkspaceHandle}/tasks/${task.id}`}
-													fallbackHref={`/${currentWorkspaceHandle}`}
-													task={task}
-													selected={task.id === currentTaskId}
-													onNavigate={closeAfterMobileNavigation}
-												/>
-											</motion.div>
-										))}
-									</AnimatePresence>
-								</div>
+								</button>
+								<AnimatePresence initial={false}>
+									{isCompletedTasksCollapsed ? null : (
+										<motion.div
+											id="completed-tasks-list"
+											initial={{ height: 0, opacity: 0 }}
+											animate={{ height: "auto", opacity: 1 }}
+											exit={{ height: 0, opacity: 0 }}
+											transition={{ duration: 0.18, ease: "easeOut" }}
+											className="overflow-hidden"
+										>
+											<div className="flex min-w-0 max-w-full flex-col gap-px">
+												<AnimatePresence initial={false} mode="popLayout">
+													{completedTasks.map((task) => (
+														<motion.div
+															key={task.id}
+															layout="position"
+															initial={{ opacity: 0, y: 4 }}
+															animate={{ opacity: 1, y: 0 }}
+															exit={{ opacity: 0, y: -4 }}
+															transition={{ duration: 0.18, ease: "easeOut" }}
+														>
+															<TaskSidebarItem
+																href={`/${currentWorkspaceHandle}/tasks/${task.id}`}
+																fallbackHref={`/${currentWorkspaceHandle}`}
+																task={task}
+																selected={task.id === currentTaskId}
+																onNavigate={closeAfterMobileNavigation}
+															/>
+														</motion.div>
+													))}
+												</AnimatePresence>
+											</div>
+										</motion.div>
+									)}
+								</AnimatePresence>
 							</>
 						) : null}
 						<div className="sticky bottom-0 z-10 mt-auto bg-grayscale-1 pt-2">
