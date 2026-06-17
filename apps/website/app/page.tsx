@@ -87,9 +87,9 @@ export default function Home() {
 			<PixelTrail
 				className="pointer-events-auto absolute inset-0 z-0"
 				fadeDuration={650}
-				pixelClassName="rounded-[5px] bg-accent-9"
-				pixelGap={5}
-				pixelSize={30}
+				pixelClassName="rounded bg-accent-9"
+				pixelGap={4}
+				pixelSize={24}
 			/>
 
 			<div className="pointer-events-none relative z-10 flex w-full flex-col divide-y divide-grayscale-3 dark:divide-grayscale-2">
