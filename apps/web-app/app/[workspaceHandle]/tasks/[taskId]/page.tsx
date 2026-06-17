@@ -40,7 +40,6 @@ import {
 	DEFAULT_CODEX_SPEED,
 } from "@/codex-options";
 import { Button } from "@/components/Button";
-import CornerBrackets from "@/components/CornerBrackets";
 import Event, {
 	buildTimeline,
 	type TimelineNode,
@@ -1499,51 +1498,44 @@ export default function TaskPage() {
 									</p>
 									<div className="flex shrink-0 flex-row items-center gap-1.5">
 										{selectedService ? (
-											<Link
-												href={`/services/${selectedService.id}`}
+											<Button
+												render={(buttonProps) => (
+													<Link
+														{...buttonProps}
+														href={`/services/${selectedService.id}`}
+													>
+														{buttonProps.children}
+													</Link>
+												)}
+												nativeButton={false}
+												variant="secondary"
 												aria-label="Open preview fullscreen"
-												className="bg-grayscale-3 shrink-0 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-accent-3"
+												className="h-7 shrink-0"
 											>
-												<CornerBrackets
-													placement="inside"
-													spacing={1}
-													translate={1.5}
-													size={6}
-													color="var(--color-accent-9)"
-												/>
-												<CornersOutIcon
-													weight="bold"
-													className="size-4 text-accent-9"
-												/>
-												<p className="text-xs text-grayscale-12">Fullscreen</p>
-											</Link>
+												<CornersOutIcon weight="bold" className="size-4" />
+												<span>Fullscreen</span>
+											</Button>
 										) : null}
-										<button
+										<Button
 											type="button"
-											className="bg-grayscale-3 shrink-0 p-1.5 px-3 flex flex-row items-center gap-2 group relative hover:bg-red-3"
+											variant="secondary"
+											className="h-7 shrink-0"
 											onClick={() => {
 												if (selectedService) {
 													stopService(selectedService.id);
 												}
 											}}
 										>
-											<CornerBrackets
-												placement="inside"
-												spacing={1}
-												translate={1.5}
-												size={6}
-												color="var(--color-red-9)"
-											/>
 											<XCircleIcon
 												weight="bold"
-												className="size-4 text-red-9 group-hover:hidden"
+												className="size-4 group-hover:hidden"
 											/>
 											<XCircleIcon
 												weight="fill"
-												className="size-4 text-red-9 group-hover:block hidden"
+												className="hidden size-4 group-hover:block"
 											/>
-											<p className="text-xs text-grayscale-12">Stop service</p>
-										</button>
+											<span>Stop service</span>
+										</Button>
 									</div>
 								</div>
 								<div className="min-h-0 flex-1">
