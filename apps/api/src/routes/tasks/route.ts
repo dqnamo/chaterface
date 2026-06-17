@@ -108,7 +108,7 @@ export const POST: RouteHandler = async (c) => {
 			.link({ workspace: authResult.workspaceId, agent: agent.id }),
 		eventTx(eventId)
 			.create({
-				type: "factoryplane.new_task",
+				type: "chaterface.new_task",
 				data: {
 					taskId,
 					apiKeyId: authResult.apiKeyId,

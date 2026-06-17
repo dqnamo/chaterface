@@ -187,18 +187,17 @@ type SetupStepOptions = {
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 const CODEX_CONFIG_PATH = "~/.codex/config.toml";
-const DEFAULT_API_URL = "https://api.factoryplane.com";
-const DIFF_BASELINE_ROOT = "/tmp/factoryplane-baselines";
-const DIFF_WORK_ROOT = "/tmp/factoryplane-diff-work";
+const DEFAULT_API_URL = "https://api.chaterface.com";
+const DIFF_BASELINE_ROOT = "/tmp/chaterface-baselines";
+const DIFF_WORK_ROOT = "/tmp/chaterface-diff-work";
 const DIFF_STORAGE_CONTENT_TYPE = "text/x-patch";
 const REPOSITORY_SECRETS_FINGERPRINT_PATH =
-	".factoryplane/repository-secrets-fingerprint";
+	".chaterface/repository-secrets-fingerprint";
 const REPOSITORY_SECRETS_ENV_BLOCK_START =
-	"# >>> FACTORYPLANE REPOSITORY SECRETS";
-const REPOSITORY_SECRETS_ENV_BLOCK_END =
-	"# <<< FACTORYPLANE REPOSITORY SECRETS";
-const FACTORYPLANE_SCRIPT_DIR = "/tmp/factoryplane-scripts";
-const WORKFLOW_OUTPUT_DIR = "/tmp/factoryplane-agent-outputs";
+	"# >>> CHATERFACE REPOSITORY SECRETS";
+const REPOSITORY_SECRETS_ENV_BLOCK_END = "# <<< CHATERFACE REPOSITORY SECRETS";
+const TASK_SCRIPT_DIR = "/tmp/chaterface-scripts";
+const WORKFLOW_OUTPUT_DIR = "/tmp/chaterface-agent-outputs";
 const HUMAN_LOOP_HANDLE_ID = "human-loop";
 const WORKSPACE_SETUP_SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
 const GITHUB_AUTH_VALIDATION_TIMEOUT_MS = 120_000;
@@ -214,7 +213,7 @@ const APT_PACKAGE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9+._:-]*$/;
 const SANDBOX_DIFF_EXCLUDES = [
 	".git",
 	".codex",
-	".factoryplane",
+	".chaterface",
 	".cache",
 	".config",
 	".npm",
@@ -402,14 +401,14 @@ export const processEventTask = task({
 		}
 
 		try {
-			if (event?.type === "factoryplane.new_task") {
+			if (event?.type === "chaterface.new_task") {
 				await processNewTask(
 					event as Event,
 					agent as Agent,
 					task as Task,
 					workspace as WorkspaceWithRepositories,
 				);
-			} else if (event?.type === "factoryplane.new_user_message") {
+			} else if (event?.type === "chaterface.new_user_message") {
 				await processNewUserMessage(
 					event as Event,
 					task as Task,
@@ -805,7 +804,7 @@ const waitForHumanInAgentSession = async (
 		}),
 	);
 
-	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.human_input", {
+	await persistChaterfaceEvent(task.id, "chaterface.workflow.human_input", {
 		taskId: task.id,
 		workflowNodeId: workflowNodeId ?? task.workflowNodeId,
 		agentSessionId: agentSession?.id,
@@ -835,7 +834,7 @@ const continueWorkflowFromNode = async (
 				agentToken: undefined,
 			}),
 		);
-		await persistFactoryplaneEvent(task.id, "factoryplane.workflow.completed", {
+		await persistChaterfaceEvent(task.id, "chaterface.workflow.completed", {
 			taskId: task.id,
 			workflowNodeId: nextNode.id,
 			message: nextNode.data.completionMessage,
@@ -947,7 +946,7 @@ const continueWorkflowFromNode = async (
 			.link({ agent: agent.id }),
 		eventTx(eventId)
 			.create({
-				type: "factoryplane.new_user_message",
+				type: "chaterface.new_user_message",
 				data: {
 					taskId: task.id,
 					content,
@@ -1033,7 +1032,7 @@ const routeYesNoClassifierNode = async (
 	task.workflowInput = nextWorkflowInput;
 	task.workflowNodeId = classifierNode.id;
 
-	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.classifier", {
+	await persistChaterfaceEvent(task.id, "chaterface.workflow.classifier", {
 		taskId: task.id,
 		workflowNodeId: classifierNode.id,
 		agentId: agent.id,
@@ -1053,9 +1052,9 @@ const routeYesNoClassifierNode = async (
 	);
 
 	if (!edge?.target) {
-		await persistFactoryplaneEvent(
+		await persistChaterfaceEvent(
 			task.id,
-			"factoryplane.workflow.classifier_unconnected",
+			"chaterface.workflow.classifier_unconnected",
 			{
 				taskId: task.id,
 				workflowNodeId: classifierNode.id,
@@ -1107,7 +1106,7 @@ const routeConditionalWorkflowNode = async (
 		}),
 	);
 
-	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.router", {
+	await persistChaterfaceEvent(task.id, "chaterface.workflow.router", {
 		taskId: task.id,
 		workflowNodeId: routerNode.id,
 		routerLabel: routerNode.data?.label,
@@ -1128,9 +1127,9 @@ const routeConditionalWorkflowNode = async (
 	);
 
 	if (!edge?.target) {
-		await persistFactoryplaneEvent(
+		await persistChaterfaceEvent(
 			task.id,
-			"factoryplane.workflow.router_unconnected",
+			"chaterface.workflow.router_unconnected",
 			{
 				taskId: task.id,
 				workflowNodeId: routerNode.id,
@@ -1189,7 +1188,7 @@ const continueFromInstructionNode = async (
 		}),
 	);
 
-	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.instruction", {
+	await persistChaterfaceEvent(task.id, "chaterface.workflow.instruction", {
 		taskId: task.id,
 		workflowNodeId: instructionNode.id,
 		agentSessionId: options.agentSession?.id,
@@ -1296,9 +1295,9 @@ const continueFromIntegrationActionNode = async (
 		}),
 	]);
 
-	await persistFactoryplaneEvent(
+	await persistChaterfaceEvent(
 		task.id,
-		"factoryplane.workflow.integration_action",
+		"chaterface.workflow.integration_action",
 		{
 			taskId: task.id,
 			workflowNodeId: actionNode.id,
@@ -1352,7 +1351,7 @@ const routeAgentDecisionNode = async (
 			}),
 		);
 
-		await persistFactoryplaneEvent(task.id, "factoryplane.workflow.decision", {
+		await persistChaterfaceEvent(task.id, "chaterface.workflow.decision", {
 			taskId: task.id,
 			workflowNodeId: decisionNode.id,
 			agentSessionId: options.agentSession?.id,
@@ -1401,7 +1400,7 @@ const routeAgentDecisionNode = async (
 		}),
 		eventTx(eventId)
 			.create({
-				type: "factoryplane.new_user_message",
+				type: "chaterface.new_user_message",
 				data: {
 					taskId: task.id,
 					content,
@@ -1417,9 +1416,9 @@ const routeAgentDecisionNode = async (
 			.link({ task: task.id, agentSession: options.agentSession.id }),
 	]);
 
-	await persistFactoryplaneEvent(
+	await persistChaterfaceEvent(
 		task.id,
-		"factoryplane.workflow.decision_question",
+		"chaterface.workflow.decision_question",
 		{
 			taskId: task.id,
 			workflowNodeId: decisionNode.id,
@@ -2393,7 +2392,7 @@ const installWorkspaceSkills = async (
 		async () => {
 			await Promise.all(
 				skills.map(async (skill) => {
-					const skillPath = `~/.codex/skills/factoryplane/${skill.slug}`;
+					const skillPath = `~/.codex/skills/chaterface/${skill.slug}`;
 					const files =
 						skill.files.length > 0
 							? skill.files
@@ -2679,7 +2678,7 @@ const createGithubAppInstallationAccessToken = async (
 			headers: {
 				Accept: "application/vnd.github+json",
 				Authorization: `Bearer ${createGithubAppJwt(config)}`,
-				"User-Agent": "Factoryplane",
+				"User-Agent": "Chaterface",
 				"X-GitHub-Api-Version": "2022-11-28",
 			},
 		},
@@ -2947,7 +2946,7 @@ const writeRepositorySecretsFingerprint = async (
 	fingerprint: string,
 ) => {
 	const result = await sandbox.commands.run(
-		`mkdir -p ${shellQuote(`${workspacePath}/.factoryplane`)}`,
+		`mkdir -p ${shellQuote(`${workspacePath}/.chaterface`)}`,
 		{ timeoutMs: 30_000 },
 	);
 	assertCommandSucceeded(
@@ -3201,7 +3200,7 @@ const runWorkspaceCommands = async (
 	}
 
 	const workspacePath = await getSandboxWorkspacePath(sandbox);
-	const scriptPath = `${FACTORYPLANE_SCRIPT_DIR}/${kind}-${taskId}.sh`;
+	const scriptPath = `${TASK_SCRIPT_DIR}/${kind}-${taskId}.sh`;
 	const title =
 		kind === "new_task" ? "Run new task commands" : "Run new turn commands";
 
@@ -3210,10 +3209,9 @@ const runWorkspaceCommands = async (
 		`workspace_${kind}_commands`,
 		title,
 		async () => {
-			await sandbox.commands.run(
-				`mkdir -p ${shellQuote(FACTORYPLANE_SCRIPT_DIR)}`,
-				{ timeoutMs: 30_000 },
-			);
+			await sandbox.commands.run(`mkdir -p ${shellQuote(TASK_SCRIPT_DIR)}`, {
+				timeoutMs: 30_000,
+			});
 			await sandbox.files.write(scriptPath, scriptContent);
 
 			return sandbox.commands.run(
@@ -3222,9 +3220,9 @@ const runWorkspaceCommands = async (
 					timeoutMs: WORKSPACE_SETUP_SCRIPT_TIMEOUT_MS,
 					envs: {
 						...envs,
-						FACTORYPLANE_WORKSPACE_ID: workspace.id,
-						FACTORYPLANE_TASK_ID: taskId,
-						FACTORYPLANE_WORKSPACE: workspacePath,
+						WORKSPACE_ID: workspace.id,
+						TASK_ID: taskId,
+						WORKSPACE: workspacePath,
 					},
 				},
 			);
@@ -3636,7 +3634,7 @@ const persistWorkflowStructuredOutput = async (
 		}),
 	);
 
-	await persistFactoryplaneEvent(task.id, "factoryplane.workflow.output", {
+	await persistChaterfaceEvent(task.id, "chaterface.workflow.output", {
 		taskId: task.id,
 		workflowNodeId,
 		agentSessionId,
@@ -3678,7 +3676,7 @@ const materializeAttachments = async (
 		return [];
 	}
 
-	const attachmentDir = `/tmp/factoryplane-attachments/${taskId}`;
+	const attachmentDir = `/tmp/chaterface-attachments/${taskId}`;
 	const downloads = await runSetupStep(
 		taskId,
 		"file_attachments",
@@ -3767,7 +3765,7 @@ const createTaskWorkspaceBaseline = async (
 		[
 			"set -e",
 			buildReplaceDirectoryFunction(),
-			`replace_factoryplane_dir ${shellQuote(workspacePath)} ${shellQuote(baselinePath)}`,
+			`replace_chaterface_dir ${shellQuote(workspacePath)} ${shellQuote(baselinePath)}`,
 		].join("\n"),
 		{ timeoutMs: 120_000 },
 	);
@@ -3836,9 +3834,9 @@ const generateTaskPatch = async (
 	taskId: string,
 	workspacePath: string,
 ) => {
-	const nameStatusMarker = "__FACTORYPLANE_DIFF_NAME_STATUS__";
-	const numstatMarker = "__FACTORYPLANE_DIFF_NUMSTAT__";
-	const patchMarker = "__FACTORYPLANE_DIFF_PATCH__";
+	const nameStatusMarker = "__DIFF_NAME_STATUS__";
+	const numstatMarker = "__DIFF_NUMSTAT__";
+	const patchMarker = "__DIFF_PATCH__";
 	const baselinePath = getTaskBaselinePath(taskId);
 	const workPath = `${DIFF_WORK_ROOT}/${taskId}`;
 	const repoPath = `${workPath}/repo`;
@@ -3848,14 +3846,14 @@ const generateTaskPatch = async (
 			buildReplaceDirectoryFunction(),
 			`rm -rf ${shellQuote(workPath)}`,
 			`mkdir -p ${shellQuote(repoPath)}`,
-			`replace_factoryplane_dir ${shellQuote(baselinePath)} ${shellQuote(repoPath)}`,
+			`replace_chaterface_dir ${shellQuote(baselinePath)} ${shellQuote(repoPath)}`,
 			`cd ${shellQuote(repoPath)}`,
 			"git init -q",
-			"git config user.email factoryplane@example.com",
-			"git config user.name Factoryplane",
+			"git config user.email chaterface@example.com",
+			"git config user.name Chaterface",
 			"git add -f -A",
 			"git commit --allow-empty -qm baseline",
-			`replace_factoryplane_dir ${shellQuote(workspacePath)} ${shellQuote(repoPath)}`,
+			`replace_chaterface_dir ${shellQuote(workspacePath)} ${shellQuote(repoPath)}`,
 			"git add -f -A",
 			`printf '%s\\n' ${shellQuote(nameStatusMarker)}`,
 			"git diff --cached --name-status HEAD",
@@ -4018,7 +4016,7 @@ const buildReplaceDirectoryFunction = () => {
 	).join(" ");
 
 	return `
-replace_factoryplane_dir() {
+replace_chaterface_dir() {
 	src="$1"
 	dest="$2"
 	mkdir -p "$dest"
@@ -4046,7 +4044,7 @@ const setupRun = async (
 	);
 
 	const envs: Record<string, string> = {
-		FACTORYPLANE_AUTH_TOKEN: agentToken,
+		TASK_API_AUTH_TOKEN: agentToken,
 		...getAgentSafeBaseEnvs(),
 		...(await getWorkspaceGithubAuthEnvs(workspace)),
 	};
@@ -4532,7 +4530,7 @@ const runSetupStep = async <T>(
 	options: SetupStepOptions = {},
 ) => {
 	console.log("Setup step started", { taskId, step, title });
-	await persistFactoryplaneEvent(taskId, "factoryplane.setup_step_started", {
+	await persistChaterfaceEvent(taskId, "chaterface.setup_step_started", {
 		step,
 		title,
 		status: "started",
@@ -4541,15 +4539,11 @@ const runSetupStep = async <T>(
 	try {
 		const result = await runWithTimeout(action(), title, options.timeoutMs);
 		console.log("Setup step completed", { taskId, step, title });
-		await persistFactoryplaneEvent(
-			taskId,
-			"factoryplane.setup_step_completed",
-			{
-				step,
-				title,
-				status: "completed",
-			},
-		);
+		await persistChaterfaceEvent(taskId, "chaterface.setup_step_completed", {
+			step,
+			title,
+			status: "completed",
+		});
 		return result;
 	} catch (error) {
 		const failureStatus = options.failureStatus ?? "failed";
@@ -4560,11 +4554,11 @@ const runSetupStep = async <T>(
 			status: failureStatus,
 			error,
 		});
-		await persistFactoryplaneEvent(
+		await persistChaterfaceEvent(
 			taskId,
 			failureStatus === "warning"
-				? "factoryplane.setup_step_warning"
-				: "factoryplane.setup_step_failed",
+				? "chaterface.setup_step_warning"
+				: "chaterface.setup_step_failed",
 			{
 				step,
 				title,
@@ -4639,7 +4633,7 @@ const runOptionalSetupStep = async <T>(
 	}
 };
 
-const persistFactoryplaneEvent = async (
+const persistChaterfaceEvent = async (
 	taskId: string,
 	type: string,
 	data: Record<string, unknown>,

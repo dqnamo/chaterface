@@ -106,7 +106,7 @@ export const POST: RouteHandler = async (c) => {
 			.link({ workspace: task.workspace.id }),
 		eventTx(id())
 			.create({
-				type: "factoryplane.mcp_server_created",
+				type: "chaterface.mcp_server_created",
 				data: {
 					mcpServerId,
 					name: body.name,

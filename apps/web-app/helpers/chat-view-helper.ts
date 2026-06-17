@@ -4,7 +4,7 @@ export type ChatViewMode = (typeof CHAT_VIEW_MODES)[number];
 
 export const DEFAULT_CHAT_VIEW_MODE: ChatViewMode = "full";
 
-const CHAT_VIEW_MODE_STORAGE_KEY = "factoryplane.chat.defaultView";
+const CHAT_VIEW_MODE_STORAGE_KEY = "chaterface.chat.defaultView";
 
 export function toChatViewMode(value: unknown): ChatViewMode {
 	return value === "minified" || value === "full"

@@ -74,7 +74,7 @@ export const PATCH: RouteHandler = async (c) => {
 		mcpServerTx(mcpServerId).update(update),
 		eventTx(id())
 			.create({
-				type: "factoryplane.mcp_server_updated",
+				type: "chaterface.mcp_server_updated",
 				data: {
 					mcpServerId,
 					name: body.name,
@@ -116,7 +116,7 @@ export const DELETE: RouteHandler = async (c) => {
 		mcpServerTx(mcpServerId).delete(),
 		eventTx(id())
 			.create({
-				type: "factoryplane.mcp_server_deleted",
+				type: "chaterface.mcp_server_deleted",
 				data: {
 					mcpServerId,
 					name: authResult.mcpServer.name,

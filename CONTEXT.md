@@ -1,6 +1,6 @@
-# Factoryplane
+# Chaterface
 
-Factoryplane helps teams configure workspaces and run agent tasks inside them.
+Chaterface helps teams configure workspaces and run agent tasks inside them.
 
 ## Language
 

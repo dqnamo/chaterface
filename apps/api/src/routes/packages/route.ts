@@ -103,7 +103,7 @@ export const PUT: RouteHandler = async (c) => {
 		),
 		eventTx(id())
 			.create({
-				type: "factoryplane.packages_updated",
+				type: "chaterface.packages_updated",
 				data: {
 					packages: body.packages,
 				},
@@ -169,7 +169,7 @@ export const POST: RouteHandler = async (c) => {
 			),
 		eventTx(id())
 			.create({
-				type: "factoryplane.packages_updated",
+				type: "chaterface.packages_updated",
 				data: {
 					added: body.packages,
 					packages,

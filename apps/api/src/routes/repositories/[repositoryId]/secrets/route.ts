@@ -127,7 +127,7 @@ export const POST: RouteHandler = async (c) => {
 		}),
 		eventTx(id())
 			.create({
-				type: "factoryplane.repository_secret_saved",
+				type: "chaterface.repository_secret_saved",
 				data: {
 					repositoryId,
 					secretId: secret.id,
@@ -178,7 +178,7 @@ export const DELETE: RouteHandler = async (c) => {
 		}),
 		eventTx(id())
 			.create({
-				type: "factoryplane.repository_secret_deleted",
+				type: "chaterface.repository_secret_deleted",
 				data: {
 					repositoryId,
 					secretId: body.secretId,

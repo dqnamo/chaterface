@@ -104,7 +104,7 @@ export default function Home() {
 					<div className="mt-4 flex flex-row flex-wrap items-center gap-2">
 						<Button
 							className="text-xs"
-							href="https://app.factoryplane.com"
+							href="https://app.chaterface.com"
 							variant="primary"
 						>
 							<RocketLaunchIcon size={16} weight="bold" />
@@ -112,7 +112,7 @@ export default function Home() {
 						</Button>
 						<Button
 							className="text-xs"
-							href="https://github.com/dqnamo/factoryplane"
+							href="https://github.com/dqnamo/chaterface"
 							target="_blank"
 							variant="secondary"
 						>
@@ -162,7 +162,7 @@ export default function Home() {
 								<div className="flex flex-row p-2 mt-auto w-full">
 									<Button
 										className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-										href="https://github.com/dqnamo/factoryplane"
+										href="https://github.com/dqnamo/chaterface"
 										target="_blank"
 										variant="secondary"
 									>

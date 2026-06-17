@@ -1,6 +1,5 @@
 const previewsDomain =
-	process.env.NEXT_PUBLIC_FACTORYPLANE_PREVIEWS_DOMAIN ??
-	"previews.factoryplane.com";
+	process.env.NEXT_PUBLIC_PREVIEWS_DOMAIN ?? "previews.chaterface.com";
 
 type PublicServiceUrlInput = {
 	serviceId?: string | null;

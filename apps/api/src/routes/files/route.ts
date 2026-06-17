@@ -82,7 +82,7 @@ export const POST: RouteHandler = async (c) => {
 			.link({ workspace: task.workspace.id }),
 		eventTx(id())
 			.create({
-				type: "factoryplane.environment_file_created",
+				type: "chaterface.environment_file_created",
 				data: {
 					fileId,
 					path: body.path,

@@ -1,4 +1,4 @@
-const CACHE_NAME = "factoryplane-v1";
+const CACHE_NAME = "chaterface-v1";
 const APP_SHELL = ["/", "/offline.html", "/icons/icon-192.png"];
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const isLocalDevelopment = LOCAL_HOSTS.has(self.location.hostname);
@@ -15,7 +15,7 @@ if (isLocalDevelopment) {
 				.then((keys) =>
 					Promise.all(
 						keys
-							.filter((key) => key.startsWith("factoryplane-"))
+							.filter((key) => key.startsWith("chaterface-"))
 							.map((key) => caches.delete(key)),
 					),
 				)

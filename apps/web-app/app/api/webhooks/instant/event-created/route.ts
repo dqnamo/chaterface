@@ -12,8 +12,8 @@ const handlers = combineHandlers(
 		);
 
 		if (
-			record.after.type !== "factoryplane.new_user_message" &&
-			record.after.type !== "factoryplane.new_task"
+			record.after.type !== "chaterface.new_user_message" &&
+			record.after.type !== "chaterface.new_task"
 		) {
 			console.log("Skipping event", record.after.type);
 			return;

@@ -119,7 +119,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 			.link({ workspace: webhook.workspace.id }),
 		eventTx(eventId)
 			.create({
-				type: "factoryplane.workflow.webhook_received",
+				type: "chaterface.workflow.webhook_received",
 				data: {
 					workspaceId: webhook.workspace.id,
 					taskId,
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 }
 
 const getWebhookSecret = (req: NextRequest, body: Record<string, unknown>) => {
-	const headerSecret = req.headers.get("x-factoryplane-webhook-secret");
+	const headerSecret = req.headers.get("x-chaterface-webhook-secret");
 
 	if (headerSecret) {
 		return headerSecret;

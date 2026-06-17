@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	const token = generateSecretToken("fp_live");
+	const token = generateSecretToken("chaterface_live");
 	const tokenHash = await hashSecretValue(token);
 	const apiKeyId = id();
 	const createdAt = new Date().toISOString();

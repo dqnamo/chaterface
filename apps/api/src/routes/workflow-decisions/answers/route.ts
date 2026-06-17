@@ -149,7 +149,7 @@ export const POST: RouteHandler = async (c) => {
 
 	const eventId = id();
 	const eventTransaction = eventTx(eventId).create({
-		type: "factoryplane.workflow.decision_answered",
+		type: "chaterface.workflow.decision_answered",
 		data: {
 			taskId: task.id,
 			workflowNodeId: pendingDecision.workflowNodeId,

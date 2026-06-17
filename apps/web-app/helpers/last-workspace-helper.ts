@@ -1,6 +1,6 @@
 "use client";
 
-const LAST_WORKSPACE_COOKIE = "factoryplane_last_workspace";
+const LAST_WORKSPACE_COOKIE = "chaterface_last_workspace";
 const LAST_WORKSPACE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 type LastWorkspace = {

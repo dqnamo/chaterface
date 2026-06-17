@@ -7,7 +7,7 @@ import {
 import type { NextRequest, NextResponse } from "next/server";
 import db from "@/instant.admin";
 
-export const GITHUB_APP_STATE_COOKIE = "factoryplane_github_app_state";
+export const GITHUB_APP_STATE_COOKIE = "chaterface_github_app_state";
 const GITHUB_APP_STATE_TTL_SECONDS = 10 * 60;
 const GITHUB_API_VERSION = "2022-11-28";
 

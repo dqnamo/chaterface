@@ -362,12 +362,12 @@ const isMinifiedTimelineNode = (node: TimelineNode) => {
 	const type = node.event.type ?? "";
 
 	if (
-		type === "factoryplane.new_task" ||
-		type === "factoryplane.new_user_message" ||
+		type === "chaterface.new_task" ||
+		type === "chaterface.new_user_message" ||
 		type === "codex.thread.started" ||
 		type === "codex.turn.started" ||
 		type === "codex.turn.completed" ||
-		type.startsWith("factoryplane.setup_step_")
+		type.startsWith("chaterface.setup_step_")
 	) {
 		return true;
 	}
@@ -992,7 +992,7 @@ export default function TaskPage() {
 				}),
 				eventTx(eventId)
 					.create({
-						type: "factoryplane.new_user_message",
+						type: "chaterface.new_user_message",
 						data: { content, attachments, userId: user?.id },
 						createdAt,
 					})

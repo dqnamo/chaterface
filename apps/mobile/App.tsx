@@ -101,7 +101,7 @@ type Member = InstaQLEntity<AppSchema, "members"> & {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const API_BASE_URL = process.env.EXPO_PUBLIC_FACTORYPLANE_API_URL;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 function tx<EntityName extends keyof typeof db.tx>(
 	entityName: EntityName,
@@ -137,7 +137,7 @@ export default function App() {
 						<Stack.Screen
 							name="Home"
 							component={HomeScreen}
-							options={{ title: "Factoryplane" }}
+							options={{ title: "Chaterface" }}
 						/>
 						<Stack.Screen
 							name="Workspace"
@@ -262,7 +262,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 	}
 
 	if (isLoading) {
-		return <LoadingState label="Loading Factoryplane..." />;
+		return <LoadingState label="Loading Chaterface..." />;
 	}
 
 	if (authError) {
@@ -282,7 +282,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 				<CenterShell>
 					<Logo size={7} />
 					<View style={styles.centeredBlock}>
-						<Text style={textStyles.title}>Sign in to Factoryplane</Text>
+						<Text style={textStyles.title}>Sign in to Chaterface</Text>
 						<Text style={styles.centeredCopy}>
 							Enter your email to receive a magic code.
 						</Text>
@@ -535,7 +535,7 @@ function WorkspaceScreen({
 			await db.transact(
 				tx("events", id())
 					.create({
-						type: "factoryplane.new_task",
+						type: "chaterface.new_task",
 						data: {
 							taskId,
 							name: taskName.trim(),
@@ -850,7 +850,7 @@ function TaskScreen({
 			await db.transact(
 				tx("events", id())
 					.create({
-						type: "factoryplane.new_user_message",
+						type: "chaterface.new_user_message",
 						data: { content, images: [] },
 						createdAt: nowIso(),
 					})
@@ -1458,7 +1458,7 @@ function FormSheet({ children }: { children: React.ReactNode }) {
 }
 
 async function signOut() {
-	await AsyncStorage.removeItem("factoryplane:last-workspace");
+	await AsyncStorage.removeItem("chaterface:last-workspace");
 	await db.auth.signOut();
 }
 
@@ -1478,9 +1478,9 @@ function getString(
 
 function titleForEvent(type: string | undefined) {
 	switch (type) {
-		case "factoryplane.new_task":
+		case "chaterface.new_task":
 			return "New task";
-		case "factoryplane.new_user_message":
+		case "chaterface.new_user_message":
 			return "User message";
 		case "codex.turn.started":
 			return "Agent started";

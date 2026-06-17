@@ -72,7 +72,7 @@ export const PATCH: RouteHandler = async (c) => {
 		repositoryTx(repositoryId).update(body),
 		eventTx(id())
 			.create({
-				type: "factoryplane.repository_updated",
+				type: "chaterface.repository_updated",
 				data: {
 					repositoryId,
 					...body,
@@ -120,7 +120,7 @@ export const DELETE: RouteHandler = async (c) => {
 		repositoryTx(repositoryId).delete(),
 		eventTx(id())
 			.create({
-				type: "factoryplane.repository_deleted",
+				type: "chaterface.repository_deleted",
 				data: {
 					repositoryId,
 					url: repositoryDetails?.url,

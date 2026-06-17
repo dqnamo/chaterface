@@ -136,8 +136,8 @@ export function buildTimeline(events: readonly EventEntity[]): TimelineNode[] {
 		const type = event.type ?? "";
 
 		if (
-			type === "factoryplane.new_task" ||
-			type === "factoryplane.new_user_message"
+			type === "chaterface.new_task" ||
+			type === "chaterface.new_user_message"
 		) {
 			runKey = `run:${event.id}`;
 			turnKey = `turn:${runKey}:pending`;
@@ -182,7 +182,7 @@ function groupInfoFor(
 	const type = event.type ?? "";
 	const data = asRecord(event.data) ?? {};
 
-	if (type.startsWith("factoryplane.setup_step_")) {
+	if (type.startsWith("chaterface.setup_step_")) {
 		const step = getString(data, "step") ?? "step";
 		const phase: TimelinePhase = type.endsWith("_failed")
 			? "failed"
@@ -248,11 +248,11 @@ function getEventTime(event: EventEntity) {
 function getEventSortRank(event: EventEntity) {
 	const type = event.type ?? "";
 
-	if (type === "factoryplane.new_task") {
+	if (type === "chaterface.new_task") {
 		return 0;
 	}
 
-	if (type === "factoryplane.new_user_message") {
+	if (type === "chaterface.new_user_message") {
 		return 1;
 	}
 
@@ -329,11 +329,11 @@ export default function Event({
 	const timestampMeta = formatTimestampMeta(event.createdAt);
 	const timestamp = timestampMeta?.time;
 
-	if (type === "factoryplane.new_task") {
+	if (type === "chaterface.new_task") {
 		return <NewTaskEvent data={data} task={task} timestamp={timestamp} />;
 	}
 
-	if (type === "factoryplane.new_user_message") {
+	if (type === "chaterface.new_user_message") {
 		const content = getString(data, "content");
 		const attachments = getAttachments(data);
 		const userId = getString(data, "userId");
@@ -349,22 +349,22 @@ export default function Event({
 		);
 	}
 
-	if (type.startsWith("factoryplane.service_")) {
+	if (type.startsWith("chaterface.service_")) {
 		return <ServiceEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
-	if (type.startsWith("factoryplane.repository_")) {
+	if (type.startsWith("chaterface.repository_")) {
 		return <RepositoryEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
 	if (
-		type === "factoryplane.pull_request_attached" ||
-		type === "factoryplane.pull_request_merged"
+		type === "chaterface.pull_request_attached" ||
+		type === "chaterface.pull_request_merged"
 	) {
 		return <PullRequestEvent data={data} timestamp={timestamp} type={type} />;
 	}
 
-	if (type.startsWith("factoryplane.setup_step_")) {
+	if (type.startsWith("chaterface.setup_step_")) {
 		return <SetupStepEvent data={data} phase={phase} timestamp={timestamp} />;
 	}
 
@@ -411,7 +411,7 @@ export default function Event({
 			glyph="EV"
 			meta={timestamp}
 			phase={type.includes("failed") ? "failed" : undefined}
-			source={type.startsWith("factoryplane.") ? "factoryplane" : "event"}
+			source={type.startsWith("chaterface.") ? "chaterface" : "event"}
 			subtitle={type}
 			title={formatEventType(type)}
 			tone={type.includes("failed") ? "danger" : "neutral"}
@@ -441,7 +441,7 @@ function NewTaskEvent({
 			glyph="FP"
 			logo
 			meta={timestamp}
-			source="factoryplane"
+			source="chaterface"
 			subtitle={name ? "New task created" : taskId}
 			title={name ?? "New task created"}
 			tone="accent"
@@ -515,7 +515,7 @@ function SetupStepEvent({
 			glyph="ST"
 			meta={timestamp}
 			phase={phase ?? "running"}
-			source="factoryplane"
+			source="chaterface"
 			subtitle={getString(data, "step")}
 			title={getString(data, "title") ?? "Setup step"}
 			tone="accent"
@@ -541,11 +541,11 @@ function ServiceEvent({
 	});
 	const isFailure = type.includes("failed");
 	const title =
-		type === "factoryplane.service_started"
+		type === "chaterface.service_started"
 			? "Service started"
-			: type === "factoryplane.service_stopped"
+			: type === "chaterface.service_stopped"
 				? "Service stopped"
-				: type === "factoryplane.service_failed"
+				: type === "chaterface.service_failed"
 					? "Service failed"
 					: "Service stop failed";
 
@@ -554,7 +554,7 @@ function ServiceEvent({
 			glyph="SV"
 			meta={timestamp}
 			phase={isFailure ? "failed" : "success"}
-			source="factoryplane"
+			source="chaterface"
 			subtitle={name}
 			title={title}
 			tone={isFailure ? "danger" : "success"}
@@ -596,9 +596,9 @@ function RepositoryEvent({
 }) {
 	const url = getString(data, "url");
 	const title =
-		type === "factoryplane.repository_created"
+		type === "chaterface.repository_created"
 			? "Repository added"
-			: type === "factoryplane.repository_updated"
+			: type === "chaterface.repository_updated"
 				? "Repository updated"
 				: "Repository removed";
 
@@ -607,7 +607,7 @@ function RepositoryEvent({
 			glyph="RP"
 			meta={timestamp}
 			phase="success"
-			source="factoryplane"
+			source="chaterface"
 			subtitle={url ?? getString(data, "repositoryId")}
 			title={title}
 			tone="success"
@@ -634,7 +634,7 @@ function PullRequestEvent({
 }) {
 	const url = getString(data, "url");
 	const title =
-		type === "factoryplane.pull_request_merged"
+		type === "chaterface.pull_request_merged"
 			? "Pull request merged"
 			: "Pull request attached";
 
@@ -643,7 +643,7 @@ function PullRequestEvent({
 			glyph="PR"
 			meta={timestamp}
 			phase="success"
-			source="factoryplane"
+			source="chaterface"
 			title={title}
 			tone="success"
 		>
@@ -939,7 +939,7 @@ function UserMessage({
 	);
 }
 
-type EventSource = "agent" | "event" | "factoryplane";
+type EventSource = "agent" | "event" | "chaterface";
 
 function EventCard({
 	actorName,
@@ -1115,7 +1115,7 @@ function TimelineAvatar({
 		);
 	}
 
-	if (source === "factoryplane" || logo) {
+	if (source === "chaterface" || logo) {
 		return <Logo className="mt-0.5 size-4 text-accent-11" />;
 	}
 
@@ -1492,7 +1492,7 @@ function formatEventType(type: string) {
 	const label = type
 		.replace(/^codex\./, "")
 		.replace(/^cursor\./, "")
-		.replace(/^factoryplane\./, "")
+		.replace(/^chaterface\./, "")
 		.replace(/[._-]/g, " ");
 
 	return label.charAt(0).toUpperCase() + label.slice(1);

@@ -209,7 +209,7 @@ export const POST: RouteHandler = async (c) => {
 		}),
 		eventTx(id())
 			.create({
-				type: "factoryplane.service_started",
+				type: "chaterface.service_started",
 				data: {
 					serviceId,
 					terminalSessionId,
@@ -308,7 +308,7 @@ const markServiceFailed = async (
 		}),
 		eventTx(id())
 			.create({
-				type: "factoryplane.service_failed",
+				type: "chaterface.service_failed",
 				data: {
 					serviceId,
 					terminalSessionId,
@@ -362,8 +362,7 @@ const waitForService = async (
 };
 
 const getPreviewUrl = (serviceId: string) => {
-	const domain =
-		process.env.FACTORYPLANE_PREVIEWS_DOMAIN ?? "previews.factoryplane.com";
+	const domain = process.env.PREVIEWS_DOMAIN ?? "previews.chaterface.com";
 	return `https://${serviceId}.${domain}`;
 };
 

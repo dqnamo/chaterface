@@ -214,7 +214,7 @@ export function NewTaskDialog({
 					.link({ task: taskId, agent: resolvedAgentId }),
 				eventTx(eventId)
 					.create({
-						type: "factoryplane.new_task",
+						type: "chaterface.new_task",
 						data: {
 							taskId,
 							name,

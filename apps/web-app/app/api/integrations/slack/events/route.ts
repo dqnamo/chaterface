@@ -361,7 +361,7 @@ const startWorkflowForSubscription = async (
 			.link({ task: taskId, agent: agent.id }),
 		eventTx(triggerEventId)
 			.create({
-				type: "factoryplane.workflow.integration_triggered",
+				type: "chaterface.workflow.integration_triggered",
 				data: {
 					workspaceId: workspace.id,
 					taskId,
@@ -378,7 +378,7 @@ const startWorkflowForSubscription = async (
 			.link({ task: taskId, agentSession: agentSessionId }),
 		eventTx(newTaskEventId)
 			.create({
-				type: "factoryplane.new_task",
+				type: "chaterface.new_task",
 				data: {
 					taskId,
 					name,

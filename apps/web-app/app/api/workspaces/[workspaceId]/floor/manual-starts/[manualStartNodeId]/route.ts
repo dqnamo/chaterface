@@ -192,7 +192,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 			.link({ task: taskId, agent: agent.id }),
 		eventTx(manualStartedEventId)
 			.create({
-				type: "factoryplane.workflow.manual_started",
+				type: "chaterface.workflow.manual_started",
 				data: {
 					workspaceId: authResult.workspace.id,
 					taskId,
@@ -208,7 +208,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 			.link({ task: taskId, agentSession: agentSessionId }),
 		eventTx(newTaskEventId)
 			.create({
-				type: "factoryplane.new_task",
+				type: "chaterface.new_task",
 				data: {
 					taskId,
 					name,

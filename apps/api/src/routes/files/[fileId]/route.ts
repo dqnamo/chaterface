@@ -71,7 +71,7 @@ export const PATCH: RouteHandler = async (c) => {
 		environmentFileTx(fileId).update(body),
 		eventTx(id())
 			.create({
-				type: "factoryplane.environment_file_updated",
+				type: "chaterface.environment_file_updated",
 				data: {
 					fileId,
 					updated: Object.keys(body),
@@ -117,7 +117,7 @@ export const DELETE: RouteHandler = async (c) => {
 		environmentFileTx(fileId).delete(),
 		eventTx(id())
 			.create({
-				type: "factoryplane.environment_file_deleted",
+				type: "chaterface.environment_file_deleted",
 				data: {
 					fileId,
 					path: environmentFile.path,

@@ -298,7 +298,7 @@ const writeDevelopmentInviteEmail = async ({
 		email,
 		inviteUrl,
 		workspaceName,
-		from: "dev@factoryplane.local",
+		from: "dev@chaterface.local",
 	});
 	const outboxDirectory = getDevelopmentEmailOutboxDirectory();
 
@@ -344,15 +344,15 @@ const buildInviteEmailMessage = ({
 	return {
 		to: email,
 		from,
-		subject: `Join ${workspaceName} on Factoryplane`,
+		subject: `Join ${workspaceName} on Chaterface`,
 		html: [
-			`<p>You have been invited to join <strong>${safeWorkspaceName}</strong> on Factoryplane.</p>`,
+			`<p>You have been invited to join <strong>${safeWorkspaceName}</strong> on Chaterface.</p>`,
 			`<p><a href="${safeInviteUrl}">Accept your invite</a></p>`,
 			`<p>If the button does not work, copy and paste this URL into your browser:</p>`,
 			`<p>${safeInviteUrl}</p>`,
 		].join(""),
 		text: [
-			`You have been invited to join ${workspaceName} on Factoryplane.`,
+			`You have been invited to join ${workspaceName} on Chaterface.`,
 			"",
 			`Accept your invite: ${inviteUrl}`,
 		].join("\n"),

@@ -102,7 +102,7 @@ export const POST: RouteHandler = async (c) => {
 		),
 		eventTx(id())
 			.create({
-				type: "factoryplane.commands_updated",
+				type: "chaterface.commands_updated",
 				data: {
 					added: body.commands.length,
 					commands: body.commands,
@@ -164,7 +164,7 @@ export const PUT: RouteHandler = async (c) => {
 		),
 		eventTx(id())
 			.create({
-				type: "factoryplane.commands_updated",
+				type: "chaterface.commands_updated",
 				data: {
 					replaced: true,
 					commands: body.commands,

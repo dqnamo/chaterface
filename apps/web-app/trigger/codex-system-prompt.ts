@@ -6,8 +6,8 @@ const SYSTEM_PROMPT_PATH = path.join(
 	"trigger/prompts/system.md",
 );
 
-const DEFAULT_API_URL = "https://api.factoryplane.com";
-const API_URL_PLACEHOLDER = "{{FACTORYPLANE_API_URL}}";
+const DEFAULT_API_URL = "https://api.chaterface.com";
+const API_URL_PLACEHOLDER = "{{TASK_API_URL}}";
 
 export const getCodexDeveloperInstructions = () => {
 	const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);

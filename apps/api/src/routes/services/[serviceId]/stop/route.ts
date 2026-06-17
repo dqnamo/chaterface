@@ -116,7 +116,7 @@ export const POST: RouteHandler = async (c) => {
 				}),
 				eventTx(id())
 					.create({
-						type: "factoryplane.service_stop_failed",
+						type: "chaterface.service_stop_failed",
 						data: {
 							serviceId,
 							terminalSessionId,
@@ -157,7 +157,7 @@ export const POST: RouteHandler = async (c) => {
 		serviceTx(serviceId).delete(),
 		eventTx(id())
 			.create({
-				type: "factoryplane.service_stopped",
+				type: "chaterface.service_stopped",
 				data: {
 					serviceId,
 					terminalSessionId,

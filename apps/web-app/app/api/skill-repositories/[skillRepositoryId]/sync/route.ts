@@ -321,9 +321,7 @@ const authenticateSkillRepositoryRequest = async (
 };
 
 const cloneSkillRepository = async (repository: SkillRepositoryRecord) => {
-	const checkoutPath = await mkdtemp(
-		path.join(tmpdir(), "factoryplane-skills-"),
-	);
+	const checkoutPath = await mkdtemp(path.join(tmpdir(), "chaterface-skills-"));
 	const cloneUrl =
 		getGithubHttpsCloneUrl(repository.url) ?? repository.url.trim();
 	const extraHeader = await getGithubAuthHeader(repository);

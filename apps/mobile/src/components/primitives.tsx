@@ -27,7 +27,7 @@ const LOGO_PATTERN = [
 	false,
 ] as const;
 const LOGO_KEYS = LOGO_PATTERN.map(
-	(_cell, index) => `factoryplane-logo-cell-${index}`,
+	(_cell, index) => `chaterface-logo-cell-${index}`,
 );
 
 const monogramColors = [

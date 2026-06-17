@@ -31,12 +31,10 @@ type ResolvedProxyRequest =
 	| { ok: false; status: number; message: string };
 
 const port = Number(process.env.PORT ?? 3003);
-const previewsDomain =
-	process.env.FACTORYPLANE_PREVIEWS_DOMAIN ?? "previews.factoryplane.com";
-const cookieDomain =
-	process.env.FACTORYPLANE_PREVIEW_COOKIE_DOMAIN ?? `.${previewsDomain}`;
-const cookieName = process.env.FACTORYPLANE_PREVIEW_COOKIE_NAME ?? "fp_preview";
-const sessionSecret = process.env.FACTORYPLANE_PREVIEW_SESSION_SECRET;
+const previewsDomain = process.env.PREVIEWS_DOMAIN ?? "previews.chaterface.com";
+const cookieDomain = process.env.PREVIEW_COOKIE_DOMAIN ?? `.${previewsDomain}`;
+const cookieName = process.env.PREVIEW_COOKIE_NAME ?? "chaterface_preview";
+const sessionSecret = process.env.PREVIEW_SESSION_SECRET;
 const sessionMaxAgeSeconds = 60 * 60 * 8;
 
 const proxy = httpProxy.createProxyServer({
@@ -115,7 +113,7 @@ const handleHttpRequest = async (req: IncomingMessage, res: ServerResponse) => {
 
 	const url = getRequestUrl(req);
 
-	if (url.pathname === "/__factoryplane/preview-session") {
+	if (url.pathname === "/__chaterface/preview-session") {
 		await handlePreviewSessionRequest(req, res, url);
 		return;
 	}
@@ -301,7 +299,7 @@ const rewriteUpstreamLocation = (
 
 const signValue = (value: PreviewSession) => {
 	if (!sessionSecret) {
-		throw new Error("FACTORYPLANE_PREVIEW_SESSION_SECRET is not configured");
+		throw new Error("PREVIEW_SESSION_SECRET is not configured");
 	}
 
 	const payload = Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -314,7 +312,7 @@ const signValue = (value: PreviewSession) => {
 
 const verifySignedValue = <T>(value: string): T | undefined => {
 	if (!sessionSecret) {
-		throw new Error("FACTORYPLANE_PREVIEW_SESSION_SECRET is not configured");
+		throw new Error("PREVIEW_SESSION_SECRET is not configured");
 	}
 
 	const [payload, signature] = value.split(".");

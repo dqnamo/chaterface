@@ -104,7 +104,7 @@ export default function InvitePage() {
 					<h1 className="text-lg font-medium text-grayscale-12">
 						{member?.workspace?.name
 							? `Join ${member.workspace.name}`
-							: "Join Factoryplane"}
+							: "Join Chaterface"}
 					</h1>
 				</div>
 				<div className="flex flex-col gap-3 p-3">

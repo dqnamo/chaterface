@@ -82,20 +82,20 @@ export async function POST(req: NextRequest) {
 		exp: Date.now() + ticketTtlMs,
 	});
 	const domain =
-		process.env.NEXT_PUBLIC_FACTORYPLANE_PREVIEWS_DOMAIN ??
-		process.env.FACTORYPLANE_PREVIEWS_DOMAIN ??
-		"previews.factoryplane.com";
+		process.env.NEXT_PUBLIC_PREVIEWS_DOMAIN ??
+		process.env.PREVIEWS_DOMAIN ??
+		"previews.chaterface.com";
 
 	return NextResponse.json({
-		url: `https://${serviceId}.${domain}/__factoryplane/preview-session?ticket=${ticket}`,
+		url: `https://${serviceId}.${domain}/__chaterface/preview-session?ticket=${ticket}`,
 	});
 }
 
 const signValue = (value: PreviewSession) => {
-	const secret = process.env.FACTORYPLANE_PREVIEW_SESSION_SECRET;
+	const secret = process.env.PREVIEW_SESSION_SECRET;
 
 	if (!secret) {
-		throw new Error("FACTORYPLANE_PREVIEW_SESSION_SECRET is not configured");
+		throw new Error("PREVIEW_SESSION_SECRET is not configured");
 	}
 
 	const payload = Buffer.from(JSON.stringify(value)).toString("base64url");

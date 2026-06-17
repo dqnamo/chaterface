@@ -26,7 +26,7 @@ export default function PwaRegister() {
 					.then((cacheNames) =>
 						Promise.all(
 							cacheNames
-								.filter((cacheName) => cacheName.startsWith("factoryplane-"))
+								.filter((cacheName) => cacheName.startsWith("chaterface-"))
 								.map((cacheName) => caches.delete(cacheName)),
 						),
 					)

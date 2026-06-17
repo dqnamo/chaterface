@@ -82,7 +82,7 @@ export const POST: RouteHandler = async (c) => {
 			taskUpdate,
 			eventTx(id())
 				.create({
-					type: "factoryplane.pull_request_attached",
+					type: "chaterface.pull_request_attached",
 					data: {
 						url: body.url,
 					},

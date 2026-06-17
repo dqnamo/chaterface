@@ -133,7 +133,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 			.link({ task: task.id, agent: agent.id }),
 		eventTx(eventId)
 			.create({
-				type: "factoryplane.new_task",
+				type: "chaterface.new_task",
 				data: {
 					taskId: task.id,
 					name: task.name,
