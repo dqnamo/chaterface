@@ -88,7 +88,7 @@ export default function WorkspaceSettingsLayout({
 									key={label}
 									href={href}
 									className={cn(
-										"group relative flex items-center gap-2.5 px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+										"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
 										selected ? "bg-grayscale-3" : "",
 									)}
 								>
