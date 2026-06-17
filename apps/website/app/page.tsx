@@ -89,6 +89,42 @@ const waitlistCalConfig = JSON.stringify({ layout: "month_view" });
 export default function Home() {
 	return (
 		<main className="landing-page-colors relative isolate flex min-h-dvh w-full flex-col overflow-hidden bg-grayscale-1">
+			<Script id="cal-embed" strategy="afterInteractive">
+				{`
+					(function (C, A, L) {
+						let p = function (a, ar) { a.q.push(ar); };
+						let d = C.document;
+						C.Cal = C.Cal || function () {
+							let cal = C.Cal;
+							let ar = arguments;
+							if (!cal.loaded) {
+								cal.ns = {};
+								cal.q = cal.q || [];
+								d.head.appendChild(d.createElement("script")).src = A;
+								cal.loaded = true;
+							}
+							if (ar[0] === L) {
+								const api = function () { p(api, arguments); };
+								const namespace = ar[1];
+								api.q = api.q || [];
+								if (typeof namespace === "string") {
+									cal.ns[namespace] = cal.ns[namespace] || api;
+									p(cal.ns[namespace], ar);
+									p(cal, ["initNamespace", namespace]);
+								} else {
+									p(cal, ar);
+								}
+								return;
+							}
+							p(cal, ar);
+						};
+					})(window, "https://app.cal.com/embed/embed.js", "init");
+
+					Cal("init", "${waitlistCalNamespace}", { origin: "https://cal.com" });
+					Cal.ns.${waitlistCalNamespace}("ui", { theme: "light", layout: "month_view" });
+					Cal.ns.${waitlistCalNamespace}("preload", { calLink: "${waitlistCalLink}" });
+				`}
+			</Script>
 			<PixelTrail
 				className="pointer-events-auto absolute inset-0 z-0"
 				fadeDuration={650}
@@ -117,14 +153,10 @@ export default function Home() {
 							work together — all from one place.
 						</p>
 						<div className="mt-4 flex flex-row flex-wrap items-center gap-2">
-							<Button
-								className="text-xs"
-								href="https://app.chaterface.com"
-								variant="primary"
-							>
+							<WaitlistButton className="text-xs" variant="primary">
 								<RocketLaunchIcon size={16} weight="bold" />
-								Get Started
-							</Button>
+								Join waitlist
+							</WaitlistButton>
 							<Button
 								className="text-xs"
 								href="https://github.com/dqnamo/chaterface"
@@ -144,14 +176,14 @@ export default function Home() {
 						<div className="flex flex-col gap-px p-2">
 							<h2 className="font-medium text-grayscale-12">Pricing & plans</h2>
 							<p className="text-sm text-grayscale-11">
-								Start free with Builder for solo use, then move to Team when you
-								need more members.
+								Start with Builder for solo use, then move to Team when you need
+								more members and more concurrent workers.
 							</p>
 						</div>
 
 						<Card
 							layer={0}
-							className="p-1.5 grid grid-cols-3 gap-1.5 rounded-[16px]"
+							className="grid grid-cols-1 gap-1.5 rounded-[16px] p-1.5 lg:grid-cols-3"
 						>
 							<Card
 								layer={0}
@@ -189,7 +221,7 @@ export default function Home() {
 							</Card>
 							<Card
 								layer={0}
-								className="p-0 bg-grayscale-1 dark:bg-grayscale-3 dark:border-grayscale-5 dark:divide-grayscale-4 col-span-2 grid grid-cols-2 divide-x divide-grayscale-3 rounded-[13px] small-shadow"
+								className="grid grid-cols-1 divide-y divide-grayscale-3 rounded-[13px] bg-grayscale-1 p-0 small-shadow dark:divide-grayscale-4 dark:border-grayscale-5 dark:bg-grayscale-3 md:grid-cols-2 md:divide-x md:divide-y-0 lg:col-span-2"
 							>
 								<div className="flex flex-col">
 									<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
@@ -226,7 +258,17 @@ export default function Home() {
 											</div>
 											<div className="flex flex-row items-center justify-between">
 												<p className="text-sm text-grayscale-10">
-													Unlimited workers
+													100 tasks/month
+												</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9 "
+												/>
+											</div>
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">
+													3 concurrent workers
 												</p>
 												<CheckCircleIcon
 													size={14}
@@ -237,14 +279,13 @@ export default function Home() {
 										</div>
 									</div>
 									<div className="flex flex-row p-2 w-full mt-auto">
-										<Button
+										<WaitlistButton
 											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-											href="/login"
 											variant="secondary"
 										>
-											Get Started
+											Join waitlist
 											<ArrowRightIcon size={14} weight="bold" />
-										</Button>
+										</WaitlistButton>
 									</div>
 								</div>
 
@@ -287,7 +328,17 @@ export default function Home() {
 											</div>
 											<div className="flex flex-row items-center justify-between">
 												<p className="text-sm text-grayscale-10">
-													Unlimited workers
+													Unlimited tasks
+												</p>
+												<CheckCircleIcon
+													size={14}
+													weight="fill"
+													className="text-accent-9"
+												/>
+											</div>
+											<div className="flex flex-row items-center justify-between">
+												<p className="text-sm text-grayscale-10">
+													25 concurrent workers
 												</p>
 												<CheckCircleIcon
 													size={14}
@@ -299,19 +350,44 @@ export default function Home() {
 									</div>
 
 									<div className="flex flex-row p-2 w-full mt-auto">
-										<Button
+										<WaitlistButton
 											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-											href="/login"
 											variant="secondary"
 										>
-											Start team plan
+											Join waitlist
 											<ArrowRightIcon size={14} weight="bold" />
-										</Button>
+										</WaitlistButton>
 									</div>
 								</div>
 							</Card>
 						</Card>
 					</div>
+
+					<section
+						className="pointer-events-auto mt-8 flex flex-col gap-2"
+						id="waitlist"
+					>
+						<div className="flex flex-col gap-px p-2">
+							<p className="font-mono font-bold text-grayscale-9 text-tiny uppercase tracking-wide">
+								Waitlist
+							</p>
+							<h2 className="font-medium text-grayscale-12">
+								Book a Chaterface onboarding call
+							</h2>
+							<p className="max-w-2xl text-sm text-grayscale-11">
+								We are opening access gradually. Book a short call to join the
+								waitlist, talk through your workspace, and pick the right launch
+								plan.
+							</p>
+						</div>
+
+						<div className="flex flex-row flex-wrap items-center gap-2 p-2">
+							<WaitlistButton className="text-xs" variant="primary">
+								Join waitlist
+								<ArrowRightIcon size={14} weight="bold" />
+							</WaitlistButton>
+						</div>
+					</section>
 
 					<Footer className="pointer-events-auto p-2 mt-8" />
 				</div>
