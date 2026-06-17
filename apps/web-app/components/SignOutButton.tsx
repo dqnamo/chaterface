@@ -3,6 +3,10 @@
 import { SignOutIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { cn } from "@/helpers/classname-helper";
+import {
+	captureProductEvent,
+	resetProductUser,
+} from "@/helpers/posthog-helper";
 import db from "@/instant.client";
 
 type SignOutButtonProps = {
@@ -20,7 +24,9 @@ export default function SignOutButton({ className }: SignOutButtonProps) {
 		setIsSigningOut(true);
 
 		try {
+			captureProductEvent("signed_out");
 			await db.auth.signOut();
+			resetProductUser();
 		} catch (error) {
 			console.error("Failed to sign out", {
 				error: error instanceof Error ? error.message : String(error),

@@ -43,6 +43,14 @@ ngrok exposes:
 
 Set `NEXT_PUBLIC_API_URL` in `apps/web-app/.env.local` to the API URL (see `.env.example`). Both Next.js apps allow ngrok origins in dev via `allowedDevOrigins` in each `next.config.js`.
 
+To enable PostHog web and product analytics, set these variables for both
+`apps/website` and `apps/web-app`:
+
+```sh
+NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+```
+
 To enable Vercel-style GitHub repository selection, create a GitHub App with
 setup URL `https://app.interface.ngrok.pro/api/github/app/install/callback` in
 dev and set these variables in `apps/web-app/.env.local`:

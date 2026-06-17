@@ -9,6 +9,7 @@ import { Input } from "@/components/Input";
 import Logo from "@/components/Logo";
 import SignOutButton from "@/components/SignOutButton";
 import { getRememberedWorkspace } from "@/helpers/last-workspace-helper";
+import { captureProductEvent } from "@/helpers/posthog-helper";
 import db from "@/instant.client";
 import CornerBrackets from "../components/CornerBrackets";
 
@@ -70,6 +71,10 @@ export default function HomePage() {
 		]);
 
 		const nextHandle = workspaceHandle;
+		captureProductEvent("workspace_created", {
+			workspace_id: workspaceId,
+			workspace_handle: nextHandle,
+		});
 		setWorkspaceName("");
 		setWorkspaceHandle("");
 		router.push(`/${nextHandle}`);
