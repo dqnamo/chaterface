@@ -81,7 +81,7 @@ const featureCards = [
 	},
 ];
 
-const waitlistCalLink = "dqnamo";
+const waitlistCalLink = "interface.london/30min";
 const waitlistCalNamespace = "waitlist";
 const waitlistCalUrl = `https://cal.com/${waitlistCalLink}`;
 const waitlistCalConfig = JSON.stringify({ layout: "month_view" });
