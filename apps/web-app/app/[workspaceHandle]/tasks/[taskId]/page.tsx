@@ -1365,7 +1365,7 @@ export default function TaskPage() {
 				</ScrollArea.Root>
 				<div className="flex shrink-0 flex-col px-2">
 					<div className="bg-grayscale-2 dark:bg-grayscale-2 px-1.5 pt-1.5 border border-grayscale-3 rounded-t-xl max-w-3xl mx-auto w-full">
-						<div className="flex flex-col gap-2 bg-grayscale-1 dark:bg-grayscale-3 rounded-t-lg overflow-hidden border border-grayscale-3 dark:border-grayscale-5">
+						<div className="flex flex-col gap-2 rounded-t-lg border border-grayscale-3 bg-grayscale-1 dark:border-grayscale-5 dark:bg-grayscale-3">
 							<fieldset
 								aria-label="Task message composer"
 								className={cn(
