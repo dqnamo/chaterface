@@ -6,6 +6,7 @@ settings:
 
 overrides:
   '@opentelemetry/core': 2.8.0
+  '@instantdb/admin@1.0.43>cookie': 1.1.1
   cookie: 0.7.2
   dompurify: 3.4.9
   hono: 4.12.25
@@ -1920,6 +1921,10 @@ packages:
   cookie@0.7.2:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
     engines: {node: '>= 0.6'}
+
+  cookie@1.1.1:
+    resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
+    engines: {node: '>=18'}
 
   core-js@3.49.0:
     resolution: {integrity: sha512-es1U2+YTtzpwkxVLwAFdSpaIMyQaq0PBgm3YD1W3Qpsn1NAmO3KSgZfu+oGSWVu6NvLHoHCV/aYcsE5wiB7ALg==}
@@ -4315,7 +4320,7 @@ snapshots:
       '@instantdb/eventsource': 4.1.0-2
       '@instantdb/version': 1.0.43
       '@instantdb/webhooks': 1.0.43
-      cookie: 0.7.2
+      cookie: 1.1.1
       uuid: 11.1.1
 
   '@instantdb/core@1.0.43':
@@ -5319,6 +5324,8 @@ snapshots:
   cookie-signature@1.2.2: {}
 
   cookie@0.7.2: {}
+
+  cookie@1.1.1: {}
 
   core-js@3.49.0: {}
 
