@@ -391,32 +391,32 @@ function HolographicSticker() {
 		>
 			<HolographicFoil
 				aria-label="Interactive holographic Interface Company of London sticker"
-				className="group h-40 w-72 cursor-pointer rounded-xl shadow-sm sm:h-44 sm:w-80"
+				className="group h-36 w-72 cursor-pointer rounded-xl shadow-sm sm:h-40 sm:w-80"
 				role="img"
 			>
-				<div className="flex h-full flex-col">
-					<div className="flex h-10 items-center justify-start p-3">
+				<div className="relative h-full">
+					<div className="absolute top-0 left-0 flex h-10 items-center justify-start p-3">
 						<p className="font-mono font-semibold text-[10px] text-grayscale-8 leading-none uppercase">
 							A product by
 						</p>
 					</div>
 					<div
-						className={`${arvo.className} flex h-full w-full flex-col items-center justify-center gap-px text-center text-grayscale-12 leading-none uppercase`}
+						className={`${arvo.className} absolute bottom-6 left-5 flex flex-col items-start gap-px text-left text-grayscale-12 leading-none uppercase sm:left-6`}
 					>
-						<span className="mb-px font-medium text-grayscale-9 text-xs leading-none transition-colors duration-200 group-hover:text-grayscale-11">
+						<span className="mb-px font-medium text-grayscale-9 text-[11px] leading-none transition-colors duration-200 group-hover:text-grayscale-11">
 							THE
 						</span>
-						<span className="font-medium text-grayscale-11 text-xl leading-none transition-colors duration-200 group-hover:text-grayscale-12">
+						<span className="font-medium text-grayscale-11 text-lg leading-none transition-colors duration-200 group-hover:text-grayscale-12">
 							INTERFACE
 						</span>
-						<span className="font-medium text-grayscale-11 text-xl leading-none transition-colors duration-200 group-hover:text-grayscale-12">
+						<span className="font-medium text-grayscale-11 text-lg leading-none transition-colors duration-200 group-hover:text-grayscale-12">
 							COMPANY
 						</span>
-						<span className="mt-px font-medium text-grayscale-9 text-xs leading-none transition-colors duration-200 group-hover:text-grayscale-11">
+						<span className="mt-px font-medium text-grayscale-9 text-[11px] leading-none transition-colors duration-200 group-hover:text-grayscale-11">
 							OF LONDON
 						</span>
 					</div>
-					<div className="flex h-10 items-center justify-end p-3">
+					<div className="absolute right-0 bottom-0 flex h-10 items-center justify-end p-3">
 						<div className="flex size-5 items-center justify-center rounded-full bg-grayscale-7/30 transition-colors duration-200 group-hover:bg-accent-9">
 							<ArrowRightIcon
 								className="size-3 text-grayscale-11 transition-colors duration-200 group-hover:text-grayscale-1"
