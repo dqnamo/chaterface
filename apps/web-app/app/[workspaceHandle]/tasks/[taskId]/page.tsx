@@ -632,6 +632,9 @@ export default function TaskPage() {
 				},
 			},
 			agent: {},
+			workspaceAgent: {
+				agent: {},
+			},
 			agentSessions: {
 				agent: {},
 			},
@@ -695,11 +698,15 @@ export default function TaskPage() {
 	const selectedAgentSession =
 		agentSessions.find((session) => session.id === selectedAgentSessionId) ??
 		agentSessions[0];
-	const taskAgentId = getEntityId(task?.agent);
+	const taskAgentId =
+		getEntityId(task?.workspaceAgent?.agent) ?? getEntityId(task?.agent);
 	const selectedAgentId =
 		getEntityId(selectedAgentSession?.agent) ?? taskAgentId;
 	const selectedAgentName =
-		selectedAgentSession?.agent?.name ?? task?.agent?.name ?? undefined;
+		selectedAgentSession?.agent?.name ??
+		task?.workspaceAgent?.name ??
+		task?.agent?.name ??
+		undefined;
 	const selectedAgentItems = selectedAgentId
 		? [{ value: selectedAgentId, label: selectedAgentName ?? "Agent" }]
 		: [];
@@ -1013,8 +1020,8 @@ export default function TaskPage() {
 			throw new Error("Task is not loaded");
 		}
 
-		const rawAgentId = asJsonRecord(task.agent)?.id;
-		const agentId = typeof rawAgentId === "string" ? rawAgentId : undefined;
+		const agentId =
+			getEntityId(task.workspaceAgent?.agent) ?? getEntityId(task.agent);
 		const agentSessionId = id();
 		const createdAt = DateTime.now().toISO();
 

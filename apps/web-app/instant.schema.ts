@@ -156,6 +156,12 @@ const _schema = i.schema({
 			status: i.string().optional(),
 			sandboxId: i.string().optional(),
 		}),
+		workspaceAgents: i.entity({
+			name: i.string().indexed(),
+			createdAt: i.date().optional(),
+			settings: i.json().optional(),
+			status: i.string().optional(),
+		}),
 		agentSessions: i.entity({
 			name: i.string().indexed(),
 			status: i.string().optional(),
@@ -348,6 +354,18 @@ const _schema = i.schema({
 				on: "agents",
 				has: "many",
 				label: "agentSessions",
+			},
+		},
+		taskWorkspaceAgent: {
+			forward: {
+				on: "tasks",
+				has: "one",
+				label: "workspaceAgent",
+			},
+			reverse: {
+				on: "workspaceAgents",
+				has: "many",
+				label: "tasks",
 			},
 		},
 		agentTerminalSessions: {
@@ -613,6 +631,32 @@ const _schema = i.schema({
 				on: "agents",
 				has: "one",
 				label: "workspace",
+			},
+		},
+		workspaceWorkspaceAgents: {
+			forward: {
+				on: "workspaces",
+				has: "many",
+				label: "workspaceAgents",
+			},
+			reverse: {
+				on: "workspaceAgents",
+				has: "one",
+				label: "workspace",
+				onDelete: "cascade",
+			},
+		},
+		agentWorkspaceAgents: {
+			forward: {
+				on: "agents",
+				has: "many",
+				label: "workspaceAgents",
+			},
+			reverse: {
+				on: "workspaceAgents",
+				has: "one",
+				label: "agent",
+				onDelete: "cascade",
 			},
 		},
 		workspaceIntegrationConnections: {

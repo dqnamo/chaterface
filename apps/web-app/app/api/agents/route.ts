@@ -26,6 +26,18 @@ const agentTx = (agentId: string) => {
 	return tx;
 };
 
+const workspaceAgentTx = (workspaceAgentId: string) => {
+	const tx = db.tx.workspaceAgents[workspaceAgentId];
+
+	if (!tx) {
+		throw new Error(
+			`Workspace agent transaction builder ${workspaceAgentId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 export async function POST(req: NextRequest) {
 	const body = await readJson(req);
 	const workspaceId = getNonEmptyString(body.workspaceId);
@@ -52,10 +64,12 @@ export async function POST(req: NextRequest) {
 	}
 
 	const agentId = id();
+	const workspaceAgentId = id();
 	const createdAt = new Date().toISOString();
 	const providerAccountId = getAgentAuthProviderAccountId(provider, body.auth);
+	const settings = getAgentSettings(body.settings);
 
-	await db.transact(
+	await db.transact([
 		agentTx(agentId)
 			.create({
 				name,
@@ -64,13 +78,23 @@ export async function POST(req: NextRequest) {
 				createdAt,
 				status: "ready",
 				auth: await encryptAgentAuth(body.auth),
-				settings: getAgentSettings(body.settings),
+				settings,
+			})
+			.link({
+				creator: authResult.user.id,
+			}),
+		workspaceAgentTx(workspaceAgentId)
+			.create({
+				name,
+				createdAt,
+				status: "ready",
+				settings,
 			})
 			.link({
 				workspace: authResult.workspace.id,
-				creator: authResult.user.id,
+				agent: agentId,
 			}),
-	);
+	]);
 
 	return NextResponse.json(
 		{
@@ -78,6 +102,12 @@ export async function POST(req: NextRequest) {
 				id: agentId,
 				name,
 				provider,
+				createdAt,
+				status: "ready",
+			},
+			workspaceAgent: {
+				id: workspaceAgentId,
+				name,
 				createdAt,
 				status: "ready",
 			},

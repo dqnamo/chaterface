@@ -22,6 +22,18 @@ const agentTx = (agentId: string) => {
 	return tx;
 };
 
+const workspaceAgentTx = (workspaceAgentId: string) => {
+	const tx = db.tx.workspaceAgents[workspaceAgentId];
+
+	if (!tx) {
+		throw new Error(
+			`Workspace agent transaction builder ${workspaceAgentId} not found`,
+		);
+	}
+
+	return tx;
+};
+
 export async function POST(req: NextRequest) {
 	const body = await readJson(req);
 	const workspaceId = getNonEmptyString(body.workspaceId);
@@ -40,9 +52,11 @@ export async function POST(req: NextRequest) {
 	}
 
 	const agentId = id();
+	const workspaceAgentId = id();
 	const createdAt = new Date().toISOString();
+	const settings = getAgentSettings(body.settings);
 
-	await db.transact(
+	await db.transact([
 		agentTx(agentId)
 			.create({
 				name,
@@ -54,13 +68,23 @@ export async function POST(req: NextRequest) {
 					status: "queued",
 					queuedAt: createdAt,
 				},
-				settings: getAgentSettings(body.settings),
+				settings,
+			})
+			.link({
+				creator: authResult.user.id,
+			}),
+		workspaceAgentTx(workspaceAgentId)
+			.create({
+				name,
+				createdAt,
+				status: "auth_queued",
+				settings,
 			})
 			.link({
 				workspace: authResult.workspace.id,
-				creator: authResult.user.id,
+				agent: agentId,
 			}),
-	);
+	]);
 
 	try {
 		const handle = await tasks.trigger<typeof startCodexDeviceAuthTask>(
@@ -89,6 +113,12 @@ export async function POST(req: NextRequest) {
 					id: agentId,
 					name,
 					provider: "codex",
+					createdAt,
+					status: "auth_queued",
+				},
+				workspaceAgent: {
+					id: workspaceAgentId,
+					name,
 					createdAt,
 					status: "auth_queued",
 				},

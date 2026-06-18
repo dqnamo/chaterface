@@ -1,8 +1,9 @@
 "use client";
 
-import type { InstaQLEntity } from "@instantdb/react";
+import { type InstaQLEntity, id } from "@instantdb/react";
 import {
 	ArrowSquareOutIcon,
+	DownloadSimpleIcon,
 	PlusIcon,
 	RobotIcon,
 	TrashIcon,
@@ -28,6 +29,16 @@ import db from "@/instant.client";
 import type { AppSchema } from "@/instant.schema";
 
 type Agent = InstaQLEntity<AppSchema, "agents">;
+type WorkspaceAgent = InstaQLEntity<AppSchema, "workspaceAgents"> & {
+	agent?: Agent;
+};
+type WorkspaceSummary = Pick<
+	InstaQLEntity<AppSchema, "workspaces">,
+	"id" | "handle" | "name"
+>;
+type ImportableAgent = Agent & {
+	workspaceAgents?: Array<WorkspaceAgent & { workspace?: WorkspaceSummary }>;
+};
 type AgentProvider = "codex" | "cursor";
 type CodexDeviceAuth = {
 	verificationUri: string;
@@ -52,11 +63,13 @@ const PROVIDERS: {
 	},
 ];
 
-const agentTx = (agentId: string) => {
-	const tx = db.tx.agents[agentId];
+const workspaceAgentTx = (workspaceAgentId: string) => {
+	const tx = db.tx.workspaceAgents[workspaceAgentId];
 
 	if (!tx) {
-		throw new Error(`Agent transaction builder ${agentId} not found`);
+		throw new Error(
+			`Workspace agent transaction builder ${workspaceAgentId} not found`,
+		);
 	}
 
 	return tx;
@@ -72,7 +85,8 @@ export default function AgentsPage() {
 	const [name, setName] = useState("");
 	const [provider, setProvider] = useState<AgentProvider>("codex");
 	const [cursorApiKey, setCursorApiKey] = useState("");
-	const [pendingCodexAgentId, setPendingCodexAgentId] = useState<string>();
+	const [pendingCodexWorkspaceAgentId, setPendingCodexWorkspaceAgentId] =
+		useState<string>();
 	const [codexDeviceAuth, setCodexDeviceAuth] = useState<CodexDeviceAuth>();
 	const [codexAuthStatus, setCodexAuthStatus] = useState<string>();
 	const [codexAuthOutput, setCodexAuthOutput] = useState<string>();
@@ -84,6 +98,10 @@ export default function AgentsPage() {
 	);
 	const [agentSpeed, setAgentSpeed] = useState(DEFAULT_CODEX_SPEED);
 	const [formError, setFormError] = useState<string>();
+	const [importingAgentIds, setImportingAgentIds] = useState(
+		() => new Set<string>(),
+	);
+	const [importStatus, setImportStatus] = useState<string>();
 
 	const { data, isLoading, error } = db.useQuery({
 		workspaces: {
@@ -92,45 +110,101 @@ export default function AgentsPage() {
 					handle: currentWorkspaceHandle,
 				},
 			},
-			agents: {
+			workspaceAgents: {
 				$: {
-					fields: [
-						"name",
-						"authState",
-						"createdAt",
-						"provider",
-						"providerAccountId",
-						"settings",
-						"status",
-					],
+					fields: ["name", "createdAt", "settings", "status"],
+				},
+				agent: {
+					$: {
+						fields: [
+							"name",
+							"authState",
+							"createdAt",
+							"provider",
+							"providerAccountId",
+							"settings",
+							"status",
+						],
+					},
 				},
 			},
 		},
 	});
+	const { data: createdAgentsData, isLoading: isLoadingCreatedAgents } =
+		db.useQuery({
+			$users: {
+				$: {
+					where: {
+						id: user?.id ?? "__missing_user__",
+					},
+				},
+				createdAgents: {
+					$: {
+						fields: [
+							"name",
+							"createdAt",
+							"provider",
+							"providerAccountId",
+							"settings",
+							"status",
+						],
+					},
+					workspaceAgents: {
+						$: {
+							fields: ["name", "settings"],
+						},
+						workspace: {
+							$: {
+								fields: ["name", "handle"],
+							},
+						},
+					},
+				},
+			},
+		});
 
 	const workspace = data?.workspaces?.[0];
 	const agents = useMemo(
 		() =>
-			[...(workspace?.agents ?? [])].sort(
+			[
+				...((workspace?.workspaceAgents as WorkspaceAgent[] | undefined) ?? []),
+			].sort(
 				(firstAgent, secondAgent) =>
 					new Date(secondAgent.createdAt ?? 0).getTime() -
 					new Date(firstAgent.createdAt ?? 0).getTime(),
 			),
-		[workspace?.agents],
+		[workspace?.workspaceAgents],
+	);
+	const importableAgents = useMemo(
+		() =>
+			getImportableAgents({
+				currentAgents: agents,
+				createdAgents:
+					(createdAgentsData?.$users?.[0]?.createdAgents as
+						| ImportableAgent[]
+						| undefined) ?? [],
+			}),
+		[agents, createdAgentsData?.$users],
 	);
 	const selectedProvider = PROVIDERS.find((item) => item.value === provider);
-	const pendingCodexAgent = pendingCodexAgentId
-		? agents.find((agent) => agent.id === pendingCodexAgentId)
+	const pendingCodexWorkspaceAgent = pendingCodexWorkspaceAgentId
+		? agents.find((agent) => agent.id === pendingCodexWorkspaceAgentId)
 		: undefined;
 
 	useEffect(() => {
-		if (!pendingCodexAgentId) {
+		if (!pendingCodexWorkspaceAgentId) {
 			return;
 		}
 
-		const deviceAuth = getCodexDeviceAuth(pendingCodexAgent?.authState);
-		const authStatus = getCodexAuthStatus(pendingCodexAgent?.authState);
-		const authOutput = getCodexAuthOutput(pendingCodexAgent?.authState);
+		const deviceAuth = getCodexDeviceAuth(
+			pendingCodexWorkspaceAgent?.agent?.authState,
+		);
+		const authStatus = getCodexAuthStatus(
+			pendingCodexWorkspaceAgent?.agent?.authState,
+		);
+		const authOutput = getCodexAuthOutput(
+			pendingCodexWorkspaceAgent?.agent?.authState,
+		);
 
 		if (authOutput) {
 			setCodexAuthOutput(authOutput);
@@ -141,7 +215,10 @@ export default function AgentsPage() {
 			setFormError(undefined);
 		}
 
-		if (pendingCodexAgent?.status === "ready" || authStatus === "completed") {
+		if (
+			pendingCodexWorkspaceAgent?.agent?.status === "ready" ||
+			authStatus === "completed"
+		) {
 			setCodexAuthStatus("completed");
 			setFormError(undefined);
 			return;
@@ -151,15 +228,17 @@ export default function AgentsPage() {
 			setCodexAuthStatus(authStatus);
 		}
 
-		const authError = getCodexAuthError(pendingCodexAgent?.authState);
+		const authError = getCodexAuthError(
+			pendingCodexWorkspaceAgent?.agent?.authState,
+		);
 
 		if (authError) {
 			setFormError(authError);
 		}
 	}, [
-		pendingCodexAgentId,
-		pendingCodexAgent?.authState,
-		pendingCodexAgent?.status,
+		pendingCodexWorkspaceAgentId,
+		pendingCodexWorkspaceAgent?.agent?.authState,
+		pendingCodexWorkspaceAgent?.agent?.status,
 	]);
 
 	const createAgent = async () => {
@@ -176,7 +255,7 @@ export default function AgentsPage() {
 		}
 
 		if (provider === "codex") {
-			if (pendingCodexAgentId) {
+			if (pendingCodexWorkspaceAgentId) {
 				setCodexAuthModalOpen(true);
 				return;
 			}
@@ -241,7 +320,7 @@ export default function AgentsPage() {
 			return;
 		}
 
-		setPendingCodexAgentId(undefined);
+		setPendingCodexWorkspaceAgentId(undefined);
 		setCodexDeviceAuth(undefined);
 		setCodexAuthOutput(undefined);
 		setCodexAuthStatus("queued");
@@ -268,6 +347,7 @@ export default function AgentsPage() {
 
 			const body = (await response.json().catch(() => ({}))) as {
 				agent?: { id?: unknown };
+				workspaceAgent?: { id?: unknown };
 				message?: unknown;
 			};
 
@@ -280,12 +360,12 @@ export default function AgentsPage() {
 				return;
 			}
 
-			if (typeof body.agent?.id !== "string") {
+			if (typeof body.workspaceAgent?.id !== "string") {
 				setFormError("Codex device auth response was incomplete.");
 				return;
 			}
 
-			setPendingCodexAgentId(body.agent.id);
+			setPendingCodexWorkspaceAgentId(body.workspaceAgent.id);
 		} catch (error) {
 			setFormError(
 				error instanceof Error
@@ -302,7 +382,7 @@ export default function AgentsPage() {
 
 		if (codexAuthStatus === "completed" || codexAuthStatus === "failed") {
 			setName("");
-			setPendingCodexAgentId(undefined);
+			setPendingCodexWorkspaceAgentId(undefined);
 			setCodexDeviceAuth(undefined);
 			setCodexAuthOutput(undefined);
 			setCodexAuthStatus(undefined);
@@ -310,22 +390,62 @@ export default function AgentsPage() {
 		}
 	};
 
-	const deleteAgent = async (agent: Agent) => {
-		await db.transact(agentTx(agent.id).delete());
+	const deleteAgent = async (agent: WorkspaceAgent) => {
+		await db.transact(workspaceAgentTx(agent.id).delete());
 	};
 
 	const updateAgentDefaults = async (
-		agent: Agent,
+		agent: WorkspaceAgent,
 		defaults: Partial<AgentDefaultOptions>,
 	) => {
 		await db.transact(
-			agentTx(agent.id).update({
+			workspaceAgentTx(agent.id).update({
 				settings: {
 					...getAgentSettingsRecord(agent.settings),
 					...defaults,
 				},
 			}),
 		);
+	};
+
+	const importAgent = async (agent: ImportableAgent) => {
+		if (!workspace || !user?.refresh_token) {
+			setImportStatus("You must be signed in to import an agent.");
+			return;
+		}
+
+		setImportStatus(undefined);
+		setImportingAgentIds((current) => new Set(current).add(agent.id));
+
+		try {
+			const workspaceAgentId = id();
+
+			await db.transact(
+				workspaceAgentTx(workspaceAgentId)
+					.create({
+						name: agent.name,
+						createdAt: new Date().toISOString(),
+						status: agent.status ?? "ready",
+						settings: getAgentSettingsRecord(agent.settings),
+					})
+					.link({
+						workspace: workspace.id,
+						agent: agent.id,
+					}),
+			);
+
+			setImportStatus("Agent imported.");
+		} catch (error) {
+			setImportStatus(
+				error instanceof Error ? error.message : "Failed to import agent.",
+			);
+		} finally {
+			setImportingAgentIds((current) => {
+				const next = new Set(current);
+				next.delete(agent.id);
+				return next;
+			});
+		}
 	};
 
 	return (
@@ -379,6 +499,46 @@ export default function AgentsPage() {
 					)}
 				</div>
 			</section>
+
+			{isLoadingCreatedAgents || importableAgents.length > 0 ? (
+				<section className="relative border border-grayscale-4 bg-grayscale-1">
+					<CornerBrackets
+						placement="outside"
+						spacing={3}
+						translate={12}
+						size={6}
+						color="var(--color-grayscale-6)"
+						active={true}
+					/>
+					<div className="border-b border-grayscale-4 p-3">
+						<div className="flex items-center gap-2 text-sm font-medium text-grayscale-12">
+							<DownloadSimpleIcon weight="bold" className="size-4" />
+							Import Your Agents
+						</div>
+					</div>
+					<div className="flex flex-col divide-y divide-grayscale-4">
+						{isLoadingCreatedAgents ? (
+							<p className="p-3 text-sm text-grayscale-10">
+								Loading your agents...
+							</p>
+						) : (
+							importableAgents.map((agent) => (
+								<ImportableAgentListItem
+									key={agent.id}
+									agent={agent}
+									isImporting={importingAgentIds.has(agent.id)}
+									onImport={importAgent}
+								/>
+							))
+						)}
+					</div>
+					{importStatus ? (
+						<div className="border-t border-grayscale-4 p-3 text-xs text-grayscale-10">
+							{importStatus}
+						</div>
+					) : null}
+				</section>
+			) : null}
 
 			<section className="relative border border-grayscale-4 bg-grayscale-1">
 				<CornerBrackets
@@ -485,7 +645,7 @@ export default function AgentsPage() {
 							{provider === "codex"
 								? isStartingCodexAuth
 									? "Starting..."
-									: pendingCodexAgentId
+									: pendingCodexWorkspaceAgentId
 										? "Show Codex Auth"
 										: "Start Codex Auth"
 								: "Create Agent"}
@@ -567,6 +727,44 @@ const getCodexAuthOutput = (authState: unknown) => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getImportableAgents = ({
+	currentAgents,
+	createdAgents,
+}: {
+	currentAgents: WorkspaceAgent[];
+	createdAgents: ImportableAgent[];
+}) => {
+	const currentImportKeys = new Set(
+		currentAgents.flatMap((agent) =>
+			agent.agent ? getAgentImportKeys(agent.agent) : [],
+		),
+	);
+
+	return createdAgents
+		.filter(
+			(agent) =>
+				agent.status === "ready" &&
+				!getAgentImportKeys(agent).some((key) => currentImportKeys.has(key)),
+		)
+		.sort(
+			(firstAgent, secondAgent) =>
+				new Date(secondAgent.createdAt ?? 0).getTime() -
+				new Date(firstAgent.createdAt ?? 0).getTime(),
+		);
+};
+
+const getAgentImportKeys = (agent: Agent) => {
+	const keys = [`agent:${agent.id}`];
+
+	if (agent.provider !== "cursor" && agent.providerAccountId) {
+		keys.push(
+			`provider:${agent.provider ?? "codex"}:${agent.providerAccountId}`,
+		);
+	}
+
+	return keys;
+};
 
 function CodexDeviceAuthDialog({
 	open,
@@ -694,14 +892,15 @@ function AgentListItem({
 	onDelete,
 	onDefaultsChange,
 }: {
-	agent: Agent;
-	onDelete: (agent: Agent) => Promise<void>;
+	agent: WorkspaceAgent;
+	onDelete: (agent: WorkspaceAgent) => Promise<void>;
 	onDefaultsChange: (
-		agent: Agent,
+		agent: WorkspaceAgent,
 		defaults: Partial<AgentDefaultOptions>,
 	) => Promise<void>;
 }) {
 	const defaults = getAgentDefaultOptions(agent.settings);
+	const linkedAgent = agent.agent;
 
 	return (
 		<div className="grid gap-3 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -712,14 +911,14 @@ function AgentListItem({
 							{agent.name}
 						</p>
 						<span className="shrink-0 bg-grayscale-2 px-1.5 py-0.5 font-mono text-[10px] text-grayscale-10 uppercase">
-							{getProviderLabel(agent.provider)}
+							{getProviderLabel(linkedAgent?.provider)}
 						</span>
 					</div>
 					<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-grayscale-10">
-						<span>{agent.status ?? "idle"}</span>
-						{agent.providerAccountId ? (
+						<span>{linkedAgent?.status ?? agent.status ?? "idle"}</span>
+						{linkedAgent?.providerAccountId ? (
 							<span className="min-w-0 truncate font-mono">
-								Account {agent.providerAccountId}
+								Account {linkedAgent.providerAccountId}
 							</span>
 						) : null}
 					</div>
@@ -755,6 +954,54 @@ function AgentListItem({
 				<TrashIcon weight="bold" className="size-3.5" />
 				Delete
 			</button>
+		</div>
+	);
+}
+
+function ImportableAgentListItem({
+	agent,
+	isImporting,
+	onImport,
+}: {
+	agent: ImportableAgent;
+	isImporting: boolean;
+	onImport: (agent: ImportableAgent) => Promise<void>;
+}) {
+	const defaults = getAgentDefaultOptions(agent.settings);
+	const sourceWorkspace = agent.workspaceAgents?.find(
+		(workspaceAgent) => workspaceAgent.workspace,
+	)?.workspace;
+
+	return (
+		<div className="grid gap-3 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+			<div className="flex min-w-0 flex-col gap-1">
+				<div className="flex min-w-0 items-center gap-2">
+					<p className="truncate text-sm font-medium text-grayscale-12">
+						{agent.name}
+					</p>
+					<span className="shrink-0 bg-grayscale-2 px-1.5 py-0.5 font-mono text-[10px] text-grayscale-10 uppercase">
+						{getProviderLabel(agent.provider)}
+					</span>
+				</div>
+				<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-grayscale-10">
+					{sourceWorkspace ? <span>{sourceWorkspace.name}</span> : null}
+					<span>
+						Defaults: reasoning {defaults.agentReasoningEffort}, speed{" "}
+						{defaults.agentSpeed}
+					</span>
+				</div>
+			</div>
+			<Button
+				type="button"
+				variant="secondary"
+				disabled={isImporting}
+				onClick={() => {
+					void onImport(agent);
+				}}
+			>
+				<DownloadSimpleIcon weight="bold" className="size-3.5" />
+				{isImporting ? "Importing..." : "Import"}
+			</Button>
 		</div>
 	);
 }

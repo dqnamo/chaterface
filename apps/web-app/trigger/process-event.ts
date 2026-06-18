@@ -30,6 +30,14 @@ import { syncAgentAuthFromSandbox } from "./sync-agent-auth";
 type Event = InstaQLEntity<AppSchema, "events">;
 type Task = InstaQLEntity<AppSchema, "tasks">;
 type Agent = InstaQLEntity<AppSchema, "agents">;
+type WorkspaceAgent = InstaQLEntity<AppSchema, "workspaceAgents"> & {
+	agent?: Agent;
+};
+type TaskWithAgent = Task & {
+	agent?: Agent;
+	workspaceAgent?: WorkspaceAgent;
+	workspace?: WorkspaceWithRepositories;
+};
 type AgentSession = InstaQLEntity<AppSchema, "agentSessions"> & {
 	agent?: Agent;
 };
@@ -52,6 +60,7 @@ type WorkspaceWithRepositories = Workspace & {
 	commands?: Command[];
 	sandboxPackages?: SandboxPackage[];
 	agents?: Agent[];
+	workspaceAgents?: WorkspaceAgent[];
 	integrationConnections?: IntegrationConnection[];
 };
 type WorkflowNode = {
@@ -376,6 +385,9 @@ export const processEventTask = task({
 					},
 					task: {
 						agent: {},
+						workspaceAgent: {
+							agent: {},
+						},
 						workspace: {
 							repositories: {},
 							environmentFiles: {},
@@ -384,6 +396,9 @@ export const processEventTask = task({
 							commands: {},
 							sandboxPackages: {},
 							agents: {},
+							workspaceAgents: {
+								agent: {},
+							},
 							integrationConnections: {},
 						},
 					},
@@ -391,8 +406,8 @@ export const processEventTask = task({
 			})
 			.then((result) => result.events?.[0]);
 
-		const task = event?.task;
-		const agent = task?.agent;
+		const task = event?.task as TaskWithAgent | undefined;
+		const agent = task?.workspaceAgent?.agent ?? task?.agent;
 		const workspace = task?.workspace;
 
 		if (!event || !task || !agent || !workspace) {
@@ -907,7 +922,11 @@ const continueWorkflowFromNode = async (
 	}
 
 	const requestedAgentId = getOptionalDataString(nextNode.data.agentId);
-	const agent = resolveWorkflowAgent(workspace, requestedAgentId);
+	const workspaceAgent = resolveWorkflowWorkspaceAgent(
+		workspace,
+		requestedAgentId,
+	);
+	const agent = workspaceAgent?.agent;
 
 	if (!agent) {
 		throw new Error(
@@ -925,7 +944,7 @@ const continueWorkflowFromNode = async (
 			workflowInput,
 		) ||
 			"Continue this workflow task.");
-	const agentDefaults = getAgentDefaultOptions(agent.settings);
+	const agentDefaults = getAgentDefaultOptions(workspaceAgent.settings);
 	const eventId = randomUUID();
 	const agentSession = await getOrCreateAgentSessionForStep(
 		task,
@@ -943,7 +962,7 @@ const continueWorkflowFromNode = async (
 				workflowState: "agent_running",
 				workflowNodeId: nextNode.id,
 			})
-			.link({ agent: agent.id }),
+			.link({ agent: agent.id, workspaceAgent: workspaceAgent.id }),
 		eventTx(eventId)
 			.create({
 				type: "chaterface.new_user_message",
@@ -956,6 +975,7 @@ const continueWorkflowFromNode = async (
 						input: workflowInput,
 						agentRunNodeId: nextNode.id,
 						agentId: agent.id,
+						workspaceAgentId: workspaceAgent.id,
 						sessionKey: getWorkflowSessionKey(nextNode),
 					},
 				},
@@ -978,7 +998,11 @@ const routeYesNoClassifierNode = async (
 ) => {
 	const workflowInput = getWorkflowInput(task.workflowInput);
 	const requestedAgentId = getOptionalDataString(classifierNode.data?.agentId);
-	const agent = resolveWorkflowAgent(workspace, requestedAgentId);
+	const workspaceAgent = resolveWorkflowWorkspaceAgent(
+		workspace,
+		requestedAgentId,
+	);
+	const agent = workspaceAgent?.agent;
 
 	if (!agent) {
 		throw new Error(
@@ -1026,7 +1050,7 @@ const routeYesNoClassifierNode = async (
 				workflowNodeId: classifierNode.id,
 				workflowInput: nextWorkflowInput,
 			})
-			.link({ agent: agent.id }),
+			.link({ agent: agent.id, workspaceAgent: workspaceAgent.id }),
 	);
 
 	task.workflowInput = nextWorkflowInput;
@@ -1036,6 +1060,7 @@ const routeYesNoClassifierNode = async (
 		taskId: task.id,
 		workflowNodeId: classifierNode.id,
 		agentId: agent.id,
+		workspaceAgentId: workspaceAgent.id,
 		answer: classification?.answer,
 		reason: classification?.reason,
 		prompt: renderedPrompt,
@@ -1660,12 +1685,17 @@ const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
 	(typeof value.source === "string" || value.source === undefined) &&
 	(typeof value.target === "string" || value.target === undefined);
 
-const resolveWorkflowAgent = (
+const resolveWorkflowWorkspaceAgent = (
 	workspace: WorkspaceWithRepositories,
 	agentId: string | undefined,
 ) => {
-	const agents = workspace.agents ?? [];
-	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
+	const workspaceAgents = workspace.workspaceAgents ?? [];
+	return agentId
+		? workspaceAgents.find(
+				(workspaceAgent) =>
+					workspaceAgent.id === agentId || workspaceAgent.agent?.id === agentId,
+			)
+		: workspaceAgents[0];
 };
 
 const resolveIntegrationConnection = (
