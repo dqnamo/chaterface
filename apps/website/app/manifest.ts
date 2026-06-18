@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
 	return {
-		name: "WorkspacePlane",
-		short_name: "WorkspacePlane",
+		name: "Chaterface",
+		short_name: "Chaterface",
 		description:
-			"Open source, collaborative software workspace running in the cloud using your existing codex agents.",
+			"Open source multiplayer cloud workspace for background agents.",
 		start_url: "/",
 		scope: "/",
 		display: "standalone",

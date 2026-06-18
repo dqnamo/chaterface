@@ -14,10 +14,12 @@ pnpm --filter web-app dev
 
 The app runs at <http://localhost:3001>.
 
-For the full local workflow with the API and ngrok tunnel, use the root command:
+For the web app plus API, run both services from the repository root in
+separate terminals:
 
 ```sh
-pnpm dev
+pnpm --filter web-app dev
+pnpm --filter api dev
 ```
 
 Run the Trigger.dev worker locally:
@@ -39,8 +41,9 @@ TRIGGER_PROJECT_REF=
 TRIGGER_SECRET_KEY=
 ```
 
-Use `NEXT_PUBLIC_API_URL=https://api.interface.ngrok.pro` when running the
-default ngrok workflow.
+Use `NEXT_PUBLIC_API_URL=http://localhost:3002` for normal local development.
+If you need a public URL for OAuth callbacks or webhooks, use your own tunnel
+and set `NEXT_PUBLIC_API_URL` to that API origin.
 
 Optional integrations include PostHog, GitHub App credentials,
 Slack OAuth/signing secrets, preview session settings, and Cloudflare email/API

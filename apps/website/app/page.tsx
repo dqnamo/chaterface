@@ -3,7 +3,6 @@ import {
 	CheckCircleIcon,
 	CornersOutIcon,
 	DesktopTowerIcon,
-	FadersIcon,
 	FileCodeIcon,
 	FilesIcon,
 	GithubLogoIcon,
@@ -11,7 +10,6 @@ import {
 	PaperclipIcon,
 	PlayCircleIcon,
 	PlugsConnectedIcon,
-	RocketLaunchIcon,
 	SidebarSimpleIcon,
 	TerminalWindowIcon,
 	TextboxIcon,
@@ -20,12 +18,12 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { Arvo } from "next/font/google";
-import Script from "next/script";
+import Image from "next/image";
+import { Footer } from "@/components/Footer";
 import { HolographicFoil } from "@/components/HolographicFoil";
 import Logo from "@/components/Logo";
 import MobileHeader from "@/components/MobileHeader";
 import Button from "@/components/public/Button";
-import Card from "@/components/public/Card";
 import PixelTrail from "@/components/public/PixelTrail";
 
 const arvo = Arvo({
@@ -36,8 +34,7 @@ const arvo = Arvo({
 export const metadata: Metadata = {
 	title: "Chaterface",
 	applicationName: "Chaterface",
-	description:
-		"Open source, collaborative software workspace running in the cloud using your existing codex agents.",
+	description: "Open source multiplayer cloud workspace for background agents.",
 	appleWebApp: {
 		title: "Chaterface",
 	},
@@ -46,91 +43,166 @@ export const metadata: Metadata = {
 const featureCards = [
 	{
 		description:
-			"Spin up a dedicated cloud worker for every prompt — including queued follow-ups and long-running jobs.",
-		icon: <RocketLaunchIcon size={18} weight="bold" />,
+			"Create tasks, add follow-up instructions, and keep the conversation, files, previews, and terminal output in one place.",
+		icon: <PlayCircleIcon size={18} weight="bold" />,
 		iconClassName: "text-accent-11",
-		title: "Cloud workers",
+		title: "Task workspace",
 	},
 	{
 		description:
-			"Invite supervisors into the same workspace so product, engineering, and ops can steer the work together.",
+			"Give product, engineering, and operations the same workspace so people can supervise agent work together.",
 		icon: <UsersThreeIcon size={18} weight="bold" />,
 		iconClassName: "text-green-11",
 		title: "Shared supervision",
 	},
 	{
 		description:
-			"Plug in MCP servers and external tools without rebuilding your agent environment from scratch.",
+			"Connect MCP servers and workspace tools so agents can use the same capabilities every time they run.",
 		icon: <PlugsConnectedIcon size={18} weight="bold" />,
 		iconClassName: "text-cyan-11",
-		title: "Tool integrations",
+		title: "MCP and tools",
 	},
 	{
 		description:
-			"Install reusable skills onto the workspace computer so the workflows you run again and again just work.",
+			"Install reusable skills, packages, and setup commands once at the workspace level instead of rebuilding context per task.",
 		icon: <FilesIcon size={18} weight="bold" />,
 		iconClassName: "text-orange-11",
-		title: "Skills library",
+		title: "Reusable setup",
 	},
 	{
 		description:
-			"Store secrets at the workspace level so every worker can use them securely.",
+			"Store encrypted workspace secrets for APIs, deployments, and integrations without pasting credentials into prompts.",
 		icon: <TextboxIcon size={18} weight="bold" />,
 		iconClassName: "text-crimson-11",
 		title: "Secret handling",
 	},
 	{
 		description:
-			"Point workers at your repos and Git credentials so their changes can land cleanly.",
+			"Connect GitHub repositories so agent changes can become branches, pull requests, and reviewable code.",
 		icon: <GithubLogoIcon size={18} weight="bold" />,
 		iconClassName: "text-grayscale-11",
-		title: "GitHub setup",
+		title: "Repository workflow",
 	},
 ];
 
-const waitlistCalLink = "interface.london/30min";
-const waitlistCalNamespace = "waitlist";
-const waitlistCalConfig = JSON.stringify({ layout: "month_view" });
+const techStackCards = [
+	{
+		description:
+			"Serves the public website and the authenticated workspace interface.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/nextjs.png"
+				width={20}
+			/>
+		),
+		title: "Next.js",
+	},
+	{
+		description:
+			"Runs the API that agent sandboxes call for files, tasks, services, and repositories.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/hono.svg"
+				width={20}
+			/>
+		),
+		title: "Hono",
+	},
+	{
+		description:
+			"Stores realtime workspace data for tasks, members, agents, secrets, and settings.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/instantdb.png"
+				width={20}
+			/>
+		),
+		title: "InstantDB",
+	},
+	{
+		description:
+			"Processes agent events, device auth, sandbox startup, and background task sync.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/trigger-dev.png"
+				width={20}
+			/>
+		),
+		title: "Trigger.dev",
+	},
+	{
+		description:
+			"Provides the isolated computers where Codex sessions run commands and edit repos.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/e2b.svg"
+				width={20}
+			/>
+		),
+		title: "E2B",
+	},
+	{
+		description:
+			"Styles the landing page, workspace shell, task view, settings, and preview UI.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/tailwind.png"
+				width={20}
+			/>
+		),
+		title: "Tailwind CSS",
+	},
+	{
+		description:
+			"Keeps shared app, API, database, and encryption code typed across the monorepo.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/typescript.svg"
+				width={20}
+			/>
+		),
+		title: "TypeScript",
+	},
+	{
+		description:
+			"Coordinates builds and checks across the website, web app, API, previews, and packages.",
+		logo: (
+			<Image
+				alt=""
+				className="size-5 object-contain"
+				height={20}
+				src="/logos/turborepo.svg"
+				width={20}
+			/>
+		),
+		title: "Turborepo",
+	},
+];
 
 export default function Home() {
 	return (
 		<main className="landing-page-colors relative isolate flex min-h-dvh w-full flex-col overflow-hidden bg-grayscale-1">
-			<Script id="cal-embed" strategy="afterInteractive">
-				{`
-					(function (C, A, L) {
-						let p = function (a, ar) { a.q.push(ar); };
-						let d = C.document;
-						C.Cal = C.Cal || function () {
-							let cal = C.Cal;
-							let ar = arguments;
-							if (!cal.loaded) {
-								cal.ns = {};
-								cal.q = cal.q || [];
-								d.head.appendChild(d.createElement("script")).src = A;
-								cal.loaded = true;
-							}
-							if (ar[0] === L) {
-								const api = function () { p(api, arguments); };
-								const namespace = ar[1];
-								api.q = api.q || [];
-								if (typeof namespace === "string") {
-									cal.ns[namespace] = cal.ns[namespace] || api;
-									p(cal.ns[namespace], ar);
-									p(cal, ["initNamespace", namespace]);
-								} else {
-									p(cal, ar);
-								}
-								return;
-							}
-							p(cal, ar);
-						};
-					})(window, "https://app.cal.com/embed/embed.js", "init");
-
-					Cal("init", "${waitlistCalNamespace}", { origin: "https://cal.com" });
-					Cal.ns.${waitlistCalNamespace}("ui", { theme: "light", layout: "month_view" });
-					Cal.ns.${waitlistCalNamespace}("preload", { calLink: "${waitlistCalLink}" });
-				`}
-			</Script>
 			<PixelTrail
 				className="pointer-events-auto absolute inset-0 z-0"
 				fadeDuration={650}
@@ -151,27 +223,31 @@ export default function Home() {
 									Chaterface
 								</p>
 							</div>
-							<p className="max-w-lg text-balance text-lg font-medium leading-6 text-grayscale-12 mt-8">
-								Open source, collaborative software workspace running in the
-								cloud using your existing codex agents.
+							<p className="max-w-lg text-balance text-2xl font-medium leading-8 text-grayscale-12 mt-8">
+								Open source multiplayer cloud workspace for background agents.
 							</p>
 							<p className="max-w-lg text-balance text-sm leading-6 text-grayscale-11 mt-1">
-								Spin up workers in the cloud, invite supervisors, and steer the
-								work together — all from one place.
+								Self-host tasks, agent sessions, previews, secrets, and pull
+								requests in one place.
 							</p>
 							<div className="mt-4 flex flex-row flex-wrap items-center gap-2">
-								<WaitlistButton className="text-xs" variant="primary">
-									<RocketLaunchIcon size={16} weight="bold" />
-									Join waitlist
-								</WaitlistButton>
 								<Button
 									className="text-xs"
 									href="https://github.com/dqnamo/chaterface"
 									target="_blank"
-									variant="secondary"
+									variant="primary"
 								>
 									<GithubLogoIcon size={16} weight="bold" />
-									GitHub repo
+									View on GitHub
+								</Button>
+								<Button
+									className="text-xs"
+									href="https://github.com/dqnamo/chaterface#quick-start"
+									target="_blank"
+									variant="secondary"
+								>
+									<TerminalWindowIcon size={16} weight="bold" />
+									Run locally
 								</Button>
 							</div>
 						</div>
@@ -183,197 +259,8 @@ export default function Home() {
 
 					<ChaterfaceDesktopPreview />
 					<FeatureGrid />
-
-					<div className="pointer-events-auto mt-8 flex flex-col gap-2">
-						<div className="flex flex-col gap-px p-2">
-							<h2 className="font-medium text-grayscale-12">Pricing & plans</h2>
-							<p className="text-sm text-grayscale-11">
-								Start with Builder for solo use, then move to Team when you need
-								more members and more concurrent workers.
-							</p>
-						</div>
-
-						<Card
-							layer={0}
-							className="grid grid-cols-1 gap-1.5 rounded-[16px] p-1.5 lg:grid-cols-3"
-						>
-							<Card
-								layer={0}
-								className="p-0 bg-grayscale-1 dark:bg-grayscale-3 dark:border-grayscale-5 rounded-[13px] small-shadow"
-							>
-								<div className="flex flex-col h-full">
-									<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
-										<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-											Open source
-										</p>
-									</div>
-									<div className="p-4">
-										<div className="flex flex-col">
-											<h3 className="text-lg font-medium text-grayscale-12">
-												Free
-											</h3>
-											<p className="text-xs text-grayscale-10">Forever</p>
-										</div>
-										<p className="text-sm text-grayscale-10 mt-4">
-											Run it yourself on your own infrastructure.
-										</p>
-									</div>
-									<div className="flex flex-row p-2 mt-auto w-full">
-										<Button
-											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-											href="https://github.com/dqnamo/chaterface"
-											target="_blank"
-											variant="secondary"
-										>
-											View on GitHub
-											<ArrowRightIcon size={14} weight="bold" />
-										</Button>
-									</div>
-								</div>
-							</Card>
-							<Card
-								layer={0}
-								className="grid grid-cols-1 divide-y divide-grayscale-3 rounded-[13px] bg-grayscale-1 p-0 small-shadow dark:divide-grayscale-4 dark:border-grayscale-5 dark:bg-grayscale-3 md:grid-cols-2 md:divide-x md:divide-y-0 lg:col-span-2"
-							>
-								<div className="flex flex-col">
-									<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
-										<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-											Builder
-										</p>
-									</div>
-									<div className="p-4">
-										<div className="flex flex-col">
-											<h3 className="text-lg font-medium text-grayscale-12">
-												Free
-											</h3>
-											<p className="text-xs text-grayscale-10">Forever</p>
-										</div>
-
-										<div className="flex flex-col mt-4 w-full gap-1">
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">
-													Bring your own agents
-												</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9"
-												/>
-											</div>
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">1 member</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9"
-												/>
-											</div>
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">
-													100 tasks/month
-												</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9 "
-												/>
-											</div>
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">
-													3 concurrent workers
-												</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9 "
-												/>
-											</div>
-										</div>
-									</div>
-									<div className="flex flex-row p-2 w-full mt-auto">
-										<WaitlistButton
-											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-											variant="secondary"
-										>
-											Join waitlist
-											<ArrowRightIcon size={14} weight="bold" />
-										</WaitlistButton>
-									</div>
-								</div>
-
-								<div className="flex flex-col">
-									<div className="p-2 px-4 border-b border-grayscale-3 dark:border-grayscale-4">
-										<p className="text-tiny font-mono uppercase tracking-wide font-bold text-grayscale-9">
-											Team
-										</p>
-									</div>
-									<div className="p-4">
-										<div className="flex flex-col">
-											<h3 className="text-lg font-medium text-grayscale-12">
-												US$50
-											</h3>
-											<p className="text-xs text-grayscale-10">
-												Per member/month
-											</p>
-										</div>
-
-										<div className="flex flex-col mt-4 w-full gap-1">
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">
-													Bring your own agents
-												</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9"
-												/>
-											</div>
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">
-													Unlimited members
-												</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9"
-												/>
-											</div>
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">
-													Unlimited tasks
-												</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9"
-												/>
-											</div>
-											<div className="flex flex-row items-center justify-between">
-												<p className="text-sm text-grayscale-10">
-													25 concurrent workers
-												</p>
-												<CheckCircleIcon
-													size={14}
-													weight="fill"
-													className="text-accent-9"
-												/>
-											</div>
-										</div>
-									</div>
-
-									<div className="flex flex-row p-2 w-full mt-auto">
-										<WaitlistButton
-											className="text-xs px-2 w-full flex flex-row items-center justify-between dark:bg-grayscale-6 dark:border-grayscale-7 dark:hover:bg-grayscale-7 dark:hover:border-grayscale-8"
-											variant="secondary"
-										>
-											Join waitlist
-											<ArrowRightIcon size={14} weight="bold" />
-										</WaitlistButton>
-									</div>
-								</div>
-							</Card>
-						</Card>
-					</div>
+					<TechStackSection />
+					<Footer className="pointer-events-auto mt-10 p-2" />
 				</div>
 			</div>
 		</main>
@@ -430,28 +317,6 @@ function HolographicSticker() {
 	);
 }
 
-function WaitlistButton({
-	children,
-	...props
-}: {
-	children: React.ReactNode;
-	className?: string;
-	shortcut?: string;
-	variant?: "primary" | "secondary";
-} & Omit<React.ComponentPropsWithoutRef<"button">, "type">) {
-	return (
-		<Button
-			{...props}
-			data-cal-config={waitlistCalConfig}
-			data-cal-link={waitlistCalLink}
-			data-cal-namespace={waitlistCalNamespace}
-			type="button"
-		>
-			{children}
-		</Button>
-	);
-}
-
 function ChaterfaceDesktopPreview() {
 	return (
 		<section className="pointer-events-auto mt-8">
@@ -481,16 +346,18 @@ function ChaterfaceDesktopPreview() {
 							</span>
 						</div>
 						<div className="flex flex-col gap-px">
-							<PreviewNavItem icon={<FadersIcon size={15} weight="bold" />}>
-								Workspace Settings
+							<PreviewNavItem
+								icon={<TerminalWindowIcon size={15} weight="bold" />}
+							>
+								Agent Environment
 							</PreviewNavItem>
 							<PreviewNavItem icon={<UsersThreeIcon size={15} weight="bold" />}>
-								Personal Settings
+								Humans
 							</PreviewNavItem>
 							<PreviewNavItem
 								icon={<DesktopTowerIcon size={15} weight="bold" />}
 							>
-								Workspace Settings
+								Agents
 							</PreviewNavItem>
 						</div>
 						<PreviewButton className="mt-2 w-full justify-start" shortcut="N">
@@ -663,7 +530,7 @@ function ChaterfaceDesktopPreview() {
 										<p className="font-medium text-grayscale-12">Chaterface</p>
 									</div>
 									<p className="mt-4 max-w-56 text-balance font-medium text-grayscale-12 text-sm">
-										Collaborative software workspace running in the cloud.
+										Open-source workspace for supervised agent tasks.
 									</p>
 									<div className="mt-4 h-24 rounded-lg border border-grayscale-3 bg-grayscale-2 p-2 dark:border-grayscale-4 dark:bg-grayscale-3">
 										<div className="mb-2 h-2 w-28 rounded bg-grayscale-5" />
@@ -883,6 +750,36 @@ function FeatureGrid() {
 							</h3>
 							<p className="mt-1 text-grayscale-11 text-sm leading-5">
 								{feature.description}
+							</p>
+						</div>
+					</div>
+				))}
+			</div>
+		</section>
+	);
+}
+
+function TechStackSection() {
+	return (
+		<section className="pointer-events-auto mt-14 px-2">
+			<h2 className="font-medium text-grayscale-12 text-sm">Tech stack</h2>
+			<p className="mt-1 max-w-xl text-grayscale-11 text-sm leading-5">
+				Chaterface is built from familiar web app tools and agent infrastructure
+				you can run, inspect, and connect yourself.
+			</p>
+
+			<div className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+				{techStackCards.map((item) => (
+					<div className="flex flex-col items-start gap-2 p-2" key={item.title}>
+						<div className="flex size-8 items-center justify-start text-grayscale-12">
+							{item.logo}
+						</div>
+						<div>
+							<h3 className="font-medium text-grayscale-12 text-sm">
+								{item.title}
+							</h3>
+							<p className="mt-1 text-grayscale-11 text-sm leading-5">
+								{item.description}
 							</p>
 						</div>
 					</div>

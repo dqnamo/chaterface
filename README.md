@@ -1,59 +1,78 @@
 # Chaterface
 
-Chaterface is an open-source, collaborative software workspace for running Codex
-agents in the cloud. It gives teams one place to create tasks, supervise
-long-running workers, connect tools, manage workspace secrets, and land code
-through GitHub.
+Chaterface is an open-source workspace for running cloud software agents. It
+brings agent tasks, repositories, secrets, previews, integrations, and review
+workflows into one shared interface.
 
-## Features
+The project is built as a TypeScript monorepo with a Next.js product app, a
+public website, a Hono API, and shared packages for data, encryption, and UI.
 
-- Cloud workers for prompt-driven software tasks.
-- Shared workspaces for product, engineering, and operations supervision.
-- GitHub repository setup for cloning, branching, pull requests, and merges.
-- Workspace-level secrets, packages, commands, repositories, and MCP server configuration.
-- Preview service forwarding for apps started inside agent sandboxes.
-- Slack, MCP, GitHub App, Trigger.dev, InstantDB, E2B, and PostHog integration points.
+## Project Status
 
-## Monorepo layout
+Chaterface is under active development. The core app is usable locally, but some
+workflows depend on third-party services such as InstantDB, Trigger.dev, E2B,
+GitHub Apps, Slack, PostHog, Cloudflare, and a public tunnel for OAuth/webhooks.
+
+You do not need the maintainer's tunnel domains to contribute. The default
+contributor setup should run against `localhost`.
+
+## What Chaterface Does
+
+- Runs prompt-driven coding tasks in cloud sandboxes.
+- Gives teams a shared interface for supervising long-running agents.
+- Connects GitHub repositories for cloning, branching, pull requests, and merges.
+- Stores workspace secrets, package setup, commands, repositories, and MCP server
+  configuration.
+- Provides preview URLs for services started inside agent sandboxes.
+- Supports integration points for Slack, MCP, GitHub Apps, Trigger.dev, InstantDB,
+  E2B, and PostHog.
+
+## Repository Layout
 
 | Path | Description |
 | --- | --- |
-| `apps/website` | Public marketing/docs site at `localhost:3000`. |
-| `apps/web-app` | Main Chaterface web app at `localhost:3001`. |
-| `apps/api` | Hono API used by agent sandboxes at `localhost:3002`. |
+| `apps/website` | Public Chaterface website. Runs on `localhost:3000`. |
+| `apps/web-app` | Main product app. Runs on `localhost:3001`. |
+| `apps/api` | Hono API used by the web app and agent sandboxes. Runs on `localhost:3002`. |
 | `apps/previews` | Preview proxy for services started inside sandboxes. |
-| `packages/db` | Shared InstantDB schema and client/admin helpers. |
+| `packages/db` | Shared InstantDB schema, client helpers, and admin helpers. |
 | `packages/encryption` | Shared encryption helpers. |
 | `packages/ui` | Shared React UI primitives. |
 | `packages/typescript-config` | Shared TypeScript configuration. |
+| `docs` | Deployment and operations notes. |
 
-## Tech stack
+## Tech Stack
 
-- [Next.js](https://nextjs.org/) and React for the website and web app.
+- [Next.js](https://nextjs.org/) and React for the website and product app.
 - [Hono](https://hono.dev/) for the API service.
 - [InstantDB](https://www.instantdb.com/) for auth, data, and realtime state.
-- [Trigger.dev](https://trigger.dev/) for task processing.
+- [Trigger.dev](https://trigger.dev/) for background task processing.
 - [E2B](https://e2b.dev/) for cloud sandboxes.
 - [Turborepo](https://turbo.build/repo), pnpm, TypeScript, and Biome for the
-  workspace.
-- [Overmind](https://github.com/DarthSim/overmind) and ngrok for the full local
-  dev stack.
+  monorepo toolchain.
 
-## Prerequisites
+## Requirements
 
 - Node.js 18 or newer.
 - pnpm 9.
-- Overmind for running the local process group.
-- ngrok with access to the reserved `*.interface.ngrok.pro` domains when using
-  the default `pnpm dev` workflow.
+- Optional: Overmind if you want one command to run the local process group.
+- Optional: ngrok, Cloudflare Tunnel, or another tunnel provider for testing
+  OAuth callbacks and webhooks from external services.
 
-On macOS:
+Install pnpm with Corepack:
 
 ```sh
-brew install overmind ngrok
+corepack enable
+corepack prepare pnpm@9.0.0 --activate
 ```
 
-## Quick start
+On macOS, you can install Overmind with:
+
+```sh
+brew install overmind
+```
+
+## Quick Start
 
 Install dependencies:
 
@@ -61,124 +80,162 @@ Install dependencies:
 pnpm install
 ```
 
-Start the local stack with Overmind and ngrok:
+Create local environment files:
+
+```sh
+cp apps/api/.env.example apps/api/.env.local
+touch apps/web-app/.env.local
+```
+
+At minimum, fill in InstantDB and encryption values:
+
+```sh
+# apps/api/.env.local
+NEXT_PUBLIC_INSTANT_APP_ID=
+INSTANT_APP_ADMIN_TOKEN=
+SECRET_ENCRYPTION_KEY=
+PORT=3002
+
+# apps/web-app/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:3002
+NEXT_PUBLIC_INSTANT_APP_ID=
+INSTANT_APP_ADMIN_TOKEN=
+SECRET_ENCRYPTION_KEY=
+```
+
+Start the main local services in separate terminals:
+
+```sh
+pnpm --filter api dev
+pnpm --filter web-app dev
+pnpm --filter website dev
+```
+
+Then open:
+
+| Service | URL |
+| --- | --- |
+| Website | <http://localhost:3000> |
+| Web app | <http://localhost:3001> |
+| API | <http://localhost:3002> |
+
+Optional services:
+
+```sh
+pnpm --filter previews dev
+pnpm --filter web-app trigger:dev
+```
+
+## Running With Overmind
+
+The root `pnpm dev` command starts the `Procfile` with Overmind:
 
 ```sh
 pnpm dev
 ```
 
-This starts:
-
-| Service | Local URL | Public dev URL |
-| --- | --- | --- |
-| Website | <http://localhost:3000> | n/a |
-| Web app | <http://localhost:3001> | <https://app.interface.ngrok.pro> |
-| API | <http://localhost:3002> | <https://api.interface.ngrok.pro> |
-
-If ngrok reports `ERR_NGROK_4018`, add your auth token:
+The current `Procfile` includes website, web app, API, Trigger.dev, and ngrok
+processes. Because the checked-in `ngrok.yml` references maintainer-owned
+reserved domains, most contributors should run only the processes they need:
 
 ```sh
-ngrok config add-authtoken YOUR_TOKEN
+OVERMIND_PROCESSES=website,web-app,api pnpm dev
+OVERMIND_PROCESSES=web-app,api pnpm dev
 ```
 
-If either reserved tunnel fails, confirm `app.interface.ngrok.pro` and
-`api.interface.ngrok.pro` are reserved in the
-[ngrok dashboard](https://dashboard.ngrok.com/domains).
-
-## Development
-
-Run the full stack without ngrok:
+There is also a Turborepo command that starts every workspace `dev` script:
 
 ```sh
 pnpm dev:turbo
 ```
 
-Run only the Next.js apps through Overmind:
+Use it when you intentionally want all local services, including the preview
+proxy.
+
+If you need public URLs for OAuth callbacks or webhooks, use your own tunnel and
+set app environment variables to your tunnel origins. For example:
 
 ```sh
-OVERMIND_PROCESSES=website,web-app pnpm dev
+NEXT_PUBLIC_API_URL=https://your-api-tunnel.example.com
 ```
 
-Run a single app:
+Do not rely on `app.interface.ngrok.pro` or `api.interface.ngrok.pro`; those are
+maintainer development domains.
 
-```sh
-pnpm --filter website dev
-pnpm --filter web-app dev
-pnpm --filter api dev
-```
+## Environment Variables
 
-Run Trigger.dev locally for the web app task worker:
+Required for the API and web app:
+
+| Variable | Used by | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_INSTANT_APP_ID` | API, web app | InstantDB app ID. |
+| `INSTANT_APP_ADMIN_TOKEN` | API, web app | InstantDB admin token for server-side operations. |
+| `SECRET_ENCRYPTION_KEY` | API, web app, worker | Secret used to encrypt stored credentials and integration tokens. |
+| `NEXT_PUBLIC_API_URL` | web app, worker | Base URL for the API. Use `http://localhost:3002` for local development. |
+| `PORT` | API | API port. Defaults to `3002` in local setup. |
+
+Common optional variables:
+
+| Variable | Used by | Description |
+| --- | --- | --- |
+| `TRIGGER_PROJECT_REF` | web app | Trigger.dev project reference. |
+| `TRIGGER_SECRET_KEY` | web app | Trigger.dev local/remote worker secret. |
+| `GITHUB_APP_ID` | web app, worker | GitHub App ID for repository access. |
+| `GITHUB_APP_SLUG` | web app | GitHub App slug for install flows. |
+| `GITHUB_APP_PRIVATE_KEY` | web app, worker | GitHub App private key. |
+| `GITHUB_APP_STATE_SECRET` | web app | Optional override for signing GitHub install state. |
+| `SLACK_CLIENT_ID` | web app | Slack OAuth app client ID. |
+| `SLACK_CLIENT_SECRET` | web app | Slack OAuth app client secret. |
+| `SLACK_SIGNING_SECRET` | web app | Slack event/request signing secret. |
+| `PREVIEWS_DOMAIN` | API, previews | Base domain for sandbox preview URLs. |
+| `NEXT_PUBLIC_PREVIEWS_DOMAIN` | web app | Browser-visible preview base domain. |
+| `PREVIEW_COOKIE_DOMAIN` | previews | Cookie domain for preview auth. |
+| `PREVIEW_COOKIE_NAME` | previews | Cookie name for preview auth. |
+| `PREVIEW_SESSION_SECRET` | web app, previews | Signing secret for preview sessions. |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | website, web app | Optional PostHog project token. |
+| `NEXT_PUBLIC_POSTHOG_HOST` | website, web app | Optional PostHog host. |
+| `CLOUDFLARE_ACCOUNT_ID` | web app, API | Cloudflare account ID for email or AI Gateway integrations. |
+| `CLOUDFLARE_API_TOKEN` | web app, API | Cloudflare API token fallback. |
+| `CLOUDFLARE_EMAIL_API_TOKEN` | web app | Cloudflare token for invite email. |
+| `CLOUDFLARE_AI_GATEWAY_ID` | API | Cloudflare AI Gateway ID for task naming. |
+
+For local-only work, start with the required variables and add optional services
+only when you are working on those integrations.
+
+## GitHub App Setup
+
+Repository operations require a GitHub App. For local development:
+
+1. Create a GitHub App in your GitHub account or organization.
+2. Set the callback URL to your local or tunneled web app origin:
+   `http://localhost:3001/api/github/app/install/callback` for local-only
+   testing, or `https://your-web-app-tunnel.example.com/api/github/app/install/callback`
+   when GitHub needs to redirect to a public URL.
+3. Give the app these minimum permissions:
+   - Contents: read and write.
+   - Pull requests: read and write.
+   - Metadata: read-only.
+4. Add `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, and `GITHUB_APP_PRIVATE_KEY` to
+   `apps/web-app/.env.local`.
+5. Add `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` to any API or worker
+   environment that needs to mint installation tokens.
+
+## Trigger.dev Worker
+
+Run the web app worker locally with:
 
 ```sh
 pnpm --filter web-app trigger:dev
 ```
 
-## Environment
+Set `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY` in
+`apps/web-app/.env.local` when using Trigger.dev.
 
-The API includes a starting template at `apps/api/.env.example`:
+## Database Schema
 
-```sh
-NEXT_PUBLIC_INSTANT_APP_ID=
-INSTANT_APP_ADMIN_TOKEN=
-SECRET_ENCRYPTION_KEY=
-PORT=3002
-```
-
-For the web app, set `NEXT_PUBLIC_API_URL` to the API origin. In the default
-ngrok workflow, use:
-
-```sh
-NEXT_PUBLIC_API_URL=https://api.interface.ngrok.pro
-```
-
-Both Next.js apps allow the configured ngrok origins during development through
-`allowedDevOrigins` in their `next.config.js` files.
-
-Optional analytics variables for `apps/website` and `apps/web-app`:
-
-```sh
-NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=
-NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
-```
-
-Optional GitHub App variables for repository selection and agent GitHub operations:
-
-```sh
-GITHUB_APP_ID=
-GITHUB_APP_SLUG=
-GITHUB_APP_PRIVATE_KEY=
-```
-
-In local development, use
-`https://app.interface.ngrok.pro/api/github/app/install/callback` as the GitHub
-App setup callback URL. The GitHub App needs at least:
-
-- Contents: read and write.
-- Pull requests: read and write.
-- Metadata: read-only.
-
-`GITHUB_APP_STATE_SECRET` can override the install state signing secret. If it
-is not set, `SECRET_ENCRYPTION_KEY` is used. The API and task worker
-environments also need `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` so they can
-mint installation tokens.
-
-## Scripts
-
-| Command | Description |
-| --- | --- |
-| `pnpm dev` | Start the Overmind process group from `Procfile`. |
-| `pnpm dev:turbo` | Start all package `dev` scripts through Turborepo. |
-| `pnpm build` | Build all apps and packages through Turborepo. |
-| `pnpm lint` | Run Biome checks. |
-| `pnpm format` | Format files with Biome. |
-| `pnpm check` | Run Biome checks and apply safe fixes. |
-| `pnpm check-types` | Run TypeScript checks across the workspace. |
-
-## Database schema
-
-The InstantDB schema source of truth is `packages/db/src/schema.ts`. The web
-app's `instant.schema.ts` re-exports `@repo/db/schema`, which resolves through
-`packages/db/dist` for normal CLI imports.
+The InstantDB schema source of truth is
+`packages/db/src/schema.ts`. The web app's `instant.schema.ts` re-exports
+`@repo/db/schema`, which resolves through `packages/db/dist` for CLI imports.
 
 Push the schema with:
 
@@ -188,22 +245,55 @@ pnpm --filter web-app instant:push-schema
 
 This builds `@repo/db` first so the Instant CLI reads the current schema.
 
-## Deployment notes
+You can also push permissions:
 
-Production deployment requires coordinated app, API, preview, webhook, OAuth,
-and sandbox environment configuration. See
-[docs/deployment-checklist.md](docs/deployment-checklist.md) before moving
+```sh
+pnpm --filter web-app instant:push-perms
+```
+
+## Quality Checks
+
+Run these before opening a pull request:
+
+```sh
+pnpm lint
+pnpm check-types
+pnpm build
+```
+
+Useful formatting commands:
+
+```sh
+pnpm format
+pnpm check
+```
+
+## Deployment
+
+Production deployment requires coordinated configuration for the app, API,
+preview proxy, OAuth callbacks, webhooks, and sandbox environment. See
+[`docs/deployment-checklist.md`](docs/deployment-checklist.md) before moving
 traffic to a new deployment.
 
 ## Contributing
 
-This repository does not currently include a separate contributing guide. For now:
+Contributions are welcome. Until a dedicated `CONTRIBUTING.md` exists:
 
-1. Keep changes scoped to the relevant app or package.
-2. Run `pnpm lint` and `pnpm check-types` before opening a pull request.
-3. Include setup or migration notes when a change adds environment variables,
-   external services, or schema changes.
+1. Keep changes focused on the app or package they affect.
+2. Prefer existing patterns over introducing new libraries or architecture.
+3. Update docs when adding environment variables, external services, schema
+   changes, or deployment steps.
+4. Run `pnpm lint`, `pnpm check-types`, and any relevant app-level build before
+   opening a pull request.
+5. Include screenshots or screen recordings for user-facing UI changes.
+
+## Security
+
+Do not commit real `.env.local` files, API keys, tunnel credentials, private
+keys, or service tokens. Use local environment files and provider dashboards for
+secret management.
 
 ## License
 
-No license file is currently included in this repository.
+No license file is currently included. Add a `LICENSE` file before publishing
+the project for broad external use.

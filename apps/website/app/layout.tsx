@@ -25,14 +25,14 @@ const pirataOne = Pirata_One({
 });
 
 export const metadata: Metadata = {
-	title: "Workspace",
-	description: "A Next.js starter using Chord UI, InstantDB, and Trigger.dev",
-	applicationName: "WorkspacePlane",
+	title: "Chaterface",
+	description: "Open source multiplayer cloud workspace for background agents.",
+	applicationName: "Chaterface",
 	manifest: "/manifest.webmanifest",
 	appleWebApp: {
 		capable: true,
 		statusBarStyle: "black-translucent",
-		title: "WorkspacePlane",
+		title: "Chaterface",
 	},
 	formatDetection: {
 		telephone: false,
