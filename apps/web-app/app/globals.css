@@ -140,6 +140,31 @@
 	animation: task-status-dot-spin 0.9s ease-in-out infinite;
 }
 
+.mention-composer-content p.is-editor-empty:first-child::before {
+	color: var(--color-grayscale-10);
+	content: attr(data-placeholder);
+	float: left;
+	height: 0;
+	pointer-events: none;
+}
+
+.mention-composer-content p {
+	margin: 0;
+}
+
+.mention-composer-content p + p {
+	margin-top: 0.25rem;
+}
+
+.mention-composer-token {
+	border: 1px solid var(--color-accent-5);
+	border-radius: 0.25rem;
+	background: var(--color-accent-2);
+	color: var(--color-accent-12);
+	padding: 0 0.1875rem;
+	white-space: nowrap;
+}
+
 .workspace-floor-flow .react-flow__edge-path,
 .workspace-floor-flow .react-flow__connection-path {
 	stroke: var(--color-grayscale-8);

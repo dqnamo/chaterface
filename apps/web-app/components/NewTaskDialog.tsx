@@ -25,7 +25,13 @@ import {
 	ImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
-import { Textarea } from "@/components/Input";
+import {
+	buildWorkspaceMentionItems,
+	type MentionableMcpServer,
+	type MentionableRepository,
+	type MentionableSkill,
+	MentionComposer,
+} from "@/components/MentionComposer";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { Select } from "@/components/Select";
 import { cn } from "@/helpers/classname-helper";
@@ -43,6 +49,21 @@ type WorkspaceAgent = Pick<
 > & {
 	agent?: Agent;
 };
+type WorkspaceSkill = Pick<
+	InstaQLEntity<AppSchema, "skills">,
+	"id" | "name" | "slug" | "description" | "removedAt"
+> &
+	MentionableSkill;
+type WorkspaceRepository = Pick<
+	InstaQLEntity<AppSchema, "repositories">,
+	"id" | "url" | "path" | "branch"
+> &
+	MentionableRepository;
+type WorkspaceMcpServer = Pick<
+	InstaQLEntity<AppSchema, "mcpServers">,
+	"id" | "name" | "url" | "enabled"
+> &
+	MentionableMcpServer;
 
 const DEFAULT_TASK_NAME = "New task";
 
@@ -129,6 +150,21 @@ export function NewTaskDialog({
 					},
 				},
 			},
+			repositories: {
+				$: {
+					fields: ["url", "path", "branch"],
+				},
+			},
+			mcpServers: {
+				$: {
+					fields: ["name", "url", "enabled"],
+				},
+			},
+			skills: {
+				$: {
+					fields: ["name", "slug", "description", "removedAt"],
+				},
+			},
 		},
 	});
 
@@ -137,6 +173,17 @@ export function NewTaskDialog({
 	const workspaceAgents = workspace?.workspaceAgents as
 		| WorkspaceAgent[]
 		| undefined;
+	const mentionItems = useMemo(
+		() =>
+			buildWorkspaceMentionItems({
+				mcpServers: workspace?.mcpServers as WorkspaceMcpServer[] | undefined,
+				repositories: workspace?.repositories as
+					| WorkspaceRepository[]
+					| undefined,
+				skills: workspace?.skills as WorkspaceSkill[] | undefined,
+			}),
+		[workspace?.mcpServers, workspace?.repositories, workspace?.skills],
+	);
 	const resolvedWorkspaceAgentId = workspaceAgentId || workspaceAgents?.[0]?.id;
 	const selectedWorkspaceAgent = useMemo(
 		() =>
@@ -356,14 +403,14 @@ export function NewTaskDialog({
 							onDrop={handleComposerDrop}
 							onPaste={handleComposerPaste}
 						>
-							<Textarea
+							<MentionComposer
 								aria-label="Task instructions"
 								autoFocus
-								id="task-instructions"
 								className="min-h-32 text-sm"
+								mentionItems={mentionItems}
 								placeholder="What should the agent do?"
 								value={taskInstructions}
-								onChange={(event) => setTaskInstructions(event.target.value)}
+								onChange={setTaskInstructions}
 								onSubmit={() => submitTask()}
 							/>
 							<ImageAttachments
