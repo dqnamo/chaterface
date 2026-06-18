@@ -19,13 +19,19 @@ import {
 	XCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
+import { Arvo } from "next/font/google";
 import Script from "next/script";
-import { Footer } from "@/components/Footer";
+import { HolographicFoil } from "@/components/HolographicFoil";
 import Logo from "@/components/Logo";
 import MobileHeader from "@/components/MobileHeader";
 import Button from "@/components/public/Button";
 import Card from "@/components/public/Card";
 import PixelTrail from "@/components/public/PixelTrail";
+
+const arvo = Arvo({
+	subsets: ["latin"],
+	weight: ["400", "700"],
+});
 
 export const metadata: Metadata = {
 	title: "Chaterface",
@@ -363,10 +369,56 @@ export default function Home() {
 						</Card>
 					</div>
 
-					<Footer className="pointer-events-auto p-2 mt-8" />
+					<HolographicStickerSection />
 				</div>
 			</div>
 		</main>
+	);
+}
+
+function HolographicStickerSection() {
+	return (
+		<section className="pointer-events-auto p-2">
+			<div className="py-16">
+				<HolographicFoil
+					aria-label="Interactive holographic Interface Company of London sticker"
+					className="group h-40 w-72 cursor-pointer rounded-xl shadow-sm sm:h-44 sm:w-80"
+					role="img"
+				>
+					<div className="flex h-full flex-col">
+						<div className="flex h-10 items-center justify-start p-3">
+							<p className="font-mono font-semibold text-[10px] text-grayscale-8 leading-none uppercase">
+								A product by
+							</p>
+						</div>
+						<div
+							className={`${arvo.className} flex h-full w-full flex-col items-center justify-center gap-px text-center text-grayscale-12 leading-none uppercase`}
+						>
+							<span className="mb-px font-medium text-grayscale-9 text-xs leading-none transition-colors duration-200 group-hover:text-grayscale-11">
+								THE
+							</span>
+							<span className="font-medium text-grayscale-11 text-xl leading-none transition-colors duration-200 group-hover:text-grayscale-12">
+								INTERFACE
+							</span>
+							<span className="font-medium text-grayscale-11 text-xl leading-none transition-colors duration-200 group-hover:text-grayscale-12">
+								COMPANY
+							</span>
+							<span className="mt-px font-medium text-grayscale-9 text-xs leading-none transition-colors duration-200 group-hover:text-grayscale-11">
+								OF LONDON
+							</span>
+						</div>
+						<div className="flex h-10 items-center justify-end p-3">
+							<div className="flex size-5 items-center justify-center rounded-full bg-grayscale-7/30 transition-colors duration-200 group-hover:bg-accent-9">
+								<ArrowRightIcon
+									className="size-3 text-grayscale-11 transition-colors duration-200 group-hover:text-grayscale-1"
+									weight="bold"
+								/>
+							</div>
+						</div>
+					</div>
+				</HolographicFoil>
+			</div>
+		</section>
 	);
 }
 
