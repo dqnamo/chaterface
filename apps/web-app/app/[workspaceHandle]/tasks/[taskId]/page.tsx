@@ -645,9 +645,7 @@ export default function TaskPage() {
 					id: taskId as string,
 				},
 			},
-			services: {
-				terminalSession: {},
-			},
+			services: {},
 			workspace: {
 				members: {
 					user: {},
@@ -1554,9 +1552,7 @@ export default function TaskPage() {
 								</Tabs.List>
 								<div className="p-2 border-b border-grayscale-4 flex flex-row items-center justify-between gap-2">
 									<p className="text-xs text-grayscale-10 truncate">
-										{selectedService?.terminalSession?.command ??
-											selectedService?.command ??
-											"No command"}
+										{selectedService?.command ?? "No command"}
 									</p>
 									<div className="flex shrink-0 flex-row items-center gap-1.5">
 										{selectedService ? (
