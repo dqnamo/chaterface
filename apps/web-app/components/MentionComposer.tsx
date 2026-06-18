@@ -366,7 +366,7 @@ export function MentionComposer({
 			{mentionState ? (
 				<div
 					className={cn(
-						"absolute left-2 right-2 z-50 max-h-72 overflow-y-auto rounded-md border border-grayscale-5 bg-grayscale-1 p-1 shadow-lg",
+						"absolute left-2 z-50 max-h-72 w-[min(32rem,calc(100%-1rem))] overflow-y-auto rounded-md border border-grayscale-5 bg-grayscale-1 p-1 shadow-lg",
 						mentionMenuPlacement === "bottom"
 							? "top-full mt-1"
 							: "bottom-full mb-1",
