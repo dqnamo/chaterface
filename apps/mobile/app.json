@@ -1,0 +1,24 @@
+{
+	"expo": {
+		"name": "Chaterface",
+		"slug": "chaterface",
+		"scheme": "chaterface",
+		"version": "0.1.0",
+		"orientation": "portrait",
+		"userInterfaceStyle": "automatic",
+		"newArchEnabled": true,
+		"splash": {
+			"backgroundColor": "#ffffff"
+		},
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "com.chaterface.mobile"
+		},
+		"android": {
+			"package": "com.chaterface.mobile"
+		},
+		"web": {
+			"bundler": "metro"
+		}
+	}
+}
