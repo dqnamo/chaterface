@@ -363,32 +363,6 @@ export default function Home() {
 						</Card>
 					</div>
 
-					<section
-						className="pointer-events-auto mt-8 flex flex-col gap-2"
-						id="waitlist"
-					>
-						<div className="flex flex-col gap-px p-2">
-							<p className="font-mono font-bold text-grayscale-9 text-tiny uppercase tracking-wide">
-								Waitlist
-							</p>
-							<h2 className="font-medium text-grayscale-12">
-								Book a Chaterface onboarding call
-							</h2>
-							<p className="max-w-2xl text-sm text-grayscale-11">
-								We are opening access gradually. Book a short call to join the
-								waitlist, talk through your workspace, and pick the right launch
-								plan.
-							</p>
-						</div>
-
-						<div className="flex flex-row flex-wrap items-center gap-2 p-2">
-							<WaitlistButton className="text-xs" variant="primary">
-								Join waitlist
-								<ArrowRightIcon size={14} weight="bold" />
-							</WaitlistButton>
-						</div>
-					</section>
-
 					<Footer className="pointer-events-auto p-2 mt-8" />
 				</div>
 			</div>
