@@ -60,10 +60,12 @@ export function HolographicFoil({
 
 		const applyEffect = () => {
 			const { x, y } = pointerRef.current;
-			const maxScroll =
-				document.documentElement.scrollHeight - window.innerHeight;
+			const rect = foil.getBoundingClientRect();
+			const visibleScrollRange = window.innerHeight + rect.height;
 			const scrollProgress =
-				maxScroll > 0 ? clamp(window.scrollY / maxScroll, 0, 1) : 0;
+				visibleScrollRange > 0
+					? clamp((window.innerHeight - rect.top) / visibleScrollRange, 0, 1)
+					: 0;
 
 			foil.style.setProperty("--pointer-x", `${x * 100}%`);
 			foil.style.setProperty("--pointer-y", `${y * 100}%`);
