@@ -61,6 +61,7 @@ type MentionComposerProps = {
 	autoFocus?: boolean;
 	className?: string;
 	disabled?: boolean;
+	mentionMenuPlacement?: "bottom" | "top";
 	mentionItems?: MentionComposerItem[];
 	onBlur?: () => void;
 	onChange: (value: string) => void;
@@ -106,6 +107,7 @@ export function MentionComposer({
 	autoFocus,
 	className,
 	disabled,
+	mentionMenuPlacement = "top",
 	mentionItems = [],
 	onBlur,
 	onChange,
@@ -362,7 +364,14 @@ export function MentionComposer({
 		>
 			<EditorContent editor={editor} />
 			{mentionState ? (
-				<div className="absolute left-2 right-2 bottom-full z-50 mb-1 max-h-72 overflow-y-auto rounded-md border border-grayscale-5 bg-grayscale-1 p-1 shadow-lg">
+				<div
+					className={cn(
+						"absolute left-2 right-2 z-50 max-h-72 overflow-y-auto rounded-md border border-grayscale-5 bg-grayscale-1 p-1 shadow-lg",
+						mentionMenuPlacement === "bottom"
+							? "top-full mt-1"
+							: "bottom-full mb-1",
+					)}
+				>
 					{filteredMentionItems.length > 0 ? (
 						filteredMentionItems.map((item, index) => {
 							const Icon = kindIcon[item.kind] ?? CubeIcon;
