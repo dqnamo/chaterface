@@ -37,6 +37,12 @@ type Agent = Pick<
 	InstaQLEntity<AppSchema, "agents">,
 	"id" | "name" | "settings"
 >;
+type WorkspaceAgent = Pick<
+	InstaQLEntity<AppSchema, "workspaceAgents">,
+	"id" | "name" | "settings"
+> & {
+	agent?: Agent;
+};
 
 const DEFAULT_TASK_NAME = "New task";
 
@@ -85,7 +91,7 @@ export function NewTaskDialog({
 	const { user } = db.useAuth();
 
 	const [taskInstructions, setTaskInstructions] = useState("");
-	const [agentId, setAgentId] = useState("");
+	const [workspaceAgentId, setWorkspaceAgentId] = useState("");
 	const [agentModel, setAgentModel] = useState(DEFAULT_CODEX_MODEL);
 	const [agentReasoningEffort, setAgentReasoningEffort] = useState(
 		DEFAULT_CODEX_REASONING_EFFORT,
@@ -113,9 +119,14 @@ export function NewTaskDialog({
 					handle: currentWorkspaceHandle,
 				},
 			},
-			agents: {
+			workspaceAgents: {
 				$: {
 					fields: ["name", "settings"],
+				},
+				agent: {
+					$: {
+						fields: ["name", "settings"],
+					},
 				},
 			},
 		},
@@ -123,29 +134,33 @@ export function NewTaskDialog({
 
 	const workspace = data?.workspaces?.[0];
 	const currentWorkspaceId = workspace?.id;
-	const agents = workspace?.agents as Agent[] | undefined;
-	const resolvedAgentId = agentId || agents?.[0]?.id;
-	const selectedAgent = useMemo(
-		() => agents?.find((agent) => agent.id === resolvedAgentId),
-		[agents, resolvedAgentId],
+	const workspaceAgents = workspace?.workspaceAgents as
+		| WorkspaceAgent[]
+		| undefined;
+	const resolvedWorkspaceAgentId = workspaceAgentId || workspaceAgents?.[0]?.id;
+	const selectedWorkspaceAgent = useMemo(
+		() =>
+			workspaceAgents?.find((agent) => agent.id === resolvedWorkspaceAgentId),
+		[workspaceAgents, resolvedWorkspaceAgentId],
 	);
+	const selectedAgent = selectedWorkspaceAgent?.agent;
 	const noAgentsConfigured =
-		Boolean(data?.workspaces?.[0]) && (agents?.length ?? 0) === 0;
+		Boolean(data?.workspaces?.[0]) && (workspaceAgents?.length ?? 0) === 0;
 	const canSubmit =
 		!isCreating &&
-		Boolean(resolvedAgentId) &&
+		Boolean(resolvedWorkspaceAgentId && selectedAgent?.id) &&
 		(Boolean(taskInstructions.trim()) || fileAttachments.length > 0);
 
 	useEffect(() => {
-		if (!selectedAgent) {
+		if (!selectedWorkspaceAgent) {
 			return;
 		}
 
-		const defaults = getAgentDefaultOptions(selectedAgent.settings);
+		const defaults = getAgentDefaultOptions(selectedWorkspaceAgent.settings);
 		setAgentModel(defaults.agentModel);
 		setAgentReasoningEffort(defaults.agentReasoningEffort);
 		setAgentSpeed(defaults.agentSpeed);
-	}, [selectedAgent]);
+	}, [selectedWorkspaceAgent]);
 
 	const resetForm = () => {
 		clearFileAttachments();
@@ -162,7 +177,7 @@ export function NewTaskDialog({
 			return;
 		}
 
-		if (!resolvedAgentId) {
+		if (!resolvedWorkspaceAgentId || !selectedAgent?.id) {
 			setCreateError("Create an agent before creating a task.");
 			return;
 		}
@@ -203,7 +218,11 @@ export function NewTaskDialog({
 						agentReasoningEffort,
 						agentSpeed,
 					})
-					.link({ workspace: currentWorkspaceId, agent: resolvedAgentId }),
+					.link({
+						workspace: currentWorkspaceId,
+						workspaceAgent: resolvedWorkspaceAgentId,
+						agent: selectedAgent.id,
+					}),
 				agentSessionTx(agentSessionId)
 					.create({
 						name: "Agent",
@@ -211,7 +230,7 @@ export function NewTaskDialog({
 						createdAt,
 						updatedAt: createdAt,
 					})
-					.link({ task: taskId, agent: resolvedAgentId }),
+					.link({ task: taskId, agent: selectedAgent.id }),
 				eventTx(eventId)
 					.create({
 						type: "chaterface.new_task",
@@ -235,7 +254,8 @@ export function NewTaskDialog({
 			captureProductEvent("task_created", {
 				task_id: taskId,
 				workspace_id: currentWorkspaceId,
-				agent_id: resolvedAgentId,
+				agent_id: selectedAgent.id,
+				workspace_agent_id: resolvedWorkspaceAgentId,
 				agent_model: agentModel,
 				agent_reasoning_effort: agentReasoningEffort,
 				agent_speed: agentSpeed,
@@ -355,13 +375,13 @@ export function NewTaskDialog({
 							<div className="flex flex-wrap items-center gap-2">
 								<Select.Root
 									items={
-										agents?.map((agent) => ({
+										workspaceAgents?.map((agent) => ({
 											value: agent.id,
 											label: agent.name,
 										})) ?? []
 									}
-									value={resolvedAgentId ?? null}
-									onValueChange={(value) => setAgentId(value ?? "")}
+									value={resolvedWorkspaceAgentId ?? null}
+									onValueChange={(value) => setWorkspaceAgentId(value ?? "")}
 								>
 									<Select.Trigger>
 										<Select.Value placeholder="Select an agent" />
@@ -371,7 +391,7 @@ export function NewTaskDialog({
 										<Select.Positioner>
 											<Select.Popup>
 												<Select.List>
-													{agents?.map((agent) => (
+													{workspaceAgents?.map((agent) => (
 														<Select.Item value={agent.id} key={agent.id}>
 															<Select.ItemText>{agent.name}</Select.ItemText>
 															<Select.ItemIndicator />

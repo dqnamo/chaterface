@@ -5,6 +5,9 @@ import type { InstantRules } from "@instantdb/react";
 const signedIn = "auth.id != null";
 const workspaceMember =
 	"auth.id != null && auth.id in data.ref('workspace.members.user.id')";
+const linkedWorkspaceAgentMember =
+	"auth.id != null && auth.id in data.ref('workspaceAgents.workspace.members.user.id')";
+const agentWorkspaceMemberOrCreator = `(${workspaceMember}) || (${linkedWorkspaceAgentMember}) || (auth.id != null && auth.id in data.ref('creator.id'))`;
 const taskWorkspaceMember =
 	"auth.id != null && auth.id in data.ref('task.workspace.members.user.id')";
 const agentSessionWorkspaceMember =
@@ -120,9 +123,23 @@ const rules = {
 		},
 	},
 	agents: {
-		...workspaceScoped,
+		allow: {
+			view: agentWorkspaceMemberOrCreator,
+			create: signedIn,
+			update: "auth.id != null && auth.id in data.ref('creator.id')",
+			delete: "auth.id != null && auth.id in data.ref('creator.id')",
+		},
 		fields: {
 			auth: "false",
+		},
+	},
+	workspaceAgents: {
+		allow: {
+			view: workspaceMember,
+			create:
+				"auth.id != null && auth.id in data.ref('workspace.members.user.id') && auth.id in data.ref('agent.creator.id')",
+			update: workspaceMember,
+			delete: workspaceMember,
 		},
 	},
 	agentSessions: taskScoped,

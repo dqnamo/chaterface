@@ -33,13 +33,20 @@ type Agent = {
 	settings?: unknown;
 };
 
+type WorkspaceAgent = {
+	id: string;
+	name?: string;
+	settings?: unknown;
+	agent?: Agent;
+};
+
 type AuthenticatedWorkspace = {
 	id: string;
 	floorWorkflow?: {
 		nodes?: WorkflowNode[];
 		edges?: WorkflowEdge[];
 	};
-	agents?: Agent[];
+	workspaceAgents?: WorkspaceAgent[];
 	members?: Array<{
 		user?: {
 			id: string;
@@ -141,7 +148,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
 	const { agentRunNode, prompt } = start;
 	const requestedAgentId = getOptionalString(agentRunNode.data?.agentId);
-	const agent = resolveAgent(authResult.workspace, requestedAgentId);
+	const workspaceAgent = resolveWorkspaceAgent(
+		authResult.workspace,
+		requestedAgentId,
+	);
+	const agent = workspaceAgent?.agent;
 
 	if (!agent) {
 		return NextResponse.json(
@@ -162,7 +173,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	const name = `${startNode.data?.label || "Workflow"} started`;
 	const instructions =
 		prompt || buildManualStartFallbackInstructions(message, images);
-	const agentDefaults = getAgentDefaultOptions(agent.settings);
+	const agentDefaults = getAgentDefaultOptions(workspaceAgent.settings);
 	const workflowSessionKey = getWorkflowSessionKey(agentRunNode);
 
 	await db.transact([
@@ -179,7 +190,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
 				workflowInput,
 				workflowNodeId: agentRunNode.id,
 			})
-			.link({ workspace: authResult.workspace.id, agent: agent.id }),
+			.link({
+				workspace: authResult.workspace.id,
+				workspaceAgent: workspaceAgent.id,
+				agent: agent.id,
+			}),
 		agentSessionTx(agentSessionId)
 			.create({
 				name: getAgentSessionName(workflowSessionKey),
@@ -199,6 +214,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 					startNodeId: manualStartNodeId,
 					agentRunNodeId: agentRunNode.id,
 					agentId: agent.id,
+					workspaceAgentId: workspaceAgent.id,
 					sessionKey: workflowSessionKey,
 					input: workflowInput,
 					images,
@@ -232,6 +248,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 			taskId,
 			workspaceId: authResult.workspace.id,
 			agentId: agent.id,
+			workspaceAgentId: workspaceAgent.id,
 			agentSessionId,
 			workflowState: "agent_running",
 		},
@@ -271,9 +288,14 @@ const authenticateWorkspaceRequest = async (
 						id: workspaceId,
 					},
 				},
-				agents: {
+				workspaceAgents: {
 					$: {
-						fields: ["name"],
+						fields: ["name", "settings"],
+					},
+					agent: {
+						$: {
+							fields: ["name", "settings"],
+						},
 					},
 				},
 				members: {
@@ -410,12 +432,17 @@ const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
 	(typeof value.source === "string" || value.source === undefined) &&
 	(typeof value.target === "string" || value.target === undefined);
 
-const resolveAgent = (
+const resolveWorkspaceAgent = (
 	workspace: AuthenticatedWorkspace,
 	agentId: string | undefined,
 ) => {
-	const agents = workspace.agents ?? [];
-	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
+	const workspaceAgents = workspace.workspaceAgents ?? [];
+	return agentId
+		? workspaceAgents.find(
+				(workspaceAgent) =>
+					workspaceAgent.id === agentId || workspaceAgent.agent?.id === agentId,
+			)
+		: workspaceAgents[0];
 };
 
 const buildManualStartFallbackInstructions = (

@@ -11,6 +11,11 @@ type Agent = {
 	id: string;
 };
 
+type WorkspaceAgent = {
+	id: string;
+	agent?: Agent;
+};
+
 type TaskForStart = {
 	id: string;
 	name: string;
@@ -20,10 +25,11 @@ type TaskForStart = {
 	agentReasoningEffort?: string;
 	agentSpeed?: string;
 	agent?: Agent;
+	workspaceAgent?: WorkspaceAgent;
 	agentSessions?: Array<{ id: string }>;
 	workspace?: {
 		id: string;
-		agents?: Agent[];
+		workspaceAgents?: WorkspaceAgent[];
 		members?: Array<{
 			user?: {
 				id: string;
@@ -76,7 +82,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
 	}
 
 	const { task } = authResult;
-	const agent = task.agent ?? task.workspace?.agents?.[0];
+	const workspaceAgent =
+		task.workspaceAgent ?? task.workspace?.workspaceAgents?.[0];
+	const agent = workspaceAgent?.agent ?? task.agent;
 
 	if (!agent) {
 		return NextResponse.json(
@@ -103,6 +111,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 		return NextResponse.json({
 			taskId: task.id,
 			agentId: agent.id,
+			workspaceAgentId: workspaceAgent?.id,
 			agentSessionId: existingSession.id,
 			status: "in_progress",
 		});
@@ -148,6 +157,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 		{
 			taskId: task.id,
 			agentId: agent.id,
+			workspaceAgentId: workspaceAgent?.id,
 			agentSessionId,
 			status: "in_progress",
 		},
@@ -185,9 +195,14 @@ const authenticateTaskRequest = async (req: NextRequest, taskId: string) => {
 					},
 				},
 				agent: {},
+				workspaceAgent: {
+					agent: {},
+				},
 				agentSessions: {},
 				workspace: {
-					agents: {},
+					workspaceAgents: {
+						agent: {},
+					},
 					members: {
 						user: {},
 					},

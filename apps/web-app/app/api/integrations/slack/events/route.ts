@@ -41,6 +41,12 @@ type Agent = {
 	settings?: unknown;
 };
 
+type WorkspaceAgent = {
+	id: string;
+	settings?: unknown;
+	agent?: Agent;
+};
+
 type Subscription = {
 	id: string;
 	nodeId?: string;
@@ -53,7 +59,7 @@ type Subscription = {
 	workspace?: {
 		id: string;
 		floorWorkflow?: FloorWorkflow;
-		agents?: Agent[];
+		workspaceAgents?: WorkspaceAgent[];
 	};
 };
 
@@ -251,7 +257,9 @@ const getMatchingSubscriptions = async (teamId: string, channelId: string) => {
 				},
 				integrationConnection: {},
 				workspace: {
-					agents: {},
+					workspaceAgents: {
+						agent: {},
+					},
 				},
 			},
 		})
@@ -316,7 +324,8 @@ const startWorkflowForSubscription = async (
 	}
 
 	const requestedAgentId = getOptionalString(start.agentRunNode.data?.agentId);
-	const agent = resolveAgent(workspace, requestedAgentId);
+	const workspaceAgent = resolveWorkspaceAgent(workspace, requestedAgentId);
+	const agent = workspaceAgent?.agent;
 
 	if (!agent) {
 		return;
@@ -332,7 +341,7 @@ const startWorkflowForSubscription = async (
 	const instructions =
 		start.prompt ||
 		`Slack message received.\n\nInput:\n${JSON.stringify(workflowInput, null, 2)}`;
-	const agentDefaults = getAgentDefaultOptions(agent.settings);
+	const agentDefaults = getAgentDefaultOptions(workspaceAgent.settings);
 
 	await db.transact([
 		taskTx(taskId)
@@ -348,7 +357,11 @@ const startWorkflowForSubscription = async (
 				workflowInput,
 				workflowNodeId: start.agentRunNode.id,
 			})
-			.link({ workspace: workspace.id, agent: agent.id }),
+			.link({
+				workspace: workspace.id,
+				workspaceAgent: workspaceAgent.id,
+				agent: agent.id,
+			}),
 		agentSessionTx(agentSessionId)
 			.create({
 				name: getAgentSessionName(workflowSessionKey),
@@ -499,12 +512,17 @@ const isWorkflowEdge = (value: unknown): value is WorkflowEdge =>
 	(typeof value.source === "string" || value.source === undefined) &&
 	(typeof value.target === "string" || value.target === undefined);
 
-const resolveAgent = (
+const resolveWorkspaceAgent = (
 	workspace: NonNullable<Subscription["workspace"]>,
 	agentId: string | undefined,
 ) => {
-	const agents = workspace.agents ?? [];
-	return agentId ? agents.find((agent) => agent.id === agentId) : agents[0];
+	const workspaceAgents = workspace.workspaceAgents ?? [];
+	return agentId
+		? workspaceAgents.find(
+				(workspaceAgent) =>
+					workspaceAgent.id === agentId || workspaceAgent.agent?.id === agentId,
+			)
+		: workspaceAgents[0];
 };
 
 const getWorkflowSessionKey = (agentRunNode: WorkflowNode) =>
