@@ -1,6 +1,6 @@
 "use client";
 
-import { id } from "@instantdb/react";
+import { type InstaQLEntity, id } from "@instantdb/react";
 import {
 	ArrowSquareOutIcon,
 	ArrowsLeftRightIcon,
@@ -51,7 +51,13 @@ import {
 	ImageAttachments,
 	useImageAttachments,
 } from "@/components/ImageAttachments";
-import { Textarea } from "@/components/Input";
+import {
+	buildWorkspaceMentionItems,
+	type MentionableMcpServer,
+	type MentionableRepository,
+	type MentionableSkill,
+	MentionComposer,
+} from "@/components/MentionComposer";
 import { ModelConfigMenu } from "@/components/ModelConfigMenu";
 import { ScrollArea } from "@/components/ScrollArea";
 import { Select } from "@/components/Select";
@@ -74,6 +80,7 @@ import {
 import { cn } from "@/helpers/classname-helper";
 import { toAgentSessionDotStatus } from "@/helpers/task-status-helper";
 import db from "@/instant.client";
+import type { AppSchema } from "@/instant.schema";
 
 const MIN_PREVIEW_SIZE = 320;
 const MAX_PREVIEW_SIZE = 720;
@@ -92,6 +99,21 @@ const DIFF_VIEW_OPTIONS = {
 	theme: "pierre-light",
 } as const;
 type JsonRecord = Record<string, unknown>;
+type WorkspaceSkill = Pick<
+	InstaQLEntity<AppSchema, "skills">,
+	"id" | "name" | "slug" | "description" | "removedAt"
+> &
+	MentionableSkill;
+type WorkspaceRepository = Pick<
+	InstaQLEntity<AppSchema, "repositories">,
+	"id" | "url" | "path" | "branch"
+> &
+	MentionableRepository;
+type WorkspaceMcpServer = Pick<
+	InstaQLEntity<AppSchema, "mcpServers">,
+	"id" | "name" | "url" | "enabled"
+> &
+	MentionableMcpServer;
 type TaskDiffFileStatus =
 	| "added"
 	| "modified"
@@ -630,6 +652,21 @@ export default function TaskPage() {
 				members: {
 					user: {},
 				},
+				repositories: {
+					$: {
+						fields: ["url", "path", "branch"],
+					},
+				},
+				mcpServers: {
+					$: {
+						fields: ["name", "url", "enabled"],
+					},
+				},
+				skills: {
+					$: {
+						fields: ["name", "slug", "description", "removedAt"],
+					},
+				},
 			},
 			agent: {},
 			workspaceAgent: {
@@ -663,6 +700,23 @@ export default function TaskPage() {
 	});
 
 	const task = data?.tasks?.[0];
+	const mentionItems = useMemo(
+		() =>
+			buildWorkspaceMentionItems({
+				mcpServers: task?.workspace?.mcpServers as
+					| WorkspaceMcpServer[]
+					| undefined,
+				repositories: task?.workspace?.repositories as
+					| WorkspaceRepository[]
+					| undefined,
+				skills: task?.workspace?.skills as WorkspaceSkill[] | undefined,
+			}),
+		[
+			task?.workspace?.mcpServers,
+			task?.workspace?.repositories,
+			task?.workspace?.skills,
+		],
+	);
 	const diffFileSummaries = useMemo(
 		() => getTaskDiffFileSummaries(task?.latestDiffFiles),
 		[task?.latestDiffFiles],
@@ -1324,7 +1378,7 @@ export default function TaskPage() {
 								onPaste={handleComposerPaste}
 							>
 								<div className="flex flex-col p-2 gap-2">
-									<Textarea
+									<MentionComposer
 										className="text-sm bg-grayscale-1 border-grayscale-3 p-2 dark:bg-grayscale-4 focus:bg-grayscale-2 dark:hover:bg-grayscale-5 dark:focus:bg-grayscale-5"
 										placeholder={
 											isTaskStarted
@@ -1332,11 +1386,12 @@ export default function TaskPage() {
 												: "Start this task before sending messages"
 										}
 										disabled={isSendingMessage || !isTaskStarted}
+										mentionItems={mentionItems}
 										value={message}
 										onBlur={taskPresence.stopTyping}
 										onFocus={taskPresence.focusComposer}
-										onChange={(e) => {
-											setMessage(e.target.value);
+										onChange={(value) => {
+											setMessage(value);
 											taskPresence.markTyping();
 										}}
 										onSubmit={sendMessage}
