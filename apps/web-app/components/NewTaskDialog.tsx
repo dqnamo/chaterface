@@ -408,6 +408,7 @@ export function NewTaskDialog({
 								autoFocus
 								className="min-h-32 text-sm"
 								mentionItems={mentionItems}
+								mentionMenuPlacement="bottom"
 								placeholder="What should the agent do?"
 								value={taskInstructions}
 								onChange={setTaskInstructions}
