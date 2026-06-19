@@ -8,6 +8,7 @@ import {
 	HeadCircuitIcon,
 	MinusCircleIcon,
 	PlusCircleIcon,
+	ShapesIcon,
 	SignOutIcon,
 	TerminalWindowIcon,
 	UsersIcon,
@@ -218,9 +219,11 @@ export default function Sidebar() {
 	const settingsHref = `/${currentWorkspaceHandle}/settings`;
 	const humansHref = `/${currentWorkspaceHandle}/humans`;
 	const agentsHref = `/${currentWorkspaceHandle}/agents`;
+	const floorHref = `/${currentWorkspaceHandle}/floor`;
 	const isSettingsSelected = pathname.startsWith(settingsHref);
 	const isHumansSelected = pathname.startsWith(humansHref);
 	const isAgentsSelected = pathname.startsWith(agentsHref);
+	const isFloorSelected = pathname === floorHref;
 	const openNewTask = useCallback(() => {
 		setIsNewTaskOpen(true);
 		closeAfterMobileNavigation();
@@ -262,6 +265,23 @@ export default function Sidebar() {
 							/>
 						</div>
 						<div className="min-w-0 max-w-full">
+							<Link
+								href={floorHref}
+								onClick={closeAfterMobileNavigation}
+								className={cn(
+									"group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-grayscale-11 transition-colors hover:bg-grayscale-2 hover:text-grayscale-12",
+									isFloorSelected ? "bg-grayscale-3" : "",
+								)}
+							>
+								<CornerBrackets
+									placement="inside"
+									color={isFloorSelected ? "accent-9" : "grayscale-8"}
+									size={6}
+									active={isFloorSelected}
+								/>
+								<ShapesIcon weight="bold" className="size-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">Factory</span>
+							</Link>
 							<Link
 								href={settingsHref}
 								onClick={closeAfterMobileNavigation}
