@@ -156,7 +156,7 @@ type CodexEvent = {
 	type: string;
 	data: unknown;
 };
-type AgentProvider = "codex" | "cursor";
+type AgentProvider = "codex" | "cursor" | "claude" | "opencode";
 type WorkspaceSetupScriptKind = "new_task" | "new_turn";
 type Attachment = {
 	id: string;
@@ -238,14 +238,37 @@ const SANDBOX_DIFF_EXCLUDES = [
 	".env.*",
 ];
 
+const AGENT_PROVIDERS = new Set<AgentProvider>([
+	"codex",
+	"cursor",
+	"claude",
+	"opencode",
+]);
+
 const getAgentProvider = (agent: {
 	provider?: string | null;
-}): AgentProvider => (agent.provider === "cursor" ? "cursor" : "codex");
+}): AgentProvider =>
+	agent.provider && AGENT_PROVIDERS.has(agent.provider as AgentProvider)
+		? (agent.provider as AgentProvider)
+		: "codex";
 
-const getProviderLabel = (provider: AgentProvider) =>
-	provider === "cursor" ? "Cursor" : "Codex";
+const getProviderLabel = (provider: AgentProvider) => {
+	if (provider === "cursor") {
+		return "Cursor";
+	}
 
-const getCursorApiKey = (auth: unknown) => {
+	if (provider === "claude") {
+		return "Claude Code";
+	}
+
+	if (provider === "opencode") {
+		return "OpenCode";
+	}
+
+	return "Codex";
+};
+
+const getAgentApiKey = (auth: unknown) => {
 	if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
 		return undefined;
 	}
@@ -256,16 +279,27 @@ const getCursorApiKey = (auth: unknown) => {
 		: undefined;
 };
 
-const getCursorAuthEnvs = async (
+const getApiKeyAuthEnvs = async (
 	agent: Agent,
+	provider: AgentProvider,
 ): Promise<Record<string, string>> => {
-	const apiKey = getCursorApiKey(await getAgentAuth(agent));
+	const apiKey = getAgentApiKey(await getAgentAuth(agent));
 
 	if (!apiKey) {
-		throw new Error(`Cursor agent ${agent.id} is missing auth.apiKey`);
+		throw new Error(
+			`${getProviderLabel(provider)} agent ${agent.id} is missing auth.apiKey`,
+		);
 	}
 
-	return { CURSOR_API_KEY: apiKey };
+	if (provider === "cursor") {
+		return { CURSOR_API_KEY: apiKey };
+	}
+
+	if (provider === "claude" || provider === "opencode") {
+		return { ANTHROPIC_API_KEY: apiKey };
+	}
+
+	return {};
 };
 
 const getAgentAuth = async (agent: Agent) => {
@@ -286,6 +320,27 @@ const buildCursorInstallCommand = () =>
 		"  curl https://cursor.com/install -fsS | bash",
 		"fi",
 		"cursor-agent --version",
+	].join("\n");
+
+const buildClaudeInstallCommand = () =>
+	[
+		'export PATH="$HOME/.local/bin:$PATH"',
+		"if ! command -v claude >/dev/null 2>&1; then",
+		"  npm install -g @anthropic-ai/claude-code@latest --no-audit --no-fund",
+		"fi",
+		"claude --version",
+	].join("\n");
+
+const getOpenCodePathPrefix = () =>
+	'export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"';
+
+const buildOpenCodeInstallCommand = () =>
+	[
+		getOpenCodePathPrefix(),
+		"if ! command -v opencode >/dev/null 2>&1; then",
+		"  npm install -g opencode-ai@latest --no-audit --no-fund",
+		"fi",
+		"opencode --version",
 	].join("\n");
 
 const taskTx = (taskId: string) => {
@@ -2060,19 +2115,25 @@ const setupTaskSandbox = async (
 		}),
 	);
 
-	if (provider === "cursor") {
-		await getCursorAuthEnvs(agent);
-		const cursorInstall = await runSetupStep(
+	if (provider !== "codex") {
+		await getApiKeyAuthEnvs(agent, provider);
+		const installCommand =
+			provider === "cursor"
+				? buildCursorInstallCommand()
+				: provider === "claude"
+					? buildClaudeInstallCommand()
+					: buildOpenCodeInstallCommand();
+		const cliInstall = await runSetupStep(
 			task.id,
-			"cursor_update",
-			"Install Cursor CLI",
+			`${provider}_update`,
+			`Install ${getProviderLabel(provider)} CLI`,
 			() =>
-				sandbox.commands.run(buildCursorInstallCommand(), {
+				sandbox.commands.run(installCommand, {
 					timeoutMs: 120_000,
 				}),
 			{ timeoutMs: 130_000 },
 		);
-		console.log(cursorInstall);
+		console.log(cliInstall);
 	} else {
 		await runSetupStep(task.id, "codex_auth", "Write Codex auth", () =>
 			sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agentAuth)),
@@ -3350,7 +3411,7 @@ const runAgentExec = async (
 	const output = createAgentOutputHandler(task.id, provider, agentSession?.id);
 	const command = await runSetupStep(
 		task.id,
-		provider === "cursor" ? "cursor_launch" : "codex_launch",
+		`${provider}_launch`,
 		shouldResumeRun
 			? `Resume ${getProviderLabel(provider)}`
 			: `Start ${getProviderLabel(provider)}`,
@@ -4079,8 +4140,9 @@ const setupRun = async (
 		...(await getWorkspaceGithubAuthEnvs(workspace)),
 	};
 
-	if (getAgentProvider(agent) === "cursor") {
-		Object.assign(envs, await getCursorAuthEnvs(agent));
+	const provider = getAgentProvider(agent);
+	if (provider !== "codex") {
+		Object.assign(envs, await getApiKeyAuthEnvs(agent, provider));
 	}
 
 	try {
@@ -4115,6 +4177,14 @@ const buildAgentExecCommand = (
 
 	if (provider === "cursor") {
 		return buildCursorExecCommand(task, promptWithAttachments, options);
+	}
+
+	if (provider === "claude") {
+		return buildClaudeExecCommand(task, promptWithAttachments, options);
+	}
+
+	if (provider === "opencode") {
+		return buildOpenCodeExecCommand(task, promptWithAttachments, options);
 	}
 
 	return buildCodexExecCommand(task, promptWithAttachments, options);
@@ -4230,6 +4300,68 @@ const buildCursorExecCommand = (
 
 	args.push(shellQuote(prompt));
 	return [getCursorPathPrefix(), args.join(" ")].join("\n");
+};
+
+const buildClaudeExecCommand = (
+	task: Task,
+	prompt: string,
+	options: RunCodexExecOptions = {},
+) => {
+	const args = [
+		"claude",
+		"--bare",
+		"-p",
+		"--output-format stream-json",
+		"--verbose",
+		"--dangerously-skip-permissions",
+		`--append-system-prompt ${shellQuote(getCodexDeveloperInstructions())}`,
+	];
+	const model = task.agentModel?.trim();
+	const reasoningEffort = task.agentReasoningEffort?.trim();
+
+	if (model) {
+		args.push(`--model ${shellQuote(model)}`);
+	}
+
+	if (reasoningEffort) {
+		args.push(`--effort ${shellQuote(reasoningEffort)}`);
+	}
+
+	if (options.resumeLast) {
+		args.push("--continue");
+	}
+
+	args.push(shellQuote(prompt));
+	return args.join(" ");
+};
+
+const buildOpenCodeExecCommand = (
+	task: Task,
+	prompt: string,
+	options: RunCodexExecOptions = {},
+) => {
+	const args = [
+		"opencode",
+		"run",
+		"--format json",
+		"--dangerously-skip-permissions",
+	];
+	const model = task.agentModel?.trim();
+
+	if (model) {
+		args.push(`--model ${shellQuote(model)}`);
+	}
+
+	if (options.resumeLast) {
+		args.push("--continue");
+	}
+
+	for (const attachmentPath of options.attachmentPaths ?? []) {
+		args.push(`--file ${shellQuote(attachmentPath)}`);
+	}
+
+	args.push(shellQuote(prompt));
+	return [getOpenCodePathPrefix(), args.join(" ")].join("\n");
 };
 
 const getTaskAgentModel = (task: Task) => {

@@ -56,8 +56,8 @@ export const startCodexDeviceAuthTask = task({
 			throw new Error(`Agent ${payload.agentId} not found`);
 		}
 
-		if (agent.provider === "cursor") {
-			throw new Error("Cursor agents do not use Codex device auth");
+		if (agent.provider && agent.provider !== "codex") {
+			throw new Error(`${agent.provider} agents do not use Codex device auth`);
 		}
 
 		let sandbox: Sandbox | undefined;

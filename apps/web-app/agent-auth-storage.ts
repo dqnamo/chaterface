@@ -53,7 +53,7 @@ export const getAgentAuthProviderAccountId = (
 	provider: string | undefined,
 	auth: unknown,
 ) => {
-	if (provider === "cursor") {
+	if (provider && provider !== "codex") {
 		return undefined;
 	}
 

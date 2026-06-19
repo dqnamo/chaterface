@@ -50,15 +50,19 @@ const getStringSetting = (
 	settings: Record<string, unknown>,
 	key: string,
 	fallback: string,
-	options: readonly { value: string }[],
+	options?: readonly { value: string }[],
 ) => {
 	const value = settings[key];
 
-	if (typeof value !== "string") {
+	if (typeof value !== "string" || value.trim().length === 0) {
 		return fallback;
 	}
 
-	return options.some((option) => option.value === value) ? value : fallback;
+	const trimmed = value.trim();
+
+	return !options || options.some((option) => option.value === trimmed)
+		? trimmed
+		: fallback;
 };
 
 export const getAgentDefaultOptions = (
@@ -67,12 +71,7 @@ export const getAgentDefaultOptions = (
 	const record = isRecord(settings) ? settings : {};
 
 	return {
-		agentModel: getStringSetting(
-			record,
-			"agentModel",
-			DEFAULT_CODEX_MODEL,
-			CODEX_MODEL_OPTIONS,
-		),
+		agentModel: getStringSetting(record, "agentModel", DEFAULT_CODEX_MODEL),
 		agentReasoningEffort: getStringSetting(
 			record,
 			"agentReasoningEffort",

@@ -5,7 +5,7 @@ import {
 } from "@/agent-auth-storage";
 import db, { id } from "@/instant.admin";
 
-type AgentProvider = "codex" | "cursor";
+type AgentProvider = "codex" | "cursor" | "claude" | "opencode";
 
 type AuthenticatedWorkspace = {
 	id: string;
@@ -217,15 +217,24 @@ const getNonEmptyString = (value: unknown) => {
 	return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const AGENT_PROVIDERS = new Set<AgentProvider>([
+	"codex",
+	"cursor",
+	"claude",
+	"opencode",
+]);
+
 const getAgentProvider = (value: unknown): AgentProvider =>
-	value === "cursor" ? "cursor" : "codex";
+	typeof value === "string" && AGENT_PROVIDERS.has(value as AgentProvider)
+		? (value as AgentProvider)
+		: "codex";
 
 const isValidAgentAuth = (provider: AgentProvider, auth: unknown) => {
 	if (!isRecord(auth)) {
 		return false;
 	}
 
-	if (provider === "cursor") {
+	if (provider !== "codex") {
 		return getNonEmptyString(auth.apiKey) !== undefined;
 	}
 
@@ -233,9 +242,25 @@ const isValidAgentAuth = (provider: AgentProvider, auth: unknown) => {
 };
 
 const getInvalidAuthMessage = (provider: AgentProvider) =>
-	provider === "cursor"
-		? "Cursor agents require auth.apiKey"
+	provider !== "codex"
+		? `${getProviderLabel(provider)} agents require auth.apiKey`
 		: "Codex auth must be a non-empty JSON object";
+
+const getProviderLabel = (provider: AgentProvider) => {
+	if (provider === "cursor") {
+		return "Cursor";
+	}
+
+	if (provider === "claude") {
+		return "Claude Code";
+	}
+
+	if (provider === "opencode") {
+		return "OpenCode";
+	}
+
+	return "Codex";
+};
 
 const getAgentSettings = (value: unknown) => (isRecord(value) ? value : {});
 
