@@ -95,7 +95,7 @@ const getSameOwnerAgentIds = async (
 	const matchingIds = agents
 		.filter(
 			(agent) =>
-				agent.provider !== "cursor" &&
+				(!agent.provider || agent.provider === "codex") &&
 				agent.providerAccountId === providerAccountId &&
 				agent.creator?.id === creatorId,
 		)

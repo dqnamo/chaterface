@@ -39,7 +39,7 @@ type WorkspaceSummary = Pick<
 type ImportableAgent = Agent & {
 	workspaceAgents?: Array<WorkspaceAgent & { workspace?: WorkspaceSummary }>;
 };
-type AgentProvider = "codex" | "cursor";
+type AgentProvider = "codex" | "cursor" | "claude" | "opencode";
 type CodexDeviceAuth = {
 	verificationUri: string;
 	userCode: string;
@@ -49,17 +49,40 @@ const PROVIDERS: {
 	value: AgentProvider;
 	label: string;
 	description: string;
+	authLabel?: string;
+	authPlaceholder?: string;
+	defaultModel: string;
 }[] = [
 	{
 		value: "codex",
 		label: "Codex",
 		description:
 			"Uses Codex CLI device code auth and the existing Codex runner.",
+		defaultModel: DEFAULT_CODEX_MODEL,
 	},
 	{
 		value: "cursor",
 		label: "Cursor",
 		description: "Uses Cursor CLI with CURSOR_API_KEY for headless runs.",
+		authLabel: "Cursor API key",
+		authPlaceholder: "Cursor API key",
+		defaultModel: DEFAULT_CODEX_MODEL,
+	},
+	{
+		value: "claude",
+		label: "Claude Code",
+		description: "Uses Claude Code headless mode with ANTHROPIC_API_KEY.",
+		authLabel: "Anthropic API key",
+		authPlaceholder: "Anthropic API key",
+		defaultModel: "sonnet",
+	},
+	{
+		value: "opencode",
+		label: "OpenCode",
+		description: "Uses OpenCode run mode with an Anthropic API key by default.",
+		authLabel: "Anthropic API key",
+		authPlaceholder: "Anthropic API key",
+		defaultModel: "anthropic/claude-sonnet-4-5",
 	},
 ];
 
@@ -76,7 +99,11 @@ const workspaceAgentTx = (workspaceAgentId: string) => {
 };
 
 const getProviderLabel = (provider: string | undefined) =>
-	provider === "cursor" ? "Cursor" : "Codex";
+	PROVIDERS.find((item) => item.value === provider)?.label ?? "Codex";
+
+const getProviderDefaultModel = (provider: AgentProvider) =>
+	PROVIDERS.find((item) => item.value === provider)?.defaultModel ??
+	DEFAULT_CODEX_MODEL;
 
 export default function AgentsPage() {
 	const { workspaceHandle } = useParams();
@@ -84,7 +111,7 @@ export default function AgentsPage() {
 	const { user } = db.useAuth();
 	const [name, setName] = useState("");
 	const [provider, setProvider] = useState<AgentProvider>("codex");
-	const [cursorApiKey, setCursorApiKey] = useState("");
+	const [agentApiKey, setAgentApiKey] = useState("");
 	const [pendingCodexWorkspaceAgentId, setPendingCodexWorkspaceAgentId] =
 		useState<string>();
 	const [codexDeviceAuth, setCodexDeviceAuth] = useState<CodexDeviceAuth>();
@@ -264,9 +291,9 @@ export default function AgentsPage() {
 			return;
 		}
 
-		const apiKey = cursorApiKey.trim();
+		const apiKey = agentApiKey.trim();
 		if (!apiKey) {
-			setFormError("Enter a Cursor API key.");
+			setFormError(`Enter a ${selectedProvider?.authLabel ?? "API key"}.`);
 			return;
 		}
 
@@ -307,7 +334,7 @@ export default function AgentsPage() {
 		}
 
 		setName("");
-		setCursorApiKey("");
+		setAgentApiKey("");
 	};
 
 	const startCodexDeviceAuth = async (trimmedName: string) => {
@@ -569,9 +596,13 @@ export default function AgentsPage() {
 							<Select.Root
 								items={PROVIDERS}
 								value={provider}
-								onValueChange={(value) =>
-									setProvider((value as AgentProvider | null) ?? "codex")
-								}
+								onValueChange={(value) => {
+									const nextProvider =
+										(value as AgentProvider | null) ?? "codex";
+									setProvider(nextProvider);
+									setAgentModel(getProviderDefaultModel(nextProvider));
+									setAgentApiKey("");
+								}}
 							>
 								<Select.Trigger>
 									<Select.Value />
@@ -613,13 +644,13 @@ export default function AgentsPage() {
 					<p className="text-xs text-grayscale-10">
 						{selectedProvider?.description}
 					</p>
-					{provider === "cursor" ? (
-						<Field label="Cursor API key">
+					{provider !== "codex" ? (
+						<Field label={selectedProvider?.authLabel ?? "API key"}>
 							<Input
 								type="password"
-								placeholder="Cursor API key"
-								value={cursorApiKey}
-								onChange={(event) => setCursorApiKey(event.target.value)}
+								placeholder={selectedProvider?.authPlaceholder ?? "API key"}
+								value={agentApiKey}
+								onChange={(event) => setAgentApiKey(event.target.value)}
 							/>
 						</Field>
 					) : (
@@ -757,7 +788,10 @@ const getImportableAgents = ({
 const getAgentImportKeys = (agent: Agent) => {
 	const keys = [`agent:${agent.id}`];
 
-	if (agent.provider !== "cursor" && agent.providerAccountId) {
+	if (
+		(!agent.provider || agent.provider === "codex") &&
+		agent.providerAccountId
+	) {
 		keys.push(
 			`provider:${agent.provider ?? "codex"}:${agent.providerAccountId}`,
 		);
