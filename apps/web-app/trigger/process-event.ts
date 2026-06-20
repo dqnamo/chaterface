@@ -196,6 +196,8 @@ type SetupStepOptions = {
 
 const CODEX_AUTH_PATH = "~/.codex/auth.json";
 const CODEX_CONFIG_PATH = "~/.codex/config.toml";
+const OPENCODE_AUTH_PATH = "~/.local/share/opencode/auth.json";
+const DEFAULT_OPENCODE_PROVIDER_ID = "anthropic";
 const DEFAULT_API_URL = "https://api.chaterface.com";
 const DIFF_BASELINE_ROOT = "/tmp/chaterface-baselines";
 const DIFF_WORK_ROOT = "/tmp/chaterface-diff-work";
@@ -279,10 +281,40 @@ const getAgentApiKey = (auth: unknown) => {
 		: undefined;
 };
 
+const getOpenCodeProviderId = (auth: unknown) => {
+	if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
+		return DEFAULT_OPENCODE_PROVIDER_ID;
+	}
+
+	const value = (auth as { providerId?: unknown }).providerId;
+	return typeof value === "string" && value.trim().length > 0
+		? value.trim()
+		: DEFAULT_OPENCODE_PROVIDER_ID;
+};
+
+const getOpenCodeAuth = async (agent: Agent) => {
+	const auth = await getAgentAuth(agent);
+	const apiKey = getAgentApiKey(auth);
+
+	if (!apiKey) {
+		throw new Error(`OpenCode agent ${agent.id} is missing auth.apiKey`);
+	}
+
+	return {
+		apiKey,
+		providerId: getOpenCodeProviderId(auth),
+	};
+};
+
 const getApiKeyAuthEnvs = async (
 	agent: Agent,
 	provider: AgentProvider,
 ): Promise<Record<string, string>> => {
+	if (provider === "opencode") {
+		await getOpenCodeAuth(agent);
+		return {};
+	}
+
 	const apiKey = getAgentApiKey(await getAgentAuth(agent));
 
 	if (!apiKey) {
@@ -295,7 +327,7 @@ const getApiKeyAuthEnvs = async (
 		return { CURSOR_API_KEY: apiKey };
 	}
 
-	if (provider === "claude" || provider === "opencode") {
+	if (provider === "claude") {
 		return { ANTHROPIC_API_KEY: apiKey };
 	}
 
@@ -3649,7 +3681,14 @@ const prepareAgentAuthForRun = async (
 	taskId: string,
 	agent: Agent,
 ) => {
-	if (getAgentProvider(agent) !== "codex") {
+	const provider = getAgentProvider(agent);
+
+	if (provider === "opencode") {
+		await prepareOpenCodeAuthForRun(sandbox, taskId, agent);
+		return;
+	}
+
+	if (provider !== "codex") {
 		return;
 	}
 
@@ -3657,6 +3696,38 @@ const prepareAgentAuthForRun = async (
 
 	await runSetupStep(taskId, "codex_auth", "Write Codex auth", () =>
 		sandbox.files.write(CODEX_AUTH_PATH, JSON.stringify(agentAuth)),
+	);
+};
+
+const prepareOpenCodeAuthForRun = async (
+	sandbox: Sandbox,
+	taskId: string,
+	agent: Agent,
+) => {
+	const auth = await getOpenCodeAuth(agent);
+
+	await runSetupStep(
+		taskId,
+		"opencode_auth",
+		"Write OpenCode auth",
+		async () => {
+			await sandbox.commands.run("mkdir -p ~/.local/share/opencode", {
+				timeoutMs: 30_000,
+			});
+			await sandbox.files.write(
+				OPENCODE_AUTH_PATH,
+				JSON.stringify(
+					{
+						[auth.providerId]: {
+							type: "api",
+							key: auth.apiKey,
+						},
+					},
+					null,
+					2,
+				),
+			);
+		},
 	);
 };
 

@@ -234,6 +234,13 @@ const isValidAgentAuth = (provider: AgentProvider, auth: unknown) => {
 		return false;
 	}
 
+	if (provider === "opencode") {
+		return (
+			getNonEmptyString(auth.providerId) !== undefined &&
+			getNonEmptyString(auth.apiKey) !== undefined
+		);
+	}
+
 	if (provider !== "codex") {
 		return getNonEmptyString(auth.apiKey) !== undefined;
 	}
@@ -242,9 +249,11 @@ const isValidAgentAuth = (provider: AgentProvider, auth: unknown) => {
 };
 
 const getInvalidAuthMessage = (provider: AgentProvider) =>
-	provider !== "codex"
-		? `${getProviderLabel(provider)} agents require auth.apiKey`
-		: "Codex auth must be a non-empty JSON object";
+	provider === "opencode"
+		? "OpenCode agents require auth.providerId and auth.apiKey"
+		: provider !== "codex"
+			? `${getProviderLabel(provider)} agents require auth.apiKey`
+			: "Codex auth must be a non-empty JSON object";
 
 const getProviderLabel = (provider: AgentProvider) => {
 	if (provider === "cursor") {
