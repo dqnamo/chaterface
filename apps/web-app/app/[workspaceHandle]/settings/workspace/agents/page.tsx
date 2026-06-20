@@ -45,6 +45,8 @@ type CodexDeviceAuth = {
 	userCode: string;
 };
 
+const DEFAULT_OPENCODE_PROVIDER_ID = "anthropic";
+
 const PROVIDERS: {
 	value: AgentProvider;
 	label: string;
@@ -79,9 +81,10 @@ const PROVIDERS: {
 	{
 		value: "opencode",
 		label: "OpenCode",
-		description: "Uses OpenCode run mode with an Anthropic API key by default.",
-		authLabel: "Anthropic API key",
-		authPlaceholder: "Anthropic API key",
+		description:
+			"Uses OpenCode run mode with credentials stored in OpenCode auth.json.",
+		authLabel: "Provider API key",
+		authPlaceholder: "Provider API key",
 		defaultModel: "anthropic/claude-sonnet-4-5",
 	},
 ];
@@ -112,6 +115,9 @@ export default function AgentsPage() {
 	const [name, setName] = useState("");
 	const [provider, setProvider] = useState<AgentProvider>("codex");
 	const [agentApiKey, setAgentApiKey] = useState("");
+	const [opencodeProviderId, setOpenCodeProviderId] = useState(
+		DEFAULT_OPENCODE_PROVIDER_ID,
+	);
 	const [pendingCodexWorkspaceAgentId, setPendingCodexWorkspaceAgentId] =
 		useState<string>();
 	const [codexDeviceAuth, setCodexDeviceAuth] = useState<CodexDeviceAuth>();
@@ -296,6 +302,11 @@ export default function AgentsPage() {
 			setFormError(`Enter a ${selectedProvider?.authLabel ?? "API key"}.`);
 			return;
 		}
+		const providerId = opencodeProviderId.trim();
+		if (provider === "opencode" && !providerId) {
+			setFormError("Enter an OpenCode provider ID.");
+			return;
+		}
 
 		if (!user?.refresh_token) {
 			setFormError("You must be signed in to create an agent.");
@@ -312,7 +323,7 @@ export default function AgentsPage() {
 				workspaceId: workspace.id,
 				name: trimmedName,
 				provider,
-				auth: { apiKey },
+				auth: provider === "opencode" ? { providerId, apiKey } : { apiKey },
 				settings: {
 					agentModel,
 					agentReasoningEffort,
@@ -335,6 +346,7 @@ export default function AgentsPage() {
 
 		setName("");
 		setAgentApiKey("");
+		setOpenCodeProviderId(DEFAULT_OPENCODE_PROVIDER_ID);
 	};
 
 	const startCodexDeviceAuth = async (trimmedName: string) => {
@@ -602,6 +614,7 @@ export default function AgentsPage() {
 									setProvider(nextProvider);
 									setAgentModel(getProviderDefaultModel(nextProvider));
 									setAgentApiKey("");
+									setOpenCodeProviderId(DEFAULT_OPENCODE_PROVIDER_ID);
 								}}
 							>
 								<Select.Trigger>
@@ -645,14 +658,28 @@ export default function AgentsPage() {
 						{selectedProvider?.description}
 					</p>
 					{provider !== "codex" ? (
-						<Field label={selectedProvider?.authLabel ?? "API key"}>
-							<Input
-								type="password"
-								placeholder={selectedProvider?.authPlaceholder ?? "API key"}
-								value={agentApiKey}
-								onChange={(event) => setAgentApiKey(event.target.value)}
-							/>
-						</Field>
+						<div className="grid gap-3 md:grid-cols-2">
+							{provider === "opencode" ? (
+								<Field label="OpenCode provider ID">
+									<Input
+										type="text"
+										placeholder="anthropic"
+										value={opencodeProviderId}
+										onChange={(event) =>
+											setOpenCodeProviderId(event.target.value)
+										}
+									/>
+								</Field>
+							) : null}
+							<Field label={selectedProvider?.authLabel ?? "API key"}>
+								<Input
+									type="password"
+									placeholder={selectedProvider?.authPlaceholder ?? "API key"}
+									value={agentApiKey}
+									onChange={(event) => setAgentApiKey(event.target.value)}
+								/>
+							</Field>
+						</div>
 					) : (
 						<p className="text-xs text-grayscale-10">
 							Start device auth to open a Codex sign-in modal with a one-time
