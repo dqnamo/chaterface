@@ -1,10 +1,9 @@
-import { task } from "@trigger.dev/sdk";
 import {
 	encryptAgentAuth,
 	getAgentAuthProviderAccountId,
 } from "@/agent-auth-storage";
 import db from "@/instant.admin";
-import { E2BSandbox as Sandbox } from "./e2b-sandbox";
+import { E2BSandbox as Sandbox } from "@/workflows/e2b-sandbox";
 
 const CODEX_HOME = "/home/user/.codex";
 const CODEX_AUTH_PATH = `${CODEX_HOME}/auth.json`;
@@ -33,133 +32,157 @@ const agentTx = (agentId: string) => {
 	return tx;
 };
 
-export const startCodexDeviceAuthTask = task({
-	id: "start-codex-device-auth",
-	retry: {
-		maxAttempts: 1,
-	},
-	run: async (payload: { agentId: string }) => {
-		const agent = await db
-			.query({
-				agents: {
-					$: {
-						fields: ["provider"],
-						where: {
-							id: payload.agentId,
-						},
+export async function runStartCodexDeviceAuthWorkflow(payload: {
+	agentId: string;
+}) {
+	const agent = await db
+		.query({
+			agents: {
+				$: {
+					fields: ["provider"],
+					where: {
+						id: payload.agentId,
 					},
 				},
-			})
-			.then((result) => result.agents[0] as Agent | undefined);
+			},
+		})
+		.then((result) => result.agents[0] as Agent | undefined);
 
-		if (!agent) {
-			throw new Error(`Agent ${payload.agentId} not found`);
-		}
+	if (!agent) {
+		throw new Error(`Agent ${payload.agentId} not found`);
+	}
 
-		if (agent.provider && agent.provider !== "codex") {
-			throw new Error(`${agent.provider} agents do not use Codex device auth`);
-		}
+	if (agent.provider && agent.provider !== "codex") {
+		throw new Error(`${agent.provider} agents do not use Codex device auth`);
+	}
 
-		let sandbox: Sandbox | undefined;
-		let deviceAuth: CodexDeviceAuthInstructions | undefined;
-		let loginOutput = "";
+	let sandbox: Sandbox | undefined;
+	let deviceAuth: CodexDeviceAuthInstructions | undefined;
+	let loginOutput = "";
 
-		try {
-			console.log("Creating Codex auth sandbox", { agentId: payload.agentId });
-			sandbox = await Sandbox.create("codex", {
-				timeoutMs: LOGIN_TIMEOUT_MS + 5 * 60 * 1000,
-			});
-			console.log("Created Codex auth sandbox", {
-				agentId: payload.agentId,
+	try {
+		console.log("Creating Codex auth sandbox", { agentId: payload.agentId });
+		sandbox = await Sandbox.create("codex", {
+			timeoutMs: LOGIN_TIMEOUT_MS + 5 * 60 * 1000,
+		});
+		console.log("Created Codex auth sandbox", {
+			agentId: payload.agentId,
+			sandboxId: sandbox.sandboxId,
+		});
+
+		await db.transact(
+			agentTx(payload.agentId).update({
 				sandboxId: sandbox.sandboxId,
-			});
-
-			await db.transact(
-				agentTx(payload.agentId).update({
-					sandboxId: sandbox.sandboxId,
-					status: "auth_starting",
-					authState: {
-						type: "codex_device_auth",
-						status: "starting",
-						startedAt: new Date().toISOString(),
-					},
-				}),
-			);
-
-			console.log("Preparing Codex auth home", { agentId: payload.agentId });
-			await prepareCodexHome(sandbox);
-			console.log("Starting Codex device login command", {
-				agentId: payload.agentId,
-			});
-
-			const login = await sandbox.commands.run(buildCodexLoginCommand(), {
-				background: true,
-				timeoutMs: 30_000,
-				onStdout: (data) => {
-					loginOutput += data;
-					console.log("Codex device login stdout", {
-						agentId: payload.agentId,
-						data,
-					});
+				status: "auth_starting",
+				authState: {
+					type: "codex_device_auth",
+					status: "starting",
+					startedAt: new Date().toISOString(),
 				},
-				onStderr: (data) => {
-					loginOutput += data;
-					console.log("Codex device login stderr", {
-						agentId: payload.agentId,
-						data,
-					});
+			}),
+		);
+
+		console.log("Preparing Codex auth home", { agentId: payload.agentId });
+		await prepareCodexHome(sandbox);
+		console.log("Starting Codex device login command", {
+			agentId: payload.agentId,
+		});
+
+		const login = await sandbox.commands.run(buildCodexLoginCommand(), {
+			background: true,
+			timeoutMs: 30_000,
+			onStdout: (data) => {
+				loginOutput += data;
+				console.log("Codex device login stdout", {
+					agentId: payload.agentId,
+					data,
+				});
+			},
+			onStderr: (data) => {
+				loginOutput += data;
+				console.log("Codex device login stderr", {
+					agentId: payload.agentId,
+					data,
+				});
+			},
+		});
+		console.log("Started Codex device login command", {
+			agentId: payload.agentId,
+			pid: login.pid,
+		});
+
+		await db.transact(
+			agentTx(payload.agentId).update({
+				status: "auth_pending",
+				authState: {
+					type: "codex_device_auth",
+					status: "waiting_for_code",
+					updatedAt: new Date().toISOString(),
 				},
-			});
-			console.log("Started Codex device login command", {
-				agentId: payload.agentId,
-				pid: login.pid,
-			});
+			}),
+		);
 
-			await db.transact(
-				agentTx(payload.agentId).update({
-					status: "auth_pending",
-					authState: {
-						type: "codex_device_auth",
-						status: "waiting_for_code",
-						updatedAt: new Date().toISOString(),
-					},
-				}),
-			);
+		const deadline = Date.now() + LOGIN_TIMEOUT_MS;
+		let lastPublishedLog = "";
 
-			const deadline = Date.now() + LOGIN_TIMEOUT_MS;
-			let lastPublishedLog = "";
+		while (Date.now() < deadline) {
+			const auth = await readCodexAuth(sandbox);
+			const cleanOutput = cleanLoginOutput(loginOutput);
+			const nextDeviceAuth =
+				parseCodexDeviceAuthInstructions(cleanOutput) ?? deviceAuth;
 
-			while (Date.now() < deadline) {
-				const auth = await readCodexAuth(sandbox);
-				const cleanOutput = cleanLoginOutput(loginOutput);
-				const nextDeviceAuth =
-					parseCodexDeviceAuthInstructions(cleanOutput) ?? deviceAuth;
+			if (
+				cleanOutput !== lastPublishedLog ||
+				JSON.stringify(nextDeviceAuth) !== JSON.stringify(deviceAuth)
+			) {
+				lastPublishedLog = cleanOutput;
+				deviceAuth = nextDeviceAuth;
 
-				if (
-					cleanOutput !== lastPublishedLog ||
-					JSON.stringify(nextDeviceAuth) !== JSON.stringify(deviceAuth)
-				) {
-					lastPublishedLog = cleanOutput;
-					deviceAuth = nextDeviceAuth;
+				await db.transact(
+					agentTx(payload.agentId).update({
+						authState: {
+							type: "codex_device_auth",
+							status: "waiting_for_code",
+							deviceAuth,
+							output: cleanOutput,
+							updatedAt: new Date().toISOString(),
+						},
+					}),
+				);
+			}
 
+			if (auth) {
+				await db.transact(
+					agentTx(payload.agentId).update({
+						auth: await encryptAgentAuth(auth),
+						providerAccountId: getAgentAuthProviderAccountId("codex", auth),
+						status: "ready",
+						authState: {
+							type: "codex_device_auth",
+							status: "completed",
+							deviceAuth,
+							updatedAt: new Date().toISOString(),
+						},
+					}),
+				);
+
+				return { agentId: payload.agentId, status: "ready" };
+			}
+
+			if (!(await isProcessRunning(sandbox, login.pid))) {
+				const result = await login.wait();
+				loginOutput += result.stdout;
+				loginOutput += result.stderr;
+
+				const authAfterExit = await readCodexAuth(sandbox);
+				if (authAfterExit) {
 					await db.transact(
 						agentTx(payload.agentId).update({
-							authState: {
-								type: "codex_device_auth",
-								status: "waiting_for_code",
-								deviceAuth,
-								output: cleanOutput,
-								updatedAt: new Date().toISOString(),
-							},
-						}),
-					);
-				}
-
-				if (auth) {
-					await db.transact(
-						agentTx(payload.agentId).update({
-							auth: await encryptAgentAuth(auth),
-							providerAccountId: getAgentAuthProviderAccountId("codex", auth),
+							auth: await encryptAgentAuth(authAfterExit),
+							providerAccountId: getAgentAuthProviderAccountId(
+								"codex",
+								authAfterExit,
+							),
 							status: "ready",
 							authState: {
 								type: "codex_device_auth",
@@ -173,66 +196,38 @@ export const startCodexDeviceAuthTask = task({
 					return { agentId: payload.agentId, status: "ready" };
 				}
 
-				if (!(await isProcessRunning(sandbox, login.pid))) {
-					const result = await login.wait();
-					loginOutput += result.stdout;
-					loginOutput += result.stderr;
-
-					const authAfterExit = await readCodexAuth(sandbox);
-					if (authAfterExit) {
-						await db.transact(
-							agentTx(payload.agentId).update({
-								auth: await encryptAgentAuth(authAfterExit),
-								providerAccountId: getAgentAuthProviderAccountId(
-									"codex",
-									authAfterExit,
-								),
-								status: "ready",
-								authState: {
-									type: "codex_device_auth",
-									status: "completed",
-									deviceAuth,
-									updatedAt: new Date().toISOString(),
-								},
-							}),
-						);
-
-						return { agentId: payload.agentId, status: "ready" };
-					}
-
-					const finalLog = cleanLoginOutput(loginOutput);
-					throw new Error(
-						getLoginFailureMessage(finalLog) ??
-							"Codex device login ended before auth.json was written.",
-					);
-				}
-
-				await delay(POLL_INTERVAL_MS);
+				const finalLog = cleanLoginOutput(loginOutput);
+				throw new Error(
+					getLoginFailureMessage(finalLog) ??
+						"Codex device login ended before auth.json was written.",
+				);
 			}
 
-			throw new Error(
-				"Codex device login timed out before auth.json was written.",
-			);
-		} catch (error) {
-			const message = getErrorMessage(error);
-
-			await db.transact(
-				agentTx(payload.agentId).update({
-					status: "auth_failed",
-					authState: {
-						type: "codex_device_auth",
-						status: "failed",
-						deviceAuth,
-						error: message,
-						updatedAt: new Date().toISOString(),
-					},
-				}),
-			);
-
-			throw error;
+			await delay(POLL_INTERVAL_MS);
 		}
-	},
-});
+
+		throw new Error(
+			"Codex device login timed out before auth.json was written.",
+		);
+	} catch (error) {
+		const message = getErrorMessage(error);
+
+		await db.transact(
+			agentTx(payload.agentId).update({
+				status: "auth_failed",
+				authState: {
+					type: "codex_device_auth",
+					status: "failed",
+					deviceAuth,
+					error: message,
+					updatedAt: new Date().toISOString(),
+				},
+			}),
+		);
+
+		throw error;
+	}
+}
 
 const prepareCodexHome = async (sandbox: Sandbox) => {
 	const result = await sandbox.commands.run(

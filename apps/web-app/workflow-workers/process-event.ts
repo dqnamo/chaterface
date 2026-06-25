@@ -1,6 +1,5 @@
 import { createHash, createSign, randomUUID } from "node:crypto";
 import type { InstaQLEntity } from "@instantdb/react";
-import { task } from "@trigger.dev/sdk";
 import { decryptAgentAuth } from "@/agent-auth-storage";
 import {
 	CODEX_REASONING_EFFORT_OPTIONS,
@@ -23,9 +22,9 @@ import {
 import {
 	formatCodexDeveloperInstructionsConfig,
 	getCodexDeveloperInstructions,
-} from "./codex-system-prompt";
-import { E2BSandbox as Sandbox } from "./e2b-sandbox";
-import { syncAgentAuthFromSandbox } from "./sync-agent-auth";
+} from "@/workflows/codex-system-prompt";
+import { E2BSandbox as Sandbox } from "@/workflows/e2b-sandbox";
+import { syncAgentAuthFromSandbox } from "@/workflows/sync-agent-auth";
 
 type Event = InstaQLEntity<AppSchema, "events">;
 type Task = InstaQLEntity<AppSchema, "tasks">;
@@ -451,82 +450,76 @@ const eventTx = (eventId: string) => {
 	return tx;
 };
 
-export const processEventTask = task({
-	id: "process-event",
-	retry: {
-		maxAttempts: 3,
-	},
-	run: async (payload: { eventId: string }) => {
-		console.log("Processing event", payload);
+export async function runProcessEventWorkflow(payload: { eventId: string }) {
+	console.log("Processing event", payload);
 
-		const event = await db
-			.query({
-				events: {
-					$: {
-						where: {
-							id: payload.eventId,
-						},
-					},
-					agentSession: {
-						agent: {},
-					},
-					task: {
-						agent: {},
-						workspaceAgent: {
-							agent: {},
-						},
-						workspace: {
-							repositories: {},
-							environmentFiles: {},
-							skills: {},
-							mcpServers: {},
-							commands: {},
-							sandboxPackages: {},
-							agents: {},
-							workspaceAgents: {
-								agent: {},
-							},
-							integrationConnections: {},
-						},
+	const event = await db
+		.query({
+			events: {
+				$: {
+					where: {
+						id: payload.eventId,
 					},
 				},
-			})
-			.then((result) => result.events?.[0]);
+				agentSession: {
+					agent: {},
+				},
+				task: {
+					agent: {},
+					workspaceAgent: {
+						agent: {},
+					},
+					workspace: {
+						repositories: {},
+						environmentFiles: {},
+						skills: {},
+						mcpServers: {},
+						commands: {},
+						sandboxPackages: {},
+						agents: {},
+						workspaceAgents: {
+							agent: {},
+						},
+						integrationConnections: {},
+					},
+				},
+			},
+		})
+		.then((result) => result.events?.[0]);
 
-		const task = event?.task as TaskWithAgent | undefined;
-		const agent = task?.workspaceAgent?.agent ?? task?.agent;
-		const workspace = task?.workspace;
+	const task = event?.task as TaskWithAgent | undefined;
+	const agent = task?.workspaceAgent?.agent ?? task?.agent;
+	const workspace = task?.workspace;
 
-		if (!event || !task || !agent || !workspace) {
-			console.log("Skipping event without task, agent, or workspace", payload);
-			return;
-		}
+	if (!event || !task || !agent || !workspace) {
+		console.log("Skipping event without task, agent, or workspace", payload);
+		return;
+	}
 
-		try {
-			if (event?.type === "chaterface.new_task") {
-				await processNewTask(
-					event as Event,
-					agent as Agent,
-					task as Task,
-					workspace as WorkspaceWithRepositories,
-				);
-			} else if (event?.type === "chaterface.new_user_message") {
-				await processNewUserMessage(
-					event as Event,
-					task as Task,
-					agent as Agent,
-					workspace as WorkspaceWithRepositories,
-				);
-			}
-		} catch (error) {
-			await updateTaskFailureState(
-				task.id,
-				(event as EventWithAgentSession).agentSession?.id,
+	try {
+		if (event?.type === "chaterface.new_task") {
+			await processNewTask(
+				event as Event,
+				agent as Agent,
+				task as Task,
+				workspace as WorkspaceWithRepositories,
 			);
-			throw error;
+		} else if (event?.type === "chaterface.new_user_message") {
+			await processNewUserMessage(
+				event as Event,
+				task as Task,
+				agent as Agent,
+				workspace as WorkspaceWithRepositories,
+			);
 		}
-	},
-});
+	} catch (error) {
+		await updateTaskFailureState(
+			task.id,
+			(event as EventWithAgentSession).agentSession?.id,
+		);
+		throw error;
+	}
+}
 
 const processNewTask = async (
 	event: Event,

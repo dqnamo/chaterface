@@ -5,7 +5,6 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --port 3001",
-		"trigger:dev": "trigger dev --env-file .env.local",
 		"instant:push-schema": "pnpx instant-cli@latest push schema",
 		"instant:push-perms": "pnpx instant-cli@latest push perms",
 		"build": "next build",
@@ -27,7 +26,6 @@
 		"@tiptap/extension-placeholder": "^3.27.0",
 		"@tiptap/react": "^3.27.0",
 		"@tiptap/starter-kit": "^3.27.0",
-		"@trigger.dev/sdk": "^4.4.6",
 		"@xyflow/react": "^12.11.0",
 		"clsx": "^2.1.1",
 		"e2b": "^2.29.1",
@@ -42,19 +40,18 @@
 		"react-resizable-panels": "^4.11.2",
 		"shiki": "3.23.0",
 		"streamdown": "^2.5.0",
-		"tailwind-merge": "^3.6.0"
+		"tailwind-merge": "^3.6.0",
+		"workflow": "^4.5.0"
 	},
 	"devDependencies": {
 		"@repo/typescript-config": "workspace:*",
 		"@tailwindcss/postcss": "^4.3.0",
-		"@trigger.dev/build": "^4.4.6",
 		"@types/luxon": "^3.7.1",
 		"@types/node": "^22.15.3",
 		"@types/react": "19.2.2",
 		"@types/react-dom": "19.2.2",
 		"postcss": "^8.5.15",
 		"tailwindcss": "^4.3.0",
-		"trigger.dev": "^4.4.6",
 		"typescript": "5.9.2"
 	}
 }

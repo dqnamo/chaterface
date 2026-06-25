@@ -1,3 +1,6 @@
+import { resolve } from "node:path";
+import { withWorkflow } from "workflow/next";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
 	allowedDevOrigins: [
@@ -6,6 +9,7 @@ const nextConfig = {
 		"*.interface.ngrok.pro",
 		"*.previews.chaterface.com",
 	],
+	outputFileTracingRoot: resolve(process.cwd(), "../.."),
 };
 
-export default nextConfig;
+export default withWorkflow(nextConfig);

@@ -3,7 +3,7 @@ import path from "node:path";
 
 const SYSTEM_PROMPT_PATH = path.join(
 	process.cwd(),
-	"trigger/prompts/system.md",
+	"workflows/prompts/system.md",
 );
 
 const DEFAULT_API_URL = "https://api.chaterface.com";

@@ -2,7 +2,7 @@
 
 This Next.js app is the main Chaterface product interface. It handles workspace
 setup, task timelines, agent interaction, integrations, repository settings,
-secrets, preview sessions, and Trigger.dev task processing.
+secrets, preview sessions, and Vercel Workflow processing.
 
 ## Development
 
@@ -22,12 +22,6 @@ pnpm --filter web-app dev
 pnpm --filter api dev
 ```
 
-Run the Trigger.dev worker locally:
-
-```sh
-pnpm --filter web-app trigger:dev
-```
-
 ## Environment
 
 Common local variables:
@@ -37,8 +31,8 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 NEXT_PUBLIC_INSTANT_APP_ID=
 INSTANT_APP_ADMIN_TOKEN=
 SECRET_ENCRYPTION_KEY=
-TRIGGER_PROJECT_REF=
-TRIGGER_SECRET_KEY=
+# Optional. Falls back to SECRET_ENCRYPTION_KEY.
+WORKFLOW_INTERNAL_SECRET=
 ```
 
 Use `NEXT_PUBLIC_API_URL=http://localhost:3002` for normal local development.

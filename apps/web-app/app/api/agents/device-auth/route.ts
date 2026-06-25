@@ -1,7 +1,7 @@
-import { tasks } from "@trigger.dev/sdk";
 import { type NextRequest, NextResponse } from "next/server";
+import { start } from "workflow/api";
 import db, { id } from "@/instant.admin";
-import type { startCodexDeviceAuthTask } from "@/trigger/start-codex-device-auth";
+import { startCodexDeviceAuthWorkflow } from "@/workflows/start-codex-device-auth";
 
 type AuthenticatedWorkspace = {
 	id: string;
@@ -87,21 +87,14 @@ export async function POST(req: NextRequest) {
 	]);
 
 	try {
-		const handle = await tasks.trigger<typeof startCodexDeviceAuthTask>(
-			"start-codex-device-auth",
-			{ agentId },
-			{
-				idempotencyKey: `codex-device-auth-${agentId}`,
-				idempotencyKeyTTL: "1h",
-			},
-		);
+		const run = await start(startCodexDeviceAuthWorkflow, [{ agentId }]);
 
 		await db.transact(
 			agentTx(agentId).update({
 				authState: {
 					type: "codex_device_auth",
 					status: "queued",
-					triggerRunId: handle.id,
+					workflowRunId: run.runId,
 					queuedAt: createdAt,
 				},
 			}),
@@ -122,7 +115,7 @@ export async function POST(req: NextRequest) {
 					createdAt,
 					status: "auth_queued",
 				},
-				triggerRunId: handle.id,
+				workflowRunId: run.runId,
 			},
 			{ status: 202 },
 		);
