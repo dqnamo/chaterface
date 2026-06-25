@@ -64,6 +64,7 @@ import { Select } from "@/components/Select";
 import { ServicePreviewFrame } from "@/components/ServicePreviewFrame";
 import { ExpandSidebarButton, useSidebar } from "@/components/SidebarContext";
 import { Tabs } from "@/components/Tabs";
+import { TaskCodeEditor } from "@/components/TaskCodeEditor";
 import {
 	getTaskPresenceProfile,
 	getUserProfileDisplayName,
@@ -1520,6 +1521,7 @@ export default function TaskPage() {
 					<div className="flex flex-row items-center gap-1.5 p-1.5 border-b border-grayscale-4">
 						<Tabs.List>
 							<Tabs.Tab value="previews">Previews</Tabs.Tab>
+							<Tabs.Tab value="editor">Editor</Tabs.Tab>
 							<Tabs.Tab value="pull-requests">PRs</Tabs.Tab>
 							<Tabs.Tab value="changes">Changes</Tabs.Tab>
 							<Tabs.Indicator />
@@ -1630,6 +1632,13 @@ export default function TaskPage() {
 								</div>
 							</div>
 						)}
+					</Tabs.Panel>
+					<Tabs.Panel value="editor" className="flex min-h-0 flex-1 flex-col">
+						<TaskCodeEditor
+							hasSandbox={Boolean(task?.sandboxId)}
+							taskId={taskId as string}
+							userToken={user?.refresh_token}
+						/>
 					</Tabs.Panel>
 					<Tabs.Panel
 						value="pull-requests"

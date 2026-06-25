@@ -41,7 +41,7 @@ export const authenticateTaskRequest = async (
 					tasks: {
 						$: {
 							where: { id },
-							fields: ["latestDiffPath"],
+							fields: ["latestDiffPath", "sandboxId"],
 						},
 						workspace: workspaceMembershipQuery,
 					},
