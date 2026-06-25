@@ -242,6 +242,7 @@ const _schema = i.schema({
 			type: i.string().optional(),
 			data: i.json().optional(),
 			createdAt: i.date().optional(),
+			workflowRunId: i.string().indexed().optional(),
 		}),
 	},
 	links: {

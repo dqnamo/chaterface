@@ -1,16 +1,25 @@
-import { idempotencyKeys, tasks } from "@trigger.dev/sdk";
+import { start } from "workflow/api";
 import db from "@/instant.admin";
-import type { processEventTask } from "@/trigger/process-event";
+import { processEventWorkflow } from "@/workflows/process-event";
+
+type EventForWorkflowStart = {
+	workflowRunId?: string;
+};
 
 const { typedHandlers, combineHandlers } = db.webhooks.helpers();
 
+const eventTx = (eventId: string) => {
+	const tx = db.tx.events[eventId];
+
+	if (!tx) {
+		throw new Error(`Event transaction builder ${eventId} not found`);
+	}
+
+	return tx;
+};
+
 const handlers = combineHandlers(
 	typedHandlers("events", "create", async (record) => {
-		const idempotencyKey = await idempotencyKeys.create(
-			`instant-event-created-${record.idempotencyKey}`,
-			{ scope: "global" },
-		);
-
 		if (
 			record.after.type !== "chaterface.new_user_message" &&
 			record.after.type !== "chaterface.new_task"
@@ -19,15 +28,38 @@ const handlers = combineHandlers(
 			return;
 		}
 
-		const handle = await tasks.trigger<typeof processEventTask>(
-			"process-event",
-			{ eventId: record.id },
-			{ idempotencyKey, idempotencyKeyTTL: "60d" },
+		const event = await db
+			.query({
+				events: {
+					$: {
+						fields: ["workflowRunId"],
+						where: {
+							id: record.id,
+						},
+					},
+				},
+			})
+			.then((result) => result.events[0] as EventForWorkflowStart | undefined);
+
+		if (event?.workflowRunId) {
+			console.log("Skipping already-started workflow event", {
+				eventId: record.id,
+				runId: event.workflowRunId,
+			});
+			return;
+		}
+
+		const run = await start(processEventWorkflow, [{ eventId: record.id }]);
+
+		await db.transact(
+			eventTx(record.id).update({
+				workflowRunId: run.runId,
+			}),
 		);
 
-		console.log("Triggered process-event task", {
+		console.log("Started process-event workflow", {
 			eventId: record.id,
-			runId: handle.id,
+			runId: run.runId,
 		});
 	}),
 );

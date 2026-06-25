@@ -10,7 +10,7 @@ public website, a Hono API, and shared packages for data, encryption, and UI.
 ## Project Status
 
 Chaterface is under active development. The core app is usable locally, but some
-workflows depend on third-party services such as InstantDB, Trigger.dev, E2B,
+workflows depend on third-party services such as InstantDB, Vercel Workflows, E2B,
 GitHub Apps, Slack, PostHog, Cloudflare, and a public tunnel for OAuth/webhooks.
 
 You do not need the maintainer's tunnel domains to contribute. The default
@@ -24,7 +24,7 @@ contributor setup should run against `localhost`.
 - Stores workspace secrets, package setup, commands, repositories, and MCP server
   configuration.
 - Provides preview URLs for services started inside agent sandboxes.
-- Supports integration points for Slack, MCP, GitHub Apps, Trigger.dev, InstantDB,
+- Supports integration points for Slack, MCP, GitHub Apps, Vercel Workflows, InstantDB,
   E2B, and PostHog.
 
 ## Repository Layout
@@ -46,7 +46,7 @@ contributor setup should run against `localhost`.
 - [Next.js](https://nextjs.org/) and React for the website and product app.
 - [Hono](https://hono.dev/) for the API service.
 - [InstantDB](https://www.instantdb.com/) for auth, data, and realtime state.
-- [Trigger.dev](https://trigger.dev/) for background task processing.
+- [Vercel Workflows](https://vercel.com/docs/workflows) for durable background processing.
 - [E2B](https://e2b.dev/) for cloud sandboxes.
 - [Turborepo](https://turbo.build/repo), pnpm, TypeScript, and Biome for the
   monorepo toolchain.
@@ -123,7 +123,6 @@ Optional services:
 
 ```sh
 pnpm --filter previews dev
-pnpm --filter web-app trigger:dev
 ```
 
 ## Running With Overmind
@@ -134,7 +133,7 @@ The root `pnpm dev` command starts the `Procfile` with Overmind:
 pnpm dev
 ```
 
-The current `Procfile` includes website, web app, API, Trigger.dev, and ngrok
+The current `Procfile` includes website, web app, API, and ngrok
 processes. Because the checked-in `ngrok.yml` references maintainer-owned
 reserved domains, most contributors should run only the processes they need:
 
@@ -170,19 +169,19 @@ Required for the API and web app:
 | --- | --- | --- |
 | `NEXT_PUBLIC_INSTANT_APP_ID` | API, web app | InstantDB app ID. |
 | `INSTANT_APP_ADMIN_TOKEN` | API, web app | InstantDB admin token for server-side operations. |
-| `SECRET_ENCRYPTION_KEY` | API, web app, worker | Secret used to encrypt stored credentials and integration tokens. |
-| `NEXT_PUBLIC_API_URL` | web app, worker | Base URL for the API. Use `http://localhost:3002` for local development. |
+| `SECRET_ENCRYPTION_KEY` | API, web app | Secret used to encrypt stored credentials and integration tokens. Also secures internal workflow calls when `WORKFLOW_INTERNAL_SECRET` is unset. |
+| `NEXT_PUBLIC_API_URL` | web app | Base URL for the API. Use `http://localhost:3002` for local development. |
 | `PORT` | API | API port. Defaults to `3002` in local setup. |
 
 Common optional variables:
 
 | Variable | Used by | Description |
 | --- | --- | --- |
-| `TRIGGER_PROJECT_REF` | web app | Trigger.dev project reference. |
-| `TRIGGER_SECRET_KEY` | web app | Trigger.dev local/remote worker secret. |
-| `GITHUB_APP_ID` | web app, worker | GitHub App ID for repository access. |
+| `WORKFLOW_INTERNAL_SECRET` | web app | Optional secret for Vercel Workflow calls into internal API routes. Falls back to `SECRET_ENCRYPTION_KEY`. |
+| `NEXT_PUBLIC_APP_URL` | web app | Optional explicit web app origin for workflow self-calls. Falls back to `VERCEL_URL` or `http://localhost:3001`. |
+| `GITHUB_APP_ID` | web app | GitHub App ID for repository access. |
 | `GITHUB_APP_SLUG` | web app | GitHub App slug for install flows. |
-| `GITHUB_APP_PRIVATE_KEY` | web app, worker | GitHub App private key. |
+| `GITHUB_APP_PRIVATE_KEY` | web app | GitHub App private key. |
 | `GITHUB_APP_STATE_SECRET` | web app | Optional override for signing GitHub install state. |
 | `SLACK_CLIENT_ID` | web app | Slack OAuth app client ID. |
 | `SLACK_CLIENT_SECRET` | web app | Slack OAuth app client secret. |
@@ -217,19 +216,8 @@ Repository operations require a GitHub App. For local development:
    - Metadata: read-only.
 4. Add `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, and `GITHUB_APP_PRIVATE_KEY` to
    `apps/web-app/.env.local`.
-5. Add `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` to any API or worker
-   environment that needs to mint installation tokens.
-
-## Trigger.dev Worker
-
-Run the web app worker locally with:
-
-```sh
-pnpm --filter web-app trigger:dev
-```
-
-Set `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY` in
-`apps/web-app/.env.local` when using Trigger.dev.
+5. Add `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` to the web app environment
+   so background workflows can mint installation tokens.
 
 ## Database Schema
 

@@ -130,17 +130,17 @@ const techStackCards = [
 	},
 	{
 		description:
-			"Processes agent events, device auth, sandbox startup, and background task sync.",
+			"Runs durable background workflows for agent events, device auth, and sandbox lifecycle work.",
 		logo: (
 			<Image
 				alt=""
 				className="size-5 object-contain"
 				height={20}
-				src="/logos/trigger-dev.png"
+				src="/logos/vercel.svg"
 				width={20}
 			/>
 		),
-		title: "Trigger.dev",
+		title: "Vercel Workflows",
 	},
 	{
 		description:
