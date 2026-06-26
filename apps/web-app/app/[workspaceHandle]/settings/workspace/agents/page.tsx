@@ -462,7 +462,7 @@ export default function AgentsPage() {
 			await db.transact(
 				workspaceAgentTx(workspaceAgentId)
 					.create({
-						name: agent.name,
+						name: getAgentDisplayName(agent),
 						createdAt: new Date().toISOString(),
 						status: agent.status ?? "ready",
 						settings: getAgentSettingsRecord(agent.settings),
@@ -1038,7 +1038,7 @@ function ImportableAgentListItem({
 			<div className="flex min-w-0 flex-col gap-1">
 				<div className="flex min-w-0 items-center gap-2">
 					<p className="truncate text-sm font-medium text-grayscale-12">
-						{agent.name}
+						{getAgentDisplayName(agent)}
 					</p>
 					<span className="shrink-0 bg-grayscale-2 px-1.5 py-0.5 font-mono text-[10px] text-grayscale-10 uppercase">
 						{getProviderLabel(agent.provider)}
@@ -1066,6 +1066,9 @@ function ImportableAgentListItem({
 		</div>
 	);
 }
+
+const getAgentDisplayName = (agent: Pick<Agent, "id" | "name">) =>
+	agent.name?.trim() || `Agent ${agent.id.slice(0, 8)}`;
 
 function Field({
 	label,

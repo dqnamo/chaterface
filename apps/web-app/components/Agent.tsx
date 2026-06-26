@@ -11,7 +11,7 @@ export default function Agent({ agent }: { agent: Agent }) {
 
 	return (
 		<div className="flex flex-row gap-2">
-			<div className="text-sm font-medium">{agent.name}</div>
+			<div className="text-sm font-medium">{agent.name ?? "Unnamed agent"}</div>
 			<div className="text-sm text-gray-500">{agent.status}</div>
 			<button
 				type="button"

@@ -146,7 +146,7 @@ const _schema = i.schema({
 			lastTriggeredAt: i.date().optional(),
 		}),
 		agents: i.entity({
-			name: i.string().indexed(),
+			name: i.string().indexed().optional(),
 			auth: i.json().optional(),
 			authState: i.json().optional(),
 			createdAt: i.date().optional(),
