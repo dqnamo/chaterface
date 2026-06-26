@@ -1,8 +1,8 @@
 import { type ConnectionOptions, type JobsOptions, Queue } from "bullmq";
 
-export const PROCESS_EVENT_QUEUE_NAME = "chaterface:process-event";
+export const PROCESS_EVENT_QUEUE_NAME = "chaterface-process-event";
 export const START_CODEX_DEVICE_AUTH_QUEUE_NAME =
-	"chaterface:start-codex-device-auth";
+	"chaterface-start-codex-device-auth";
 
 export type ProcessEventJobData = {
 	eventId: string;
