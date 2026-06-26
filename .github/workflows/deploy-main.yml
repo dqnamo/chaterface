@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Push schema and deploy tasks
+    name: Push schema
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,13 +39,6 @@ jobs:
       - name: Push Instant schema
         working-directory: apps/web-app
         env:
-          NEXT_PUBLIC_INSTANT_APP_ID: ${{ secrets.NEXT_PUBLIC_INSTANT_APP_ID }}
+          NEXT_PUBLIC_INSTANT_APP_ID: ${{ secrets.INSTANT_APP_ID }}
           INSTANT_APP_ADMIN_TOKEN: ${{ secrets.INSTANT_APP_ADMIN_TOKEN }}
         run: pnpx instant-cli@latest push schema --yes --token "$INSTANT_APP_ADMIN_TOKEN"
-
-      - name: Deploy Trigger.dev
-        working-directory: apps/web-app
-        env:
-          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-          TRIGGER_PROJECT_REF: ${{ secrets.TRIGGER_PROJECT_REF }}
-        run: pnpx trigger.dev@latest deploy
