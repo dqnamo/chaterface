@@ -5,6 +5,10 @@
 		"build": {
 			"dependsOn": ["^build"],
 			"env": [
+				"CLOUDFLARE_AI_GATEWAY_ID",
+				"CLOUDFLARE_API_TOKEN",
+				"CLOUDFLARE_TASK_NAMING_MODEL",
+				"E2B_API_KEY",
 				"UPSTASH_BOX_API_KEY",
 				"PREVIEW_COOKIE_DOMAIN",
 				"PREVIEW_SESSION_SECRET",
@@ -12,7 +16,8 @@
 				"INSTANT_APP_ADMIN_TOKEN",
 				"SECRET_ENCRYPTION_KEY",
 				"TRIGGER_PROJECT_REF",
-				"TRIGGER_SECRET_KEY"
+				"TRIGGER_SECRET_KEY",
+				"WORKER_REDIS_URL"
 			],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
