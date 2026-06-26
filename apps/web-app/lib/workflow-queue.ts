@@ -34,7 +34,7 @@ export const enqueueProcessEventWorkflow = async (
 	const queue = createProcessEventQueue();
 	const job = await queue.add("process-event", payload, {
 		...getDefaultJobOptions(),
-		jobId: `process-event:${payload.eventId}`,
+		jobId: `process-event-${payload.eventId}`,
 	});
 
 	return { runId: job.id ?? job.name };
@@ -46,7 +46,7 @@ export const enqueueStartCodexDeviceAuthWorkflow = async (
 	const queue = createStartCodexDeviceAuthQueue();
 	const job = await queue.add("start-codex-device-auth", payload, {
 		...getDefaultJobOptions(),
-		jobId: `start-codex-device-auth:${payload.agentId}`,
+		jobId: `start-codex-device-auth-${payload.agentId}`,
 	});
 
 	return { runId: job.id ?? job.name };
