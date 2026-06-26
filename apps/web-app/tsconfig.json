@@ -7,9 +7,6 @@
 		},
 		"plugins": [
 			{
-				"name": "workflow"
-			},
-			{
 				"name": "next"
 			}
 		],

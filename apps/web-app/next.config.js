@@ -1,5 +1,4 @@
 import { resolve } from "node:path";
-import { withWorkflow } from "workflow/next";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -12,4 +11,4 @@ const nextConfig = {
 	outputFileTracingRoot: resolve(process.cwd(), "../.."),
 };
 
-export default withWorkflow(nextConfig);
+export default nextConfig;

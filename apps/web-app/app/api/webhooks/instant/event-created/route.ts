@@ -1,6 +1,5 @@
-import { start } from "workflow/api";
 import db from "@/instant.admin";
-import { processEventWorkflow } from "@/workflows/process-event";
+import { enqueueProcessEventWorkflow } from "@/lib/workflow-queue";
 
 type EventForWorkflowStart = {
 	workflowRunId?: string;
@@ -49,7 +48,7 @@ const handlers = combineHandlers(
 			return;
 		}
 
-		const run = await start(processEventWorkflow, [{ eventId: record.id }]);
+		const run = await enqueueProcessEventWorkflow({ eventId: record.id });
 
 		await db.transact(
 			eventTx(record.id).update({
@@ -57,7 +56,7 @@ const handlers = combineHandlers(
 			}),
 		);
 
-		console.log("Started process-event workflow", {
+		console.log("Enqueued process-event workflow", {
 			eventId: record.id,
 			runId: run.runId,
 		});

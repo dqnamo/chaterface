@@ -1,0 +1,15 @@
+{
+	"extends": "@repo/typescript-config/base.json",
+	"compilerOptions": {
+		"baseUrl": "../web-app",
+		"paths": {
+			"@/*": ["./*"]
+		},
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"noEmit": true,
+		"strictNullChecks": true
+	},
+	"include": ["src/**/*.ts", "../web-app/**/*.ts"],
+	"exclude": ["node_modules", "../web-app/.next"]
+}

@@ -10,7 +10,7 @@ public website, a Hono API, and shared packages for data, encryption, and UI.
 ## Project Status
 
 Chaterface is under active development. The core app is usable locally, but some
-workflows depend on third-party services such as InstantDB, Vercel Workflows, E2B,
+workflows depend on third-party services such as InstantDB, Redis/BullMQ, E2B,
 GitHub Apps, Slack, PostHog, Cloudflare, and a public tunnel for OAuth/webhooks.
 
 You do not need the maintainer's tunnel domains to contribute. The default
@@ -24,8 +24,8 @@ contributor setup should run against `localhost`.
 - Stores workspace secrets, package setup, commands, repositories, and MCP server
   configuration.
 - Provides preview URLs for services started inside agent sandboxes.
-- Supports integration points for Slack, MCP, GitHub Apps, Vercel Workflows, InstantDB,
-  E2B, and PostHog.
+- Supports integration points for Slack, MCP, GitHub Apps, Redis/BullMQ,
+  InstantDB, E2B, and PostHog.
 
 ## Repository Layout
 
@@ -34,6 +34,7 @@ contributor setup should run against `localhost`.
 | `apps/website` | Public Chaterface website. Runs on `localhost:3000`. |
 | `apps/web-app` | Main product app. Runs on `localhost:3001`. |
 | `apps/api` | Hono API used by the web app and agent sandboxes. Runs on `localhost:3002`. |
+| `apps/worker` | Persistent BullMQ worker that runs long-running agent jobs. |
 | `apps/previews` | Preview proxy for services started inside sandboxes. |
 | `packages/db` | Shared InstantDB schema, client helpers, and admin helpers. |
 | `packages/encryption` | Shared encryption helpers. |
@@ -46,16 +47,17 @@ contributor setup should run against `localhost`.
 - [Next.js](https://nextjs.org/) and React for the website and product app.
 - [Hono](https://hono.dev/) for the API service.
 - [InstantDB](https://www.instantdb.com/) for auth, data, and realtime state.
-- [Vercel Workflows](https://vercel.com/docs/workflows) for durable background processing.
+- [BullMQ](https://bullmq.io/) and Redis for persistent background processing.
 - [E2B](https://e2b.dev/) for cloud sandboxes.
 - [Turborepo](https://turbo.build/repo), pnpm, TypeScript, and Biome for the
   monorepo toolchain.
 
 ## Requirements
 
-- Node.js 18 or newer.
+- Node.js 20.10 or newer.
 - pnpm 9.
 - Optional: Overmind if you want one command to run the local process group.
+- Optional: Redis if you want to run background agent jobs locally.
 - Optional: ngrok, Cloudflare Tunnel, or another tunnel provider for testing
   OAuth callbacks and webhooks from external services.
 
@@ -85,6 +87,7 @@ Create local environment files:
 ```sh
 cp apps/api/.env.example apps/api/.env.local
 touch apps/web-app/.env.local
+touch apps/worker/.env.local
 ```
 
 At minimum, fill in InstantDB and encryption values:
@@ -101,6 +104,9 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 NEXT_PUBLIC_INSTANT_APP_ID=
 INSTANT_APP_ADMIN_TOKEN=
 SECRET_ENCRYPTION_KEY=
+
+# apps/worker/.env.local
+WORKER_REDIS_URL=redis://localhost:6379
 ```
 
 Start the main local services in separate terminals:
@@ -108,6 +114,7 @@ Start the main local services in separate terminals:
 ```sh
 pnpm --filter api dev
 pnpm --filter web-app dev
+pnpm --filter worker dev
 pnpm --filter website dev
 ```
 
@@ -133,13 +140,13 @@ The root `pnpm dev` command starts the `Procfile` with Overmind:
 pnpm dev
 ```
 
-The current `Procfile` includes website, web app, API, and ngrok
+The current `Procfile` includes website, web app, API, worker, and ngrok
 processes. Because the checked-in `ngrok.yml` references maintainer-owned
 reserved domains, most contributors should run only the processes they need:
 
 ```sh
-OVERMIND_PROCESSES=website,web-app,api pnpm dev
-OVERMIND_PROCESSES=web-app,api pnpm dev
+OVERMIND_PROCESSES=website,web-app,api,worker pnpm dev
+OVERMIND_PROCESSES=web-app,api,worker pnpm dev
 ```
 
 There is also a Turborepo command that starts every workspace `dev` script:
@@ -171,14 +178,15 @@ Required for the API and web app:
 | `INSTANT_APP_ADMIN_TOKEN` | API, web app | InstantDB admin token for server-side operations. |
 | `SECRET_ENCRYPTION_KEY` | API, web app | Secret used to encrypt stored credentials and integration tokens. Also secures internal workflow calls when `WORKFLOW_INTERNAL_SECRET` is unset. |
 | `NEXT_PUBLIC_API_URL` | web app | Base URL for the API. Use `http://localhost:3002` for local development. |
+| `WORKER_REDIS_URL` | web app, worker | Redis connection URL used by BullMQ to enqueue and process long-running jobs. `BULLMQ_REDIS_URL` and `REDIS_URL` are also accepted. |
 | `PORT` | API | API port. Defaults to `3002` in local setup. |
 
 Common optional variables:
 
 | Variable | Used by | Description |
 | --- | --- | --- |
-| `WORKFLOW_INTERNAL_SECRET` | web app | Optional secret for Vercel Workflow calls into internal API routes. Falls back to `SECRET_ENCRYPTION_KEY`. |
-| `NEXT_PUBLIC_APP_URL` | web app | Optional explicit web app origin for workflow self-calls. Falls back to `VERCEL_URL` or `http://localhost:3001`. |
+| `WORKFLOW_INTERNAL_SECRET` | web app | Optional secret for internal workflow HTTP routes. Falls back to `SECRET_ENCRYPTION_KEY`. |
+| `NEXT_PUBLIC_APP_URL` | web app | Optional explicit web app origin for legacy workflow self-calls. Falls back to `VERCEL_URL` or `http://localhost:3001`. |
 | `GITHUB_APP_ID` | web app | GitHub App ID for repository access. |
 | `GITHUB_APP_SLUG` | web app | GitHub App slug for install flows. |
 | `GITHUB_APP_PRIVATE_KEY` | web app | GitHub App private key. |

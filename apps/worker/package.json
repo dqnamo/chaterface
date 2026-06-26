@@ -1,0 +1,27 @@
+{
+	"name": "worker",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "NODE_OPTIONS='--conditions=development' tsx watch src/index.ts",
+		"start": "NODE_OPTIONS='--conditions=development' tsx src/index.ts",
+		"lint": "biome check .",
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@instantdb/admin": "^1.0.43",
+		"@instantdb/react": "^1.0.43",
+		"@repo/db": "workspace:*",
+		"bullmq": "^5.34.2",
+		"dotenv": "^17.2.3",
+		"e2b": "^2.29.1",
+		"luxon": "^3.7.2"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "^22.15.3",
+		"tsx": "^4.19.4",
+		"typescript": "5.9.2"
+	}
+}

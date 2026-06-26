@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { start } from "workflow/api";
 import db, { id } from "@/instant.admin";
-import { startCodexDeviceAuthWorkflow } from "@/workflows/start-codex-device-auth";
+import { enqueueStartCodexDeviceAuthWorkflow } from "@/lib/workflow-queue";
 
 type AuthenticatedWorkspace = {
 	id: string;
@@ -87,7 +86,7 @@ export async function POST(req: NextRequest) {
 	]);
 
 	try {
-		const run = await start(startCodexDeviceAuthWorkflow, [{ agentId }]);
+		const run = await enqueueStartCodexDeviceAuthWorkflow({ agentId });
 
 		await db.transact(
 			agentTx(agentId).update({
