@@ -1,6 +1,8 @@
 // Docs: https://www.instantdb.com/docs/modeling-data
 
-import { i } from "@instantdb/react";
+// Imported from `@instantdb/core` (rather than `@instantdb/react`) so the schema
+// stays platform-neutral and can be shared with the React Native app.
+import { i } from "@instantdb/core";
 
 const _schema = i.schema({
 	entities: {

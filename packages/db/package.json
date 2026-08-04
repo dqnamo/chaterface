@@ -18,6 +18,16 @@
 			"types": "./src/client.ts",
 			"development": "./src/client.ts",
 			"default": "./dist/client.js"
+		},
+		"./timeline": {
+			"types": "./src/timeline.ts",
+			"development": "./src/timeline.ts",
+			"default": "./dist/timeline.js"
+		},
+		"./agent-options": {
+			"types": "./src/agent-options.ts",
+			"development": "./src/agent-options.ts",
+			"default": "./dist/agent-options.js"
 		}
 	},
 	"scripts": {
@@ -27,6 +37,7 @@
 	},
 	"dependencies": {
 		"@instantdb/admin": "^1.0.43",
+		"@instantdb/core": "^1.0.43",
 		"@instantdb/react": "^1.0.43"
 	},
 	"devDependencies": {
