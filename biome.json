@@ -5,6 +5,9 @@
 		"clientKind": "git",
 		"useIgnoreFile": true
 	},
+	"files": {
+		"includes": ["**", "!**/uniwind-types.d.ts"]
+	},
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab",
@@ -39,5 +42,60 @@
 				"organizeImports": "on"
 			}
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["apps/mobile/src/components/markdown/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noArrayIndexKey": "off",
+						"useGetterReturn": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/mobile/src/components/markdown/**",
+				"apps/mobile/src/components/chat/conversation.tsx",
+				"apps/mobile/src/components/chat/conversation.web.tsx",
+				"apps/mobile/src/components/chat/prompt-input.web.tsx",
+				"apps/mobile/src/components/icon.tsx",
+				"apps/mobile/src/components/symbol-image.tsx",
+				"apps/mobile/src/components/touchable-glass.tsx",
+				"apps/mobile/src/components/tw.tsx"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/mobile/src/components/chat/conversation.tsx",
+				"apps/mobile/src/components/chat/conversation.web.tsx"
+			],
+			"linter": {
+				"rules": {
+					"correctness": {
+						"useExhaustiveDependencies": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/mobile/src/global.css"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noDuplicateCustomProperties": "off"
+					}
+				}
+			}
+		}
+	]
 }

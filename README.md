@@ -36,7 +36,8 @@ contributor setup should run against `localhost`.
 | `apps/api` | Hono API used by the web app and agent sandboxes. Runs on `localhost:3002`. |
 | `apps/worker` | Persistent BullMQ worker that runs long-running agent jobs. |
 | `apps/previews` | Preview proxy for services started inside sandboxes. |
-| `packages/db` | Shared InstantDB schema, client helpers, and admin helpers. |
+| `apps/mobile` | Expo app for iOS, Android, and web. Runs on `localhost:8081`. |
+| `packages/db` | Shared InstantDB schema, timeline model, agent options, and client/admin helpers. |
 | `packages/encryption` | Shared encryption helpers. |
 | `packages/ui` | Shared React UI primitives. |
 | `packages/typescript-config` | Shared TypeScript configuration. |
@@ -45,6 +46,7 @@ contributor setup should run against `localhost`.
 ## Tech Stack
 
 - [Next.js](https://nextjs.org/) and React for the website and product app.
+- [Expo](https://expo.dev/) and React Native for the mobile app.
 - [Hono](https://hono.dev/) for the API service.
 - [InstantDB](https://www.instantdb.com/) for auth, data, and realtime state.
 - [BullMQ](https://bullmq.io/) and Redis for persistent background processing.
@@ -57,6 +59,7 @@ contributor setup should run against `localhost`.
 - Node.js 20.10 or newer.
 - pnpm 9.
 - Optional: Overmind if you want one command to run the local process group.
+- Optional: Xcode or Android Studio if you want to run the mobile app natively.
 - Optional: Redis if you want to run background agent jobs locally.
 - Optional: ngrok, Cloudflare Tunnel, or another tunnel provider for testing
   OAuth callbacks and webhooks from external services.
@@ -132,6 +135,27 @@ Optional services:
 pnpm --filter previews dev
 ```
 
+## Mobile App
+
+`apps/mobile` is an Expo app that talks to the same InstantDB workspace as the
+web app. It signs in with the same email magic code, lists the active
+workspace's tasks, renders a task's agent event timeline as a chat transcript,
+and can start new tasks and send follow-up turns.
+
+```sh
+cp apps/mobile/.env.example apps/mobile/.env
+# EXPO_PUBLIC_INSTANT_APP_ID must match NEXT_PUBLIC_INSTANT_APP_ID
+pnpm --filter mobile dev
+```
+
+Then press `i`, `a`, or `w` to open iOS, Android, or web. The app needs no API
+or worker process of its own: tasks and turns are plain InstantDB transactions,
+picked up by the same backend workflow the web app relies on.
+
+Expo tooling requires a flat `node_modules` tree, so the repo sets
+`node-linker=hoisted` in `.npmrc`. If you are upgrading an existing checkout,
+delete `node_modules` and run `pnpm install` again.
+
 ## Running With Overmind
 
 The root `pnpm dev` command starts the `Procfile` with Overmind:
@@ -180,6 +204,7 @@ Required for the API and web app:
 | `NEXT_PUBLIC_API_URL` | web app | Base URL for the API. Use `http://localhost:3002` for local development. |
 | `WORKER_REDIS_URL` | web app, worker | Redis connection URL used by BullMQ to enqueue and process long-running jobs. `BULLMQ_REDIS_URL` and `REDIS_URL` are also accepted. |
 | `PORT` | API | API port. Defaults to `3002` in local setup. |
+| `EXPO_PUBLIC_INSTANT_APP_ID` | mobile | InstantDB app ID for the mobile app. Same value as `NEXT_PUBLIC_INSTANT_APP_ID`. |
 
 Common optional variables:
 

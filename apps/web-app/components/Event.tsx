@@ -1,4 +1,3 @@
-import type { InstaQLEntity } from "@instantdb/react";
 import {
 	CheckCircleIcon,
 	CircleNotchIcon,
@@ -6,6 +5,26 @@ import {
 	WarningCircleIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
+import {
+	type Attachment,
+	asRecord,
+	buildTimeline,
+	formatEventType,
+	formatFileSize,
+	formatNumber,
+	formatRelativeTimestamp,
+	getAttachments,
+	getNumber,
+	getRecordArray,
+	getString,
+	getUserDisplayName,
+	type JsonRecord,
+	parseTimestamp,
+	summarizeCount,
+	type TimelineNode,
+	type TimelinePhase,
+	type UserDisplayProfile,
+} from "@repo/db/timeline";
 import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
@@ -16,53 +35,21 @@ import {
 	Streamdown,
 } from "streamdown";
 import { getPublicServiceUrl } from "@/helpers/service-preview-url-helper";
-import type { AppSchema } from "@/instant.schema";
 import CodeBlock from "./CodeBlock";
 import Logo from "./Logo";
 import Monogram from "./Monogram";
 
-type EventEntity = InstaQLEntity<AppSchema, "events">;
-type JsonRecord = Record<string, unknown>;
+export type { TimelineNode, TimelinePhase, UserDisplayProfile };
+// The timeline model is shared with the mobile app; this module owns only the
+// web rendering of it.
+export { buildTimeline };
+
 type TaskSummary = {
 	id?: string;
 	name?: string;
 	instructions?: string;
 };
-type Attachment = {
-	id: string;
-	path: string;
-	url?: string;
-	name: string;
-	contentType: string;
-	size: number;
-};
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
-export type UserDisplayProfile = {
-	id: string;
-	email?: string;
-	memberName?: string;
-	userName?: string;
-};
-
-/** A resolved lifecycle state for a grouped (started -> finished) timeline row. */
-export type TimelinePhase = "running" | "success" | "warning" | "failed";
-
-/**
- * A single row in the timeline. Lifecycle events that share a key (e.g. a
- * setup step's `started` and `completed` events) are folded into one node so
- * the row stays in place and just updates its icon as it progresses.
- */
-export type TimelineNode = {
-	key: string;
-	event: EventEntity;
-	phase?: TimelinePhase;
-	startedAt?: string;
-};
-
-type TimelineContext = {
-	runKey: string;
-	turnKey: string;
-};
 type TimestampMeta = {
 	dateTime: string;
 	relative: string;
@@ -93,222 +80,6 @@ const phaseClasses: Record<TimelinePhase, string> = {
 };
 
 type StreamdownCodeProps = ComponentPropsWithoutRef<"code"> & ExtraProps;
-
-/**
- * Folds a flat list of events into timeline nodes, merging lifecycle pairs
- * (started/completed/failed) that describe the same underlying unit of work.
- */
-export function buildTimeline(events: readonly EventEntity[]): TimelineNode[] {
-	const sorted = [...events].sort(compareEvents);
-	const nodes: TimelineNode[] = [];
-	const indexByKey = new Map<string, number>();
-	let unscopedRunIndex = 0;
-	let runKey = `run:unscoped:${unscopedRunIndex}`;
-	let turnKey = `turn:${runKey}:pending`;
-
-	const upsertNode = (
-		key: string,
-		event: EventEntity,
-		phase?: TimelinePhase,
-	) => {
-		const existingIndex = indexByKey.get(key);
-
-		if (existingIndex === undefined) {
-			indexByKey.set(key, nodes.length);
-			nodes.push({
-				key,
-				event,
-				phase,
-				startedAt: event.createdAt ? String(event.createdAt) : undefined,
-			});
-			return;
-		}
-
-		const node = nodes[existingIndex];
-
-		if (node) {
-			node.event = event;
-			node.phase = phase ? mergePhase(node.phase, phase) : node.phase;
-		}
-	};
-
-	for (const event of sorted) {
-		const type = event.type ?? "";
-
-		if (
-			type === "chaterface.new_task" ||
-			type === "chaterface.new_user_message"
-		) {
-			runKey = `run:${event.id}`;
-			turnKey = `turn:${runKey}:pending`;
-			upsertNode(event.id, event);
-			continue;
-		}
-
-		if (type === "codex.turn.started") {
-			turnKey = `turn:${event.id}`;
-			upsertNode(turnKey, event, "running");
-			continue;
-		}
-
-		if (type === "codex.turn.completed") {
-			upsertNode(turnKey, event, "success");
-
-			unscopedRunIndex += runKey.startsWith("run:unscoped:") ? 1 : 0;
-			if (runKey.startsWith("run:unscoped:")) {
-				runKey = `run:unscoped:${unscopedRunIndex}`;
-				turnKey = `turn:${runKey}:pending`;
-			}
-			continue;
-		}
-
-		const group = groupInfoFor(event, { runKey, turnKey });
-
-		if (!group) {
-			nodes.push({ key: event.id, event });
-			continue;
-		}
-
-		upsertNode(group.key, event, group.phase);
-	}
-
-	return nodes;
-}
-
-function groupInfoFor(
-	event: EventEntity,
-	context: TimelineContext,
-): { key: string; phase: TimelinePhase } | null {
-	const type = event.type ?? "";
-	const data = asRecord(event.data) ?? {};
-
-	if (type.startsWith("chaterface.setup_step_")) {
-		const step = getString(data, "step") ?? "step";
-		const phase: TimelinePhase = type.endsWith("_failed")
-			? "failed"
-			: type.endsWith("_warning")
-				? "warning"
-				: type.endsWith("_completed")
-					? "success"
-					: "running";
-
-		return { key: `${context.runKey}:setup:${step}`, phase };
-	}
-
-	if (type.startsWith("codex.item.")) {
-		const item = asRecord(data.item);
-		const itemType = item ? getString(item, "type") : undefined;
-
-		if (
-			item &&
-			(itemType === "command_execution" || itemType === "file_change")
-		) {
-			const id = getString(item, "id") ?? event.id;
-			const status = getString(item, "status");
-			const exitCode = getNumber(item, "exit_code");
-			const phase: TimelinePhase =
-				status === "failed" || (exitCode !== undefined && exitCode !== 0)
-					? "failed"
-					: status === "completed" || type.endsWith(".completed")
-						? "success"
-						: "running";
-
-			return { key: `${context.turnKey}:item:${id}`, phase };
-		}
-	}
-
-	return null;
-}
-
-function compareEvents(a: EventEntity, b: EventEntity) {
-	const timeCompare = getEventTime(a) - getEventTime(b);
-
-	if (timeCompare !== 0) {
-		return timeCompare;
-	}
-
-	const rankCompare = getEventSortRank(a) - getEventSortRank(b);
-
-	if (rankCompare !== 0) {
-		return rankCompare;
-	}
-
-	return String(a.id).localeCompare(String(b.id));
-}
-
-function getEventTime(event: EventEntity) {
-	const timestamp =
-		event.createdAt ??
-		getString((event as unknown as JsonRecord) ?? {}, "serverCreatedAt");
-	const time = parseTimestamp(timestamp);
-
-	return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
-}
-
-function getEventSortRank(event: EventEntity) {
-	const type = event.type ?? "";
-
-	if (type === "chaterface.new_task") {
-		return 0;
-	}
-
-	if (type === "chaterface.new_user_message") {
-		return 1;
-	}
-
-	if (type === "codex.thread.started") {
-		return 2;
-	}
-
-	if (type === "codex.turn.started") {
-		return 3;
-	}
-
-	if (type === "codex.item.started") {
-		return 4;
-	}
-
-	if (type === "codex.item.completed") {
-		return 5;
-	}
-
-	if (type === "codex.turn.completed") {
-		return 6;
-	}
-
-	if (type.endsWith("_started") || type.endsWith(".started")) {
-		return 7;
-	}
-
-	if (
-		type.endsWith("_completed") ||
-		type.endsWith("_failed") ||
-		type.endsWith("_warning")
-	) {
-		return 8;
-	}
-
-	return 9;
-}
-
-function mergePhase(
-	prev: TimelinePhase | undefined,
-	next: TimelinePhase,
-): TimelinePhase {
-	if (prev === "failed" || next === "failed") {
-		return "failed";
-	}
-
-	if (prev === "warning" || next === "warning") {
-		return "warning";
-	}
-
-	if (prev === "success" || next === "success") {
-		return "success";
-	}
-
-	return next;
-}
 
 export default function Event({
 	agentName,
@@ -1335,69 +1106,6 @@ function RawPayload({ value }: { value: unknown }) {
 	);
 }
 
-function asRecord(value: unknown): JsonRecord | undefined {
-	if (!value || typeof value !== "object" || Array.isArray(value)) {
-		return undefined;
-	}
-
-	return value as JsonRecord;
-}
-
-function getString(record: JsonRecord, key: string): string | undefined {
-	const value = record[key];
-	return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function getNumber(record: JsonRecord, key: string): number | undefined {
-	const value = record[key];
-	return typeof value === "number" && Number.isFinite(value)
-		? value
-		: undefined;
-}
-
-function getRecordArray(record: JsonRecord, key: string): JsonRecord[] {
-	const value = record[key];
-
-	if (!Array.isArray(value)) {
-		return [];
-	}
-
-	return value.flatMap((item) => {
-		const record = asRecord(item);
-		return record ? [record] : [];
-	});
-}
-
-function getAttachments(record: JsonRecord): Attachment[] {
-	const items = [
-		...getRecordArray(record, "attachments"),
-		...getRecordArray(record, "images"),
-	];
-
-	return items.flatMap((item) => {
-		const id = getString(item, "id") ?? getString(item, "path");
-		const path = getString(item, "path");
-		const name = getString(item, "name") ?? "file";
-		const contentType =
-			getString(item, "contentType") ?? "application/octet-stream";
-
-		if (!id || !path) {
-			return [];
-		}
-
-		return [
-			{
-				id,
-				path,
-				url: getString(item, "url"),
-				name,
-				contentType,
-				size: getNumber(item, "size") ?? 0,
-			},
-		];
-	});
-}
-
 function formatContentType(value: string) {
 	if (value === "application/octet-stream") {
 		return "FILE";
@@ -1429,81 +1137,6 @@ function formatTimestampMeta(value: unknown): TimestampMeta | undefined {
 	};
 }
 
-function formatRelativeTimestamp(time: number) {
-	const diffSeconds = Math.round((time - Date.now()) / 1000);
-	const absoluteSeconds = Math.abs(diffSeconds);
-
-	if (absoluteSeconds < 45) {
-		return "just now";
-	}
-
-	const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
-		["minute", 60],
-		["hour", 60 * 60],
-		["day", 60 * 60 * 24],
-		["week", 60 * 60 * 24 * 7],
-		["month", 60 * 60 * 24 * 30],
-		["year", 60 * 60 * 24 * 365],
-	];
-	const formatter = new Intl.RelativeTimeFormat(undefined, {
-		numeric: "auto",
-		style: "narrow",
-	});
-
-	for (let index = 0; index < units.length; index += 1) {
-		const [unit, unitSeconds] = units[index] ?? ["year", 60 * 60 * 24 * 365];
-		const nextUnitSeconds = units[index + 1]?.[1];
-
-		if (!nextUnitSeconds || absoluteSeconds < nextUnitSeconds) {
-			return formatter.format(Math.round(diffSeconds / unitSeconds), unit);
-		}
-	}
-
-	return formatter.format(
-		Math.round(diffSeconds / (60 * 60 * 24 * 365)),
-		"year",
-	);
-}
-
-function getUserDisplayName(profile: UserDisplayProfile | undefined) {
-	return (
-		profile?.memberName?.trim() ||
-		profile?.userName?.trim() ||
-		profile?.email?.trim() ||
-		"You"
-	);
-}
-
-function parseTimestamp(value: unknown) {
-	if (typeof value === "string") {
-		const time = Date.parse(value);
-
-		return Number.isNaN(time) ? Number.NaN : time;
-	}
-
-	if (value instanceof Date) {
-		const time = value.getTime();
-
-		return Number.isNaN(time) ? Number.NaN : time;
-	}
-
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return value;
-	}
-
-	return Number.NaN;
-}
-
-function formatEventType(type: string) {
-	const label = type
-		.replace(/^codex\./, "")
-		.replace(/^cursor\./, "")
-		.replace(/^chaterface\./, "")
-		.replace(/[._-]/g, " ");
-
-	return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
 function toneForStatus(status: string | undefined): Tone {
 	if (!status) {
 		return "neutral";
@@ -1522,33 +1155,6 @@ function toneForStatus(status: string | undefined): Tone {
 	}
 
 	return "neutral";
-}
-
-function formatNumber(value: number | undefined) {
-	return value === undefined
-		? undefined
-		: new Intl.NumberFormat().format(value);
-}
-
-function formatFileSize(size: number) {
-	if (!Number.isFinite(size) || size <= 0) {
-		return "0 B";
-	}
-
-	const units = ["B", "KB", "MB", "GB"];
-	let value = size;
-	let unitIndex = 0;
-
-	while (value >= 1024 && unitIndex < units.length - 1) {
-		value /= 1024;
-		unitIndex += 1;
-	}
-
-	return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
-}
-
-function summarizeCount(count: number, singular: string) {
-	return `${formatNumber(count) ?? 0} ${singular}${count === 1 ? "" : "s"}`;
 }
 
 function cx(...classes: Array<string | false | null | undefined>) {
