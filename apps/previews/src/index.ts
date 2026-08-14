@@ -43,6 +43,14 @@ const proxy = httpProxy.createProxyServer({
 	ws: true,
 });
 
+const handleSocketError = (error: Error & { code?: string }) => {
+	if (error.code === "ECONNRESET" || error.code === "EPIPE") {
+		return;
+	}
+
+	console.error("Preview socket error", error);
+};
+
 proxy.on("error", (_error, _req, res) => {
 	if (res instanceof Socket) {
 		res.destroy();
@@ -67,6 +75,10 @@ proxy.on("proxyRes", (proxyRes: IncomingMessage, req: IncomingMessage) => {
 	}
 });
 
+proxy.on("open", (socket) => {
+	socket.on("error", handleSocketError);
+});
+
 const server = createServer(async (req, res) => {
 	try {
 		await handleHttpRequest(req, res);
@@ -77,6 +89,8 @@ const server = createServer(async (req, res) => {
 });
 
 server.on("upgrade", async (req, socket, head) => {
+	socket.on("error", handleSocketError);
+
 	try {
 		const resolution = await resolveProxyRequest(req);
 
