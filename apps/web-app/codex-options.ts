@@ -9,6 +9,9 @@ export type AgentDefaultOptions = {
 };
 
 export const CODEX_MODEL_OPTIONS = [
+	{ value: "gpt-5.6-sol", label: "gpt-5.6-sol" },
+	{ value: "gpt-5.6-terra", label: "gpt-5.6-terra" },
+	{ value: "gpt-5.6-luna", label: "gpt-5.6-luna" },
 	{ value: "gpt-5.5", label: "gpt-5.5" },
 	{ value: "gpt-5.4", label: "gpt-5.4" },
 ] as const;
