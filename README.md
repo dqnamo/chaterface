@@ -196,7 +196,6 @@ Common optional variables:
 | `SLACK_SIGNING_SECRET` | web app | Slack event/request signing secret. |
 | `PREVIEWS_DOMAIN` | API, previews | Base domain for sandbox preview URLs. |
 | `NEXT_PUBLIC_PREVIEWS_DOMAIN` | web app | Browser-visible preview base domain. |
-| `PREVIEW_COOKIE_DOMAIN` | previews | Cookie domain for preview auth. |
 | `PREVIEW_COOKIE_NAME` | previews | Cookie name for preview auth. |
 | `PREVIEW_SESSION_SECRET` | web app, previews | Signing secret for preview sessions. |
 | `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | website, web app | Optional PostHog project token. |

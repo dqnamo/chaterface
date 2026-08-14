@@ -535,10 +535,12 @@ function ServiceEvent({
 	type: string;
 }) {
 	const name = getString(data, "name") ?? "Service";
+	const serviceId = getString(data, "serviceId");
 	const url = getPublicServiceUrl({
-		serviceId: getString(data, "serviceId"),
+		serviceId,
 		url: getString(data, "url"),
 	});
+	const previewHref = serviceId ? `/services/${serviceId}` : url;
 	const isFailure = type.includes("failed");
 	const title =
 		type === "chaterface.service_started"
@@ -566,10 +568,10 @@ function ServiceEvent({
 					["pid", getNumber(data, "pid")],
 					[
 						"url",
-						url ? (
+						url && previewHref ? (
 							<a
 								className="text-accent-11 underline-offset-2 hover:underline"
-								href={url}
+								href={previewHref}
 								key="service-url"
 								rel="noopener noreferrer"
 								target="_blank"

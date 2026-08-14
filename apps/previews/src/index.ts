@@ -32,10 +32,24 @@ type ResolvedProxyRequest =
 
 const port = Number(process.env.PORT ?? 3003);
 const previewsDomain = process.env.PREVIEWS_DOMAIN ?? "previews.chaterface.com";
-const cookieDomain = process.env.PREVIEW_COOKIE_DOMAIN ?? `.${previewsDomain}`;
 const cookieName = process.env.PREVIEW_COOKIE_NAME ?? "chaterface_preview";
 const sessionSecret = process.env.PREVIEW_SESSION_SECRET;
 const sessionMaxAgeSeconds = 60 * 60 * 8;
+const previewServiceCacheTtlMs = 5_000;
+const previewServiceCacheMaxEntries = 1_000;
+
+if (!sessionSecret) {
+	throw new Error("PREVIEW_SESSION_SECRET is not configured");
+}
+
+const previewServiceCache = new Map<
+	string,
+	{ expiresAt: number; service: PreviewService }
+>();
+const previewServiceLoads = new Map<
+	string,
+	Promise<PreviewService | undefined>
+>();
 
 const proxy = httpProxy.createProxyServer({
 	changeOrigin: true,
@@ -43,17 +57,27 @@ const proxy = httpProxy.createProxyServer({
 	ws: true,
 });
 
+const isExpectedSocketError = (error: Error & { code?: string }) => {
+	return error.code === "ECONNRESET" || error.code === "EPIPE";
+};
+
 const handleSocketError = (error: Error & { code?: string }) => {
-	if (error.code === "ECONNRESET" || error.code === "EPIPE") {
+	if (isExpectedSocketError(error)) {
 		return;
 	}
 
 	console.error("Preview socket error", error);
 };
 
-proxy.on("error", (_error, _req, res) => {
+proxy.on("error", (error, _req, res) => {
+	if (!isExpectedSocketError(error)) {
+		console.error("Preview proxy error", error);
+	}
+
 	if (res instanceof Socket) {
-		res.destroy();
+		if (!res.destroyed) {
+			res.destroy();
+		}
 		return;
 	}
 
@@ -88,9 +112,15 @@ const server = createServer(async (req, res) => {
 	}
 });
 
-server.on("upgrade", async (req, socket, head) => {
-	socket.on("error", handleSocketError);
+const clientSockets = new Set<Socket>();
 
+server.on("connection", (socket) => {
+	clientSockets.add(socket);
+	socket.on("error", handleSocketError);
+	socket.on("close", () => clientSockets.delete(socket));
+});
+
+server.on("upgrade", async (req, socket, head) => {
 	try {
 		const resolution = await resolveProxyRequest(req);
 
@@ -111,7 +141,9 @@ server.on("upgrade", async (req, socket, head) => {
 		});
 	} catch (error) {
 		console.error(error);
-		socket.destroy();
+		if (!socket.destroyed) {
+			socket.destroy();
+		}
 	}
 });
 
@@ -119,8 +151,39 @@ server.listen(port, () => {
 	console.log(`previews listening on http://localhost:${port}`);
 });
 
+let isShuttingDown = false;
+
+const shutdown = (signal: NodeJS.Signals) => {
+	if (isShuttingDown) {
+		return;
+	}
+
+	isShuttingDown = true;
+	console.log(`Received ${signal}; stopping preview proxy`);
+
+	server.close((error) => {
+		if (error) {
+			console.error("Failed to stop preview proxy cleanly", error);
+			process.exit(1);
+		}
+
+		process.exit(0);
+	});
+
+	setTimeout(() => {
+		for (const socket of clientSockets) {
+			socket.destroy();
+		}
+
+		process.exit(0);
+	}, 10_000).unref();
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
 const handleHttpRequest = async (req: IncomingMessage, res: ServerResponse) => {
-	if (req.url === "/health") {
+	if (getRequestPathname(req) === "/health") {
 		sendText(res, 200, "ok");
 		return;
 	}
@@ -177,6 +240,7 @@ const handlePreviewSessionRequest = async (
 	res.writeHead(302, {
 		"cache-control": "no-store",
 		location: "/",
+		"referrer-policy": "no-referrer",
 		"set-cookie": serializeCookie(cookie),
 	});
 	res.end();
@@ -208,6 +272,14 @@ const resolveProxyRequest = async (
 		};
 	}
 
+	if (!isAllowedE2BHost(service.e2bHost)) {
+		return {
+			ok: false,
+			status: 502,
+			message: "Preview service has an invalid E2B upstream",
+		};
+	}
+
 	const trafficAccessToken = service.task?.sandboxTrafficAccessToken;
 
 	if (!trafficAccessToken) {
@@ -229,18 +301,68 @@ const resolveProxyRequest = async (
 const getPreviewService = async (
 	serviceId: string,
 ): Promise<PreviewService | undefined> => {
-	const result = await db.query({
-		services: {
-			$: {
-				where: {
-					id: serviceId,
-				},
-			},
-			task: {},
-		},
-	});
+	const cached = previewServiceCache.get(serviceId);
 
-	return result.services[0] as PreviewService | undefined;
+	if (cached && cached.expiresAt > Date.now()) {
+		return cached.service;
+	}
+
+	previewServiceCache.delete(serviceId);
+
+	const pendingLoad = previewServiceLoads.get(serviceId);
+
+	if (pendingLoad) {
+		return pendingLoad;
+	}
+
+	const load = db
+		.query({
+			services: {
+				$: {
+					where: {
+						id: serviceId,
+					},
+				},
+				task: {},
+			},
+		})
+		.then((result) => result.services[0] as PreviewService | undefined)
+		.then((service) => {
+			if (service) {
+				cachePreviewService(serviceId, service);
+			}
+
+			return service;
+		})
+		.finally(() => previewServiceLoads.delete(serviceId));
+
+	previewServiceLoads.set(serviceId, load);
+	return load;
+};
+
+const cachePreviewService = (serviceId: string, service: PreviewService) => {
+	if (previewServiceCache.size >= previewServiceCacheMaxEntries) {
+		const now = Date.now();
+
+		for (const [cachedServiceId, entry] of previewServiceCache) {
+			if (entry.expiresAt <= now) {
+				previewServiceCache.delete(cachedServiceId);
+			}
+		}
+	}
+
+	if (previewServiceCache.size >= previewServiceCacheMaxEntries) {
+		const oldestServiceId = previewServiceCache.keys().next().value;
+
+		if (oldestServiceId) {
+			previewServiceCache.delete(oldestServiceId);
+		}
+	}
+
+	previewServiceCache.set(serviceId, {
+		expiresAt: Date.now() + previewServiceCacheTtlMs,
+		service,
+	});
 };
 
 const getPreviewSession = (req: IncomingMessage) => {
@@ -264,6 +386,10 @@ const getServiceIdFromHost = (hostHeader: string | undefined) => {
 const getRequestUrl = (req: IncomingMessage) => {
 	const host = req.headers.host ?? previewsDomain;
 	return new URL(req.url ?? "/", `https://${host}`);
+};
+
+const getRequestPathname = (req: IncomingMessage) => {
+	return new URL(req.url ?? "/", "http://localhost").pathname;
 };
 
 const getForwardedPreviewHeaders = (
@@ -390,13 +516,27 @@ const serializeCookie = (value: string) => {
 	const encodedValue = encodeURIComponent(value);
 	return [
 		`${cookieName}=${encodedValue}`,
-		`Domain=${cookieDomain}`,
 		"Path=/",
 		"HttpOnly",
 		"Secure",
 		"SameSite=Lax",
 		`Max-Age=${sessionMaxAgeSeconds}`,
 	].join("; ");
+};
+
+const isAllowedE2BHost = (host: string) => {
+	const normalizedHost = host.toLowerCase();
+	const suffix = ".e2b.app";
+
+	if (!normalizedHost.endsWith(suffix)) {
+		return false;
+	}
+
+	const sandboxHost = normalizedHost.slice(0, -suffix.length);
+	return (
+		!sandboxHost.includes(".") &&
+		/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(sandboxHost)
+	);
 };
 
 const sendText = (res: ServerResponse, status: number, body: string) => {
